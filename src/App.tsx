@@ -5,6 +5,7 @@ import { LoginPage } from "./pages/LoginPage";
 import { LandingPage } from "./pages/LandingPage";
 import { AvailablePage } from "./pages/AvailablePage";
 import { ConfirmPage } from "./pages/ConfirmPage";
+import { BookingsPage } from "./pages/BookingsPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated } = useAuth();
@@ -42,6 +43,14 @@ function App() {
           element={
             <ProtectedRoute>
               <ConfirmPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bookings"
+          element={
+            <ProtectedRoute>
+              <BookingsPage />
             </ProtectedRoute>
           }
         />

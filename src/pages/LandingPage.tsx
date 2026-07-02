@@ -39,6 +39,16 @@ export function LandingPage() {
                 <h2 className="text-xl font-semibold text-brand-800">
                   Opret reservation
                 </h2>
+                <button
+                  type="button"
+                  onClick={() => navigate(-1)}
+                  aria-label="Tilbage"
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <polyline points="15 18 9 12 15 6" />
+                  </svg>
+                </button>
               </div>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
