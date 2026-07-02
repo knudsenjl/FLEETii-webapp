@@ -4,6 +4,7 @@ import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { LandingPage } from "./pages/LandingPage";
 import { AvailablePage } from "./pages/AvailablePage";
+import { ConfirmPage } from "./pages/ConfirmPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated } = useAuth();
@@ -33,6 +34,14 @@ function App() {
           element={
             <ProtectedRoute>
               <AvailablePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/confirm"
+          element={
+            <ProtectedRoute>
+              <ConfirmPage />
             </ProtectedRoute>
           }
         />
