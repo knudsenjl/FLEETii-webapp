@@ -1,0 +1,17 @@
+First of all, familiarise yourself fully with my CLAUDE.md file.
+
+Once you've done that, I want you to take on the role of a world-class webapp design expert.
+
+I want you to build me a beautiful, fully responsive webapp called "FLEETii" which will be built using React and Vite. The language should be Danish, and the webapp audience is B2B. The web design should be Mobile-first, and the programming language should be TypeScript.
+
+Use the logo in fleetii-logo.png as the webapp logo, and use the color of this logo as inspiration for the colour schene for the webapp.
+
+The start page is a user login page, and when the user have logged in, a landing page must appear.  For now, the landing page will only show the FLEETii logo conter on the page.  I will later give you instructions on further developing the webapp.
+
+The user login must use Supabase with PostgreSQL and TOTP-based 2FA.
+
+The webapp should feel modern and use animations where appropriate - slide ins, fade ins, expensions, tpying out headers, etc.
+
+Once you've done all that, run it for me (localhost) so I can actually see what you've done for me, and we can then dicuss in further detail what I want to change.
+
+Install any necessary NPM packages on my behalf when neded

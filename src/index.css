@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Brand navy — derived from the FLEETii logo (#18385B) */
+  --color-brand-50: #f3f5f7;
+  --color-brand-100: #e3e7eb;
+  --color-brand-200: #c3cbd4;
+  --color-brand-300: #9eabba;
+  --color-brand-400: #708499;
+  --color-brand-500: #425c79;
+  --color-brand-600: #18385b;
+  --color-brand-700: #14304d;
+  --color-brand-800: #10263e;
+  --color-brand-900: #0c1d2f;
+  --color-brand-950: #081420;
+
+  /* Accent teal — complements the navy, evokes GPS/live-tracking */
+  --color-accent-50: #effcfa;
+  --color-accent-100: #d6f6f0;
+  --color-accent-200: #aeeae1;
+  --color-accent-300: #79d9cd;
+  --color-accent-400: #43bfb1;
+  --color-accent-500: #29a396;
+  --color-accent-600: #1e847a;
+  --color-accent-700: #1c6a63;
+  --color-accent-800: #1c5550;
+  --color-accent-900: #1a4744;
+
+  --animate-fade-in: fade-in 0.6s ease-out both;
+  --animate-fade-in-up: fade-in-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-scale-in: scale-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  --animate-pulse-slow: pulse-slow 3.5s ease-in-out infinite;
+  --animate-blink: blink 1s step-end infinite;
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(16px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  @keyframes scale-in {
+    from {
+      opacity: 0;
+      transform: scale(0.92);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes pulse-slow {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
+  }
+  @keyframes blink {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0;
+    }
+  }
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+  }
+
+  body {
+    @apply bg-brand-50 text-brand-900 antialiased;
+  }
+
+  #root {
+    min-height: 100dvh;
+  }
+}

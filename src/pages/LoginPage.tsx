@@ -1,0 +1,187 @@
+import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
+import { AnimatePresence, motion } from "framer-motion";
+import { supabase } from "../lib/supabase";
+import { useAuth } from "../contexts/AuthContext";
+import { FleetiiLogo } from "../components/FleetiiLogo";
+import { TypingHeader } from "../components/TypingHeader";
+
+type Step = { name: "credentials" };
+
+const stepVariants = {
+  initial: { opacity: 0, x: 24 },
+  animate: { opacity: 1, x: 0 },
+  exit: { opacity: 0, x: -24 },
+};
+
+export function LoginPage() {
+  const navigate = useNavigate();
+  const { refreshAssuranceLevel } = useAuth();
+
+  const [step] = useState<Step>({ name: "credentials" });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("fleetii_remember_username");
+      if (stored) {
+        setUsername(stored);
+      }
+    } catch (_) {
+      /* ignore */
+    }
+  }, []);
+
+  async function handleCredentialsSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    if (!username || !password) {
+      setError("Indtast både brugernavn og adgangskode.");
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      localStorage.setItem("fleetii_remember_username", username);
+    } catch (_) {
+      // ignore storage errors
+    }
+
+    try {
+      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+        email: username,
+        password,
+      });
+
+      if (signInError || !data.session) {
+        setError("Forkert brugernavn eller adgangskode.");
+        setSubmitting(false);
+        return;
+      }
+
+      await refreshAssuranceLevel();
+      navigate("/oversigt");
+    } catch {
+      setError("Login fejlede. Prøv igen senere.");
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-brand-50 px-5 py-10 sm:px-6">
+      <div
+        className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,theme(colors.brand.100),transparent_60%)]"
+        aria-hidden="true"
+      />
+
+      <motion.div
+        initial={{ opacity: 0, y: -12 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        className="mb-8 flex flex-col items-center gap-3 sm:mb-10"
+      >
+        <FleetiiLogo className="h-14 w-auto sm:h-16" />
+        <TypingHeader
+          as="h1"
+          text="Velkommen til FLEETii"
+          className="text-center text-xl font-semibold text-brand-800 sm:text-2xl"
+        />
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-xl shadow-brand-900/5"
+      >
+        <div className="relative min-h-[22rem] p-6 sm:p-8">
+          <AnimatePresence mode="wait">
+            {step.name === "credentials" && (
+              <motion.form
+                key="credentials"
+                variants={stepVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                transition={{ duration: 0.3, ease: "easeOut" }}
+                onSubmit={handleCredentialsSubmit}
+                className="flex flex-col gap-4"
+              >
+                <div>
+                  <h2 className="text-lg font-semibold text-brand-900">
+                    Log ind
+                  </h2>
+                  <p className="mt-1 text-sm text-brand-500">
+                    Indtast dine virksomhedsoplysninger for at fortsætte.
+                  </p>
+                </div>
+
+                <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">
+                  Brugernavn / e-mail
+                  <input
+                    type="text"
+                    required
+                    autoComplete="username"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="dig@virksomhed.dk"
+                    className="rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 text-base text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                  />
+                </label>
+
+                <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">
+                  Adgangskode
+                  <input
+                    type="password"
+                    required
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 text-base text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                  />
+                </label>
+
+                {error && (
+                  <p
+                    role="alert"
+                    className="animate-fade-in rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                  >
+                    {error}
+                  </p>
+                )}
+
+                {error && (
+                  <p
+                    role="alert"
+                    className="animate-fade-in rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
+                  >
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="mt-2 inline-flex items-center justify-center rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {submitting ? "Logger ind…" : "Log ind"}
+                </button>
+              </motion.form>
+            )}
+
+          </AnimatePresence>
+        </div>
+      </motion.div>
+
+      <p className="mt-6 text-center text-xs text-brand-400">
+        © {new Date().getFullYear()} FLEETii. Alle rettigheder forbeholdes.
+      </p>
+    </div>
+  );
+}
