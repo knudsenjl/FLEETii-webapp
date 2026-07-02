@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
@@ -32,6 +32,8 @@ const availableVehicles: AvailableVehicle[] = [
 export function AvailablePage() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const bruger = (location.state as { user?: string } | null)?.user ?? "";
   const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
   const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
 
@@ -107,7 +109,9 @@ export function AvailablePage() {
                 <button
                   type="button"
                   disabled={!selectedVehicle}
-                  onClick={() => selectedVehicle && navigate("/confirm", { state: { vehicle: selectedVehicle } })}
+                  onClick={() =>
+                    selectedVehicle && navigate("/confirm", { state: { vehicle: selectedVehicle, user: bruger } })
+                  }
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Reserver

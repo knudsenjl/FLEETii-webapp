@@ -1,11 +1,13 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
 export function LandingPage() {
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
   const navigate = useNavigate();
+  const [bruger, setBruger] = useState(session?.user.email ?? "");
 
   const now = new Date();
   const formatDate = (date: Date) =>
@@ -53,6 +55,18 @@ export function LandingPage() {
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
+                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                    <label className="flex items-center text-sm font-medium text-brand-700">
+                      Bruger
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="dig@virksomhed.dk"
+                      value={bruger}
+                      onChange={(e) => setBruger(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
                   {reservationFields.map((field) => (
                     <div key={field.label} className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                       <label className="flex items-center text-sm font-medium text-brand-700">
@@ -72,7 +86,7 @@ export function LandingPage() {
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => navigate("/available")}
+                  onClick={() => navigate("/available", { state: { user: bruger } })}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Find ledige

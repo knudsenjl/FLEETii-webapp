@@ -15,10 +15,12 @@ type ReservationVehicle = {
 };
 
 export function ConfirmPage() {
-  const { signOut } = useAuth();
+  const { signOut, session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const vehicle = (location.state as { vehicle?: ReservationVehicle } | null)?.vehicle ?? null;
+  const state = location.state as { vehicle?: ReservationVehicle; user?: string } | null;
+  const vehicle = state?.vehicle ?? null;
+  const bruger = state?.user ?? "";
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +48,7 @@ export function ConfirmPage() {
       start: toIsoDateTime(vehicle.date, vehicle.start),
       end: toIsoDateTime(vehicle.date, vehicle.end),
       usage: vehicle.use,
+      user: bruger || session?.user.email || null,
     });
 
     if (insertError) {

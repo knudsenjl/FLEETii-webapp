@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
+import { supabase } from "../lib/supabase";
 
 type Booking = {
   id: number;
@@ -13,18 +14,73 @@ type Booking = {
   use: string;
 };
 
-const activeBookings: Booking[] = [
-  { id: 1, vehicle: "Skoda Enyaq", date: "02.07.2026", start: "08:00", end: "10:00", use: "Kundebesøg" },
-  { id: 2, vehicle: "BMW iX1", date: "02.07.2026", start: "12:00", end: "15:00", use: "Fleetsalg" },
-  { id: 3, vehicle: "Kia EV6", date: "03.07.2026", start: "09:00", end: "11:30", use: "Service" },
-  { id: 4, vehicle: "Toyota bZ4X", date: "04.07.2026", start: "13:00", end: "16:00", use: "Kundebesøg" },
-  { id: 5, vehicle: "Nissan Ariya", date: "05.07.2026", start: "07:30", end: "09:30", use: "Fleetsalg" },
-];
+type BookingRow = {
+  id: number;
+  "number plate": string;
+  start: string;
+  end: string;
+  usage: string;
+  user: string | null;
+};
+
+function splitIsoDateTime(iso: string): { date: string; time: string } {
+  const [datePart, timePart] = iso.split("T");
+  const [year, month, day] = datePart.split("-");
+  return { date: `${day}.${month}.${year}`, time: timePart.slice(0, 5) };
+}
 
 export function BookingsPage() {
   const { signOut, session } = useAuth();
   const navigate = useNavigate();
   const [user, setUser] = useState(session?.user.email ?? "");
+  const [activeBookings, setActiveBookings] = useState<Booking[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!user) {
+      setActiveBookings([]);
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
+    async function loadBookings() {
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from("Bookings")
+        .select("id, \"number plate\", start, end, usage, user")
+        .eq("user", user)
+        .order("start", { ascending: true })
+        .returns<BookingRow[]>();
+
+      if (fetchError) {
+        setError(fetchError.message);
+        setLoading(false);
+        return;
+      }
+
+      setActiveBookings(
+        (data ?? []).map((row) => {
+          const { date, time: start } = splitIsoDateTime(row.start);
+          const { time: end } = splitIsoDateTime(row.end);
+          return {
+            id: row.id,
+            vehicle: row["number plate"],
+            date,
+            start,
+            end,
+            use: row.usage,
+          };
+        }),
+      );
+      setLoading(false);
+    }
+
+    void loadBookings();
+  }, [user]);
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -76,23 +132,34 @@ export function BookingsPage() {
                 </div>
 
                 <div className="divide-y divide-brand-100 bg-white">
-                  {activeBookings.map((booking, index) => {
-                    const isAlternate = index % 2 === 1;
-                    return (
-                      <div
-                        key={booking.id}
-                        className={`grid grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] px-1 py-1 text-[0.7rem] ${
-                          isAlternate ? "bg-brand-50/70 text-brand-700" : "bg-white text-brand-700"
-                        }`}
-                      >
-                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{booking.vehicle}</div>
-                        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.date}</div>
-                        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.start}</div>
-                        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.end}</div>
-                        <div className="truncate px-1">{booking.use}</div>
-                      </div>
-                    );
-                  })}
+                  {loading && (
+                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser bookinger…</div>
+                  )}
+                  {!loading && error && (
+                    <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
+                  )}
+                  {!loading && !error && activeBookings.length === 0 && (
+                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen aktive bookinger.</div>
+                  )}
+                  {!loading &&
+                    !error &&
+                    activeBookings.map((booking, index) => {
+                      const isAlternate = index % 2 === 1;
+                      return (
+                        <div
+                          key={booking.id}
+                          className={`grid grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] px-1 py-1 text-[0.7rem] ${
+                            isAlternate ? "bg-brand-50/70 text-brand-700" : "bg-white text-brand-700"
+                          }`}
+                        >
+                          <div className="truncate border-r border-brand-100 pr-1 font-medium">{booking.vehicle}</div>
+                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.date}</div>
+                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.start}</div>
+                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.end}</div>
+                          <div className="truncate px-1">{booking.use}</div>
+                        </div>
+                      );
+                    })}
                 </div>
               </div>
 
