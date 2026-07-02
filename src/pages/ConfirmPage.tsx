@@ -54,7 +54,7 @@ export function ConfirmPage() {
       return;
     }
 
-    navigate("/available", { replace: true });
+    navigate("/bookings", { replace: true });
   };
 
   const rows: [string, string][] = [

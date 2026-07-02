@@ -11,7 +11,7 @@ function RootRoute() {
   const { loading, isFullyAuthenticated } = useAuth();
 
   if (!loading && isFullyAuthenticated) {
-    return <Navigate to="/oversigt" replace />;
+    return <Navigate to="/bookings" replace />;
   }
 
   return <LoginPage />;

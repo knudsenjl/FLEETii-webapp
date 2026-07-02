@@ -65,7 +65,7 @@ export function LoginPage() {
       }
 
       await refreshAssuranceLevel();
-      navigate("/oversigt");
+      navigate("/bookings");
     } catch {
       setError("Login fejlede. Prøv igen senere.");
       setSubmitting(false);
