@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
-import { supabase } from "../lib/supabase";
+import { setRememberMe, supabase } from "../lib/supabase";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
@@ -21,6 +21,7 @@ export function LoginPage() {
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMeState] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
@@ -29,6 +30,8 @@ export function LoginPage() {
       const stored = localStorage.getItem("fleetii_remember_username");
       if (stored) {
         setUsername(stored);
+      } else {
+        setRememberMeState(false);
       }
     } catch (_) {
       /* ignore */
@@ -45,9 +48,14 @@ export function LoginPage() {
     }
 
     setSubmitting(true);
+    setRememberMe(rememberMe);
 
     try {
-      localStorage.setItem("fleetii_remember_username", username);
+      if (rememberMe) {
+        localStorage.setItem("fleetii_remember_username", username);
+      } else {
+        localStorage.removeItem("fleetii_remember_username");
+      }
     } catch (_) {
       // ignore storage errors
     }
@@ -147,14 +155,15 @@ export function LoginPage() {
                   />
                 </label>
 
-                {error && (
-                  <p
-                    role="alert"
-                    className="animate-fade-in rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
-                  >
-                    {error}
-                  </p>
-                )}
+                <label className="flex items-center gap-2 text-sm font-medium text-brand-700">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMeState(e.target.checked)}
+                    className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-2 focus:ring-accent-500/30"
+                  />
+                  Husk mig
+                </label>
 
                 {error && (
                   <p

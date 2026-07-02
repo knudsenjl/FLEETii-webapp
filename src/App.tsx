@@ -2,7 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
-import { LandingPage } from "./pages/LandingPage";
+import { ReservationPage } from "./pages/ReservationPage";
 import { AvailablePage } from "./pages/AvailablePage";
 import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
@@ -23,10 +23,10 @@ function App() {
       <Routes>
         <Route path="/" element={<RootRoute />} />
         <Route
-          path="/oversigt"
+          path="/reservation"
           element={
             <ProtectedRoute>
-              <LandingPage />
+              <ReservationPage />
             </ProtectedRoute>
           }
         />

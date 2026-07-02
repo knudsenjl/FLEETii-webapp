@@ -50,21 +50,33 @@ export function AvailablePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
+          <div className="mb-4 flex items-center justify-between">
+            <div className="flex items-center">
+              <FleetiiLogo className="h-8 w-auto" />
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => navigate(-1)}
+                aria-label="Tilbage"
+                className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                  <polyline points="15 18 9 12 15 6" />
+                </svg>
+              </button>
+              <button
+                onClick={() => void signOut()}
+                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Log ud
+              </button>
+            </div>
+          </div>
+
           <section className="rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold text-brand-800">Ledige biler</h2>
-                <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  aria-label="Tilbage"
-                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                    <polyline points="15 18 9 12 15 6" />
-                  </svg>
-                </button>
-              </div>
+              <h2 className="text-xl font-semibold text-brand-800">Ledige biler</h2>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] bg-brand-50 px-1 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
@@ -119,18 +131,6 @@ export function AvailablePage() {
               </div>
             </div>
           </section>
-
-          <div className="mt-4 flex items-center justify-between">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
-            </div>
-            <button
-              onClick={() => void signOut()}
-              className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-            >
-              Log ud
-            </button>
-          </div>
         </motion.main>
       </div>
     </div>
