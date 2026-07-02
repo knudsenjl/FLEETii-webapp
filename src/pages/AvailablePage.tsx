@@ -65,12 +65,12 @@ export function AvailablePage() {
               </div>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[1fr_5rem_3.2rem_3.2rem_1fr] bg-brand-50 px-1 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                  <div className="whitespace-nowrap border-r border-brand-200 pr-1">Bil</div>
+                <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] bg-brand-50 px-1 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                  <div className="truncate border-r border-brand-200 pr-1">Bil</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Dato</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
-                  <div className="whitespace-nowrap px-1">Anvendelse</div>
+                  <div className="truncate px-1">Anvendelse</div>
                 </div>
 
                 <div className="divide-y divide-brand-100 bg-white">
@@ -82,7 +82,7 @@ export function AvailablePage() {
                         key={vehicle.id}
                         type="button"
                         onClick={() => setSelectedVehicleId(vehicle.id)}
-                        className={`grid w-full grid-cols-[1fr_5rem_3.2rem_3.2rem_1fr] px-1 py-1 text-left text-[0.7rem] transition ${
+                        className={`grid w-full grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] px-1 py-1 text-left text-[0.7rem] transition ${
                           selected
                             ? "bg-brand-100 text-brand-800"
                             : index === 0
@@ -92,11 +92,11 @@ export function AvailablePage() {
                                 : "bg-white text-brand-700 hover:bg-brand-50"
                         }`}
                       >
-                        <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">{vehicle.vehicle}</div>
+                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{vehicle.vehicle}</div>
                         <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{vehicle.date}</div>
                         <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{vehicle.start}</div>
                         <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{vehicle.end}</div>
-                        <div className="whitespace-nowrap px-1">{vehicle.use}</div>
+                        <div className="truncate px-1">{vehicle.use}</div>
                       </button>
                     );
                   })}
