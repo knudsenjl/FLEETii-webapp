@@ -23,11 +23,17 @@ Everything is built and verified working (typecheck clean, no console errors, mo
 What's in place:
 
 Stack: React 19 + Vite + TypeScript, Tailwind CSS v4, React Router, Framer Motion
+
 Color palette: extracted the exact navy (#18385B) from your logo and built a full brand scale from it, plus a complementary teal accent for future highlights/CTAs
+
 Login page (/): mobile-first card layout, typing animation on the headline, animated form entrance, Danish copy throughout
+
 2FA (TOTP): after password login, the app checks the Supabase MFA assurance level — if you have no authenticator enrolled yet it shows a QR-code enrollment step, otherwise it prompts for your 6-digit code. Both paths elevate the session to aal2 before granting access
+
 Landing page (/oversigt): protected route, shows the centered FLEETii logo with a gentle floating animation and fade-in, plus a "Log ud" button
+
 Animations: fade-ins, slide-ins, scale-ins, and the typing headline are all wired up via Tailwind keyframes + Framer Motion
+
 One thing you'll need to do: I put placeholder values in .env so the app builds and the UI is fully visible, but actual login won't work until you point it at a real Supabase project. Update .env (see .env.example for the format) with your project's URL and anon key from Supabase → Project Settings → API, and make sure TOTP MFA is enabled in Supabase Auth settings.
 
 The dev server is running in the background — open http://localhost:5173/ to take a look, and let me know what you'd like to adjust (colors, copy, layout, next features for the landing page, etc.).

@@ -9,6 +9,7 @@ type ReservationVehicle = {
   id: number;
   vehicle: string;
   date: string;
+  endDate: string;
   start: string;
   end: string;
   use: string;
@@ -46,7 +47,7 @@ export function ConfirmPage() {
     const { error: insertError } = await supabase.from("Bookings").insert({
       "number plate": vehicle.vehicle,
       start: toIsoDateTime(vehicle.date, vehicle.start),
-      end: toIsoDateTime(vehicle.date, vehicle.end),
+      end: toIsoDateTime(vehicle.endDate, vehicle.end),
       usage: vehicle.use,
       user: bruger || session?.user.email || null,
     });
@@ -61,11 +62,11 @@ export function ConfirmPage() {
   };
 
   const rows: [string, string][] = [
-    ["Bil:", vehicle.vehicle],
-    ["Dato:", vehicle.date],
-    ["Start:", vehicle.start],
-    ["Slut:", vehicle.end],
+    ["Reserveret til:", bruger],
     ["Anvendelse:", vehicle.use],
+    ["Bil:", vehicle.vehicle],
+    ["Start:", `${vehicle.date} ${vehicle.start}`],
+    ["Slut:", `${vehicle.endDate} ${vehicle.end}`],
   ];
 
   return (
@@ -108,8 +109,6 @@ export function ConfirmPage() {
           <section className="rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="space-y-4">
               <h2 className="text-xl font-semibold text-brand-800">Ny reservation</h2>
-
-              <p className="text-sm text-brand-700">Bekræftigelse af reservation af:</p>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">

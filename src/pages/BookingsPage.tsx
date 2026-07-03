@@ -8,8 +8,9 @@ import { supabase } from "../lib/supabase";
 type Booking = {
   id: number;
   vehicle: string;
-  date: string;
+  startDate: string;
   start: string;
+  endDate: string;
   end: string;
   use: string;
 };
@@ -53,6 +54,7 @@ export function BookingsPage() {
         .from("Bookings")
         .select("id, \"number plate\", start, end, usage, user")
         .eq("user", user)
+        .gte("end", new Date().toISOString())
         .order("start", { ascending: true })
         .returns<BookingRow[]>();
 
@@ -64,13 +66,14 @@ export function BookingsPage() {
 
       setActiveBookings(
         (data ?? []).map((row) => {
-          const { date, time: start } = splitIsoDateTime(row.start);
-          const { time: end } = splitIsoDateTime(row.end);
+          const { date: startDate, time: start } = splitIsoDateTime(row.start);
+          const { date: endDate, time: end } = splitIsoDateTime(row.end);
           return {
             id: row.id,
             vehicle: row["number plate"],
-            date,
+            startDate,
             start,
+            endDate,
             end,
             use: row.usage,
           };
@@ -135,9 +138,8 @@ export function BookingsPage() {
               </div>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] bg-brand-50 px-1 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <div className="truncate border-r border-brand-200 pr-1">Bil</div>
-                  <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Dato</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
                   <div className="truncate px-1">Anvendelse</div>
@@ -160,14 +162,13 @@ export function BookingsPage() {
                       return (
                         <div
                           key={booking.id}
-                          className={`grid grid-cols-[minmax(0,1fr)_5rem_3.2rem_3.2rem_minmax(0,1fr)] px-1 py-1 text-[0.7rem] ${
+                          className={`grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-1 text-[0.7rem] ${
                             isAlternate ? "bg-brand-50/70 text-brand-700" : "bg-white text-brand-700"
                           }`}
                         >
                           <div className="truncate border-r border-brand-100 pr-1 font-medium">{booking.vehicle}</div>
-                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.date}</div>
-                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.start}</div>
-                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{booking.end}</div>
+                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
+                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
                           <div className="truncate px-1">{booking.use}</div>
                         </div>
                       );

@@ -1,0 +1,33 @@
+First of all, familiarise yourself fully with my CLAUDE.md file.
+
+Once you've done that, I want you to take on the role of a world-class webapp design expert.
+
+I want you to build me a beautiful, fully responsive webapp called "FLEETii" which will be built using React and Vite. The language should be Danish, and the webapp audience is B2B. The web design should be Mobile-first, and the programming language should be TypeScript.
+
+Use the logo in fleetii-logo.png as the webapp logo, and use the color of this logo as inspiration for the colour schene for the webapp.
+
+The start page is a user login page, and when the user have logged in, a landing page must appear.  For now, the landing page will only show the FLEETii logo conter on the page.  I will later give you instructions on further developing the webapp.
+
+The user login must use Supabase with PostgreSQL and TOTP-based 2FA.
+
+The webapp should feel modern and use animations where appropriate - slide ins, fade ins, expensions, tpying out headers, etc.
+
+Once you've done all that, run it for me (localhost) so I can actually see what you've done for me, and we can then dicuss in further detail what I want to change.
+
+Install any necessary NPM packages on my behalf when neded
+
+
+------------Clause svar -----------------
+Everything is built and verified working (typecheck clean, no console errors, mobile + desktop screenshots confirmed).
+
+What's in place:
+
+Stack: React 19 + Vite + TypeScript, Tailwind CSS v4, React Router, Framer Motion
+Color palette: extracted the exact navy (#18385B) from your logo and built a full brand scale from it, plus a complementary teal accent for future highlights/CTAs
+Login page (/): mobile-first card layout, typing animation on the headline, animated form entrance, Danish copy throughout
+2FA (TOTP): after password login, the app checks the Supabase MFA assurance level — if you have no authenticator enrolled yet it shows a QR-code enrollment step, otherwise it prompts for your 6-digit code. Both paths elevate the session to aal2 before granting access
+Landing page (/oversigt): protected route, shows the centered FLEETii logo with a gentle floating animation and fade-in, plus a "Log ud" button
+Animations: fade-ins, slide-ins, scale-ins, and the typing headline are all wired up via Tailwind keyframes + Framer Motion
+One thing you'll need to do: I put placeholder values in .env so the app builds and the UI is fully visible, but actual login won't work until you point it at a real Supabase project. Update .env (see .env.example for the format) with your project's URL and anon key from Supabase → Project Settings → API, and make sure TOTP MFA is enabled in Supabase Auth settings.
+
+The dev server is running in the background — open http://localhost:5173/ to take a look, and let me know what you'd like to adjust (colors, copy, layout, next features for the landing page, etc.).

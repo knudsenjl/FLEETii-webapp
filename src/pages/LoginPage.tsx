@@ -24,6 +24,8 @@ export function LoginPage() {
   const [rememberMe, setRememberMeState] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [resetMessage, setResetMessage] = useState<string | null>(null);
+  const [resetSubmitting, setResetSubmitting] = useState(false);
 
   useEffect(() => {
     try {
@@ -78,6 +80,28 @@ export function LoginPage() {
       setError("Login fejlede. Prøv igen senere.");
       setSubmitting(false);
     }
+  }
+
+  async function handleForgotPassword() {
+    setError(null);
+    setResetMessage(null);
+
+    if (!username) {
+      setError("Indtast din e-mail for at nulstille adgangskoden.");
+      return;
+    }
+
+    setResetSubmitting(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(username);
+    setResetSubmitting(false);
+
+    if (resetError) {
+      console.error("resetPasswordForEmail failed:", resetError);
+      setError(`Kunne ikke sende nulstillingsmail: ${resetError.message}`);
+      return;
+    }
+
+    setResetMessage("Vi har sendt en mail med et link til at nulstille din adgangskode.");
   }
 
   return (
@@ -155,15 +179,25 @@ export function LoginPage() {
                   />
                 </label>
 
-                <label className="flex items-center gap-2 text-sm font-medium text-brand-700">
-                  <input
-                    type="checkbox"
-                    checked={rememberMe}
-                    onChange={(e) => setRememberMeState(e.target.checked)}
-                    className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-2 focus:ring-accent-500/30"
-                  />
-                  Husk mig
-                </label>
+                <div className="flex items-center justify-between gap-3">
+                  <label className="flex items-center gap-2 text-sm font-medium text-brand-700">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMeState(e.target.checked)}
+                      className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-2 focus:ring-accent-500/30"
+                    />
+                    Husk mig
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => void handleForgotPassword()}
+                    disabled={resetSubmitting}
+                    className="text-sm font-medium text-brand-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {resetSubmitting ? "Sender…" : "Skift adgangskode"}
+                  </button>
+                </div>
 
                 {error && (
                   <p
@@ -171,6 +205,15 @@ export function LoginPage() {
                     className="animate-fade-in rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
                   >
                     {error}
+                  </p>
+                )}
+
+                {resetMessage && (
+                  <p
+                    role="status"
+                    className="animate-fade-in rounded-lg bg-green-50 px-3 py-2 text-sm text-green-700"
+                  >
+                    {resetMessage}
                   </p>
                 )}
 
