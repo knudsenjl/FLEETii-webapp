@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
-export function AdminFrontpage() {
+export function FleetManagementPage() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
 
@@ -46,31 +46,7 @@ export function AdminFrontpage() {
 
           <section className="rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-brand-800">Administration</h2>
-
-              <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate("/department")}
-                  className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Afdelingsbrugere
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/fleet-management")}
-                  className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Flådestyring
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/bookings")}
-                  className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Reservation
-                </button>
-              </div>
+              <h2 className="text-xl font-semibold text-brand-800">Flådestyring</h2>
             </div>
           </section>
         </motion.main>

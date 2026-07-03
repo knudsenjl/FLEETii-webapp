@@ -8,6 +8,8 @@ import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
+import { DepartmentPage } from "./pages/DepartmentPage";
+import { FleetManagementPage } from "./pages/FleetManagementPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated } = useAuth();
@@ -69,6 +71,22 @@ function App() {
           element={
             <ProtectedRoute>
               <AdminFrontpage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/department"
+          element={
+            <ProtectedRoute>
+              <DepartmentPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fleet-management"
+          element={
+            <ProtectedRoute>
+              <FleetManagementPage />
             </ProtectedRoute>
           }
         />
