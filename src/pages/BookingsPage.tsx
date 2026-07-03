@@ -124,7 +124,7 @@ export function BookingsPage() {
 
           <section className="rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-brand-800">Aktive bookinger</h2>
+              <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
 
               <div className="grid grid-cols-[auto_1fr] items-center gap-3">
                 <label className="text-sm font-medium text-brand-700">Bruger:</label>
@@ -147,13 +147,13 @@ export function BookingsPage() {
 
                 <div className="divide-y divide-brand-100 bg-white">
                   {loading && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser bookinger…</div>
+                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser reservationer…</div>
                   )}
                   {!loading && error && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
                   )}
                   {!loading && !error && activeBookings.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen aktive bookinger.</div>
+                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen aktive reservationer.</div>
                   )}
                   {!loading &&
                     !error &&
@@ -184,7 +184,7 @@ export function BookingsPage() {
                   onClick={() => navigate("/reservation")}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
-                  Ny booking
+                  Ny reservation
                 </button>
               </div>
             </div>
