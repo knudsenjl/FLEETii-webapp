@@ -6,6 +6,7 @@ import { ReservationPage } from "./pages/ReservationPage";
 import { AvailablePage } from "./pages/AvailablePage";
 import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
+import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated } = useAuth();
@@ -51,6 +52,14 @@ function App() {
           element={
             <ProtectedRoute>
               <BookingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/booking-details"
+          element={
+            <ProtectedRoute>
+              <BookingDetailsPage />
             </ProtectedRoute>
           }
         />

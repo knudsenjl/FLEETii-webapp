@@ -160,17 +160,19 @@ export function BookingsPage() {
                     activeBookings.map((booking, index) => {
                       const isAlternate = index % 2 === 1;
                       return (
-                        <div
+                        <button
                           key={booking.id}
-                          className={`grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-1 text-[0.7rem] ${
-                            isAlternate ? "bg-brand-50/70 text-brand-700" : "bg-white text-brand-700"
+                          type="button"
+                          onClick={() => navigate("/booking-details", { state: { booking } })}
+                          className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-1 text-left text-[0.7rem] transition ${
+                            isAlternate ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100" : "bg-white text-brand-700 hover:bg-brand-50"
                           }`}
                         >
                           <div className="truncate border-r border-brand-100 pr-1 font-medium">{booking.vehicle}</div>
                           <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
                           <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
                           <div className="truncate px-1">{booking.use}</div>
-                        </div>
+                        </button>
                       );
                     })}
                 </div>
