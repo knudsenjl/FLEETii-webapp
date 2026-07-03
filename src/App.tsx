@@ -12,10 +12,15 @@ import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
 
 function RootRoute() {
-  const { loading, isFullyAuthenticated } = useAuth();
+  const { loading, isFullyAuthenticated, profile } = useAuth();
 
   if (!loading && isFullyAuthenticated) {
-    return <Navigate to="/bookings" replace />;
+    return (
+      <Navigate
+        to={profile?.role === "admin" ? "/admin-frontpage" : "/bookings"}
+        replace
+      />
+    );
   }
 
   return <LoginPage />;

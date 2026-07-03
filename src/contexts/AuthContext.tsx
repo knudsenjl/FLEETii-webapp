@@ -24,7 +24,6 @@ interface AuthContextValue {
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
   loading: boolean;
-  refreshAssuranceLevel: () => Promise<void>;
   signOut: () => Promise<void>;
 }
 
@@ -36,30 +35,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isFullyAuthenticated, setIsFullyAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  const refreshAssuranceLevel = async () => {
-    const { data } = await supabase.auth.getSession();
-    setIsFullyAuthenticated(Boolean(data.session));
-  };
-
   const loadProfile = async (userId: string) => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("id, email, full_name, phone, department, role")
       .eq("id", userId)
       .maybeSingle<Profile>();
+    if (error) {
+      console.error("[AuthContext] profiles select failed:", error);
+    }
     setProfile(data ?? null);
   };
 
   useEffect(() => {
     let mounted = true;
 
+    // Profile is loaded before isFullyAuthenticated flips to true (and both
+    // updates land in the same tick) so route decisions that depend on the
+    // user's role never fire on a stale/empty profile — otherwise the app
+    // briefly redirects everyone to the default route before correcting
+    // itself once the role-based redirect resolves.
     supabase.auth.getSession().then(async ({ data }) => {
       if (!mounted) return;
       setSession(data.session);
       if (data.session) {
-        await refreshAssuranceLevel();
         await loadProfile(data.session.user.id);
       }
+      if (!mounted) return;
+      setIsFullyAuthenticated(Boolean(data.session));
       setLoading(false);
     });
 
@@ -67,12 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (_event, newSession) => {
         setSession(newSession);
         if (newSession) {
-          await refreshAssuranceLevel();
           await loadProfile(newSession.user.id);
         } else {
-          setIsFullyAuthenticated(false);
           setProfile(null);
         }
+        setIsFullyAuthenticated(Boolean(newSession));
       },
     );
 
@@ -96,7 +98,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         isFullyAuthenticated,
         loading,
-        refreshAssuranceLevel,
         signOut,
       }}
     >

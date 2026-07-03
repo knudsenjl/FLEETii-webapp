@@ -1,8 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { setRememberMe, supabase } from "../lib/supabase";
-import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
 
@@ -15,9 +13,6 @@ const stepVariants = {
 };
 
 export function LoginPage() {
-  const navigate = useNavigate();
-  const { refreshAssuranceLevel } = useAuth();
-
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -63,26 +58,20 @@ export function LoginPage() {
     }
 
     try {
-      const { data, error: signInError } = await supabase.auth.signInWithPassword({
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: username,
         password,
       });
 
-      if (signInError || !data.session) {
+      if (signInError) {
         setError("Forkert brugernavn eller adgangskode.");
         setSubmitting(false);
         return;
       }
 
-      await refreshAssuranceLevel();
-
-      const { data: profileData } = await supabase
-        .from("profiles")
-        .select("role")
-        .eq("id", data.session.user.id)
-        .maybeSingle();
-
-      navigate(profileData?.role === "admin" ? "/admin-frontpage" : "/bookings");
+      // AuthProvider's onAuthStateChange listener picks up the new session,
+      // loads the profile, and RootRoute redirects once both are ready —
+      // no manual navigation here, so there's no flash to the wrong page.
     } catch {
       setError("Login fejlede. Prøv igen senere.");
       setSubmitting(false);
