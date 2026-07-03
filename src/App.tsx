@@ -7,6 +7,7 @@ import { AvailablePage } from "./pages/AvailablePage";
 import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
+import { AdminFrontpage } from "./pages/AdminFrontpage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated } = useAuth();
@@ -60,6 +61,14 @@ function App() {
           element={
             <ProtectedRoute>
               <BookingDetailsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin-frontpage"
+          element={
+            <ProtectedRoute>
+              <AdminFrontpage />
             </ProtectedRoute>
           }
         />

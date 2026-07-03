@@ -25,6 +25,7 @@ export function BookingDetailsPage() {
   const [bil, setBil] = useState(booking?.vehicle ?? "");
   const [nummerplade, setNummerplade] = useState(booking?.vehicle ?? "");
   const [braendstof, setBraendstof] = useState("");
+  const [anvendelse, setAnvendelse] = useState(booking?.use ?? "");
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,11 +116,20 @@ export function BookingDetailsPage() {
                     />
                   </div>
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstof</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstof:</label>
                     <input
                       type="text"
                       value={braendstof}
                       onChange={(e) => setBraendstof(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Anvendelse:</label>
+                    <input
+                      type="text"
+                      value={anvendelse}
+                      onChange={(e) => setAnvendelse(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
                   </div>

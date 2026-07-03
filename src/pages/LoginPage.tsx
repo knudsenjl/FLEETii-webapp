@@ -75,7 +75,14 @@ export function LoginPage() {
       }
 
       await refreshAssuranceLevel();
-      navigate("/bookings");
+
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.session.user.id)
+        .maybeSingle();
+
+      navigate(profileData?.role === "admin" ? "/admin-frontpage" : "/bookings");
     } catch {
       setError("Login fejlede. Prøv igen senere.");
       setSubmitting(false);
