@@ -15,9 +15,10 @@ type LeafletMapProps = {
   lng: number;
   zoom?: number;
   className?: string;
+  extraMarkers?: { lat: number; lng: number }[];
 };
 
-export function LeafletMap({ lat, lng, zoom = 13, className }: LeafletMapProps) {
+export function LeafletMap({ lat, lng, zoom = 13, className, extraMarkers = [] }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -32,6 +33,18 @@ export function LeafletMap({ lat, lng, zoom = 13, className }: LeafletMapProps) 
       maxZoom: 19,
     }).addTo(map);
     L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map);
+    extraMarkers.forEach((marker) => {
+      L.marker([marker.lat, marker.lng], { icon: fleetiiIcon }).addTo(map);
+    });
+
+    if (extraMarkers.length > 0) {
+      const bounds = L.latLngBounds([
+        [lat, lng],
+        ...extraMarkers.map((marker): [number, number] => [marker.lat, marker.lng]),
+      ]);
+      map.fitBounds(bounds, { padding: [40, 40] });
+    }
+
     mapRef.current = map;
 
     // Container size can change after init (flex/animated layouts), which

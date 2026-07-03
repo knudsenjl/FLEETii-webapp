@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { LeafletMap } from "../components/LeafletMap";
 
+const AARHUS = { lat: 56.1629, lng: 10.2039 };
+
 export function FleetManagementPage() {
   const { signOut } = useAuth();
   const navigate = useNavigate();
@@ -72,7 +74,12 @@ export function FleetManagementPage() {
               </div>
 
               <div className="relative mt-4 min-h-[16rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                <LeafletMap lat={55.6761} lng={12.5683} className="absolute inset-0" />
+                <LeafletMap
+                  lat={55.6761}
+                  lng={12.5683}
+                  extraMarkers={[AARHUS]}
+                  className="absolute inset-0"
+                />
               </div>
 
               <button
