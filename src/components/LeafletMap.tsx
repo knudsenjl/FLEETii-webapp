@@ -1,15 +1,13 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
-import markerIcon from "leaflet/dist/images/marker-icon.png";
-import markerShadow from "leaflet/dist/images/marker-shadow.png";
+import fleetiiMarker from "../assets/fleetii-marker.png";
 
-delete (L.Icon.Default.prototype as unknown as { _getIconUrl?: unknown })._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: markerIcon2x,
-  iconUrl: markerIcon,
-  shadowUrl: markerShadow,
+const fleetiiIcon = L.icon({
+  iconUrl: fleetiiMarker,
+  iconSize: [36, 45],
+  iconAnchor: [18, 45],
+  popupAnchor: [0, -45],
 });
 
 type LeafletMapProps = {
@@ -33,7 +31,7 @@ export function LeafletMap({ lat, lng, zoom = 13, className }: LeafletMapProps) 
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);
-    L.marker([lat, lng]).addTo(map);
+    L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map);
     mapRef.current = map;
 
     return () => {
