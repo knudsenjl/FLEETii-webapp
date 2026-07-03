@@ -34,7 +34,14 @@ export function LeafletMap({ lat, lng, zoom = 13, className }: LeafletMapProps) 
     L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map);
     mapRef.current = map;
 
+    // Container size can change after init (flex/animated layouts), which
+    // Leaflet doesn't pick up on its own — without this the tiles render
+    // at a stale (sometimes zero) size and the map appears blank.
+    const resizeObserver = new ResizeObserver(() => map.invalidateSize());
+    resizeObserver.observe(containerRef.current);
+
     return () => {
+      resizeObserver.disconnect();
       map.remove();
       mapRef.current = null;
     };
