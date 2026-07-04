@@ -10,6 +10,8 @@ import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
+import { FleetPage } from "./pages/FleetPage";
+import { HandleCarPage } from "./pages/HandleCarPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated, profile } = useAuth();
@@ -17,7 +19,7 @@ function RootRoute() {
   if (!loading && isFullyAuthenticated) {
     return (
       <Navigate
-        to={profile?.role === "admin" ? "/admin-frontpage" : "/bookings"}
+        to={profile?.role === "admin" ? "/admin" : "/bookings"}
         replace
       />
     );
@@ -72,7 +74,7 @@ function App() {
           }
         />
         <Route
-          path="/admin-frontpage"
+          path="/admin"
           element={
             <ProtectedRoute>
               <AdminFrontpage />
@@ -92,6 +94,22 @@ function App() {
           element={
             <ProtectedRoute>
               <FleetManagementPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/fleet"
+          element={
+            <ProtectedRoute>
+              <FleetPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/handle-car"
+          element={
+            <ProtectedRoute>
+              <HandleCarPage />
             </ProtectedRoute>
           }
         />

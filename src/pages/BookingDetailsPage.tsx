@@ -22,12 +22,9 @@ export function BookingDetailsPage() {
   const location = useLocation();
   const booking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
 
-  const [bil, setBil] = useState(booking?.vehicle ?? "");
-  const [nummerplade, setNummerplade] = useState(booking?.vehicle ?? "");
-  const [braendstof, setBraendstof] = useState("");
-  const [anvendelse, setAnvendelse] = useState(booking?.use ?? "");
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   useEffect(() => {
     if (!booking) {
@@ -48,6 +45,7 @@ export function BookingDetailsPage() {
     if (deleteError) {
       setError(deleteError.message);
       setIsCancelling(false);
+      setShowCancelConfirm(false);
       return;
     }
 
@@ -55,17 +53,18 @@ export function BookingDetailsPage() {
   };
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex min-h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex flex-1 flex-col"
         >
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center">
@@ -91,53 +90,38 @@ export function BookingDetailsPage() {
             </div>
           </div>
 
-          <section className="rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="space-y-4">
+          <section className="flex flex-1 flex-col rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex flex-1 flex-col gap-4">
               <h2 className="text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
+
+              <span className="block text-[0.7rem] text-brand-600">
+                Periode: {booking.startDate} {booking.start} -{" "}
+                {booking.startDate === booking.endDate ? booking.end : `${booking.endDate} ${booking.end}`}
+              </span>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Bil:</label>
-                    <input
-                      type="text"
-                      value={bil}
-                      onChange={(e) => setBil(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    <span className="text-sm text-brand-800">{booking.vehicle}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Nummerplade:</label>
-                    <input
-                      type="text"
-                      value={nummerplade}
-                      onChange={(e) => setNummerplade(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    <span className="text-sm text-brand-800">{booking.vehicle}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstof:</label>
-                    <input
-                      type="text"
-                      value={braendstof}
-                      onChange={(e) => setBraendstof(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    <span className="text-sm text-brand-800"></span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Anvendelse:</label>
-                    <input
-                      type="text"
-                      value={anvendelse}
-                      onChange={(e) => setAnvendelse(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    <span className="text-sm text-brand-800">{booking.use}</span>
                   </div>
                 </div>
               </div>
 
-              <div className="h-56 overflow-hidden rounded-2xl border border-brand-100">
-                <LeafletMap lat={55.6761} lng={12.5683} className="h-full w-full" />
+              <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
+                <LeafletMap lat={55.6761} lng={12.5683} className="absolute inset-0" />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -159,7 +143,7 @@ export function BookingDetailsPage() {
 
               <button
                 type="button"
-                onClick={() => void handleCancelBooking()}
+                onClick={() => setShowCancelConfirm(true)}
                 disabled={isCancelling}
                 className="w-full rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -169,6 +153,34 @@ export function BookingDetailsPage() {
           </section>
         </motion.main>
       </div>
+
+      {showCancelConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
+            <p className="text-sm font-medium text-brand-800">
+              Er du sikker på, at du vil aflyse denne reservation?
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                disabled={isCancelling}
+                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Nej
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleCancelBooking()}
+                disabled={isCancelling}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isCancelling ? "Aflyser…" : "Ja"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

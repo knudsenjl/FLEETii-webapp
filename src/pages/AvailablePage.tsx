@@ -125,7 +125,7 @@ export function AvailablePage() {
               </div>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-1 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <div className="truncate border-r border-brand-200 pr-1">Bil</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
@@ -144,7 +144,7 @@ export function AvailablePage() {
                         key={vehicle.id}
                         type="button"
                         onClick={() => setSelectedVehicleId(vehicle.id)}
-                        className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-1 text-left text-[0.7rem] transition ${
+                        className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-0.5 text-left text-[0.7rem] transition ${
                           selected
                             ? "bg-brand-100 text-brand-800"
                             : index === 0

@@ -84,6 +84,7 @@ export function FleetManagementPage() {
 
               <button
                 type="button"
+                onClick={() => navigate("/fleet")}
                 className="mt-4 w-full rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Tabelvisning

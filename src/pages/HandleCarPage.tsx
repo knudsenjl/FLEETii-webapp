@@ -1,73 +1,70 @@
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
-import { supabase } from "../lib/supabase";
 
-type ReservationVehicle = {
+type CarBooking = {
   id: number;
-  vehicle: string;
-  date: string;
-  endDate: string;
+  startDate: string;
   start: string;
+  endDate: string;
   end: string;
   use: string;
 };
 
-export function ConfirmPage() {
-  const { signOut, session } = useAuth();
+type Car = {
+  id: number;
+  vehicle: string;
+  plate: string;
+  department: string;
+  status: string;
+  booking?: CarBooking;
+};
+
+export function HandleCarPage() {
+  const { signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { vehicle?: ReservationVehicle; user?: string } | null;
-  const vehicle = state?.vehicle ?? null;
-  const bruger = state?.user ?? "";
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const state = location.state as { car?: Car } | null;
+  const car = state?.car ?? null;
 
   useEffect(() => {
-    if (!vehicle) {
-      navigate("/available", { replace: true });
+    if (!car) {
+      navigate("/fleet", { replace: true });
     }
-  }, [vehicle, navigate]);
+  }, [car, navigate]);
 
-  if (!vehicle) {
+  if (!car) {
     return null;
   }
 
-  const toIsoDateTime = (date: string, time: string) => {
-    const [day, month, year] = date.split(".");
-    return `${year}-${month}-${day}T${time}:00`;
-  };
+  const rows: [string, string][] = [
+    ["Bil:", car.vehicle],
+    ["Nummerplade:", car.plate],
+    ["Afdeling:", car.department],
+  ];
 
-  const handleConfirm = async () => {
-    setIsSubmitting(true);
-    setError(null);
-
-    const { error: insertError } = await supabase.from("Bookings").insert({
-      "number plate": vehicle.vehicle,
-      start: toIsoDateTime(vehicle.date, vehicle.start),
-      end: toIsoDateTime(vehicle.endDate, vehicle.end),
-      usage: vehicle.use,
-      user: bruger || session?.user.email || null,
-    });
-
-    if (insertError) {
-      setError(insertError.message);
-      setIsSubmitting(false);
+  const handleStatusClick = () => {
+    if (car.status === "Ledig") {
+      navigate("/reservation");
       return;
     }
 
-    navigate("/bookings", { replace: true });
+    navigate("/booking-details", {
+      state: {
+        booking: {
+          id: car.booking?.id ?? car.id,
+          vehicle: car.vehicle,
+          startDate: car.booking?.startDate ?? "",
+          start: car.booking?.start ?? "",
+          endDate: car.booking?.endDate ?? "",
+          end: car.booking?.end ?? "",
+          use: car.booking?.use ?? "",
+        },
+      },
+    });
   };
-
-  const rows: [string, string][] = [
-    ["Reserveret til:", bruger],
-    ["Anvendelse:", vehicle.use],
-    ["Bil:", vehicle.vehicle],
-    ["Start:", `${vehicle.date} ${vehicle.start}`],
-    ["Slut:", `${vehicle.endDate} ${vehicle.end}`],
-  ];
 
   return (
     <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -108,7 +105,7 @@ export function ConfirmPage() {
 
           <section className="rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-brand-800">Ny reservation</h2>
+              <h2 className="text-xl font-semibold text-brand-800">Bil detaljer</h2>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
@@ -118,27 +115,29 @@ export function ConfirmPage() {
                       <div className="whitespace-nowrap px-1">{value}</div>
                     </div>
                   ))}
+                  <button
+                    type="button"
+                    onClick={handleStatusClick}
+                    className="grid w-full grid-cols-[0.4fr_1fr] px-1 py-0.5 text-left text-[0.7rem] text-brand-700 transition hover:bg-brand-50"
+                  >
+                    <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Status:</div>
+                    <div className="whitespace-nowrap px-1">{car.status}</div>
+                  </button>
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
-
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+              <div className="flex flex-row gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate("/available")}
-                  disabled={isSubmitting}
-                  className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
-                  Annuller
+                  Lås
                 </button>
                 <button
                   type="button"
-                  onClick={() => void handleConfirm()}
-                  disabled={isSubmitting}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                 >
-                  {isSubmitting ? "Bekræfter…" : "Bekræft reservation"}
+                  Lås op
                 </button>
               </div>
             </div>

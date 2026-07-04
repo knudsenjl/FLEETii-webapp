@@ -153,7 +153,6 @@ export function LoginPage() {
                   Brugernavn / e-mail
                   <input
                     type="text"
-                    required
                     autoComplete="username"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
@@ -166,7 +165,6 @@ export function LoginPage() {
                   Adgangskode
                   <input
                     type="password"
-                    required
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
