@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
+import { supabase } from "../lib/supabase";
 
 export function ReservationPage() {
   const { signOut, session, profile } = useAuth();
@@ -10,6 +11,40 @@ export function ReservationPage() {
   const [bruger, setBruger] = useState(
     profile?.role === "admin" ? "" : session?.user.email ?? "",
   );
+  const [isChecking, setIsChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [userExists, setUserExists] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    const trimmed = bruger.trim();
+    if (!trimmed) {
+      setUserExists(null);
+      setError(null);
+      return;
+    }
+
+    setIsChecking(true);
+    const handle = setTimeout(async () => {
+      const { data: profileRow, error: profileError } = await supabase
+        .from("profiles")
+        .select("id")
+        .eq("email", trimmed)
+        .maybeSingle();
+
+      if (profileError) {
+        setError(profileError.message);
+        setUserExists(null);
+        setIsChecking(false);
+        return;
+      }
+
+      setUserExists(Boolean(profileRow));
+      setError(profileRow ? null : "Brugeren findes ikke i systemet.");
+      setIsChecking(false);
+    }, 400);
+
+    return () => clearTimeout(handle);
+  }, [bruger]);
 
   const now = new Date();
   const end = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -99,6 +134,16 @@ export function ReservationPage() {
 
   const reservationFields = [{ label: "Anvendelse", placeholder: "Beskrivelse", defaultValue: "" }];
 
+  const handleFindAvailable = () => {
+    navigate("/available", {
+      state: {
+        user: bruger,
+        start: `${startDate}T${startTime}:00`,
+        end: `${endDate}T${endTime}:00`,
+      },
+    });
+  };
+
   return (
     <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -112,11 +157,12 @@ export function ReservationPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 grid grid-cols-3 items-center">
             <div className="flex items-center">
               <FleetiiLogo className="h-8 w-auto" />
             </div>
-            <div className="flex items-center gap-3">
+            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => navigate(-1)}
@@ -217,19 +263,14 @@ export function ReservationPage() {
                 </div>
               </div>
 
+              {error && <p className="text-sm text-red-600">{error}</p>}
+
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate("/available", {
-                      state: {
-                        user: bruger,
-                        start: `${startDate}T${startTime}:00`,
-                        end: `${endDate}T${endTime}:00`,
-                      },
-                    })
-                  }
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  onClick={handleFindAvailable}
+                  disabled={isChecking || userExists === false}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Find ledige
                 </button>

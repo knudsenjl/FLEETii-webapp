@@ -53,7 +53,7 @@ const allVehicles: AvailableVehicle[] = [
 ];
 
 export function AvailablePage() {
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { user?: string; start?: string; end?: string } | null;
@@ -86,11 +86,12 @@ export function AvailablePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 grid grid-cols-3 items-center">
             <div className="flex items-center">
               <FleetiiLogo className="h-8 w-auto" />
             </div>
-            <div className="flex items-center gap-3">
+            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => navigate(-1)}

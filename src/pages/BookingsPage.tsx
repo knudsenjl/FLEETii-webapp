@@ -31,15 +31,17 @@ function splitIsoDateTime(iso: string): { date: string; time: string } {
 }
 
 export function BookingsPage() {
-  const { signOut, session } = useAuth();
+  const { signOut, session, profile } = useAuth();
   const navigate = useNavigate();
   const [user, setUser] = useState(session?.user.email ?? "");
   const [activeBookings, setActiveBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const isAdmin = profile?.role === "admin";
+
   useEffect(() => {
-    if (!user) {
+    if (!isAdmin && !user) {
       setActiveBookings([]);
       setLoading(false);
       setError(null);
@@ -50,13 +52,15 @@ export function BookingsPage() {
       setLoading(true);
       setError(null);
 
-      const { data, error: fetchError } = await supabase
+      const baseQuery = supabase
         .from("Bookings")
         .select("id, \"number plate\", start, end, usage, user")
-        .eq("user", user)
         .gte("end", new Date().toISOString())
-        .order("start", { ascending: true })
-        .returns<BookingRow[]>();
+        .order("start", { ascending: true });
+
+      const { data, error: fetchError } = await (isAdmin ? baseQuery : baseQuery.eq("user", user)).returns<
+        BookingRow[]
+      >();
 
       if (fetchError) {
         setError(fetchError.message);
@@ -83,26 +87,28 @@ export function BookingsPage() {
     }
 
     void loadBookings();
-  }, [user]);
+  }, [user, isAdmin]);
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 grid grid-cols-3 items-center">
             <div className="flex items-center">
               <FleetiiLogo className="h-8 w-auto" />
             </div>
-            <div className="flex items-center gap-3">
+            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => navigate(-1)}
@@ -122,9 +128,11 @@ export function BookingsPage() {
             </div>
           </div>
 
-          <section className="rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
+          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
+              <h2 className="text-xl font-semibold text-brand-800">
+                {profile?.role === "user" ? "Dine reservationer" : "Flådens reservationer"}
+              </h2>
 
               <div className="grid grid-cols-[auto_1fr] items-center gap-3">
                 <label className="text-sm font-medium text-brand-700">Bruger:</label>
@@ -137,7 +145,7 @@ export function BookingsPage() {
                 />
               </div>
 
-              <div className="overflow-hidden rounded-none border border-brand-100">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <div className="truncate border-r border-brand-200 pr-1">Bil</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
@@ -145,7 +153,7 @@ export function BookingsPage() {
                   <div className="truncate px-1">Anvendelse</div>
                 </div>
 
-                <div className="divide-y divide-brand-100 bg-white">
+                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
                   {loading && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser reservationer…</div>
                   )}

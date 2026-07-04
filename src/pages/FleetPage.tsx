@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -21,7 +22,7 @@ type Car = {
   booking?: CarBooking;
 };
 
-const cars: Car[] = [
+const initialCars: Car[] = [
   { id: 1, vehicle: "VW ID.3", plate: "AB 12 345", department: "Aarhus", status: "Ledig" },
   {
     id: 2,
@@ -61,27 +62,39 @@ const cars: Car[] = [
 ];
 
 export function FleetPage() {
-  const { signOut } = useAuth();
+  const { signOut, profile } = useAuth();
   const navigate = useNavigate();
 
+  const [cars, setCars] = useState<Car[]>(initialCars);
+  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
+  const [carToDelete, setCarToDelete] = useState<Car | null>(null);
+
+  const handleDeleteCar = () => {
+    if (!carToDelete) return;
+    setCars((prev) => prev.filter((c) => c.id !== carToDelete.id));
+    setCarToDelete(null);
+  };
+
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="mb-4 flex items-center justify-between">
+          <div className="mb-4 grid grid-cols-3 items-center">
             <div className="flex items-center">
               <FleetiiLogo className="h-8 w-auto" />
             </div>
-            <div className="flex items-center gap-3">
+            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
+            <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
                 onClick={() => navigate(-1)}
@@ -101,11 +114,11 @@ export function FleetPage() {
             </div>
           </div>
 
-          <section className="rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="space-y-4">
+          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
               <h2 className="text-xl font-semibold text-brand-800">Oversigt over flåden</h2>
 
-              <div className="overflow-hidden rounded-none border border-brand-100">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_1.75rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <div className="truncate border-r border-brand-200 pr-1">Bil</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Nummerplade</div>
@@ -113,7 +126,7 @@ export function FleetPage() {
                   <div className="truncate px-1 text-center"></div>
                 </div>
 
-                <div className="divide-y divide-brand-100 bg-white">
+                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
                   {cars.length === 0 && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen biler fundet.</div>
                   )}
@@ -123,7 +136,7 @@ export function FleetPage() {
                       <button
                         key={car.id}
                         type="button"
-                        onClick={() => navigate("/handle-car", { state: { car } })}
+                        onClick={() => setSelectedCar(car)}
                         className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_1.75rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
                           isAlternate ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100" : "bg-white text-brand-700 hover:bg-brand-50"
                         }`}
@@ -148,6 +161,95 @@ export function FleetPage() {
           </section>
         </motion.main>
       </div>
+
+      {selectedCar && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
+            <p className="text-sm font-medium text-brand-800">{selectedCar.vehicle}</p>
+            <div className="mt-4 flex flex-col gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  navigate("/handle-car", { state: { car: selectedCar } });
+                  setSelectedCar(null);
+                }}
+                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Vis bil detaljer
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCar(null)}
+                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Lås bil
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCar(null)}
+                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Lås bil op
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCar(null)}
+                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Opret bil
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedCar(null)}
+                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Rediger bil
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setCarToDelete(selectedCar);
+                  setSelectedCar(null);
+                }}
+                className="w-full rounded-lg border border-red-200 bg-white px-4 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
+              >
+                Slet bil
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedCar(null)}
+              className="mt-2 w-full rounded-lg px-4 py-2 text-sm font-medium text-brand-500 transition hover:bg-brand-50"
+            >
+              Annuller
+            </button>
+          </div>
+        </div>
+      )}
+
+      {carToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
+            <p className="text-sm font-medium text-brand-800">Er du sikker på, at du vil slette denne bil?</p>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setCarToDelete(null)}
+                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              >
+                Nej
+              </button>
+              <button
+                type="button"
+                onClick={handleDeleteCar}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+              >
+                Ja
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
