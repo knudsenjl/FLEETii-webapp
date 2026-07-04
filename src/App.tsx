@@ -12,6 +12,7 @@ import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
 import { FleetPage } from "./pages/FleetPage";
 import { HandleCarPage } from "./pages/HandleCarPage";
+import { UserDetailsPage } from "./pages/UserDetailsPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated, profile } = useAuth();
@@ -110,6 +111,14 @@ function App() {
           element={
             <ProtectedRoute>
               <HandleCarPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/user-details"
+          element={
+            <ProtectedRoute>
+              <UserDetailsPage />
             </ProtectedRoute>
           }
         />
