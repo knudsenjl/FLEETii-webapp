@@ -64,7 +64,7 @@ export function ConfirmPage() {
       return;
     }
 
-    navigate("/bookings", { replace: true });
+    navigate(profile?.role === "admin" ? "/allbookings" : "/bookings", { replace: true });
   };
 
   const rows: [string, string][] = [
