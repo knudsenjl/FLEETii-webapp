@@ -169,7 +169,7 @@ export function AllBookingsPage() {
               </button>
               <button
                 onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
               >
                 Log ud
               </button>
@@ -324,7 +324,7 @@ export function AllBookingsPage() {
                     type="button"
                     disabled={!selectedBooking}
                     onClick={() => triggerNotImplemented("laas-op")}
-                    className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Lås op
                   </button>
@@ -335,7 +335,7 @@ export function AllBookingsPage() {
                     type="button"
                     disabled={!selectedBooking}
                     onClick={() => triggerNotImplemented("laas")}
-                    className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Lås
                   </button>
@@ -347,7 +347,7 @@ export function AllBookingsPage() {
                   onClick={() =>
                     selectedBooking && navigate("/booking-details", { state: { booking: selectedBooking } })
                   }
-                  className="flex-1 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Vis kort
                 </button>
@@ -355,7 +355,7 @@ export function AllBookingsPage() {
                   type="button"
                   disabled={!selectedBooking}
                   onClick={() => selectedBooking && setPendingCancel(selectedBooking)}
-                  className="flex-1 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Aflys
                 </button>
@@ -365,7 +365,7 @@ export function AllBookingsPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Ny reservation
                 </button>
@@ -387,7 +387,7 @@ export function AllBookingsPage() {
                 type="button"
                 onClick={() => setPendingCancel(null)}
                 disabled={cancellingId === pendingCancel.id}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Nej
               </button>
@@ -395,7 +395,7 @@ export function AllBookingsPage() {
                 type="button"
                 onClick={() => void handleCancel(pendingCancel)}
                 disabled={cancellingId === pendingCancel.id}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {cancellingId === pendingCancel.id ? "Aflyser…" : "Ja"}
               </button>

@@ -110,7 +110,7 @@ export function FleetPage() {
               </button>
               <button
                 onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
               >
                 Log ud
               </button>
@@ -176,7 +176,7 @@ export function FleetPage() {
                   navigate("/handle-car", { state: { car: selectedCar } });
                   setSelectedCar(null);
                 }}
-                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-left text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Vis bil detaljer
               </button>
@@ -184,7 +184,7 @@ export function FleetPage() {
                 <button
                   type="button"
                   onClick={() => triggerNotImplemented("laas-bil")}
-                  className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-left text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Lås bil
                 </button>
@@ -194,7 +194,7 @@ export function FleetPage() {
                 <button
                   type="button"
                   onClick={() => triggerNotImplemented("laas-bil-op")}
-                  className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-left text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Lås bil op
                 </button>
@@ -203,14 +203,14 @@ export function FleetPage() {
               <button
                 type="button"
                 onClick={() => setSelectedCar(null)}
-                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-left text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Opret bil
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedCar(null)}
-                className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-left text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Rediger bil
               </button>
@@ -220,7 +220,7 @@ export function FleetPage() {
                   setCarToDelete(selectedCar);
                   setSelectedCar(null);
                 }}
-                className="w-full rounded-lg border border-red-200 bg-white px-4 py-2 text-left text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-left text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Slet bil
               </button>
@@ -228,7 +228,7 @@ export function FleetPage() {
             <button
               type="button"
               onClick={() => setSelectedCar(null)}
-              className="mt-2 w-full rounded-lg px-4 py-2 text-sm font-medium text-brand-500 transition hover:bg-brand-50"
+              className="mt-2 w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Annuller
             </button>
@@ -244,14 +244,14 @@ export function FleetPage() {
               <button
                 type="button"
                 onClick={() => setCarToDelete(null)}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Nej
               </button>
               <button
                 type="button"
                 onClick={handleDeleteCar}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Ja
               </button>

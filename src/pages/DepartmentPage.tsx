@@ -100,7 +100,7 @@ export function DepartmentPage() {
               </button>
               <button
                 onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
               >
                 Log ud
               </button>
@@ -157,7 +157,7 @@ export function DepartmentPage() {
               <button
                 type="button"
                 onClick={() => navigate("/user-details")}
-                className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Opret bruger
               </button>
@@ -176,14 +176,14 @@ export function DepartmentPage() {
               <button
                 type="button"
                 onClick={() => navigate("/user-details", { state: { user: userAction.user } })}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Rediger
               </button>
               <button
                 type="button"
                 onClick={() => setUserAction({ user: userAction.user, mode: "confirm-delete" })}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Slet
               </button>
@@ -191,7 +191,7 @@ export function DepartmentPage() {
             <button
               type="button"
               onClick={() => setUserAction(null)}
-              className="mt-2 w-full rounded-lg px-4 py-2 text-sm font-medium text-brand-500 transition hover:bg-brand-50"
+              className="mt-2 w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Annuller
             </button>
@@ -211,7 +211,7 @@ export function DepartmentPage() {
                 type="button"
                 onClick={() => setUserAction(null)}
                 disabled={isDeleting}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Nej
               </button>
@@ -219,7 +219,7 @@ export function DepartmentPage() {
                 type="button"
                 onClick={() => void handleDeleteUser()}
                 disabled={isDeleting}
-                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isDeleting ? "Sletter…" : "Ja"}
               </button>

@@ -106,7 +106,7 @@ export function ConfirmPage() {
               </button>
               <button
                 onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
               >
                 Log ud
               </button>
@@ -135,7 +135,7 @@ export function ConfirmPage() {
                   type="button"
                   onClick={() => navigate("/available")}
                   disabled={isSubmitting}
-                  className="rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Annuller
                 </button>
@@ -143,7 +143,7 @@ export function ConfirmPage() {
                   type="button"
                   onClick={() => void handleConfirm()}
                   disabled={isSubmitting}
-                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting ? "Bekræfter…" : "Bekræft reservation"}
                 </button>

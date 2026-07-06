@@ -85,6 +85,7 @@
 @layer base {
   html {
     font-family: var(--font-sans);
+    font-size: 87.5%;
   }
 
   body {
