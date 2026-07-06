@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
 type AvailableVehicle = {
@@ -56,8 +56,9 @@ export function AvailablePage() {
   const { signOut, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { user?: string; start?: string; end?: string } | null;
+  const state = location.state as { user?: string; use?: string; start?: string; end?: string } | null;
   const bruger = state?.user ?? "";
+  const anvendelse = state?.use ?? "";
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
 
@@ -86,11 +87,11 @@ export function AvailablePage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 grid grid-cols-3 items-center">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto" linkToHome />
+              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
-            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
@@ -170,7 +171,16 @@ export function AvailablePage() {
                   type="button"
                   disabled={!selectedVehicle}
                   onClick={() =>
-                    selectedVehicle && navigate("/confirm", { state: { vehicle: selectedVehicle, user: bruger } })
+                    selectedVehicle &&
+                    navigate("/confirm", {
+                      state: {
+                        vehicle: selectedVehicle,
+                        user: bruger,
+                        use: anvendelse,
+                        start: state?.start,
+                        end: state?.end,
+                      },
+                    })
                   }
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >

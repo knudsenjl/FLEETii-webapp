@@ -1,9 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { supabase } from "../lib/supabase";
+
+const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
+  const hours = Math.floor(i / 4);
+  const minutes = (i % 4) * 15;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+});
+
+function ceilToQuarterHour(date: Date): Date {
+  const ms = 15 * 60 * 1000;
+  return new Date(Math.ceil(date.getTime() / ms) * ms);
+}
 
 export function ReservationPage() {
   const { signOut, session, profile } = useAuth();
@@ -11,42 +22,27 @@ export function ReservationPage() {
   const [bruger, setBruger] = useState(
     profile?.role === "admin" ? "" : session?.user.email ?? "",
   );
-  const [isChecking, setIsChecking] = useState(false);
+  const [anvendelse, setAnvendelse] = useState("");
+  const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
   const [error, setError] = useState<string | null>(null);
-  const [userExists, setUserExists] = useState<boolean | null>(null);
 
   useEffect(() => {
-    const trimmed = bruger.trim();
-    if (!trimmed) {
-      setUserExists(null);
-      setError(null);
-      return;
-    }
+    supabase
+      .from("profiles")
+      .select("id, email")
+      .order("email")
+      .then(({ data, error: usersError }) => {
+        if (usersError) {
+          setError(usersError.message);
+          return;
+        }
+        setUsers(
+          (data ?? []).filter((u): u is { id: string; email: string } => Boolean(u.email)),
+        );
+      });
+  }, []);
 
-    setIsChecking(true);
-    const handle = setTimeout(async () => {
-      const { data: profileRow, error: profileError } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("email", trimmed)
-        .maybeSingle();
-
-      if (profileError) {
-        setError(profileError.message);
-        setUserExists(null);
-        setIsChecking(false);
-        return;
-      }
-
-      setUserExists(Boolean(profileRow));
-      setError(profileRow ? null : "Brugeren findes ikke i systemet.");
-      setIsChecking(false);
-    }, 400);
-
-    return () => clearTimeout(handle);
-  }, [bruger]);
-
-  const now = new Date();
+  const now = ceilToQuarterHour(new Date());
   const end = new Date(now.getTime() + 3 * 60 * 60 * 1000);
   const toIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -99,7 +95,7 @@ export function ReservationPage() {
     let time = candidateTime;
 
     if (new Date(`${date}T${time}:00`).getTime() < Date.now()) {
-      const current = new Date();
+      const current = ceilToQuarterHour(new Date());
       date = toIsoDate(current);
       time = formatTime(current);
       triggerStartWarning();
@@ -122,7 +118,7 @@ export function ReservationPage() {
     let time = candidateTime;
 
     if (new Date(`${date}T${time}:00`).getTime() < new Date(`${startDate}T${startTime}:00`).getTime()) {
-      const corrected = new Date(Date.now() + 3 * 60 * 60 * 1000);
+      const corrected = ceilToQuarterHour(new Date(Date.now() + 3 * 60 * 60 * 1000));
       date = toIsoDate(corrected);
       time = formatTime(corrected);
       triggerEndWarning();
@@ -132,12 +128,11 @@ export function ReservationPage() {
     setEndTime(time);
   };
 
-  const reservationFields = [{ label: "Anvendelse", placeholder: "Beskrivelse", defaultValue: "" }];
-
   const handleFindAvailable = () => {
     navigate("/available", {
       state: {
         user: bruger,
+        use: anvendelse,
         start: `${startDate}T${startTime}:00`,
         end: `${endDate}T${endTime}:00`,
       },
@@ -157,11 +152,11 @@ export function ReservationPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 grid grid-cols-3 items-center">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto" linkToHome />
+              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
-            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
@@ -194,27 +189,31 @@ export function ReservationPage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Bruger
                     </label>
-                    <input
-                      type="text"
-                      placeholder="dig@virksomhed.dk"
+                    <select
                       value={bruger}
                       onChange={(e) => setBruger(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    >
+                      <option value="">Vælg bruger</option>
+                      {users.map((u) => (
+                        <option key={u.id} value={u.email}>
+                          {u.email}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                    <label className="flex items-center text-sm font-medium text-brand-700">
+                      Anvendelse
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Beskrivelse"
+                      value={anvendelse}
+                      onChange={(e) => setAnvendelse(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
                   </div>
-                  {reservationFields.map((field) => (
-                    <div key={field.label} className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        {field.label}
-                      </label>
-                      <input
-                        type="text"
-                        placeholder={field.placeholder}
-                        defaultValue={field.defaultValue}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                  ))}
                   <div className="relative grid grid-cols-[4rem_1fr_1fr] items-center gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Start
@@ -225,12 +224,17 @@ export function ReservationPage() {
                       onChange={(e) => applyStartDateTime(e.target.value, startTime, true)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                    <input
-                      type="time"
+                    <select
                       value={startTime}
                       onChange={(e) => applyStartDateTime(startDate, e.target.value, false)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    >
+                      {TIME_OPTIONS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
                     {showStartWarning && (
                       <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
                         Start kan ikke være før nu
@@ -247,13 +251,17 @@ export function ReservationPage() {
                       onChange={(e) => applyEndDateTime(e.target.value, endTime)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                    <input
-                      type="time"
+                    <select
                       value={endTime}
-                      min={startDate === endDate ? startTime : undefined}
                       onChange={(e) => applyEndDateTime(endDate, e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    >
+                      {TIME_OPTIONS.filter((t) => startDate !== endDate || t >= startTime).map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
                     {showEndWarning && (
                       <div className="absolute bottom-full left-0 z-10 mb-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
                         Slut kan ikke være før Start
@@ -269,7 +277,7 @@ export function ReservationPage() {
                 <button
                   type="button"
                   onClick={handleFindAvailable}
-                  disabled={isChecking || userExists === false}
+                  disabled={!bruger}
                   className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Find ledige

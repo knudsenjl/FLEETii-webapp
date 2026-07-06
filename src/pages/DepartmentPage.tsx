@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { supabase } from "../lib/supabase";
 
@@ -82,11 +82,11 @@ export function DepartmentPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 grid grid-cols-3 items-center">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto" linkToHome />
+              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
-            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"

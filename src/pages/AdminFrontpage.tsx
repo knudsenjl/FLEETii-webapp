@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
 export function AdminFrontpage() {
@@ -20,11 +20,11 @@ export function AdminFrontpage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 grid grid-cols-3 items-center">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto" linkToHome />
+              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
-            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
@@ -52,6 +52,20 @@ export function AdminFrontpage() {
               <div className="flex flex-col gap-3">
                 <button
                   type="button"
+                  onClick={() => navigate("/reservation")}
+                  className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Ny reservation
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/allbookings")}
+                  className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Reservationer
+                </button>
+                <button
+                  type="button"
                   onClick={() => navigate("/department")}
                   className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
@@ -63,13 +77,6 @@ export function AdminFrontpage() {
                   className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Flådestyring
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/bookings")}
-                  className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Reservation
                 </button>
               </div>
             </div>

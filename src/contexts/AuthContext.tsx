@@ -27,6 +27,10 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
+export function formatRoleLabel(role?: string | null): string {
+  return role === "admin" ? "Administrator" : "Bruger";
+}
+
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {

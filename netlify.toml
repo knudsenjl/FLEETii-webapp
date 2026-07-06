@@ -4,3 +4,11 @@
 
 [functions]
   directory = "netlify/functions"
+
+# Client-side routing (React Router) — without this, refreshing or
+# directly opening any route other than "/" 404s, since Netlify otherwise
+# looks for a matching static file instead of letting the SPA handle it.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

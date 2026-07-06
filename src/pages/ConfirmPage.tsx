@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { supabase } from "../lib/supabase";
 
@@ -19,9 +19,14 @@ export function ConfirmPage() {
   const { signOut, session, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { vehicle?: ReservationVehicle; user?: string } | null;
+  const state = location.state as
+    | { vehicle?: ReservationVehicle; user?: string; use?: string; start?: string; end?: string }
+    | null;
   const vehicle = state?.vehicle ?? null;
   const bruger = state?.user ?? "";
+  const anvendelse = state?.use ?? "";
+  const reservationStart = state?.start ?? null;
+  const reservationEnd = state?.end ?? null;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -35,9 +40,10 @@ export function ConfirmPage() {
     return null;
   }
 
-  const toIsoDateTime = (date: string, time: string) => {
-    const [day, month, year] = date.split(".");
-    return `${year}-${month}-${day}T${time}:00`;
+  const formatDanishDateTime = (isoDateTime: string) => {
+    const [date, time] = isoDateTime.split("T");
+    const [year, month, day] = date.split("-");
+    return `${day}.${month}.${year} ${time.slice(0, 5)}`;
   };
 
   const handleConfirm = async () => {
@@ -46,9 +52,9 @@ export function ConfirmPage() {
 
     const { error: insertError } = await supabase.from("Bookings").insert({
       "number plate": vehicle.vehicle,
-      start: toIsoDateTime(vehicle.date, vehicle.start),
-      end: toIsoDateTime(vehicle.endDate, vehicle.end),
-      usage: vehicle.use,
+      start: reservationStart,
+      end: reservationEnd,
+      usage: anvendelse,
       user: bruger || session?.user.email || null,
     });
 
@@ -63,10 +69,10 @@ export function ConfirmPage() {
 
   const rows: [string, string][] = [
     ["Reserveret til:", bruger],
-    ["Anvendelse:", vehicle.use],
+    ["Anvendelse:", anvendelse],
     ["Bil:", vehicle.vehicle],
-    ["Start:", `${vehicle.date} ${vehicle.start}`],
-    ["Slut:", `${vehicle.endDate} ${vehicle.end}`],
+    ["Start:", reservationStart ? formatDanishDateTime(reservationStart) : ""],
+    ["Slut:", reservationEnd ? formatDanishDateTime(reservationEnd) : ""],
   ];
 
   return (
@@ -82,11 +88,11 @@ export function ConfirmPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 grid grid-cols-3 items-center">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto" linkToHome />
+              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
-            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"

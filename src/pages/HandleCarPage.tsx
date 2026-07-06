@@ -1,8 +1,10 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
+import { InlinePopup } from "../components/InlinePopup";
+import { useTimedFlag } from "../hooks/useTimedFlag";
 
 type CarBooking = {
   id: number;
@@ -28,6 +30,7 @@ export function HandleCarPage() {
   const location = useLocation();
   const state = location.state as { car?: Car } | null;
   const car = state?.car ?? null;
+  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
   useEffect(() => {
     if (!car) {
@@ -79,11 +82,11 @@ export function HandleCarPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
         >
-          <div className="mb-4 grid grid-cols-3 items-center">
-            <div className="flex items-center">
-              <FleetiiLogo className="h-8 w-auto" />
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto" linkToHome />
+              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
-            <p className="truncate px-2 text-center text-[0.7rem] font-medium text-brand-600">{profile?.role ?? "bruger"}: {profile?.email ?? "—"}</p>
             <div className="flex items-center justify-end gap-3">
               <button
                 type="button"
@@ -128,18 +131,26 @@ export function HandleCarPage() {
               </div>
 
               <div className="flex flex-row gap-3">
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Lås
-                </button>
-                <button
-                  type="button"
-                  className="flex-1 rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-                >
-                  Lås op
-                </button>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    onClick={() => triggerNotImplemented("laas")}
+                    className="w-full rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Lås
+                  </button>
+                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" />
+                </div>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    onClick={() => triggerNotImplemented("laas-op")}
+                    className="w-full rounded-lg border border-brand-200 bg-white px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                  >
+                    Lås op
+                  </button>
+                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" align="right" />
+                </div>
               </div>
             </div>
           </section>

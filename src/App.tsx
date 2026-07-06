@@ -6,6 +6,7 @@ import { ReservationPage } from "./pages/ReservationPage";
 import { AvailablePage } from "./pages/AvailablePage";
 import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
+import { AllBookingsPage } from "./pages/AllBookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { DepartmentPage } from "./pages/DepartmentPage";
@@ -63,6 +64,14 @@ function App() {
           element={
             <ProtectedRoute>
               <BookingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/allbookings"
+          element={
+            <ProtectedRoute>
+              <AllBookingsPage />
             </ProtectedRoute>
           }
         />
