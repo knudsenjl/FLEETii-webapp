@@ -62,7 +62,7 @@ export function BookingsPage() {
   const showInfo = (key: "next" | "other") => {
     if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
     setInfoPopup(key);
-    infoTimeoutRef.current = setTimeout(() => setInfoPopup(null), 5000);
+    infoTimeoutRef.current = setTimeout(() => setInfoPopup(null), 3000);
   };
 
   const loadBookings = async () => {
@@ -210,9 +210,9 @@ export function BookingsPage() {
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 items-center gap-2">
+            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
               <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
-              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"} - Afdeling: {profile?.department ?? "—"}</p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <button

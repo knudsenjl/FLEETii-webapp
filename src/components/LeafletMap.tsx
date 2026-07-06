@@ -5,9 +5,9 @@ import fleetiiMarker from "../assets/fleetii-marker.png";
 
 const fleetiiIcon = L.icon({
   iconUrl: fleetiiMarker,
-  iconSize: [36, 45],
-  iconAnchor: [18, 45],
-  popupAnchor: [0, -45],
+  iconSize: [24, 30],
+  iconAnchor: [12, 30],
+  popupAnchor: [0, -30],
 });
 
 type LeafletMapProps = {
@@ -32,9 +32,17 @@ export function LeafletMap({ lat, lng, zoom = 13, className, extraMarkers = [] }
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);
-    L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map);
+    const bindNotImplementedPopup = (marker: L.Marker) => {
+      marker.bindPopup("Endnu ikke implementeret");
+      marker.on("click", () => {
+        marker.openPopup();
+        setTimeout(() => marker.closePopup(), 3000);
+      });
+    };
+
+    bindNotImplementedPopup(L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map));
     extraMarkers.forEach((marker) => {
-      L.marker([marker.lat, marker.lng], { icon: fleetiiIcon }).addTo(map);
+      bindNotImplementedPopup(L.marker([marker.lat, marker.lng], { icon: fleetiiIcon }).addTo(map));
     });
 
     if (extraMarkers.length > 0) {

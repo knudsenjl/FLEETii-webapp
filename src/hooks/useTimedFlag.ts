@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export function useTimedFlag(durationMs = 5000) {
+export function useTimedFlag(durationMs = 3000) {
   const [activeKey, setActiveKey] = useState<string | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
