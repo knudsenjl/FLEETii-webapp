@@ -70,22 +70,23 @@ export function DepartmentPage() {
   };
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex min-h-0 flex-1 flex-col"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <FleetiiLogo className="h-8 w-auto" linkToHome />
-              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -107,13 +108,13 @@ export function DepartmentPage() {
             </div>
           </div>
 
-          <section className="rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="space-y-4">
+          <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4">
               <h2 className="text-xl font-semibold text-brand-800">
                 Afdeling: {profile?.department ?? "—"}
               </h2>
 
-              <div className="overflow-hidden rounded-none border border-brand-100">
+              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <div className="truncate border-r border-brand-200 pr-1">Navn</div>
                   <div className="truncate border-r border-brand-200 px-1">E-mail</div>
@@ -121,7 +122,7 @@ export function DepartmentPage() {
                   <div className="truncate px-1">Rolle</div>
                 </div>
 
-                <div className="divide-y divide-brand-100 bg-white">
+                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
                   {loading && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser brugere…</div>
                   )}

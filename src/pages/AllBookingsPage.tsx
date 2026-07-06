@@ -138,7 +138,7 @@ export function AllBookingsPage() {
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-col overflow-y-auto bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
@@ -152,9 +152,9 @@ export function AllBookingsPage() {
           className="flex min-h-0 flex-1 flex-col"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <FleetiiLogo className="h-8 w-auto" linkToHome />
-              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <button

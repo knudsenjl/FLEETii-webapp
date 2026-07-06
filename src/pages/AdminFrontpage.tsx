@@ -8,22 +8,23 @@ export function AdminFrontpage() {
   const navigate = useNavigate();
 
   return (
-    <div className="relative min-h-dvh overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex max-w-7xl flex-col gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="flex min-h-0 flex-1 flex-col"
         >
           <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <FleetiiLogo className="h-8 w-auto" linkToHome />
-              <p className="truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
             </div>
             <div className="flex items-center justify-end gap-3">
               <button
@@ -45,8 +46,8 @@ export function AdminFrontpage() {
             </div>
           </div>
 
-          <section className="rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="space-y-4">
+          <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">Administration</h2>
 
               <div className="flex flex-col gap-3">
@@ -66,17 +67,24 @@ export function AdminFrontpage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("/department")}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Brugeradministration
-                </button>
-                <button
-                  type="button"
                   onClick={() => navigate("/fleet-management")}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Flådestyring
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/department")}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Administration af brugere
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/vehicles")}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Administration af køretøjer
                 </button>
               </div>
             </div>
