@@ -1,44 +1,48 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { use2hireVehicle, type Vehicle2Hire } from "../contexts/VehicleContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
-type Vehicle = {
-  id: number;
+type Vehicle = Vehicle2Hire & {
   vehicle: string;
   plate: string;
   department: string;
   status: string;
 };
 
-const initialVehicles: Vehicle[] = [
-  { id: 1, vehicle: "VW ID.3", plate: "AB 12 345", department: "Aarhus", status: "Ledig" },
-  { id: 2, vehicle: "Tesla Model 3", plate: "CD 34 567", department: "København", status: "Udlejet" },
-  { id: 3, vehicle: "Volvo XC40", plate: "EF 56 789", department: "Odense", status: "Service" },
-  { id: 4, vehicle: "Skoda Enyaq", plate: "GH 78 901", department: "Aarhus", status: "Ledig" },
-  { id: 5, vehicle: "Cupra Born", plate: "IJ 90 123", department: "Aalborg", status: "Udlejet" },
-  { id: 6, vehicle: "Peugeot e-208", plate: "KL 11 234", department: "København", status: "Ledig" },
-  { id: 7, vehicle: "BMW iX1", plate: "MN 22 345", department: "Odense", status: "Ledig" },
-  { id: 8, vehicle: "Kia EV6", plate: "OP 33 456", department: "Aarhus", status: "Service" },
-];
-
 export function VehiclesPage() {
   const { signOut, profile } = useAuth();
   const navigate = useNavigate();
+  const twoHireVehicles = use2hireVehicle();
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>(initialVehicles);
-  const [vehicleAction, setVehicleAction] = useState<{ vehicle: Vehicle; mode: "choose" | "confirm-delete" } | null>(
-    null,
-  );
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<Vehicle | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
+  const selectedVehicle = vehicles.find((v) => v.vehicleId === selectedVehicleId) ?? null;
+
+  useEffect(() => {
+    setVehicles(
+      twoHireVehicles.map((v) => ({
+        ...v,
+        vehicle: `${v.brand} ${v.model}`,
+        plate: v.alias,
+        department: "—",
+        status: v.online === "TRUE" ? "Online" : "Offline",
+      })),
+    );
+  }, [twoHireVehicles]);
+
   const handleDeleteVehicle = () => {
-    if (!vehicleAction) return;
-    setVehicles((prev) => prev.filter((v) => v.id !== vehicleAction.vehicle.id));
-    setVehicleAction(null);
+    if (!pendingDelete) return;
+    setVehicles((prev) => prev.filter((v) => v.vehicleId !== pendingDelete.vehicleId));
+    if (selectedVehicleId === pendingDelete.vehicleId) setSelectedVehicleId(null);
+    setPendingDelete(null);
   };
 
   return (
@@ -55,28 +59,21 @@ export function VehiclesPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="mb-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
               <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
-              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"} - Afdeling: {profile?.department ?? "—"}</p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => void signOut()}
+                  className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                >
+                  Log ud
+                </button>
+              </div>
             </div>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                aria-label="Tilbage"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-              <button
-                onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-              >
-                Log ud
-              </button>
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
             </div>
           </div>
 
@@ -85,36 +82,110 @@ export function VehiclesPage() {
               <h2 className="text-xl font-semibold text-brand-800">Administration af køretøjer</h2>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                  <div className="truncate border-r border-brand-200 pr-1">Bil</div>
-                  <div className="truncate border-r border-brand-200 px-1">Nummerplade</div>
-                  <div className="truncate border-r border-brand-200 px-1">Afdeling</div>
-                  <div className="truncate px-1">Status</div>
-                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <div className="truncate border-r border-brand-200 pr-1">Nummerplade</div>
+                    <div className="truncate border-r border-brand-200 px-1">Mærke</div>
+                    <div className="truncate border-r border-brand-200 px-1">Afdeling</div>
+                    <div className="truncate px-1">Status</div>
+                  </div>
 
-                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
+                  <div className="divide-y divide-brand-100 bg-white">
                   {vehicles.length === 0 && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen køretøjer fundet.</div>
                   )}
                   {vehicles.map((vehicle, index) => {
                     const isAlternate = index % 2 === 1;
+                    const isSelected = vehicle.vehicleId === selectedVehicleId;
                     return (
                       <button
-                        key={vehicle.id}
+                        key={vehicle.vehicleId}
                         type="button"
-                        onClick={() => setVehicleAction({ vehicle, mode: "choose" })}
+                        onClick={() =>
+                          setSelectedVehicleId((current) => (current === vehicle.vehicleId ? null : vehicle.vehicleId))
+                        }
                         className={`grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
-                          isAlternate ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100" : "bg-white text-brand-700 hover:bg-brand-50"
+                          isSelected
+                            ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
+                            : isAlternate
+                              ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                              : "bg-white text-brand-700 hover:bg-brand-50"
                         }`}
                       >
-                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{vehicle.vehicle}</div>
-                        <div className="truncate border-r border-brand-100 px-1">{vehicle.plate}</div>
+                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{vehicle.plate}</div>
+                        <div className="truncate border-r border-brand-100 px-1">{vehicle.vehicle}</div>
                         <div className="truncate border-r border-brand-100 px-1">{vehicle.department}</div>
                         <div className="truncate px-1">{vehicle.status}</div>
                       </button>
                     );
                   })}
+                  </div>
                 </div>
+              </div>
+
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    disabled={!selectedVehicle}
+                    onClick={() => triggerNotImplemented("laas-op")}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Lås op
+                  </button>
+                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" />
+                </div>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    disabled={!selectedVehicle}
+                    onClick={() => triggerNotImplemented("laas")}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Lås
+                  </button>
+                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" />
+                </div>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    disabled={!selectedVehicle}
+                    onClick={() => selectedVehicle && navigate("/vehicleDetails", { state: { vehicle: selectedVehicle } })}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Vis kort
+                  </button>
+                </div>
+                <div className="relative flex-1">
+                  <button
+                    type="button"
+                    disabled={!selectedVehicle}
+                    onClick={() => triggerNotImplemented("aflys")}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Aflys
+                  </button>
+                  <InlinePopup visible={notImplementedKey === "aflys"} message="Endnu ikke implementeret" align="right" />
+                </div>
+              </div>
+
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={!selectedVehicle}
+                  onClick={() => selectedVehicle && navigate("/handleVehicle", { state: { vehicle: selectedVehicle } })}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Rediger
+                </button>
+                <button
+                  type="button"
+                  disabled={!selectedVehicle}
+                  onClick={() => selectedVehicle && setPendingDelete(selectedVehicle)}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Slet
+                </button>
               </div>
 
               <div className="relative">
@@ -132,38 +203,7 @@ export function VehiclesPage() {
         </motion.main>
       </div>
 
-      {vehicleAction?.mode === "choose" && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
-            <p className="text-sm font-medium text-brand-800">{vehicleAction.vehicle.vehicle}</p>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => navigate("/handle-car", { state: { car: vehicleAction.vehicle } })}
-                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
-                Rediger
-              </button>
-              <button
-                type="button"
-                onClick={() => setVehicleAction({ vehicle: vehicleAction.vehicle, mode: "confirm-delete" })}
-                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
-                Slet
-              </button>
-            </div>
-            <button
-              type="button"
-              onClick={() => setVehicleAction(null)}
-              className="mt-2 w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              Annuller
-            </button>
-          </div>
-        </div>
-      )}
-
-      {vehicleAction?.mode === "confirm-delete" && (
+      {pendingDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
             <p className="text-sm font-medium text-brand-800">
@@ -172,7 +212,7 @@ export function VehiclesPage() {
             <div className="mt-4 grid grid-cols-2 gap-3">
               <button
                 type="button"
-                onClick={() => setVehicleAction(null)}
+                onClick={() => setPendingDelete(null)}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Nej

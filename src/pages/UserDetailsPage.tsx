@@ -145,28 +145,21 @@ export function UserDetailsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="mb-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
               <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
-              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"} - Afdeling: {profile?.department ?? "—"}</p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => void signOut()}
+                  className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                >
+                  Log ud
+                </button>
+              </div>
             </div>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                aria-label="Tilbage"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-              <button
-                onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-              >
-                Log ud
-              </button>
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
             </div>
           </div>
 

@@ -151,28 +151,21 @@ export function AllBookingsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="mb-2 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-3">
               <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
-              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"} - Afdeling: {profile?.department ?? "—"}</p>
+              <div className="flex items-center justify-end gap-3">
+                <button
+                  onClick={() => void signOut()}
+                  className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                >
+                  Log ud
+                </button>
+              </div>
             </div>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => navigate(-1)}
-                aria-label="Tilbage"
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                  <polyline points="15 18 9 12 15 6" />
-                </svg>
-              </button>
-              <button
-                onClick={() => void signOut()}
-                className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-              >
-                Log ud
-              </button>
+            <div className="flex min-w-0 items-center justify-between gap-2">
+              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
             </div>
           </div>
 
@@ -268,7 +261,7 @@ export function AllBookingsPage() {
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
                 <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                  <div className="truncate border-r border-brand-200 pr-1">Bil</div>
+                  <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
                   <div className="truncate px-1">Anvendelse</div>
@@ -345,7 +338,7 @@ export function AllBookingsPage() {
                   type="button"
                   disabled={!selectedBooking}
                   onClick={() =>
-                    selectedBooking && navigate("/booking-details", { state: { booking: selectedBooking } })
+                    selectedBooking && navigate("/bookingDetails", { state: { booking: selectedBooking } })
                   }
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
