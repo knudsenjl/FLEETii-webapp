@@ -21,6 +21,8 @@ interface AuthContextValue {
   session: Session | null;
   /** Extra user data (name, phone, department, role) synced from auth.users. */
   profile: Profile | null;
+  /** The logged-in user's department (Afdeling). Alias for profile?.department. */
+  afdeling: string | null;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
   loading: boolean;
@@ -100,6 +102,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         profile,
+        afdeling: profile?.department ?? null,
         isFullyAuthenticated,
         loading,
         signOut,

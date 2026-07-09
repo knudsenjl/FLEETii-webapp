@@ -1,24 +1,29 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
+import { supabase } from "../lib/supabase";
+import {
+  VEHICLE_ID_COLUMN,
+  computeFreePeriod,
+  formatFreePeriod,
+  isVehicleAvailable,
+  type BookingWindow,
+} from "../lib/bookings";
 
 type AvailableVehicle = {
-  id: number;
+  id: string;
   vehicle: string;
-  date: string;
-  endDate: string;
-  start: string;
-  end: string;
-  use: string;
+  plate: string;
+  ledigPeriode: string;
 };
 
-function parseDanishDateTime(date: string, time: string): Date {
-  const [day, month, year] = date.split(".").map(Number);
-  const [hours, minutes] = time.split(":").map(Number);
-  return new Date(year, month - 1, day, hours, minutes);
+function nowIsoString(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
 }
 
 function formatDanishTime(date: Date): string {
@@ -37,24 +42,8 @@ function isSameDate(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
-const bookingWindows = [
-  { id: 1, date: "02.07.2026", endDate: "02.07.2026", start: "09:00", end: "12:00", use: "Kundebesøg" },
-  { id: 2, date: "02.07.2026", endDate: "02.07.2026", start: "10:30", end: "14:00", use: "Fleetsalg" },
-  { id: 3, date: "03.07.2026", endDate: "06.07.2026", start: "13:00", end: "16:30", use: "Service" },
-  { id: 4, date: "03.07.2026", endDate: "03.07.2026", start: "08:00", end: "10:00", use: "Kundebesøg" },
-  { id: 5, date: "03.07.2026", endDate: "03.07.2026", start: "11:00", end: "15:00", use: "Fleetsalg" },
-  { id: 6, date: "04.07.2026", endDate: "06.07.2026", start: "09:30", end: "12:30", use: "Service" },
-  { id: 7, date: "04.07.2026", endDate: "04.07.2026", start: "13:00", end: "17:00", use: "Kundebesøg" },
-  { id: 8, date: "04.07.2026", endDate: "04.07.2026", start: "07:30", end: "09:00", use: "Fleetsalg" },
-  { id: 9, date: "05.07.2026", endDate: "10.07.2026", start: "10:00", end: "13:00", use: "Service" },
-  { id: 10, date: "05.07.2026", endDate: "05.07.2026", start: "14:00", end: "16:00", use: "Kundebesøg" },
-  { id: 11, date: "05.07.2026", endDate: "05.07.2026", start: "08:00", end: "11:00", use: "Fleetsalg" },
-  { id: 12, date: "06.07.2026", endDate: "10.07.2026", start: "12:00", end: "15:30", use: "Service" },
-  { id: 13, date: "06.07.2026", endDate: "06.07.2026", start: "09:00", end: "10:30", use: "Kundebesøg" },
-];
-
 export function AvailablePage() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, afdeling } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { user?: string; use?: string; start?: string; end?: string } | null;
@@ -63,22 +52,37 @@ export function AvailablePage() {
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
 
+  const [bookings, setBookings] = useState<BookingWindow[]>([]);
+  const [loadingBookings, setLoadingBookings] = useState(true);
+
+  useEffect(() => {
+    supabase
+      .from("Bookings")
+      .select(`${VEHICLE_ID_COLUMN}, start, end`)
+      .then(({ data }) => {
+        setBookings((data ?? []) as BookingWindow[]);
+        setLoadingBookings(false);
+      });
+  }, []);
+
+  const referenceStart = state?.start ?? nowIsoString();
+  const referenceEnd = state?.end ?? nowIsoString();
+
   const twoHireVehicles = use2hireVehicle();
-  const allVehicles: AvailableVehicle[] = bookingWindows.map((window, index) => {
-    const v = twoHireVehicles[index];
-    return { ...window, vehicle: v ? `${v.brand} ${v.model}` : "—" };
-  });
+  const availableVehicles: AvailableVehicle[] = twoHireVehicles
+    .filter((v) => v.tags === afdeling)
+    .filter((v) => isVehicleAvailable(v.alias, bookings, state?.start ?? null, state?.end ?? null))
+    .map((v) => {
+      const freePeriod = computeFreePeriod(v.alias, bookings, referenceStart, referenceEnd);
+      return {
+        id: v.vehicleId,
+        vehicle: `${v.brand} ${v.model}`,
+        plate: v.alias,
+        ledigPeriode: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod),
+      };
+    });
 
-  const availableVehicles =
-    reservationStart && reservationEnd
-      ? allVehicles.filter((vehicle) => {
-          const vehicleStart = parseDanishDateTime(vehicle.date, vehicle.start);
-          const vehicleEnd = parseDanishDateTime(vehicle.endDate, vehicle.end);
-          return vehicleStart < reservationStart && vehicleEnd > reservationEnd;
-        })
-      : allVehicles;
-
-  const [selectedVehicleId, setSelectedVehicleId] = useState<number | null>(null);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
 
   return (
@@ -109,7 +113,7 @@ export function AvailablePage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 
@@ -128,42 +132,44 @@ export function AvailablePage() {
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                  <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
-                  <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
-                  <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
-                  <div className="truncate px-1">Anvendelse</div>
-                </div>
+                <div className="min-h-0 flex-1 overflow-y-auto">
+                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_10rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
+                    <div className="truncate px-1 text-center">Ledig periode</div>
+                  </div>
 
-                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
-                  {availableVehicles.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen ledige køretøjer.</div>
-                  )}
-                  {availableVehicles.map((vehicle, index) => {
-                    const selected = selectedVehicleId === vehicle.id;
-                    const isAlternate = index % 2 === 1;
-                    return (
-                      <button
-                        key={vehicle.id}
-                        type="button"
-                        onClick={() => setSelectedVehicleId(vehicle.id)}
-                        className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-0.5 text-left text-[0.7rem] transition ${
-                          selected
-                            ? "bg-brand-100 text-brand-800"
-                            : index === 0
-                              ? "bg-white text-brand-700 hover:bg-brand-50"
-                              : isAlternate
-                                ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                : "bg-white text-brand-700 hover:bg-brand-50"
-                        }`}
-                      >
-                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{vehicle.vehicle}</div>
-                        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${vehicle.date} ${vehicle.start}`}</div>
-                        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${vehicle.endDate} ${vehicle.end}`}</div>
-                        <div className="truncate px-1">{vehicle.use}</div>
-                      </button>
-                    );
-                  })}
+                  <div className="divide-y divide-brand-100 bg-white">
+                    {loadingBookings && (
+                      <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Henter ledige køretøjer…</div>
+                    )}
+                    {!loadingBookings && availableVehicles.length === 0 && (
+                      <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen ledige køretøjer.</div>
+                    )}
+                    {!loadingBookings &&
+                      availableVehicles.map((vehicle, index) => {
+                      const selected = selectedVehicleId === vehicle.id;
+                      const isAlternate = index % 2 === 1;
+                      return (
+                        <button
+                          key={vehicle.id}
+                          type="button"
+                          onClick={() => setSelectedVehicleId(vehicle.id)}
+                          className={`grid w-full grid-cols-[minmax(0,1fr)_10rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
+                            selected
+                              ? "bg-brand-100 text-brand-800"
+                              : index === 0
+                                ? "bg-white text-brand-700 hover:bg-brand-50"
+                                : isAlternate
+                                  ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                  : "bg-white text-brand-700 hover:bg-brand-50"
+                          }`}
+                        >
+                          <div className="truncate border-r border-brand-100 pr-1 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</div>
+                          <div className="truncate px-1 text-center">{vehicle.ledigPeriode}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 

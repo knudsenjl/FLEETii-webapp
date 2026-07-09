@@ -15,10 +15,24 @@ type LeafletMapProps = {
   lng: number;
   zoom?: number;
   className?: string;
-  extraMarkers?: { lat: number; lng: number }[];
+  extraMarkers?: { lat: number; lng: number; tooltip?: string; onClick?: () => void }[];
+  showMarker?: boolean;
+  markerClickable?: boolean;
+  markerTooltip?: string;
+  onMarkerClick?: () => void;
 };
 
-export function LeafletMap({ lat, lng, zoom = 13, className, extraMarkers = [] }: LeafletMapProps) {
+export function LeafletMap({
+  lat,
+  lng,
+  zoom = 13,
+  className,
+  extraMarkers = [],
+  showMarker = true,
+  markerClickable = true,
+  markerTooltip,
+  onMarkerClick,
+}: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
 
@@ -40,9 +54,27 @@ export function LeafletMap({ lat, lng, zoom = 13, className, extraMarkers = [] }
       });
     };
 
-    bindNotImplementedPopup(L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map));
+    if (showMarker) {
+      const marker = L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map);
+      if (markerTooltip) {
+        marker.bindTooltip(markerTooltip, { direction: "top", offset: [0, -28] });
+      }
+      if (onMarkerClick) {
+        marker.on("click", onMarkerClick);
+      } else if (markerClickable) {
+        bindNotImplementedPopup(marker);
+      }
+    }
     extraMarkers.forEach((marker) => {
-      bindNotImplementedPopup(L.marker([marker.lat, marker.lng], { icon: fleetiiIcon }).addTo(map));
+      const extraMarker = L.marker([marker.lat, marker.lng], { icon: fleetiiIcon }).addTo(map);
+      if (marker.tooltip) {
+        extraMarker.bindTooltip(marker.tooltip, { direction: "top", offset: [0, -28] });
+      }
+      if (marker.onClick) {
+        extraMarker.on("click", marker.onClick);
+      } else {
+        bindNotImplementedPopup(extraMarker);
+      }
     });
 
     if (extraMarkers.length > 0) {
@@ -66,7 +98,7 @@ export function LeafletMap({ lat, lng, zoom = 13, className, extraMarkers = [] }
       map.remove();
       mapRef.current = null;
     };
-  }, [lat, lng, zoom]);
+  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, onMarkerClick]);
 
   return <div ref={containerRef} className={className} />;
 }

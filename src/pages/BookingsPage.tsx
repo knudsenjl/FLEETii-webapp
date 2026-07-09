@@ -2,10 +2,18 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { use2hireVehicle } from "../contexts/VehicleContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
+import {
+  BOOKINGS_SELECT_COLUMNS,
+  BOOKING_ID_COLUMN,
+  formatVehicleLabel,
+  mapBookingRow,
+  type BookingRow,
+} from "../lib/bookings";
 
 type Booking = {
   id: number;
@@ -15,33 +23,21 @@ type Booking = {
   endDate: string;
   end: string;
   use: string;
+  department: string | null;
 };
-
-type BookingRow = {
-  id: number;
-  "number plate": string;
-  start: string;
-  end: string;
-  usage: string;
-  user: string | null;
-};
-
-function splitIsoDateTime(iso: string): { date: string; time: string } {
-  const [datePart, timePart] = iso.split("T");
-  const [year, month, day] = datePart.split("-");
-  return { date: `${day}.${month}.${year}`, time: timePart.slice(0, 5) };
-}
 
 export function BookingsPage() {
-  const { signOut, session, profile } = useAuth();
+  const { signOut, session, profile, afdeling } = useAuth();
   const navigate = useNavigate();
+  const vehicles = use2hireVehicle();
   const user = session?.user.email ?? "";
   const [activeBookings, setActiveBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = profile?.role === "admin";
-  const [nextBooking, ...remainingBookings] = activeBookings;
+  const departmentBookings = activeBookings.filter((b) => b.department === afdeling);
+  const [nextBooking, ...remainingBookings] = departmentBookings;
 
   const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
   const selectedBooking = remainingBookings.find((b) => b.id === selectedBookingId) ?? null;
@@ -78,7 +74,7 @@ export function BookingsPage() {
 
     const baseQuery = supabase
       .from("Bookings")
-      .select("id, \"number plate\", start, end, usage, user")
+      .select(BOOKINGS_SELECT_COLUMNS)
       .gte("end", new Date().toISOString())
       .order("start", { ascending: true });
 
@@ -92,21 +88,7 @@ export function BookingsPage() {
       return;
     }
 
-    setActiveBookings(
-      (data ?? []).map((row) => {
-        const { date: startDate, time: start } = splitIsoDateTime(row.start);
-        const { date: endDate, time: end } = splitIsoDateTime(row.end);
-        return {
-          id: row.id,
-          vehicle: row["number plate"],
-          startDate,
-          start,
-          endDate,
-          end,
-          use: row.usage,
-        };
-      }),
-    );
+    setActiveBookings((data ?? []).map(mapBookingRow));
     setLoading(false);
   };
 
@@ -117,7 +99,7 @@ export function BookingsPage() {
   const handleCancel = async (booking: Booking) => {
     setCancelError(null);
     setCancellingId(booking.id);
-    const { error: deleteError } = await supabase.from("Bookings").delete().eq("id", booking.id);
+    const { error: deleteError } = await supabase.from("Bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
     setCancellingId(null);
 
     if (deleteError) {
@@ -154,7 +136,7 @@ export function BookingsPage() {
     }`;
     const rowContent = (
       <>
-        <div className="truncate border-r border-brand-100 pr-1 font-medium">{booking.vehicle}</div>
+        <div className="truncate border-r border-brand-100 pr-1 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</div>
         <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
         <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
         <div className="truncate px-1">{booking.use}</div>
@@ -223,7 +205,7 @@ export function BookingsPage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 

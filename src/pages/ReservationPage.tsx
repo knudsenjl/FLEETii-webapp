@@ -18,19 +18,19 @@ function ceilToQuarterHour(date: Date): Date {
 }
 
 export function ReservationPage() {
-  const { signOut, session, profile } = useAuth();
+  const { signOut, session, profile, afdeling } = useAuth();
   const navigate = useNavigate();
   const [bruger, setBruger] = useState(
     profile?.role === "admin" ? "" : session?.user.email ?? "",
   );
   const [anvendelse, setAnvendelse] = useState("");
-  const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; email: string; department: string | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("id, email")
+      .select("id, email, department")
       .order("email")
       .then(({ data, error: usersError }) => {
         if (usersError) {
@@ -38,10 +38,26 @@ export function ReservationPage() {
           return;
         }
         setUsers(
-          (data ?? []).filter((u): u is { id: string; email: string } => Boolean(u.email)),
+          (data ?? []).filter(
+            (u): u is { id: string; email: string; department: string | null } => Boolean(u.email),
+          ),
         );
       });
   }, []);
+
+  const departmentUsers = users.filter((u) => u.department === afdeling);
+
+  const hasSelectedInitialBruger = useRef(false);
+  useEffect(() => {
+    if (
+      profile?.role === "admin" &&
+      !hasSelectedInitialBruger.current &&
+      departmentUsers.length > 0
+    ) {
+      hasSelectedInitialBruger.current = true;
+      setBruger(departmentUsers[0].email);
+    }
+  }, [profile?.role, departmentUsers]);
 
   const now = ceilToQuarterHour(new Date());
   const end = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -168,7 +184,7 @@ export function ReservationPage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 
@@ -184,18 +200,28 @@ export function ReservationPage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Bruger
                     </label>
-                    <select
-                      value={bruger}
-                      onChange={(e) => setBruger(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    >
-                      <option value="">Vælg bruger</option>
-                      {users.map((u) => (
-                        <option key={u.id} value={u.email}>
-                          {u.email}
-                        </option>
-                      ))}
-                    </select>
+                    {profile?.role === "admin" ? (
+                      <select
+                        value={bruger}
+                        onChange={(e) => setBruger(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="">Vælg bruger</option>
+                        {departmentUsers.map((u) => (
+                          <option key={u.id} value={u.email}>
+                            {u.email}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="text"
+                        value={bruger}
+                        disabled
+                        readOnly
+                        className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"
+                      />
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">

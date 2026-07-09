@@ -1,18 +1,38 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
-import { use2hireGPS } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { LeafletMap } from "../components/LeafletMap";
 
 const COPENHAGEN = { lat: 55.6761, lng: 12.5683 };
 
 export function FleetManagementPage() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, afdeling } = useAuth();
   const navigate = useNavigate();
   const gpsPositions = use2hireGPS();
-  const [primary, ...rest] = gpsPositions;
+  const twoHireVehicles = use2hireVehicle();
+  const departmentGpsPositions = gpsPositions.filter(
+    (g) => twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.tags === afdeling,
+  );
+  const [primary, ...rest] = departmentGpsPositions;
   const center = primary ?? COPENHAGEN;
+
+  const goToVehicleDetails = (vehicleId: string) => {
+    const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
+    if (!twoHireVehicle) return;
+    navigate("/vehicleDetails", {
+      state: {
+        vehicle: {
+          ...twoHireVehicle,
+          vehicle: `${twoHireVehicle.brand} ${twoHireVehicle.model}`,
+          plate: twoHireVehicle.alias,
+          department: "—",
+          status: twoHireVehicle.online === "TRUE" ? "Online" : "Offline",
+        },
+      },
+    });
+  };
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 text-brand-900">
@@ -43,7 +63,7 @@ export function FleetManagementPage() {
               </div>
               <div className="flex min-w-0 items-center justify-between gap-2">
                 <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-                <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+                <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
               </div>
             </div>
 
@@ -56,7 +76,14 @@ export function FleetManagementPage() {
                 <LeafletMap
                   lat={center.lat}
                   lng={center.lng}
-                  extraMarkers={rest}
+                  markerTooltip={primary ? twoHireVehicles.find((v) => v.vehicleId === primary.vehicleId)?.alias : undefined}
+                  onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}
+                  extraMarkers={rest.map((g) => ({
+                    lat: g.lat,
+                    lng: g.lng,
+                    tooltip: twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.alias,
+                    onClick: () => goToVehicleDetails(g.vehicleId),
+                  }))}
                   className="absolute inset-0"
                 />
               </div>

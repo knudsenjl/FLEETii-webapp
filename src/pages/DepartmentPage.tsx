@@ -15,7 +15,7 @@ type ProfileRow = {
 };
 
 export function DepartmentPage() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, afdeling } = useAuth();
   const navigate = useNavigate();
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
@@ -49,6 +49,8 @@ export function DepartmentPage() {
 
     void loadUsers();
   }, []);
+
+  const departmentUsers = users.filter((u) => u.department === afdeling);
 
   const handleDeleteUser = async () => {
     if (!userAction) return;
@@ -97,14 +99,14 @@ export function DepartmentPage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 
           <section className="flex min-h-0 flex-1 flex-col rounded-[2rem] border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4">
               <h2 className="text-xl font-semibold text-brand-800">
-                Afdeling: {profile?.department ?? "—"}
+                Afdeling: {afdeling ?? "—"}
               </h2>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
@@ -122,12 +124,12 @@ export function DepartmentPage() {
                   {!loading && error && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
                   )}
-                  {!loading && !error && users.length === 0 && (
+                  {!loading && !error && departmentUsers.length === 0 && (
                     <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen brugere fundet.</div>
                   )}
                   {!loading &&
                     !error &&
-                    users.map((user, index) => {
+                    departmentUsers.map((user, index) => {
                       const isAlternate = index % 2 === 1;
                       return (
                         <button

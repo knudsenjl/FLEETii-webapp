@@ -4,7 +4,7 @@ import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
 export function AdminFrontpage() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, afdeling } = useAuth();
   const navigate = useNavigate();
 
   return (
@@ -35,7 +35,7 @@ export function AdminFrontpage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 

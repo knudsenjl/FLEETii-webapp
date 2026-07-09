@@ -22,8 +22,10 @@ type Vehicle = {
   onlineUpdatedAt?: string;
 };
 
+const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
+
 export function VehicleDetailsPage() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, afdeling } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const vehicle = (location.state as { vehicle?: Vehicle } | null)?.vehicle ?? null;
@@ -69,7 +71,7 @@ export function VehicleDetailsPage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 
@@ -92,15 +94,21 @@ export function VehicleDetailsPage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
                     <span className="text-sm text-brand-800">
-                      {vehicle.autonomyPercentage ?? "—"}
-                      {vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}
+                      {vehicle.autonomyPercentage ? (
+                        `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}`
+                      ) : (
+                        <span className="italic">Ingen information</span>
+                      )}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span className="text-sm text-brand-800">
-                      {vehicle.distanceCovered ?? "—"}
-                      {vehicle.distanceCoveredUpdatedAt ? ` (${vehicle.distanceCoveredUpdatedAt})` : ""}
+                      {vehicle.distanceCovered ? (
+                        `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${vehicle.distanceCoveredUpdatedAt})` : ""}`
+                      ) : (
+                        <span className="italic">Ingen information</span>
+                      )}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
@@ -114,7 +122,22 @@ export function VehicleDetailsPage() {
               </div>
 
               <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                <LeafletMap lat={position?.lat ?? 55.6761} lng={position?.lng ?? 12.5683} className="absolute inset-0" />
+                <LeafletMap
+                  lat={position?.lat ?? DENMARK_CENTER.lat}
+                  lng={position?.lng ?? DENMARK_CENTER.lng}
+                  zoom={position ? 13 : 7}
+                  showMarker={Boolean(position)}
+                  markerClickable={false}
+                  markerTooltip={vehicle.plate}
+                  className="absolute inset-0"
+                />
+                {!position && (
+                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
+                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
+                      Der er ingen GPS position tilgængelig for dette køretøj
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">

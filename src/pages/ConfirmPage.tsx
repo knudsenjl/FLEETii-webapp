@@ -4,19 +4,16 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { supabase } from "../lib/supabase";
+import { DEPARTMENT_COLUMN, VEHICLE_ID_COLUMN, isVehicleAvailable, type BookingWindow } from "../lib/bookings";
 
 type ReservationVehicle = {
-  id: number;
+  id: string;
   vehicle: string;
-  date: string;
-  endDate: string;
-  start: string;
-  end: string;
-  use: string;
+  plate: string;
 };
 
 export function ConfirmPage() {
-  const { signOut, session, profile } = useAuth();
+  const { signOut, session, profile, afdeling } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -50,12 +47,36 @@ export function ConfirmPage() {
     setIsSubmitting(true);
     setError(null);
 
+    const { data: existingBookings, error: fetchError } = await supabase
+      .from("Bookings")
+      .select(`${VEHICLE_ID_COLUMN}, start, end`);
+
+    if (fetchError) {
+      setError(fetchError.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    const stillAvailable = isVehicleAvailable(
+      vehicle.plate,
+      (existingBookings ?? []) as BookingWindow[],
+      reservationStart,
+      reservationEnd,
+    );
+
+    if (!stillAvailable) {
+      setError("Køretøjet er ikke længere ledigt i den valgte periode.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const { error: insertError } = await supabase.from("Bookings").insert({
-      "number plate": vehicle.vehicle,
+      [VEHICLE_ID_COLUMN]: vehicle.plate,
       start: reservationStart,
       end: reservationEnd,
       usage: anvendelse,
       user: bruger || session?.user.email || null,
+      [DEPARTMENT_COLUMN]: afdeling,
     });
 
     if (insertError) {
@@ -70,7 +91,7 @@ export function ConfirmPage() {
   const rows: [string, string][] = [
     ["Reserveret til:", bruger],
     ["Anvendelse:", anvendelse],
-    ["Køretøj:", vehicle.vehicle],
+    ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`],
     ["Start:", reservationStart ? formatDanishDateTime(reservationStart) : ""],
     ["Slut:", reservationEnd ? formatDanishDateTime(reservationEnd) : ""],
   ];
@@ -103,7 +124,7 @@ export function ConfirmPage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 

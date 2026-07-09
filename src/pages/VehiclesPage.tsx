@@ -15,7 +15,7 @@ type Vehicle = Vehicle2Hire & {
 };
 
 export function VehiclesPage() {
-  const { signOut, profile } = useAuth();
+  const { signOut, profile, afdeling } = useAuth();
   const navigate = useNavigate();
   const twoHireVehicles = use2hireVehicle();
 
@@ -28,15 +28,17 @@ export function VehiclesPage() {
 
   useEffect(() => {
     setVehicles(
-      twoHireVehicles.map((v) => ({
-        ...v,
-        vehicle: `${v.brand} ${v.model}`,
-        plate: v.alias,
-        department: "—",
-        status: v.online === "TRUE" ? "Online" : "Offline",
-      })),
+      twoHireVehicles
+        .filter((v) => v.tags === afdeling)
+        .map((v) => ({
+          ...v,
+          vehicle: `${v.brand} ${v.model}`,
+          plate: v.alias,
+          department: "—",
+          status: v.online === "TRUE" ? "Online" : "Offline",
+        })),
     );
-  }, [twoHireVehicles]);
+  }, [twoHireVehicles, afdeling]);
 
   const handleDeleteVehicle = () => {
     if (!pendingDelete) return;
@@ -73,7 +75,7 @@ export function VehiclesPage() {
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
               <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {profile?.department ?? "—"}</p>
+              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
             </div>
           </div>
 
@@ -83,10 +85,9 @@ export function VehiclesPage() {
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <div className="truncate border-r border-brand-200 pr-1">Nummerplade</div>
                     <div className="truncate border-r border-brand-200 px-1">Mærke</div>
-                    <div className="truncate border-r border-brand-200 px-1">Afdeling</div>
                     <div className="truncate px-1">Status</div>
                   </div>
 
@@ -104,7 +105,7 @@ export function VehiclesPage() {
                         onClick={() =>
                           setSelectedVehicleId((current) => (current === vehicle.vehicleId ? null : vehicle.vehicleId))
                         }
-                        className={`grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
+                        className={`grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
                           isSelected
                             ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
                             : isAlternate
@@ -114,7 +115,6 @@ export function VehiclesPage() {
                       >
                         <div className="truncate border-r border-brand-100 pr-1 font-medium">{vehicle.plate}</div>
                         <div className="truncate border-r border-brand-100 px-1">{vehicle.vehicle}</div>
-                        <div className="truncate border-r border-brand-100 px-1">{vehicle.department}</div>
                         <div className="truncate px-1">{vehicle.status}</div>
                       </button>
                     );
