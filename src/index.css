@@ -92,6 +92,9 @@
 
   body {
     @apply bg-brand-50 text-brand-900 antialiased;
+    position: fixed;
+    inset: 0;
+    width: 100%;
     height: 100%;
     overflow: hidden;
     overscroll-behavior: none;
