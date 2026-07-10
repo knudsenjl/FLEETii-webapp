@@ -40,7 +40,7 @@ export function AllBookingsPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const [users, setUsers] = useState<{ id: string; email: string }[]>([]);
+  const [users, setUsers] = useState<{ id: string; email: string; department: string | null }[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -67,14 +67,19 @@ export function AllBookingsPage() {
     (b) => (!filterUser || b.user === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
   const selectedBooking = filteredBookings.find((b) => b.id === selectedBookingId) ?? null;
+  const departmentUsers = users.filter((u) => u.department === afdeling);
 
   useEffect(() => {
     supabase
       .from("profiles")
-      .select("id, email")
+      .select("id, email, department")
       .order("email")
       .then(({ data }) => {
-        setUsers((data ?? []).filter((u): u is { id: string; email: string } => Boolean(u.email)));
+        setUsers(
+          (data ?? []).filter(
+            (u): u is { id: string; email: string; department: string | null } => Boolean(u.email),
+          ),
+        );
       });
   }, []);
 
@@ -185,7 +190,7 @@ export function AllBookingsPage() {
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
                               <option value="">Alle brugere</option>
-                              {users.map((u) => (
+                              {departmentUsers.map((u) => (
                                 <option key={u.id} value={u.email}>
                                   {u.email}
                                 </option>
@@ -242,11 +247,10 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
                   <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
-                  <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
-                  <div className="truncate px-1">Anvendelse</div>
+                  <div className="whitespace-nowrap px-1 text-center">Slut</div>
                 </div>
 
                 <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
@@ -275,7 +279,7 @@ export function AllBookingsPage() {
                           onClick={() =>
                             setSelectedBookingId((current) => (current === booking.id ? null : booking.id))
                           }
-                          className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-0.5 text-left text-[0.7rem] transition ${
+                          className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
                             isSelected
                               ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
                               : isAlternate
@@ -285,8 +289,7 @@ export function AllBookingsPage() {
                         >
                           <div className="truncate border-r border-brand-100 pr-1 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</div>
                           <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
-                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
-                          <div className="truncate px-1">{booking.use}</div>
+                          <div className="whitespace-nowrap px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
                         </button>
                       );
                     })}
@@ -316,6 +319,9 @@ export function AllBookingsPage() {
                   </button>
                   <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" align="right" />
                 </div>
+              </div>
+
+              <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={!selectedBooking}
@@ -324,7 +330,7 @@ export function AllBookingsPage() {
                   }
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Vis kort
+                  Vis reservation
                 </button>
                 <button
                   type="button"
@@ -332,7 +338,7 @@ export function AllBookingsPage() {
                   onClick={() => selectedBooking && setPendingCancel(selectedBooking)}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Aflys
+                  Slet reservation
                 </button>
               </div>
 

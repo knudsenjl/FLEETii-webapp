@@ -113,11 +113,10 @@ export function BookingsPage() {
   };
 
   const bookingTableHeaderRow = (
-    <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+    <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
       <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
       <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
-      <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Slut</div>
-      <div className="truncate px-1">Anvendelse</div>
+      <div className="whitespace-nowrap px-1 text-center">Slut</div>
     </div>
   );
 
@@ -127,7 +126,7 @@ export function BookingsPage() {
     options?: { isSelected?: boolean; onClick?: () => void },
   ) => {
     const interactive = Boolean(options?.onClick);
-    const rowClassName = `grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem_minmax(0,1fr)] px-1 py-0.5 text-left text-[0.7rem] transition ${
+    const rowClassName = `grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
       options?.isSelected
         ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
         : isAlternate
@@ -138,8 +137,7 @@ export function BookingsPage() {
       <>
         <div className="truncate border-r border-brand-100 pr-1 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</div>
         <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
-        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
-        <div className="truncate px-1">{booking.use}</div>
+        <div className="whitespace-nowrap px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
       </>
     );
 
@@ -259,13 +257,16 @@ export function BookingsPage() {
                   </button>
                   <InlinePopup visible={notImplementedKey === "laas-next"} message="Endnu ikke implementeret" />
                 </div>
+              </div>
+
+              <div className="flex gap-2">
                 <button
                   type="button"
                   disabled={!nextBooking}
                   onClick={() => nextBooking && navigate("/bookingDetails", { state: { booking: nextBooking } })}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Vis kort
+                  Vis reservation
                 </button>
                 <button
                   type="button"
@@ -273,7 +274,7 @@ export function BookingsPage() {
                   onClick={() => nextBooking && setPendingCancel(nextBooking)}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Aflys
+                  Slet reservation
                 </button>
               </div>
 
@@ -316,7 +317,7 @@ export function BookingsPage() {
                   }
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Vis kort
+                  Vis reservation
                 </button>
                 <button
                   type="button"
@@ -324,7 +325,7 @@ export function BookingsPage() {
                   onClick={() => selectedBooking && setPendingCancel(selectedBooking)}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Aflys
+                  Slet reservation
                 </button>
               </div>
 

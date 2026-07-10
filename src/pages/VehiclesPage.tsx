@@ -36,7 +36,8 @@ export function VehiclesPage() {
           plate: v.alias,
           department: "—",
           status: v.online === "TRUE" ? "Online" : "Offline",
-        })),
+        }))
+        .sort((a, b) => a.alias.localeCompare(b.alias)),
     );
   }, [twoHireVehicles, afdeling]);
 
@@ -85,10 +86,9 @@ export function VehiclesPage() {
 
               <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                    <div className="truncate border-r border-brand-200 pr-1">Nummerplade</div>
-                    <div className="truncate border-r border-brand-200 px-1">Mærke</div>
-                    <div className="truncate px-1">Status</div>
+                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_1.75rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
+                    <div className="truncate px-1 text-center"></div>
                   </div>
 
                   <div className="divide-y divide-brand-100 bg-white">
@@ -105,7 +105,7 @@ export function VehiclesPage() {
                         onClick={() =>
                           setSelectedVehicleId((current) => (current === vehicle.vehicleId ? null : vehicle.vehicleId))
                         }
-                        className={`grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
+                        className={`grid w-full grid-cols-[minmax(0,1fr)_1.75rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
                           isSelected
                             ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
                             : isAlternate
@@ -113,9 +113,15 @@ export function VehiclesPage() {
                               : "bg-white text-brand-700 hover:bg-brand-50"
                         }`}
                       >
-                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{vehicle.plate}</div>
-                        <div className="truncate border-r border-brand-100 px-1">{vehicle.vehicle}</div>
-                        <div className="truncate px-1">{vehicle.status}</div>
+                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</div>
+                        <div className="flex items-center justify-center">
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${
+                              vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"
+                            }`}
+                            title={vehicle.status}
+                          />
+                        </div>
                       </button>
                     );
                   })}
@@ -153,19 +159,8 @@ export function VehiclesPage() {
                     onClick={() => selectedVehicle && navigate("/vehicleDetails", { state: { vehicle: selectedVehicle } })}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Vis kort
+                    Vis køretøj
                   </button>
-                </div>
-                <div className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled={!selectedVehicle}
-                    onClick={() => triggerNotImplemented("aflys")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Aflys
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "aflys"} message="Endnu ikke implementeret" align="right" />
                 </div>
               </div>
 
@@ -176,7 +171,7 @@ export function VehiclesPage() {
                   onClick={() => selectedVehicle && navigate("/handleVehicle", { state: { vehicle: selectedVehicle } })}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Rediger
+                  Rediger køretøj
                 </button>
                 <button
                   type="button"
@@ -184,7 +179,7 @@ export function VehiclesPage() {
                   onClick={() => selectedVehicle && setPendingDelete(selectedVehicle)}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Slet
+                  Slet køretøj
                 </button>
               </div>
 
@@ -194,7 +189,7 @@ export function VehiclesPage() {
                   onClick={() => triggerNotImplemented("opret-koeretoej")}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
-                  Opret køretøj
+                  Opret nyt køretøj
                 </button>
                 <InlinePopup visible={notImplementedKey === "opret-koeretoej"} message="Endnu ikke implementeret" />
               </div>

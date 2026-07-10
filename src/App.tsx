@@ -12,7 +12,6 @@ import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
-import { FleetPage } from "./pages/FleetPage";
 import { HandleVehiclePage } from "./pages/HandleVehiclePage";
 import { UserDetailsPage } from "./pages/UserDetailsPage";
 import { VehiclesPage } from "./pages/VehiclesPage";
@@ -74,7 +73,7 @@ function App() {
           <Route
             path="/allbookings"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <AllBookingsPage />
               </ProtectedRoute>
             }
@@ -90,7 +89,7 @@ function App() {
           <Route
             path="/admin"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <AdminFrontpage />
               </ProtectedRoute>
             }
@@ -98,7 +97,7 @@ function App() {
           <Route
             path="/department"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <DepartmentPage />
               </ProtectedRoute>
             }
@@ -106,23 +105,15 @@ function App() {
           <Route
             path="/fleet-management"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <FleetManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fleet"
-            element={
-              <ProtectedRoute>
-                <FleetPage />
               </ProtectedRoute>
             }
           />
           <Route
             path="/handleVehicle"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <HandleVehiclePage />
               </ProtectedRoute>
             }
@@ -130,7 +121,7 @@ function App() {
           <Route
             path="/user-details"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <UserDetailsPage />
               </ProtectedRoute>
             }
@@ -138,7 +129,7 @@ function App() {
           <Route
             path="/vehicles"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireAdmin>
                 <VehiclesPage />
               </ProtectedRoute>
             }

@@ -84,16 +84,17 @@ export function FleetManagementPage() {
                     tooltip: twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.alias,
                     onClick: () => goToVehicleDetails(g.vehicleId),
                   }))}
+                  cluster
                   className="absolute inset-0"
                 />
               </div>
 
               <button
                 type="button"
-                onClick={() => navigate("/fleet")}
+                onClick={() => navigate("/vehicles")}
                 className="mt-4 w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
-                Tabelvisning
+                Administration af køretøjer
               </button>
             </section>
           </motion.main>

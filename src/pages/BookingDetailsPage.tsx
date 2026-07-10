@@ -117,10 +117,6 @@ export function BookingDetailsPage() {
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
-                    <span className="text-sm text-brand-800">{formatVehicleLabel(booking.vehicle, vehicles)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
                     <span className="text-sm text-brand-800">
                       {booking.startDate} {booking.start} -{" "}
@@ -130,6 +126,10 @@ export function BookingDetailsPage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Anvendelse:</label>
                     <span className="text-sm text-brand-800">{booking.use}</span>
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
+                    <span className="text-sm text-brand-800">{formatVehicleLabel(booking.vehicle, vehicles)}</span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
@@ -206,7 +206,7 @@ export function BookingDetailsPage() {
                 disabled={isCancelling}
                 className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {isCancelling ? "Aflyser…" : "Aflys reservation"}
+                {isCancelling ? "Aflyser…" : "Slet reservation"}
               </button>
             </div>
           </section>

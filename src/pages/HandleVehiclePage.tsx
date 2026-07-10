@@ -40,7 +40,7 @@ export function HandleVehiclePage() {
 
   useEffect(() => {
     if (!vehicle) {
-      navigate("/fleet", { replace: true });
+      navigate("/vehicles", { replace: true });
     }
   }, [vehicle, navigate]);
 

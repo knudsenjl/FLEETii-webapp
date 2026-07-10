@@ -1,6 +1,9 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import fleetiiMarker from "../assets/fleetii-marker.png";
 
 const fleetiiIcon = L.icon({
@@ -20,6 +23,7 @@ type LeafletMapProps = {
   markerClickable?: boolean;
   markerTooltip?: string;
   onMarkerClick?: () => void;
+  cluster?: boolean;
 };
 
 export function LeafletMap({
@@ -32,6 +36,7 @@ export function LeafletMap({
   markerClickable = true,
   markerTooltip,
   onMarkerClick,
+  cluster = false,
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -54,8 +59,18 @@ export function LeafletMap({
       });
     };
 
+    const clusterGroup = cluster ? L.markerClusterGroup().addTo(map) : null;
+    const addMarkerToMap = (marker: L.Marker) => {
+      if (clusterGroup) {
+        clusterGroup.addLayer(marker);
+      } else {
+        marker.addTo(map);
+      }
+    };
+
     if (showMarker) {
-      const marker = L.marker([lat, lng], { icon: fleetiiIcon }).addTo(map);
+      const marker = L.marker([lat, lng], { icon: fleetiiIcon });
+      addMarkerToMap(marker);
       if (markerTooltip) {
         marker.bindTooltip(markerTooltip, { direction: "top", offset: [0, -28] });
       }
@@ -66,7 +81,8 @@ export function LeafletMap({
       }
     }
     extraMarkers.forEach((marker) => {
-      const extraMarker = L.marker([marker.lat, marker.lng], { icon: fleetiiIcon }).addTo(map);
+      const extraMarker = L.marker([marker.lat, marker.lng], { icon: fleetiiIcon });
+      addMarkerToMap(extraMarker);
       if (marker.tooltip) {
         extraMarker.bindTooltip(marker.tooltip, { direction: "top", offset: [0, -28] });
       }
@@ -98,7 +114,7 @@ export function LeafletMap({
       map.remove();
       mapRef.current = null;
     };
-  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, onMarkerClick]);
+  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, onMarkerClick, cluster]);
 
   return <div ref={containerRef} className={className} />;
 }

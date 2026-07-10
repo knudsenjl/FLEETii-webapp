@@ -1,10 +1,30 @@
+import { useEffect } from "react";
 import type { ReactNode } from "react";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "./FleetiiLogo";
 
-export function ProtectedRoute({ children }: { children: ReactNode }) {
-  const { loading, isFullyAuthenticated } = useAuth();
+function ForbiddenNotice() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const timeout = setTimeout(() => navigate("/", { replace: true }), 5000);
+    return () => clearTimeout(timeout);
+  }, [navigate]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
+      <div className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-lg">
+        <p className="text-sm font-medium text-brand-800">
+          Du har ikke tilladelse til at tilgå denne side. Siden er udelukkende tilgængelig for administratorer.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+export function ProtectedRoute({ children, requireAdmin = false }: { children: ReactNode; requireAdmin?: boolean }) {
+  const { loading, isFullyAuthenticated, profile } = useAuth();
 
   if (loading) {
     return (
@@ -16,6 +36,10 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
 
   if (!isFullyAuthenticated) {
     return <Navigate to="/" replace />;
+  }
+
+  if (requireAdmin && profile?.role !== "admin") {
+    return <ForbiddenNotice />;
   }
 
   return <>{children}</>;

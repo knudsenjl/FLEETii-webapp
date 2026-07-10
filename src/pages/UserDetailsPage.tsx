@@ -27,23 +27,14 @@ export function UserDetailsPage() {
   const [role, setRole] = useState(user?.role ?? "");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
-  const [existingProfileId, setExistingProfileId] = useState<string | null>(user?.id ?? null);
-  const [pendingAction, setPendingAction] = useState<"create" | "update" | "close" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"create" | "close" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-
-  const hasChanges =
-    fullName !== (user?.full_name ?? "") ||
-    email !== (user?.email ?? "") ||
-    phone !== (user?.phone ?? "") ||
-    department !== (user?.department ?? "") ||
-    role !== (user?.role ?? "");
 
   useEffect(() => {
     const trimmed = email.trim();
     if (!trimmed) {
       setEmailExists(null);
-      setExistingProfileId(null);
       return;
     }
 
@@ -60,14 +51,12 @@ export function UserDetailsPage() {
       }
 
       setEmailExists(Boolean(data));
-      setExistingProfileId(data?.id ?? null);
     }, 400);
 
     return () => clearTimeout(handle);
   }, [email]);
 
   const canCreate = email.trim().length > 0 && emailExists === false;
-  const canUpdate = hasChanges && emailExists === true;
 
   const handleConfirm = async () => {
     if (pendingAction === "close") {
@@ -78,52 +67,30 @@ export function UserDetailsPage() {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    if (pendingAction === "create") {
-      try {
-        const response = await fetch("/.netlify/functions/create-user", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            email: email.trim(),
-            full_name: fullName || null,
-            phone: phone || null,
-            department: department || null,
-            role: role || "user",
-          }),
-        });
-
-        const result = (await response.json()) as { id?: string; error?: string };
-
-        if (!response.ok) {
-          setSubmitError(result.error ?? "Kunne ikke oprette bruger.");
-          setIsSubmitting(false);
-          return;
-        }
-      } catch {
-        setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
-        setIsSubmitting(false);
-        return;
-      }
-    }
-
-    if (pendingAction === "update") {
-      const targetId = existingProfileId ?? user?.id;
-      const { error: updateError } = await supabase
-        .from("profiles")
-        .update({
+    try {
+      const response = await fetch("/.netlify/functions/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           email: email.trim(),
           full_name: fullName || null,
           phone: phone || null,
           department: department || null,
           role: role || "user",
-        })
-        .eq("id", targetId);
+        }),
+      });
 
-      if (updateError) {
-        setSubmitError(updateError.message);
+      const result = (await response.json()) as { id?: string; error?: string };
+
+      if (!response.ok) {
+        setSubmitError(result.error ?? "Kunne ikke oprette bruger.");
         setIsSubmitting(false);
         return;
       }
+    } catch {
+      setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
+      setIsSubmitting(false);
+      return;
     }
 
     setIsSubmitting(false);
@@ -219,7 +186,7 @@ export function UserDetailsPage() {
 
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
                   onClick={() => setPendingAction("create")}
@@ -227,14 +194,6 @@ export function UserDetailsPage() {
                   className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Opret bruger
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingAction("update")}
-                  disabled={!canUpdate}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Opdater bruger
                 </button>
                 <button
                   type="button"
@@ -254,7 +213,6 @@ export function UserDetailsPage() {
           <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
             <p className="text-sm font-medium text-brand-800">
               {pendingAction === "create" && "Er du sikker på, at du vil oprette denne bruger?"}
-              {pendingAction === "update" && "Er du sikker på, at du vil opdatere denne bruger?"}
               {pendingAction === "close" && "Er du sikker på, at du vil lukke uden at gemme?"}
             </p>
             {submitError && <p className="mt-2 text-sm text-red-600">{submitError}</p>}
