@@ -16,6 +16,8 @@ import { HandleVehiclePage } from "./pages/HandleVehiclePage";
 import { UserDetailsPage } from "./pages/UserDetailsPage";
 import { VehiclesPage } from "./pages/VehiclesPage";
 import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
+import { NewVehiclePage } from "./pages/NewVehiclePage";
+import { AboutPage } from "./pages/AboutPage";
 
 function RootRoute() {
   const { loading, isFullyAuthenticated, profile } = useAuth();
@@ -103,7 +105,7 @@ function App() {
             }
           />
           <Route
-            path="/fleet-management"
+            path="/fleet-map"
             element={
               <ProtectedRoute requireAdmin>
                 <FleetManagementPage />
@@ -127,7 +129,7 @@ function App() {
             }
           />
           <Route
-            path="/vehicles"
+            path="/fleet-table"
             element={
               <ProtectedRoute requireAdmin>
                 <VehiclesPage />
@@ -142,6 +144,15 @@ function App() {
               </ProtectedRoute>
             }
           />
+          <Route
+            path="/new-vehicle"
+            element={
+              <ProtectedRoute requireAdmin>
+                <NewVehiclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/about" element={<AboutPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </VehicleProvider>

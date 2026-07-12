@@ -199,6 +199,14 @@ export function BookingsPage() {
                 >
                   Log ud
                 </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/about")}
+                  aria-label="Om FLEETii"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+                >
+                  i
+                </button>
               </div>
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
@@ -333,7 +341,7 @@ export function BookingsPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Ny reservation
                 </button>

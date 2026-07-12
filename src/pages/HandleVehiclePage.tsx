@@ -40,7 +40,7 @@ export function HandleVehiclePage() {
 
   useEffect(() => {
     if (!vehicle) {
-      navigate("/vehicles", { replace: true });
+      navigate("/fleet-table", { replace: true });
     }
   }, [vehicle, navigate]);
 
@@ -105,6 +105,14 @@ export function HandleVehiclePage() {
                   className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                 >
                   Log ud
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/about")}
+                  aria-label="Om FLEETii"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+                >
+                  i
                 </button>
               </div>
             </div>

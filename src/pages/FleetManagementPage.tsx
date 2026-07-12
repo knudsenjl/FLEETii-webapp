@@ -59,6 +59,14 @@ export function FleetManagementPage() {
                   >
                     Log ud
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/about")}
+                    aria-label="Om FLEETii"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+                  >
+                    i
+                  </button>
                 </div>
               </div>
               <div className="flex min-w-0 items-center justify-between gap-2">
@@ -91,7 +99,7 @@ export function FleetManagementPage() {
 
               <button
                 type="button"
-                onClick={() => navigate("/vehicles")}
+                onClick={() => navigate("/fleet-table")}
                 className="mt-4 w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
                 Administration af køretøjer

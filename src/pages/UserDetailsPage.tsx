@@ -122,6 +122,14 @@ export function UserDetailsPage() {
                 >
                   Log ud
                 </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/about")}
+                  aria-label="Om FLEETii"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+                >
+                  i
+                </button>
               </div>
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">
@@ -146,9 +154,13 @@ export function UserDetailsPage() {
                     />
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">
+                      E-mail: <span className="ml-0.5 text-red-600">*</span>
+                    </label>
                     <input
                       type="text"
+                      required
+                      aria-required="true"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
@@ -183,6 +195,10 @@ export function UserDetailsPage() {
                   </div>
                 </div>
               </div>
+
+              <p className="text-right text-xs text-brand-500">
+                <span className="text-red-600">*</span> Feltet skal udfyldes
+              </p>
 
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 

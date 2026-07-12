@@ -102,6 +102,14 @@ export function BookingDetailsPage() {
                 >
                   Log ud
                 </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/about")}
+                  aria-label="Om FLEETii"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+                >
+                  i
+                </button>
               </div>
             </div>
             <div className="flex min-w-0 items-center justify-between gap-2">

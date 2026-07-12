@@ -1,5 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { setRememberMe, supabase } from "../lib/supabase";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
@@ -13,6 +14,7 @@ const stepVariants = {
 };
 
 export function LoginPage() {
+  const navigate = useNavigate();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -128,6 +130,15 @@ export function LoginPage() {
         className="w-full max-w-sm overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-xl shadow-brand-900/5"
       >
         <div className="relative min-h-[22rem] p-6 sm:p-8">
+          <button
+            type="button"
+            onClick={() => navigate("/about")}
+            aria-label="Om FLEETii"
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+          >
+            i
+          </button>
+
           <AnimatePresence mode="wait">
             {step.name === "credentials" && (
               <motion.form
