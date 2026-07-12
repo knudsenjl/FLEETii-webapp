@@ -1,5 +1,6 @@
 import { Resend } from "resend";
-import { asTrimmedString } from "../../src/lib/requestValidation";
+import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { requireAdmin } from "./_shared/serverAuth.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
@@ -58,6 +59,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) {
+    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+  }
+
   const apiKey = process.env.RESEND_API_KEY;
   const mailReceiver = process.env.RESEND_MAIL_RECIEVER;
   if (!apiKey || !mailReceiver) {
@@ -69,7 +75,7 @@ export default async (req: Request) => {
 
   let body: SendVehicleRequestBody;
   try {
-    body = await req.json();
+    body = (await req.json()) as SendVehicleRequestBody;
   } catch {
     return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
   }

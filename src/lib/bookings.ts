@@ -1,8 +1,28 @@
+import type { Vehicle2Hire } from "./vehicleDataSource";
+
 export const BOOKING_ID_COLUMN = "booking_id";
 export const VEHICLE_ID_COLUMN = "vehicle_id";
 export const DEPARTMENT_COLUMN = "department";
 
 export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, user, ${DEPARTMENT_COLUMN}`;
+
+export type DisplayVehicle = Vehicle2Hire & {
+  vehicle: string;
+  plate: string;
+  department: string;
+  status: string;
+};
+
+/** Maps a raw 2hire vehicle onto the display shape used by the fleet/vehicle-detail pages. */
+export function toDisplayVehicle(v: Vehicle2Hire): DisplayVehicle {
+  return {
+    ...v,
+    vehicle: `${v.brand} ${v.model}`,
+    plate: v.alias,
+    department: "—",
+    status: v.online === "TRUE" ? "Online" : "Offline",
+  };
+}
 
 export type BookingRow = {
   booking_id: number;
@@ -50,6 +70,20 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
 }
 
 export type BookingWindow = { vehicle_id: string; start: string; end: string };
+
+/**
+ * The current moment as a naive "YYYY-MM-DDTHH:mm:ss" string (no timezone
+ * suffix) built from LOCAL date/time components — matching the convention
+ * reservations are created under (see isoPrefix's doc comment below). Postgres
+ * stores those naive values under its session timezone, so a query needs
+ * "now" expressed the same naive way for a `>=`/`<=` comparison to land on
+ * the intended moment instead of drifting by the local UTC offset.
+ */
+export function nowIsoString(): string {
+  const d = new Date();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 
 /**
  * Compares ISO datetime strings as plain wall-clock values (first 19 chars,

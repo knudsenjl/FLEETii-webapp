@@ -10,6 +10,7 @@ import {
   computeFreePeriod,
   formatFreePeriod,
   isVehicleAvailable,
+  nowIsoString,
   type BookingWindow,
 } from "../lib/bookings";
 
@@ -19,12 +20,6 @@ type AvailableVehicle = {
   plate: string;
   ledigPeriode: string;
 };
-
-function nowIsoString(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-}
 
 function formatDanishTime(date: Date): string {
   const hours = String(date.getHours()).padStart(2, "0");
@@ -54,12 +49,18 @@ export function AvailablePage() {
 
   const [bookings, setBookings] = useState<BookingWindow[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
+  const [bookingsError, setBookingsError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from("Bookings")
       .select(`${VEHICLE_ID_COLUMN}, start, end`)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (error) {
+          setBookingsError(error.message);
+          setLoadingBookings(false);
+          return;
+        }
         setBookings((data ?? []) as BookingWindow[]);
         setLoadingBookings(false);
       });
@@ -126,10 +127,14 @@ export function AvailablePage() {
                     {loadingBookings && (
                       <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Henter ledige køretøjer…</div>
                     )}
-                    {!loadingBookings && availableVehicles.length === 0 && (
+                    {!loadingBookings && bookingsError && (
+                      <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{bookingsError}</div>
+                    )}
+                    {!loadingBookings && !bookingsError && availableVehicles.length === 0 && (
                       <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen ledige køretøjer.</div>
                     )}
                     {!loadingBookings &&
+                      !bookingsError &&
                       availableVehicles.map((vehicle, index) => {
                       const selected = selectedVehicleId === vehicle.id;
                       const isAlternate = index % 2 === 1;

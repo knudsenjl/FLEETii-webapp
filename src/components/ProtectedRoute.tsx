@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { Navigate, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "./FleetiiLogo";
+import { Modal } from "./Modal";
 
 function ForbiddenNotice() {
   const navigate = useNavigate();
@@ -13,13 +14,11 @@ function ForbiddenNotice() {
   }, [navigate]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-5 text-center shadow-lg">
-        <p className="text-sm font-medium text-brand-800">
-          Du har ikke tilladelse til at tilgå denne side. Siden er udelukkende tilgængelig for administratorer.
-        </p>
-      </div>
-    </div>
+    <Modal>
+      <p className="text-center text-sm font-medium text-brand-800">
+        Du har ikke tilladelse til at tilgå denne side. Siden er udelukkende tilgængelig for administratorer.
+      </p>
+    </Modal>
   );
 }
 

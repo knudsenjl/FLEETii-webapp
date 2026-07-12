@@ -4,7 +4,13 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
-import { DEPARTMENT_COLUMN, VEHICLE_ID_COLUMN, isVehicleAvailable, type BookingWindow } from "../lib/bookings";
+import {
+  DEPARTMENT_COLUMN,
+  VEHICLE_ID_COLUMN,
+  isVehicleAvailable,
+  splitIsoDateTime,
+  type BookingWindow,
+} from "../lib/bookings";
 
 type ReservationVehicle = {
   id: string;
@@ -38,9 +44,8 @@ export function ConfirmPage() {
   }
 
   const formatDanishDateTime = (isoDateTime: string) => {
-    const [date, time] = isoDateTime.split("T");
-    const [year, month, day] = date.split("-");
-    return `${day}.${month}.${year} ${time.slice(0, 5)}`;
+    const { date, time } = splitIsoDateTime(isoDateTime);
+    return `${date} ${time}`;
   };
 
   const handleConfirm = async () => {
@@ -80,7 +85,16 @@ export function ConfirmPage() {
     });
 
     if (insertError) {
-      setError(insertError.message);
+      // 23P01 = Postgres exclusion_violation — the DB-level overlap
+      // constraint (supabase/booking_overlap_constraint.sql) caught a race
+      // the availability pre-check above missed (another booking for the
+      // same vehicle/period was inserted in between). Show the same
+      // friendly message as the pre-check instead of the raw DB error.
+      setError(
+        insertError.code === "23P01"
+          ? "Køretøjet er ikke længere ledigt i den valgte periode."
+          : insertError.message,
+      );
       setIsSubmitting(false);
       return;
     }

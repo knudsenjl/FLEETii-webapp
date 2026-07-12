@@ -5,22 +5,11 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
-type VehicleBooking = {
-  id: number;
-  startDate: string;
-  start: string;
-  endDate: string;
-  end: string;
-  use: string;
-};
-
 type Vehicle = {
-  id: number;
   vehicle: string;
   plate: string;
   department: string;
   status: string;
-  booking?: VehicleBooking;
   version?: string;
   autonomyPercentage?: string;
   autonomyPercentageUpdatedAt?: string;
@@ -59,27 +48,6 @@ export function HandleVehiclePage() {
     ],
   ];
 
-  const handleStatusClick = () => {
-    if (vehicle.status === "Ledig") {
-      navigate("/reservation");
-      return;
-    }
-
-    navigate("/bookingDetails", {
-      state: {
-        booking: {
-          id: vehicle.booking?.id ?? vehicle.id,
-          vehicle: vehicle.vehicle,
-          startDate: vehicle.booking?.startDate ?? "",
-          start: vehicle.booking?.start ?? "",
-          endDate: vehicle.booking?.endDate ?? "",
-          end: vehicle.booking?.end ?? "",
-          use: vehicle.booking?.use ?? "",
-        },
-      },
-    });
-  };
-
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -108,17 +76,13 @@ export function HandleVehiclePage() {
                       <div className="whitespace-nowrap px-1">{value}</div>
                     </div>
                   ))}
-                  <button
-                    type="button"
-                    onClick={handleStatusClick}
-                    className="grid w-full grid-cols-[0.4fr_1fr] px-1 py-0.5 text-left text-[0.7rem] text-brand-700 transition hover:bg-brand-50"
-                  >
+                  <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-[0.7rem] text-brand-700">
                     <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Status:</div>
                     <div className="whitespace-nowrap px-1">
                       {vehicle.status}
                       {vehicle.onlineUpdatedAt ? ` (opdateret ${vehicle.onlineUpdatedAt})` : ""}
                     </div>
-                  </button>
+                  </div>
                 </div>
               </div>
 

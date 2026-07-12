@@ -13,6 +13,7 @@ import {
   BOOKING_ID_COLUMN,
   formatVehicleLabel,
   mapBookingRow,
+  nowIsoString,
   type BookingRow,
 } from "../lib/bookings";
 
@@ -91,7 +92,7 @@ export function AllBookingsPage() {
     const { data, error: fetchError } = await supabase
       .from("Bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
-      .gte("end", new Date().toISOString())
+      .gte("end", nowIsoString())
       .order("start", { ascending: true })
       .returns<BookingRow[]>();
 

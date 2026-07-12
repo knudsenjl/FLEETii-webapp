@@ -40,6 +40,13 @@ export function LeafletMap({
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
+  // Callers routinely pass a fresh inline closure for onMarkerClick on every
+  // render. Reading it through a ref (kept current here, during render) lets
+  // the init effect below omit it from its dependency array — otherwise the
+  // whole Leaflet map would be torn down and rebuilt (resetting pan/zoom) on
+  // every unrelated re-render of the parent.
+  const onMarkerClickRef = useRef(onMarkerClick);
+  onMarkerClickRef.current = onMarkerClick;
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -74,11 +81,17 @@ export function LeafletMap({
       if (markerTooltip) {
         marker.bindTooltip(markerTooltip, { direction: "top", offset: [0, -28] });
       }
-      if (onMarkerClick) {
-        marker.on("click", onMarkerClick);
-      } else if (markerClickable) {
-        bindNotImplementedPopup(marker);
+      if (markerClickable) {
+        marker.bindPopup("Endnu ikke implementeret");
       }
+      marker.on("click", () => {
+        if (onMarkerClickRef.current) {
+          onMarkerClickRef.current();
+        } else if (markerClickable) {
+          marker.openPopup();
+          setTimeout(() => marker.closePopup(), 3000);
+        }
+      });
     }
     extraMarkers.forEach((marker) => {
       const extraMarker = L.marker([marker.lat, marker.lng], { icon: fleetiiIcon });
@@ -114,7 +127,7 @@ export function LeafletMap({
       map.remove();
       mapRef.current = null;
     };
-  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, onMarkerClick, cluster]);
+  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, cluster]);
 
   return <div ref={containerRef} className={className} />;
 }

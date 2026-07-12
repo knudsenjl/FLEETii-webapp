@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
@@ -125,70 +126,25 @@ export function UserDetailsPage() {
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Navn: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      E-mail: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Telefon: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Afdeling: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
+                  <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
+                  <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} />
+                  <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} />
+                  <RequiredFieldRow label="Afdeling:" value={department} onChange={setDepartment} />
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Rolle: <span className="ml-0.5 text-red-600">*</span>
                     </label>
-                    <input
-                      type="text"
+                    <select
                       required
                       aria-required="true"
                       value={role}
                       onChange={(e) => setRole(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
+                    >
+                      <option value="">Vælg rolle</option>
+                      <option value="user">Bruger</option>
+                      <option value="admin">Administrator</option>
+                    </select>
                   </div>
                 </div>
               </div>

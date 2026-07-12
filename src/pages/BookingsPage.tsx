@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -13,6 +13,7 @@ import {
   BOOKING_ID_COLUMN,
   formatVehicleLabel,
   mapBookingRow,
+  nowIsoString,
   type BookingRow,
 } from "../lib/bookings";
 
@@ -47,21 +48,6 @@ export function BookingsPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const [infoPopup, setInfoPopup] = useState<"next" | "other" | null>(null);
-  const infoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
-    };
-  }, []);
-
-  const showInfo = (key: "next" | "other") => {
-    if (infoTimeoutRef.current) clearTimeout(infoTimeoutRef.current);
-    setInfoPopup(key);
-    infoTimeoutRef.current = setTimeout(() => setInfoPopup(null), 3000);
-  };
-
   const loadBookings = async () => {
     if (!isAdmin && !user) {
       setActiveBookings([]);
@@ -76,7 +62,7 @@ export function BookingsPage() {
     const baseQuery = supabase
       .from("Bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
-      .gte("end", new Date().toISOString())
+      .gte("end", nowIsoString())
       .order("start", { ascending: true });
 
     const { data, error: fetchError } = await (isAdmin ? baseQuery : baseQuery.eq("user", user)).returns<
@@ -162,13 +148,13 @@ export function BookingsPage() {
       <h3 className="text-sm font-semibold text-brand-700">{title}</h3>
       <button
         type="button"
-        onClick={() => showInfo(key)}
+        onClick={() => triggerNotImplemented(key)}
         aria-label="Mere information"
         className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
       >
         ?
       </button>
-      {infoPopup === key && (
+      {notImplementedKey === key && (
         <div className="animate-fade-in absolute right-0 top-full z-10 mt-2 w-64 rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs text-brand-700 shadow-lg">
           {message}
         </div>

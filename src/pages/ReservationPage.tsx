@@ -3,8 +3,10 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { TimeSelect } from "../components/TimeSelect";
 import { supabase } from "../lib/supabase";
+import { useTimedFlag } from "../hooks/useTimedFlag";
 
 const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
   const hours = Math.floor(i / 4);
@@ -88,37 +90,7 @@ export function ReservationPage() {
   const [endDate, setEndDate] = useState(toIsoDate(end));
   const [startTime, setStartTime] = useState(formatTime(now));
   const [endTime, setEndTime] = useState(formatTime(end));
-  const [showStartWarning, setShowStartWarning] = useState(false);
-  const startWarningTimeout = useRef<number | null>(null);
-  const [showEndWarning, setShowEndWarning] = useState(false);
-  const endWarningTimeout = useRef<number | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (startWarningTimeout.current) {
-        window.clearTimeout(startWarningTimeout.current);
-      }
-      if (endWarningTimeout.current) {
-        window.clearTimeout(endWarningTimeout.current);
-      }
-    };
-  }, []);
-
-  const triggerStartWarning = () => {
-    setShowStartWarning(true);
-    if (startWarningTimeout.current) {
-      window.clearTimeout(startWarningTimeout.current);
-    }
-    startWarningTimeout.current = window.setTimeout(() => setShowStartWarning(false), 3000);
-  };
-
-  const triggerEndWarning = () => {
-    setShowEndWarning(true);
-    if (endWarningTimeout.current) {
-      window.clearTimeout(endWarningTimeout.current);
-    }
-    endWarningTimeout.current = window.setTimeout(() => setShowEndWarning(false), 3000);
-  };
+  const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
 
   const applyStartDateTime = (candidateDate: string, candidateTime: string, syncEndDate: boolean) => {
     let date = candidateDate;
@@ -128,7 +100,7 @@ export function ReservationPage() {
       const current = ceilToQuarterHour(new Date());
       date = toIsoDate(current);
       time = formatTime(current);
-      triggerStartWarning();
+      triggerWarning("start");
     }
 
     setStartDate(date);
@@ -151,11 +123,11 @@ export function ReservationPage() {
     let date = candidateDate;
     let time = candidateTime;
 
-    if (new Date(`${date}T${time}:00`).getTime() < new Date(`${startDate}T${startTime}:00`).getTime()) {
+    if (new Date(`${date}T${time}:00`).getTime() <= new Date(`${startDate}T${startTime}:00`).getTime()) {
       const bumped = addMinutes(startTime, 30);
       date = bumped.daysAdded > 0 ? addDaysToIsoDate(startDate, bumped.daysAdded) : startDate;
       time = bumped.time;
-      triggerEndWarning();
+      triggerWarning("end");
     }
 
     setEndDate(date);
@@ -224,20 +196,14 @@ export function ReservationPage() {
                       />
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Anvendelse <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      placeholder="Beskrivelse"
-                      value={anvendelse}
-                      onChange={(e) => setAnvendelse(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
+                  <RequiredFieldRow
+                    label="Anvendelse"
+                    value={anvendelse}
+                    onChange={setAnvendelse}
+                    placeholder="Beskrivelse"
+                    className="grid grid-cols-2 gap-3 p-3 sm:p-4"
+                    inputClassName="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                  />
                   <div className="relative grid grid-cols-[4rem_1fr_1fr] items-center gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Start
@@ -253,7 +219,7 @@ export function ReservationPage() {
                       options={TIME_OPTIONS}
                       onChange={(t) => applyStartDateTime(startDate, t, false)}
                     />
-                    {showStartWarning && (
+                    {warningKey === "start" && (
                       <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
                         Start kan ikke være før nu
                       </div>
@@ -271,10 +237,10 @@ export function ReservationPage() {
                     />
                     <TimeSelect
                       value={endTime}
-                      options={TIME_OPTIONS.filter((t) => startDate !== endDate || t >= startTime)}
+                      options={TIME_OPTIONS.filter((t) => startDate !== endDate || t > startTime)}
                       onChange={(t) => applyEndDateTime(endDate, t)}
                     />
-                    {showEndWarning && (
+                    {warningKey === "end" && (
                       <div className="absolute bottom-full left-0 z-10 mb-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
                         Slut kan ikke være før Start
                       </div>

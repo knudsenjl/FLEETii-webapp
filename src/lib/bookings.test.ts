@@ -9,6 +9,7 @@ import {
   formatVehicleLabel,
   isVehicleAvailable,
   mapBookingRow,
+  nowIsoString,
   resolveVehicleGpsPosition,
   splitIsoDateTime,
   type BookingRow,
@@ -53,6 +54,21 @@ describe("splitIsoDateTime", () => {
 
   it("does not throw on an empty string, falling back to empty date and time", () => {
     expect(splitIsoDateTime("")).toEqual({ date: "", time: "" });
+  });
+});
+
+describe("nowIsoString", () => {
+  it("formats the current moment as a naive local-time string with no timezone suffix", () => {
+    const before = new Date();
+    const result = nowIsoString();
+    const after = new Date();
+
+    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const expectedFromBefore = `${before.getFullYear()}-${pad(before.getMonth() + 1)}-${pad(before.getDate())}T${pad(before.getHours())}:${pad(before.getMinutes())}:${pad(before.getSeconds())}`;
+    const expectedFromAfter = `${after.getFullYear()}-${pad(after.getMonth() + 1)}-${pad(after.getDate())}T${pad(after.getHours())}:${pad(after.getMinutes())}:${pad(after.getSeconds())}`;
+    expect([expectedFromBefore, expectedFromAfter]).toContain(result);
   });
 });
 

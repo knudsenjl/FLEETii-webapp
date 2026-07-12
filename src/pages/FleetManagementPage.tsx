@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { LeafletMap } from "../components/LeafletMap";
+import { toDisplayVehicle } from "../lib/bookings";
 
 const COPENHAGEN = { lat: 55.6761, lng: 12.5683 };
 
@@ -21,17 +22,7 @@ export function FleetManagementPage() {
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
     if (!twoHireVehicle) return;
-    navigate("/vehicleDetails", {
-      state: {
-        vehicle: {
-          ...twoHireVehicle,
-          vehicle: `${twoHireVehicle.brand} ${twoHireVehicle.model}`,
-          plate: twoHireVehicle.alias,
-          department: "—",
-          status: twoHireVehicle.online === "TRUE" ? "Online" : "Offline",
-        },
-      },
-    });
+    navigate("/vehicleDetails", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
   };
 
   return (

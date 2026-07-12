@@ -2,9 +2,10 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { RequiredFieldRow } from "../components/RequiredFieldRow";
 
 export function NewVehiclePage() {
-  const { afdeling } = useAuth();
+  const { afdeling, session } = useAuth();
   const [nummerplade, setNummerplade] = useState("");
   const [brand, setBrand] = useState("");
   const [maerke, setMaerke] = useState("");
@@ -32,7 +33,10 @@ export function NewVehiclePage() {
     try {
       const response = await fetch("/.netlify/functions/send-vehicle-request", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({ afdeling, nummerplade, brand, maerke, aargang, kontaktperson, kontaktnummer }),
       });
 
@@ -83,84 +87,12 @@ export function NewVehiclePage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
                     <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
                   </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Nummerplade: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={nummerplade}
-                      onChange={(e) => setNummerplade(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Brand: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={brand}
-                      onChange={(e) => setBrand(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Mærke: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={maerke}
-                      onChange={(e) => setMaerke(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Årgang: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={aargang}
-                      onChange={(e) => setAargang(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Kontaktperson: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={kontaktperson}
-                      onChange={(e) => setKontaktperson(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Kontaktnummer: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      aria-required="true"
-                      value={kontaktnummer}
-                      onChange={(e) => setKontaktnummer(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
+                  <RequiredFieldRow label="Nummerplade:" value={nummerplade} onChange={setNummerplade} />
+                  <RequiredFieldRow label="Brand:" value={brand} onChange={setBrand} />
+                  <RequiredFieldRow label="Mærke:" value={maerke} onChange={setMaerke} />
+                  <RequiredFieldRow label="Årgang:" value={aargang} onChange={setAargang} />
+                  <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
+                  <RequiredFieldRow label="Kontaktnummer:" value={kontaktnummer} onChange={setKontaktnummer} />
                 </div>
               </div>
 

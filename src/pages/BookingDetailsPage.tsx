@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
-import { BOOKING_ID_COLUMN, formatVehicleLabel, resolveVehicleGpsPosition } from "../lib/bookings";
+import { BOOKING_ID_COLUMN, formatVehicleLabel, resolveVehicleGpsPosition, toDisplayVehicle } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LeafletMap } from "../components/LeafletMap";
@@ -48,17 +48,7 @@ export function BookingDetailsPage() {
 
   const goToVehicleDetails = () => {
     if (!twoHireVehicle) return;
-    navigate("/vehicleDetails", {
-      state: {
-        vehicle: {
-          ...twoHireVehicle,
-          vehicle: `${twoHireVehicle.brand} ${twoHireVehicle.model}`,
-          plate: twoHireVehicle.alias,
-          department: "—",
-          status: twoHireVehicle.online === "TRUE" ? "Online" : "Offline",
-        },
-      },
-    });
+    navigate("/vehicleDetails", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
   };
 
   const handleCancelBooking = async () => {

@@ -30,13 +30,37 @@ function isRemembered(): boolean {
 // Keeps the session in localStorage (survives browser restarts) when "remember me" is
 // on, otherwise falls back to sessionStorage so the session disappears when the tab closes.
 const rememberAwareStorage = {
-  getItem: (key: string) => (isRemembered() ? localStorage : sessionStorage).getItem(key),
+  getItem: (key: string) => {
+    try {
+      return (isRemembered() ? localStorage : sessionStorage).getItem(key);
+    } catch (_) {
+      return null;
+    }
+  },
   setItem: (key: string, value: string) => {
-    (isRemembered() ? localStorage : sessionStorage).setItem(key, value);
+    // Clear the other storage's copy of this key too — otherwise a token
+    // written to localStorage during a "remembered" login lingers there
+    // indefinitely once a later login on the same machine opts out of
+    // "remember me" and starts writing to sessionStorage instead.
+    try {
+      if (isRemembered()) {
+        localStorage.setItem(key, value);
+        sessionStorage.removeItem(key);
+      } else {
+        sessionStorage.setItem(key, value);
+        localStorage.removeItem(key);
+      }
+    } catch (_) {
+      /* ignore storage errors */
+    }
   },
   removeItem: (key: string) => {
-    localStorage.removeItem(key);
-    sessionStorage.removeItem(key);
+    try {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    } catch (_) {
+      /* ignore storage errors */
+    }
   },
 };
 

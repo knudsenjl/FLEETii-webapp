@@ -2,18 +2,14 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { use2hireVehicle, type Vehicle2Hire } from "../contexts/VehicleContext";
+import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
-type Vehicle = Vehicle2Hire & {
-  vehicle: string;
-  plate: string;
-  department: string;
-  status: string;
-};
+type Vehicle = DisplayVehicle;
 
 export function VehiclesPage() {
   const { afdeling } = useAuth();
@@ -31,13 +27,7 @@ export function VehiclesPage() {
     setVehicles(
       twoHireVehicles
         .filter((v) => v.tags === afdeling)
-        .map((v) => ({
-          ...v,
-          vehicle: `${v.brand} ${v.model}`,
-          plate: v.alias,
-          department: "—",
-          status: v.online === "TRUE" ? "Online" : "Offline",
-        }))
+        .map(toDisplayVehicle)
         .sort((a, b) => a.alias.localeCompare(b.alias)),
     );
   }, [twoHireVehicles, afdeling]);
