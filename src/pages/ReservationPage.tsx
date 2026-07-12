@@ -233,10 +233,12 @@ export function ReservationPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Anvendelse
+                      Anvendelse <span className="ml-0.5 text-red-600">*</span>
                     </label>
                     <input
                       type="text"
+                      required
+                      aria-required="true"
                       placeholder="Beskrivelse"
                       value={anvendelse}
                       onChange={(e) => setAnvendelse(e.target.value)}
@@ -288,13 +290,17 @@ export function ReservationPage() {
                 </div>
               </div>
 
+              <p className="text-right text-xs text-brand-500">
+                <span className="text-red-600">*</span> Feltet skal udfyldes
+              </p>
+
               {error && <p className="text-sm text-red-600">{error}</p>}
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={handleFindAvailable}
-                  disabled={!bruger}
+                  disabled={!bruger || !anvendelse.trim()}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Find ledige

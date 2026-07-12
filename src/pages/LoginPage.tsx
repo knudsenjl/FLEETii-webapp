@@ -155,9 +155,6 @@ export function LoginPage() {
                   <h2 className="text-lg font-semibold text-brand-900">
                     Log ind
                   </h2>
-                  <p className="mt-1 text-sm text-brand-500">
-                    Indtast dine virksomhedsoplysninger for at fortsætte.
-                  </p>
                 </div>
 
                 <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">
