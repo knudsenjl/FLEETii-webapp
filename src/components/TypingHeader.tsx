@@ -42,7 +42,6 @@ export function TypingHeader({
     <Tag className={className}>
       <span aria-hidden="true">{text.slice(0, visibleChars)}</span>
       <span className="sr-only">{text}</span>
-      <span className="sr-only">{text}</span>
     </Tag>
   );
 }

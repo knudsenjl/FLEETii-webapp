@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { asTrimmedString } from "../../src/lib/requestValidation";
 
 type CreateUserBody = {
   email?: string;
@@ -30,7 +31,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
   }
 
-  const email = body.email?.trim();
+  const email = asTrimmedString(body.email);
   if (!email) {
     return new Response(JSON.stringify({ error: "E-mail er påkrævet." }), { status: 400 });
   }

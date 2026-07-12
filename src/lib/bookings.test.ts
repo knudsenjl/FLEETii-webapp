@@ -46,6 +46,14 @@ describe("splitIsoDateTime", () => {
   it("splits an ISO datetime into Danish date and time parts", () => {
     expect(splitIsoDateTime("2026-07-09T14:30:00")).toEqual({ date: "09.07.2026", time: "14:30" });
   });
+
+  it("does not throw on a bare date with no time part, and returns an empty time", () => {
+    expect(splitIsoDateTime("2026-07-09")).toEqual({ date: "09.07.2026", time: "" });
+  });
+
+  it("does not throw on an empty string, falling back to empty date and time", () => {
+    expect(splitIsoDateTime("")).toEqual({ date: "", time: "" });
+  });
 });
 
 describe("mapBookingRow", () => {
@@ -156,6 +164,20 @@ describe("isVehicleAvailable", () => {
       { vehicle_id: "AB12345", start: "2026-07-09T10:30:00+00:00", end: "2026-07-09T13:30:00+00:00" },
     ];
     expect(isVehicleAvailable("AB12345", bookings, "2026-07-09T11:00:00", "2026-07-09T12:00:00")).toBe(false);
+  });
+
+  it("is available for a back-to-back booking that starts exactly when an existing booking ends", () => {
+    const bookings: BookingWindow[] = [
+      { vehicle_id: "AB12345", start: "2026-07-09T06:00:00", end: reservationStart },
+    ];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, reservationEnd)).toBe(true);
+  });
+
+  it("is available for a back-to-back booking that ends exactly when an existing booking starts", () => {
+    const bookings: BookingWindow[] = [
+      { vehicle_id: "AB12345", start: reservationEnd, end: "2026-07-09T15:00:00" },
+    ];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, reservationEnd)).toBe(true);
   });
 });
 

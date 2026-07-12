@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
-import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
-import { FleetiiLogo } from "../components/FleetiiLogo";
+import { PageHeader } from "../components/PageHeader";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
@@ -27,7 +28,7 @@ type Booking = {
 };
 
 export function AllBookingsPage() {
-  const { signOut, profile, afdeling } = useAuth();
+  const { afdeling } = useAuth();
   const navigate = useNavigate();
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -138,31 +139,7 @@ export function AllBookingsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <div className="mb-2 flex flex-col gap-2">
-            <div className="flex items-center justify-between gap-3">
-              <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
-              <div className="flex items-center justify-end gap-3">
-                <button
-                  onClick={() => void signOut()}
-                  className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
-                >
-                  Log ud
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/about")}
-                  aria-label="Om FLEETii"
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
-                >
-                  i
-                </button>
-              </div>
-            </div>
-            <div className="flex min-w-0 items-center justify-between gap-2">
-              <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.email ?? "—"}</p>
-              <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
-            </div>
-          </div>
+          <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4">
@@ -365,32 +342,14 @@ export function AllBookingsPage() {
       </div>
 
       {pendingCancel && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-brand-900/40 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-white p-5 shadow-lg">
-            <p className="text-sm font-medium text-brand-800">
-              Er du sikker på, at du vil aflyse denne reservation?
-            </p>
-            {cancelError && <p className="mt-2 text-sm text-red-600">{cancelError}</p>}
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                onClick={() => setPendingCancel(null)}
-                disabled={cancellingId === pendingCancel.id}
-                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Nej
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCancel(pendingCancel)}
-                disabled={cancellingId === pendingCancel.id}
-                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {cancellingId === pendingCancel.id ? "Aflyser…" : "Ja"}
-              </button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDialog
+          message="Er du sikker på, at du vil aflyse denne reservation?"
+          error={cancelError}
+          onCancel={() => setPendingCancel(null)}
+          onConfirm={() => void handleCancel(pendingCancel)}
+          isPending={cancellingId === pendingCancel.id}
+          confirmPendingLabel="Aflyser…"
+        />
       )}
     </div>
   );

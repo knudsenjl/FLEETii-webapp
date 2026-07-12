@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { asTrimmedString } from "../../src/lib/requestValidation";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
@@ -73,12 +74,12 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
   }
 
-  const nummerplade = body.nummerplade?.trim();
-  const brand = body.brand?.trim();
-  const maerke = body.maerke?.trim();
-  const aargang = body.aargang?.trim();
-  const kontaktperson = body.kontaktperson?.trim();
-  const kontaktnummer = body.kontaktnummer?.trim();
+  const nummerplade = asTrimmedString(body.nummerplade);
+  const brand = asTrimmedString(body.brand);
+  const maerke = asTrimmedString(body.maerke);
+  const aargang = asTrimmedString(body.aargang);
+  const kontaktperson = asTrimmedString(body.kontaktperson);
+  const kontaktnummer = asTrimmedString(body.kontaktnummer);
   if (!nummerplade || !brand || !maerke || !aargang || !kontaktperson || !kontaktnummer) {
     return new Response(
       JSON.stringify({
@@ -88,7 +89,7 @@ export default async (req: Request) => {
     );
   }
 
-  const afdeling = body.afdeling?.trim() || "—";
+  const afdeling = asTrimmedString(body.afdeling) || "—";
 
   const resend = new Resend(apiKey);
 

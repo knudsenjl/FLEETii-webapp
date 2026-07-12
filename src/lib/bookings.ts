@@ -29,7 +29,8 @@ export type MappedBooking = {
 export function splitIsoDateTime(iso: string): { date: string; time: string } {
   const [datePart, timePart] = iso.split("T");
   const [year, month, day] = datePart.split("-");
-  return { date: `${day}.${month}.${year}`, time: timePart.slice(0, 5) };
+  const date = year && month && day ? `${day}.${month}.${year}` : datePart;
+  return { date, time: timePart ? timePart.slice(0, 5) : "" };
 }
 
 export function mapBookingRow(row: BookingRow): MappedBooking {
@@ -65,6 +66,9 @@ function isoPrefix(iso: string): string {
 /**
  * A vehicle is available for a requested period if it has no bookings at all,
  * or every one of its bookings lies entirely outside that period (no overlap).
+ * Bookings that merely touch the requested period (one ends exactly when the
+ * other starts) do not count as a conflict, so back-to-back reservations are
+ * allowed.
  */
 export function isVehicleAvailable(
   plate: string,
@@ -77,7 +81,7 @@ export function isVehicleAvailable(
   const start = isoPrefix(reservationStart);
   const end = isoPrefix(reservationEnd);
   const carBookings = bookings.filter((b) => b.vehicle_id === plate);
-  return carBookings.every((b) => isoPrefix(b.start) > end || isoPrefix(b.end) < start);
+  return carBookings.every((b) => isoPrefix(b.start) >= end || isoPrefix(b.end) <= start);
 }
 
 export type FreePeriod = { start: string | null; end: string | null };

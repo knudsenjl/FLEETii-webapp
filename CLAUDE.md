@@ -11,7 +11,7 @@ You're working inside the **WAT framework** (Workflows, Agents, Tools). This arc
 * You connect intent to execution without trying to do everything yourself
 * Example: If you need to pull data from a website, don't attempt it directly. Read workflows/scrape_website.md, figure out the required inputs, then execute tools/scrape_single_site.py
 **Layer 3: Tools (The Execution)**
-* Python scripts in tools/ that do the actual work
+* TypeScript modules (Netlify Functions in netlify/functions/, or shared helpers in src/lib/)
 * API calls, data transformations, file operations, database queries
 * Credentials and API keys are stored in .env
 * These scripts are consistent, testable, and fast
