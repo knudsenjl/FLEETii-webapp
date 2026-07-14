@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
+/** A row from the `profiles` table, as listed/selected on this page. */
 type ProfileRow = {
   id: string;
   email: string | null;
@@ -15,6 +16,18 @@ type ProfileRow = {
   role: string;
 };
 
+/**
+ * Admin "user management" page ("/department"): every user in the admin's
+ * own department, select-a-row-then-act (Rediger/Slet), plus a link to
+ * create a new user via UserDetailsPage.
+ *
+ * KNOWN LIMITATION: "Rediger" navigates to UserDetailsPage pre-filled with
+ * the existing user, but that page's form only ever calls create-user
+ * (which always invites a brand-new auth user) — there is no actual update
+ * path, so editing an existing user does not work today. "Slet" also only
+ * deletes the `profiles` row, not the underlying Supabase Auth account, so a
+ * "deleted" user can still log in.
+ */
 export function DepartmentPage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();
@@ -55,6 +68,7 @@ export function DepartmentPage() {
   const departmentUsers = users.filter((u) => u.department === afdeling);
   const selectedUser = departmentUsers.find((u) => u.id === selectedUserId) ?? null;
 
+  /** Deletes the pending user's `profiles` row (does NOT revoke their Supabase Auth account — see the KNOWN LIMITATION note on DepartmentPage above) and removes them from the local list. */
   const handleDeleteUser = async () => {
     if (!pendingDelete) return;
 

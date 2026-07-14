@@ -1,3 +1,6 @@
+// The FLEETii wordmark image, optionally clickable to jump to the user's
+// role-appropriate home page. Used in PageHeader (linkToHome) and standalone
+// on the loading/login screens (plain image).
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import logo from "../assets/fleetii-logo.png";
@@ -8,6 +11,7 @@ interface FleetiiLogoProps {
   linkToHome?: boolean;
 }
 
+/** Renders the FLEETii logo image, wrapped in a nav button when linkToHome is set. */
 export function FleetiiLogo({ className = "h-10 w-auto", linkToHome = false }: FleetiiLogoProps) {
   const navigate = useNavigate();
   const { profile } = useAuth();

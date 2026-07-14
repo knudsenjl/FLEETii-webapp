@@ -1,3 +1,9 @@
+// The app's single Supabase client instance (anon key — safe to ship in the
+// browser bundle; server-privileged work happens in netlify/functions/ with
+// the service-role key instead). Also implements the "remember me" storage
+// behavior: the session is kept in localStorage (survives browser restarts)
+// when the user opted in, or sessionStorage (cleared when the tab closes)
+// otherwise.
 import { createClient } from "@supabase/supabase-js";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -11,6 +17,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 const REMEMBER_ME_KEY = "fleetii_remember_me";
 
+/** Persists the user's "remember me" choice (called from LoginPage before signing in), which rememberAwareStorage below reads to decide where to keep the session. Silently no-ops if storage is unavailable. */
 export function setRememberMe(remember: boolean) {
   try {
     localStorage.setItem(REMEMBER_ME_KEY, remember ? "true" : "false");
@@ -19,6 +26,7 @@ export function setRememberMe(remember: boolean) {
   }
 }
 
+/** Whether the current login should be remembered (localStorage) rather than session-only (sessionStorage). Defaults to true (remembered) if the flag was never set or storage is unavailable. */
 function isRemembered(): boolean {
   try {
     return localStorage.getItem(REMEMBER_ME_KEY) !== "false";
@@ -64,6 +72,7 @@ const rememberAwareStorage = {
   },
 };
 
+/** The shared Supabase client used everywhere in the app (auth, `profiles`, `Bookings`). Import this rather than calling createClient() again elsewhere. */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: rememberAwareStorage,

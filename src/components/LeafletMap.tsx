@@ -1,3 +1,8 @@
+// Thin React wrapper around a plain Leaflet map. Leaflet manages its own DOM
+// inside containerRef imperatively (not through React's render cycle), so
+// the map is created once in an effect and torn down on unmount/dependency
+// change — see the dependency-array comment below for exactly which prop
+// changes are allowed to trigger that teardown/rebuild.
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -6,6 +11,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import fleetiiMarker from "../assets/fleetii-marker.png";
 
+/** The FLEETii pin icon used for every marker on every map. */
 const fleetiiIcon = L.icon({
   iconUrl: fleetiiMarker,
   iconSize: [24, 30],
@@ -14,18 +20,25 @@ const fleetiiIcon = L.icon({
 });
 
 type LeafletMapProps = {
+  /** Center coordinate (also the primary marker's position when showMarker is true). */
   lat: number;
   lng: number;
   zoom?: number;
   className?: string;
+  /** Additional markers besides the primary one (e.g. every vehicle on the fleet map besides the "primary"/selected one). */
   extraMarkers?: { lat: number; lng: number; tooltip?: string; onClick?: () => void }[];
+  /** Whether to render a marker at lat/lng at all (false shows just the tiles, e.g. when no GPS fix exists). */
   showMarker?: boolean;
+  /** Whether clicking the primary marker (with no onMarkerClick) should show a "not implemented" popup, vs. doing nothing. */
   markerClickable?: boolean;
   markerTooltip?: string;
+  /** Called when the primary marker is clicked; if omitted, falls back to the "not implemented" popup when markerClickable is true. */
   onMarkerClick?: () => void;
+  /** Groups extraMarkers (and the primary marker) into a Leaflet marker cluster instead of showing them individually. */
   cluster?: boolean;
 };
 
+/** Renders an OpenStreetMap tile map with a primary marker and optional extra markers/clustering. See LeafletMapProps for what each prop controls. */
 export function LeafletMap({
   lat,
   lng,

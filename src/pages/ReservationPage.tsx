@@ -8,17 +8,26 @@ import { TimeSelect } from "../components/TimeSelect";
 import { supabase } from "../lib/supabase";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
+/** Every quarter-hour of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns. */
 const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
   const hours = Math.floor(i / 4);
   const minutes = (i % 4) * 15;
   return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
 });
 
+/** Rounds a Date up to the next quarter-hour boundary (used for the default "now" start time). */
 function ceilToQuarterHour(date: Date): Date {
   const ms = 15 * 60 * 1000;
   return new Date(Math.ceil(date.getTime() / ms) * ms);
 }
 
+/**
+ * Step 1 of the booking flow ("/reservation"): pick who the reservation is
+ * for (admins pick from their department's users; regular users always book
+ * for themselves), what it's for, and the start/end date+time. Defaults to
+ * "now" through "+3 hours". Continues to AvailablePage (via router state,
+ * not a DB write yet) once "Find ledige" is pressed.
+ */
 export function ReservationPage() {
   const { session, profile, afdeling } = useAuth();
   const navigate = useNavigate();
@@ -92,6 +101,15 @@ export function ReservationPage() {
   const [endTime, setEndTime] = useState(formatTime(end));
   const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
 
+  /**
+   * Commits a new start date/time. Rejects anything in the past (snapping
+   * back to "now", rounded up to the next quarter hour, with a warning)
+   * instead of accepting it. When `syncEndDate` is true (date input changed),
+   * the end date follows the start date; when the resulting end time would
+   * no longer be after the new start time on the same day, it's bumped
+   * forward by 30 minutes (rolling the end date forward too if that bump
+   * crosses midnight).
+   */
   const applyStartDateTime = (candidateDate: string, candidateTime: string, syncEndDate: boolean) => {
     let date = candidateDate;
     let time = candidateTime;
@@ -119,6 +137,7 @@ export function ReservationPage() {
     }
   };
 
+  /** Commits a new end date/time. If it would land at or before the current start, corrects it to start + 30 minutes (rolling the date forward if that crosses midnight) and shows a warning, instead of accepting an invalid/zero-duration reservation. */
   const applyEndDateTime = (candidateDate: string, candidateTime: string) => {
     let date = candidateDate;
     let time = candidateTime;

@@ -1,6 +1,12 @@
+// The standard "are you sure?" Nej/Ja confirmation dialog, built on top of
+// Modal. Every destructive/confirmable action in the app (deleting a
+// vehicle, cancelling a reservation, creating a user, etc.) renders one of
+// these instead of a bespoke modal, so behavior (disabling buttons while
+// pending, showing an error) stays consistent everywhere.
 import type { ReactNode } from "react";
 import { Modal } from "./Modal";
 
+/** Props for ConfirmDialog. Only message/onCancel/onConfirm are required — labels and pending state are opt-in for callers that need them. */
 interface ConfirmDialogProps {
   message: ReactNode;
   error?: string | null;
@@ -8,10 +14,13 @@ interface ConfirmDialogProps {
   onConfirm: () => void;
   cancelLabel?: string;
   confirmLabel?: string;
+  /** Label shown on the confirm button while isPending is true (falls back to confirmLabel if omitted). */
   confirmPendingLabel?: string;
+  /** Disables both buttons (e.g. while a request is in flight) and swaps in confirmPendingLabel. */
   isPending?: boolean;
 }
 
+/** A Nej/Ja confirmation modal with an optional error message and pending state. Both buttons render with identical styling — there is no visual "danger" distinction between confirm and cancel, so double-check the message text is clear about what confirming will do. */
 export function ConfirmDialog({
   message,
   error,

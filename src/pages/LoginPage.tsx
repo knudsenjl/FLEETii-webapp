@@ -1,3 +1,11 @@
+// The public entry point ("/" when logged out — see RootRoute in App.tsx).
+// Handles username/password sign-in via Supabase Auth, "remember me" (both
+// the username, stored directly in localStorage, and the session-persistence
+// choice handled by lib/supabase.ts), and a "forgot password" reset-email
+// flow. On success it does NOT navigate manually — AuthContext's
+// onAuthStateChange listener picks up the new session and RootRoute
+// redirects once the profile has loaded too, avoiding a flash to the wrong
+// page.
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -5,6 +13,7 @@ import { setRememberMe, supabase } from "../lib/supabase";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
 
+/** Placeholder for a possible future multi-step login flow; today there's only one step. */
 type Step = { name: "credentials" };
 
 const stepVariants = {
@@ -13,6 +22,7 @@ const stepVariants = {
   exit: { opacity: 0, x: -24 },
 };
 
+/** The login form. Renders unauthenticated at "/" (see RootRoute) and also reachable, unauthenticated, via LoginPage's own "i" about-button linking to /about. */
 export function LoginPage() {
   const navigate = useNavigate();
   const [step] = useState<Step>({ name: "credentials" });
@@ -37,6 +47,7 @@ export function LoginPage() {
     }
   }, []);
 
+  /** Validates the form, remembers the username/session-mode if requested, and signs in via Supabase Auth. Errors are shown inline; a successful sign-in is picked up by AuthContext, not handled here. */
   async function handleCredentialsSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -80,6 +91,7 @@ export function LoginPage() {
     }
   }
 
+  /** Sends a Supabase password-reset email to the entered username/email. Requires a non-empty username field (used as the recipient) but no password. */
   async function handleForgotPassword() {
     setError(null);
     setResetMessage(null);

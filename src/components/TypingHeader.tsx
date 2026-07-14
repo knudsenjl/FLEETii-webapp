@@ -1,3 +1,8 @@
+// A heading that animates in one character at a time, purely as a visual
+// flourish (e.g. LoginPage's welcome text). Accessibility: the animated text
+// is aria-hidden and a plain sr-only span with the full text is rendered
+// alongside it, so screen readers get the complete heading immediately
+// rather than reading it out character-by-character or reading it twice.
 import { useEffect, useState } from "react";
 
 interface TypingHeaderProps {
@@ -10,6 +15,7 @@ interface TypingHeaderProps {
   as?: "h1" | "h2" | "h3";
 }
 
+/** Heading that types `text` out one character at a time. Restarts from scratch if `text`, `speed`, or `startDelay` change while mounted. */
 export function TypingHeader({
   text,
   className,

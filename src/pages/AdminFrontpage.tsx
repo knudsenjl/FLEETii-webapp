@@ -1,7 +1,11 @@
+// The admin home page ("/admin" — where RootRoute sends an admin after
+// login). Pure navigation hub: no data fetching, just links to every other
+// admin-only section of the app.
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 
+/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). */
 export function AdminFrontpage() {
   const navigate = useNavigate();
 

@@ -1,3 +1,9 @@
+// App-wide authentication/authorization context. Wraps Supabase Auth's
+// session with the app's own `profiles` row (name/phone/department/role),
+// which is the source of truth for role-based UI (admin vs. regular user)
+// and department scoping (Afdeling) used throughout the app. Every page that
+// needs to know "who is logged in" or "are they an admin" reads this via
+// useAuth() rather than talking to Supabase directly.
 import {
   createContext,
   useContext,
@@ -8,6 +14,7 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
+/** A row from the `profiles` table — the app's own user record, keyed by the Supabase auth.users id. */
 export interface Profile {
   id: string;
   email: string | null;
@@ -17,6 +24,7 @@ export interface Profile {
   role: string;
 }
 
+/** Shape of the value exposed by useAuth(). */
 interface AuthContextValue {
   session: Session | null;
   /** Extra user data (name, phone, department, role) synced from auth.users. */
@@ -29,18 +37,25 @@ interface AuthContextValue {
   signOut: () => Promise<void>;
 }
 
+/** Renders a role string as the Danish label shown in page headers ("Administrator" / "Bruger"). Any non-"admin" value (including null/undefined) is treated as a regular user. */
 export function formatRoleLabel(role?: string | null): string {
   return role === "admin" ? "Administrator" : "Bruger";
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+/**
+ * Provides the current Supabase session and matching `profiles` row to the
+ * whole app. Mount once near the root (see App.tsx) — everything under it
+ * can call useAuth() to read session/profile/afdeling/role state.
+ */
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isFullyAuthenticated, setIsFullyAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
+  /** Fetches the `profiles` row for the given auth user id. Returns null (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
   const loadProfile = async (userId: string): Promise<Profile | null> => {
     const { data, error } = await supabase
       .from("profiles")
@@ -93,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /** Signs the user out of Supabase and immediately clears local session/profile state (rather than waiting for the onAuthStateChange callback), so the UI reacts instantly. */
   const signOut = async () => {
     await supabase.auth.signOut();
     setSession(null);
@@ -116,6 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
+/** Reads the current auth session/profile/role state. Must be called from a component under <AuthProvider> (i.e. anywhere in this app) — throws otherwise. */
 export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth skal bruges inden i en AuthProvider");

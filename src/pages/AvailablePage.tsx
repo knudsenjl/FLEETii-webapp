@@ -14,6 +14,7 @@ import {
   type BookingWindow,
 } from "../lib/bookings";
 
+/** A vehicle available for the requested period, plus a human-readable description of its free window. */
 type AvailableVehicle = {
   id: string;
   vehicle: string;
@@ -33,10 +34,18 @@ function formatDanishDateTime(date: Date): string {
   return `${day}.${month}.${date.getFullYear()} ${formatDanishTime(date)}`;
 }
 
+/** True if two Dates fall on the same calendar day (used to decide whether to repeat the date in the period display). */
 function isSameDate(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }
 
+/**
+ * Step 2 of the booking flow ("/available"): given the department/period
+ * chosen on ReservationPage (via router state), lists every department
+ * vehicle that's free for that whole period, with its actual free window
+ * either side. Selecting one and pressing "Reserver" continues to
+ * ConfirmPage — still no DB write at this point.
+ */
 export function AvailablePage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();

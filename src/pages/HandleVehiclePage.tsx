@@ -5,6 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
+/** The DisplayVehicle shape, as passed in via router state from VehiclesPage's "Rediger køretøj" button. */
 type Vehicle = {
   vehicle: string;
   plate: string;
@@ -18,6 +19,11 @@ type Vehicle = {
   onlineUpdatedAt?: string;
 };
 
+/**
+ * Admin "edit vehicle" page ("/handleVehicle", reached via VehiclesPage's
+ * "Rediger køretøj"). Currently read-only/display-only — lock/unlock buttons
+ * are stubbed ("not implemented"), and there is no actual edit form yet.
+ */
 export function HandleVehiclePage() {
   const navigate = useNavigate();
   const location = useLocation();

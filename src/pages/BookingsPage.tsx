@@ -17,6 +17,7 @@ import {
   type BookingRow,
 } from "../lib/bookings";
 
+/** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). */
 type Booking = {
   id: number;
   vehicle: string;
@@ -28,6 +29,14 @@ type Booking = {
   department: string | null;
 };
 
+/**
+ * "My reservations" page ("/bookings"): a regular user's own upcoming
+ * bookings, or (for admins) every upcoming booking, split into "next" (the
+ * single soonest one, with its own quick-action buttons) and "other"
+ * (everything else, in a selectable list). See AllBookingsPage for the
+ * admin-only cross-department equivalent — the two pages share almost all
+ * of this logic but haven't been consolidated.
+ */
 export function BookingsPage() {
   const { session, profile, afdeling } = useAuth();
   const navigate = useNavigate();
@@ -48,6 +57,7 @@ export function BookingsPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
+  /** Fetches every not-yet-ended booking visible to the current user (own bookings, or all department bookings if admin) and replaces `activeBookings`. Called on mount, whenever user/role changes, and again after a cancellation. */
   const loadBookings = async () => {
     if (!isAdmin && !user) {
       setActiveBookings([]);
@@ -83,6 +93,7 @@ export function BookingsPage() {
     void loadBookings();
   }, [user, isAdmin]);
 
+  /** Deletes the given booking and reloads the list. */
   const handleCancel = async (booking: Booking) => {
     setCancelError(null);
     setCancellingId(booking.id);
@@ -99,6 +110,7 @@ export function BookingsPage() {
     await loadBookings();
   };
 
+  /** Shared column-header row for both the "next" and "other" booking tables below. */
   const bookingTableHeaderRow = (
     <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
       <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
@@ -107,6 +119,7 @@ export function BookingsPage() {
     </div>
   );
 
+  /** Renders one booking row — a plain (non-interactive) div for the "next" booking, or a clickable/selectable button when `options.onClick` is given (the "other" bookings list). */
   const renderBookingRow = (
     booking: Booking,
     isAlternate: boolean,
@@ -143,6 +156,7 @@ export function BookingsPage() {
     );
   };
 
+  /** A section title with an inline info "?" button that shows `message` via useTimedFlag, keyed so the "next" and "other" sections' popups don't interfere with each other. */
   const renderSubheader = (title: string, key: "next" | "other", message: string) => (
     <div className="relative flex items-center justify-between gap-2">
       <h3 className="text-sm font-semibold text-brand-700">{title}</h3>

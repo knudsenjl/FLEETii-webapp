@@ -1,7 +1,13 @@
+// The header block shown at the top of every page (logo, "Log ud", the "i"
+// about-button, and the role/afdeling row). Reads auth state directly via
+// useAuth() rather than taking props, so every page can just render
+// <PageHeader /> with no wiring — this is the single source of truth for
+// that layout; changing it here changes it everywhere.
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "./FleetiiLogo";
 
+/** Standard page header: logo, sign-out button (only when logged in), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
 export function PageHeader() {
   const { signOut, profile, afdeling, isFullyAuthenticated } = useAuth();
   const navigate = useNavigate();

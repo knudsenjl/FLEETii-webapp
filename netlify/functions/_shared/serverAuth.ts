@@ -1,5 +1,10 @@
+// Shared server-side authorization check for Netlify Functions. Both
+// create-user.mts and send-vehicle-request.mts require the caller to be a
+// logged-in admin; this is the one place that logic lives, so a new
+// admin-only function can reuse it instead of re-implementing its own check.
 import { createClient } from "@supabase/supabase-js";
 
+/** Result of requireAdmin(): either the verified admin's user id, or an HTTP status + Danish error message ready to return to the client as-is. */
 export type AdminCheckResult = { ok: true; userId: string } | { ok: false; status: 401 | 403 | 500; error: string };
 
 /**

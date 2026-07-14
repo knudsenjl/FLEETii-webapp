@@ -4,6 +4,14 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 
+/**
+ * Admin "Opret nyt køretøj" page ("/new-vehicle"): rather than creating the
+ * vehicle directly (FLEETii doesn't have a device-provisioning API), this
+ * form emails the request to FLEETii staff via the send-vehicle-request
+ * Netlify Function (which itself requires the caller to be a logged-in
+ * admin — see netlify/functions/_shared/serverAuth.ts), who create the
+ * vehicle and arrange device installation manually.
+ */
 export function NewVehiclePage() {
   const { afdeling, session } = useAuth();
   const [nummerplade, setNummerplade] = useState("");
@@ -25,6 +33,7 @@ export function NewVehiclePage() {
     kontaktnummer.trim().length > 0 &&
     !isSending;
 
+  /** Posts the vehicle-request form to send-vehicle-request, authenticated with the current session's access token. Shows a server-supplied error message (or a generic connection-failure one) inline on failure. */
   const handleSend = async () => {
     setIsSending(true);
     setSendError(null);

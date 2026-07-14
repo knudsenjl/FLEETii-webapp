@@ -1,9 +1,20 @@
+// Shared, framework-free helpers for working with bookings and 2hire
+// vehicles: column-name constants for the Supabase "Bookings" table, mapping
+// raw DB rows to display shapes, availability/free-period computation, and
+// Danish date/time formatting. Kept dependency-free (no React) so it's
+// usable from both pages and (via the requestValidation-style .js extension
+// import trick) Netlify Functions.
 import type { Vehicle2Hire } from "./vehicleDataSource";
 
+// The "Bookings" table's columns are named differently from the local field
+// names pages use (see MappedBooking) — these constants are the single
+// source of truth for the actual DB column names so a rename only needs to
+// happen in one place.
 export const BOOKING_ID_COLUMN = "booking_id";
 export const VEHICLE_ID_COLUMN = "vehicle_id";
 export const DEPARTMENT_COLUMN = "department";
 
+/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes. */
 export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, user, ${DEPARTMENT_COLUMN}`;
 
 export type DisplayVehicle = Vehicle2Hire & {
@@ -24,6 +35,7 @@ export function toDisplayVehicle(v: Vehicle2Hire): DisplayVehicle {
   };
 }
 
+/** Raw shape of a row selected with BOOKINGS_SELECT_COLUMNS, straight off the Supabase "Bookings" table. */
 export type BookingRow = {
   booking_id: number;
   vehicle_id: string;
@@ -34,6 +46,7 @@ export type BookingRow = {
   department: string | null;
 };
 
+/** A BookingRow reshaped for display: DB column names replaced with the local field names pages use, and start/end pre-split into separate Danish date/time strings. */
 export type MappedBooking = {
   id: number;
   vehicle: string;
@@ -46,6 +59,7 @@ export type MappedBooking = {
   department: string | null;
 };
 
+/** Splits an ISO datetime into a Danish "dd.mm.yyyy" date and an "HH:mm" time. Tolerates a bare date (no "T") or an empty string by falling back to an empty time instead of throwing. */
 export function splitIsoDateTime(iso: string): { date: string; time: string } {
   const [datePart, timePart] = iso.split("T");
   const [year, month, day] = datePart.split("-");
@@ -53,6 +67,7 @@ export function splitIsoDateTime(iso: string): { date: string; time: string } {
   return { date, time: timePart ? timePart.slice(0, 5) : "" };
 }
 
+/** Converts a raw BookingRow (DB column names, single ISO start/end strings) into the MappedBooking shape pages actually render. */
 export function mapBookingRow(row: BookingRow): MappedBooking {
   const { date: startDate, time: start } = splitIsoDateTime(row.start);
   const { date: endDate, time: end } = splitIsoDateTime(row.end);
@@ -69,6 +84,7 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
   };
 }
 
+/** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle id plus its reserved start/end. */
 export type BookingWindow = { vehicle_id: string; start: string; end: string };
 
 /**
@@ -118,6 +134,7 @@ export function isVehicleAvailable(
   return carBookings.every((b) => isoPrefix(b.start) >= end || isoPrefix(b.end) <= start);
 }
 
+/** A vehicle's free window either side of a reference period; a null bound means unbounded (no earlier/later booking constrains it). */
 export type FreePeriod = { start: string | null; end: string | null };
 
 /**
@@ -157,6 +174,7 @@ export function computeFreePeriod(
   return { start: freeStart, end: freeEnd };
 }
 
+/** Formats one FreePeriod bound as "dd.mm.yyyy HH:mm". */
 function formatFreePeriodBound(iso: string): string {
   const { date, time } = splitIsoDateTime(iso);
   return `${date} ${time}`;
@@ -177,6 +195,7 @@ export function formatFreePeriod(period: FreePeriod): string {
   return "—";
 }
 
+/** Minimal vehicle shape needed to render a "{plate}: {brand} {model}" label. */
 export type VehicleLookup = { alias: string; brand: string; model: string };
 
 /**
@@ -189,7 +208,9 @@ export function formatVehicleLabel(plate: string, vehicles: VehicleLookup[]): st
   return match ? `${plate}: ${match.brand} ${match.model}` : plate;
 }
 
+/** Minimal vehicle shape needed to resolve a booking's plate to its 2hire vehicleId. */
 export type VehicleIdLookup = { alias: string; vehicleId: string };
+/** A single vehicle's live GPS fix. */
 export type GpsPosition = { vehicleId: string; lat: number; lng: number };
 
 /**

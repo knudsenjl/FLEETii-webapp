@@ -12,12 +12,21 @@ import {
   type BookingWindow,
 } from "../lib/bookings";
 
+/** The selected vehicle, as passed in via router state from AvailablePage. */
 type ReservationVehicle = {
   id: string;
   vehicle: string;
   plate: string;
 };
 
+/**
+ * Final step of the booking flow ("/confirm"): shows a read-only summary of
+ * the reservation about to be made and, on confirmation, re-checks
+ * availability (closing most of the window for a race against another
+ * booking — see handleConfirm) before actually inserting the row into
+ * Supabase's "Bookings" table. Redirects to the fleet's/own bookings list on
+ * success depending on role.
+ */
 export function ConfirmPage() {
   const { session, profile, afdeling } = useAuth();
   const navigate = useNavigate();
@@ -48,6 +57,14 @@ export function ConfirmPage() {
     return `${date} ${time}`;
   };
 
+  /**
+   * Re-checks availability (the vehicle may have been booked by someone else
+   * since AvailablePage loaded) and, if still free, inserts the booking. The
+   * DB-level exclusion constraint (supabase/booking_overlap_constraint.sql)
+   * is the actual race-proof backstop — a 23P01 (exclusion_violation) error
+   * from the insert means this pre-check's race window was lost, and is
+   * shown with the same friendly message as the pre-check itself.
+   */
   const handleConfirm = async () => {
     setIsSubmitting(true);
     setError(null);

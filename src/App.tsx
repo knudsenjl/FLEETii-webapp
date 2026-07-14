@@ -1,3 +1,8 @@
+// Top-level route table for the whole app. Every authenticated route is
+// wrapped in <ProtectedRoute> (optionally with requireAdmin) which redirects
+// unauthenticated users to "/" and shows a "forbidden" notice to non-admins
+// on admin-only routes. "/about" is the one deliberately public route (it
+// must be reachable from LoginPage before a user has signed in).
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VehicleProvider } from "./contexts/VehicleContext";
@@ -19,6 +24,12 @@ import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
 import { NewVehiclePage } from "./pages/NewVehiclePage";
 import { AboutPage } from "./pages/AboutPage";
 
+/**
+ * The "/" route. Once the initial auth check finishes, sends a signed-in
+ * user straight to their role's home page (admin dashboard vs. bookings
+ * list) instead of showing the login form again. Renders LoginPage while
+ * loading or once it's confirmed there's no session.
+ */
 function RootRoute() {
   const { loading, isFullyAuthenticated, profile } = useAuth();
 
@@ -34,6 +45,7 @@ function RootRoute() {
   return <LoginPage />;
 }
 
+/** Root component: wraps the whole route tree in the two app-wide providers (auth session/profile, and 2hire vehicle/GPS telemetry) and declares every route. */
 function App() {
   return (
     <AuthProvider>

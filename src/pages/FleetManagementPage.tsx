@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -6,8 +7,15 @@ import { PageHeader } from "../components/PageHeader";
 import { LeafletMap } from "../components/LeafletMap";
 import { toDisplayVehicle } from "../lib/bookings";
 
-const COPENHAGEN = { lat: 55.6761, lng: 12.5683 };
+/** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
+const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
+/**
+ * Admin "Flådestyring" page ("/fleet-map"): a single map showing every
+ * vehicle in the admin's department, clustered, with the first vehicle as
+ * the "primary" marker (used to center the map) and the rest as extra
+ * markers. Clicking any marker jumps to VehicleDetailsPage for that vehicle.
+ */
 export function FleetManagementPage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();
@@ -17,7 +25,20 @@ export function FleetManagementPage() {
     (g) => twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.tags === afdeling,
   );
   const [primary, ...rest] = departmentGpsPositions;
-  const center = primary ?? COPENHAGEN;
+  const center = primary ?? DENMARK_CENTER;
+
+  // Shows immediately when the department has no vehicles, then auto-hides
+  // after 3s (rather than staying up indefinitely).
+  const [showEmptyNotice, setShowEmptyNotice] = useState(false);
+  useEffect(() => {
+    if (departmentGpsPositions.length > 0) {
+      setShowEmptyNotice(false);
+      return;
+    }
+    setShowEmptyNotice(true);
+    const timeout = setTimeout(() => setShowEmptyNotice(false), 3000);
+    return () => clearTimeout(timeout);
+  }, [departmentGpsPositions.length]);
 
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
@@ -51,6 +72,8 @@ export function FleetManagementPage() {
                 <LeafletMap
                   lat={center.lat}
                   lng={center.lng}
+                  zoom={primary ? 13 : 7}
+                  showMarker={Boolean(primary)}
                   markerTooltip={primary ? twoHireVehicles.find((v) => v.vehicleId === primary.vehicleId)?.alias : undefined}
                   onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}
                   extraMarkers={rest.map((g) => ({
@@ -62,6 +85,13 @@ export function FleetManagementPage() {
                   cluster
                   className="absolute inset-0"
                 />
+                {showEmptyNotice && (
+                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
+                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
+                      Der er ingen køretøjer i afdelingen
+                    </div>
+                  </div>
+                )}
               </div>
 
               <button

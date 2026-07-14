@@ -7,6 +7,7 @@ import { LeafletMap } from "../components/LeafletMap";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
+/** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
 type Vehicle = {
   vehicleId: string;
   vehicle: string;
@@ -21,8 +22,16 @@ type Vehicle = {
   onlineUpdatedAt?: string;
 };
 
+/** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
+/**
+ * Read-only vehicle detail view ("/vehicleDetails"): plate, model, fuel
+ * level, mileage, status, and a map showing its last known GPS position (or
+ * a "no GPS available" overlay if none exists). The vehicle itself is passed
+ * in via router state — there is no direct-URL/refresh support, so it
+ * redirects to the fleet table if state is missing (e.g. a hard refresh).
+ */
 export function VehicleDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();

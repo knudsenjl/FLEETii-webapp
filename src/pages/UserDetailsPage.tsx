@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
+/** A row from the `profiles` table. When reached with one pre-filled via router state (DepartmentPage's "Rediger"), the form is meant to edit it — see the KNOWN LIMITATION below. */
 type ProfileRow = {
   id: string;
   email: string | null;
@@ -15,7 +17,20 @@ type ProfileRow = {
   role: string;
 };
 
+/**
+ * Admin "create/edit user" form ("/user-details"). Validates every field is
+ * filled and that the email isn't already taken (debounced live check
+ * against `profiles`) before enabling "Opret bruger", which calls the
+ * create-user Netlify Function (authenticated with the current session).
+ *
+ * KNOWN LIMITATION: this form only ever creates a new user — reached via
+ * DepartmentPage's "Rediger" with an existing user's data pre-filled, the
+ * live email-exists check will always find that user's own (unchanged)
+ * email and treat it as taken, so the submit button never enables and there
+ * is no actual edit/update path today.
+ */
 export function UserDetailsPage() {
+  const { session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const user = (location.state as { user?: ProfileRow } | null)?.user ?? null;
@@ -64,6 +79,7 @@ export function UserDetailsPage() {
     department.trim().length > 0 &&
     role.trim().length > 0;
 
+  /** Calls create-user with the form's values, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleConfirm = async () => {
     if (pendingAction === "close") {
       navigate("/department");
@@ -76,7 +92,10 @@ export function UserDetailsPage() {
     try {
       const response = await fetch("/.netlify/functions/create-user", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
         body: JSON.stringify({
           email: email.trim(),
           full_name: fullName || null,

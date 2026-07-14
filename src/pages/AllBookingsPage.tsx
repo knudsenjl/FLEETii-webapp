@@ -17,6 +17,7 @@ import {
   type BookingRow,
 } from "../lib/bookings";
 
+/** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). */
 type Booking = {
   id: number;
   vehicle: string;
@@ -28,6 +29,14 @@ type Booking = {
   user: string | null;
 };
 
+/**
+ * Admin-only "Aktive reservationer" page ("/allbookings"): every upcoming
+ * booking in the admin's department, with a user/vehicle filter popover.
+ * This is the admin equivalent of BookingsPage (which shows a regular user
+ * their own bookings, or an admin's own "next booking" home view) — the two
+ * share most of their fetch/cancel/render logic but haven't been
+ * consolidated into one component.
+ */
 export function AllBookingsPage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();
@@ -85,6 +94,7 @@ export function AllBookingsPage() {
       });
   }, []);
 
+  /** Fetches every not-yet-ended booking (across all departments — filtered client-side to the admin's own department below) and replaces `bookings`. Called on mount and again after a cancellation. */
   const loadBookings = async () => {
     setLoading(true);
     setError(null);
@@ -110,6 +120,7 @@ export function AllBookingsPage() {
     void loadBookings();
   }, []);
 
+  /** Deletes the given booking and reloads the list. */
   const handleCancel = async (booking: Booking) => {
     setCancelError(null);
     setCancellingId(booking.id);

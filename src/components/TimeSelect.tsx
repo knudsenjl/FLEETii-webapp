@@ -1,11 +1,18 @@
+// A custom dropdown for picking a time-of-day string from a fixed list of
+// options (e.g. 15-minute increments). Built as a plain button + absolutely
+// positioned list rather than a native <select> so it can be styled to match
+// the rest of the app's inputs consistently across browsers.
 import { useEffect, useRef, useState } from "react";
 
 interface TimeSelectProps {
+  /** Currently selected option (shown on the toggle button even if it's not present in `options`). */
   value: string;
+  /** The selectable time strings, in display order (e.g. ReservationPage filters these to exclude times that would be invalid). */
   options: string[];
   onChange: (value: string) => void;
 }
 
+/** Dropdown time picker: click the button to open/close the list, click an option to select it and close. Closes automatically on an outside click, and scrolls the currently-selected option into view when opened. */
 export function TimeSelect({ value, options, onChange }: TimeSelectProps) {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);

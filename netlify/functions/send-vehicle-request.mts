@@ -1,3 +1,7 @@
+// Netlify Function: emails FLEETii staff a "please create/provision this
+// vehicle" request on behalf of an admin (there's no vehicle-provisioning
+// API to call directly — a human sets the device up). Reached from
+// NewVehiclePage.tsx.
 import { Resend } from "resend";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
@@ -12,6 +16,7 @@ type SendVehicleRequestBody = {
   kontaktnummer?: string;
 };
 
+/** Escapes the five HTML-significant characters so user-supplied form values can't break out of the generated email's markup. */
 function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
@@ -20,6 +25,7 @@ function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** Builds the HTML table of vehicle-request fields that becomes the email body. */
 function buildHtmlBody(fields: {
   afdeling: string;
   nummerplade: string;
@@ -54,6 +60,12 @@ function buildHtmlBody(fields: {
 // domain (e.g. "FLEETii <noreply@mh3.dk>") to lift that restriction.
 const DEFAULT_FROM = "FLEETii <onboarding@resend.dev>";
 
+/**
+ * POST { afdeling?, nummerplade, brand, maerke, aargang, kontaktperson,
+ * kontaktnummer } as an authenticated admin (see requireAdmin). Validates
+ * every field is a non-empty string, then emails the request to
+ * RESEND_MAIL_RECIEVER via Resend.
+ */
 export default async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });

@@ -1,5 +1,13 @@
+// Netlify Function: creates a new FLEETii user. Invites a real Supabase Auth
+// account (so the person sets their own password via email) and upserts a
+// matching `profiles` row, using the service-role key — which bypasses RLS
+// entirely, so the requireAdmin() check below is this function's actual
+// authorization boundary (RLS's INSERT policy on `profiles` is deliberately
+// absent, precisely because writes are meant to only ever happen here).
+// Reached from UserDetailsPage.tsx.
 import { createClient } from "@supabase/supabase-js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { requireAdmin } from "./_shared/serverAuth.js";
 
 type CreateUserBody = {
   email?: string;
@@ -12,13 +20,26 @@ type CreateUserBody = {
 const ALLOWED_ROLES = ["user", "admin"] as const;
 type Role = (typeof ALLOWED_ROLES)[number];
 
+/** True if `value` is exactly "user" or "admin" — the only valid `profiles.role` values. */
 function isAllowedRole(value: string): value is Role {
   return (ALLOWED_ROLES as readonly string[]).includes(value);
 }
 
+/**
+ * POST { email, full_name?, phone?, department?, role? } as an
+ * authenticated admin. Validates the caller (requireAdmin), the email, and
+ * the role (must be "user"/"admin", default "user"), invites the auth user,
+ * upserts their profile, and rolls back the invite if the profile write
+ * fails so the email doesn't end up permanently "stuck".
+ */
 export default async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+  }
+
+  const authResult = await requireAdmin(req);
+  if (!authResult.ok) {
+    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;

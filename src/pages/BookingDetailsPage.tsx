@@ -10,6 +10,7 @@ import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 
+/** A booking as passed in via router state from BookingsPage/AllBookingsPage. */
 type BookingDetails = {
   id: number;
   vehicle: string;
@@ -20,8 +21,16 @@ type BookingDetails = {
   use: string;
 };
 
+/** Fallback map center used when the booked vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
+/**
+ * Reservation detail view ("/bookingDetails"): the booking's period/usage,
+ * the vehicle's current fuel/mileage/status (looked up live from
+ * VehicleContext by plate, not stored on the booking itself), a map of its
+ * last known position, and a "Slet reservation" cancel flow. The vehicle is
+ * passed in via router state — there is no direct-URL/refresh support.
+ */
 export function BookingDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
@@ -51,6 +60,7 @@ export function BookingDetailsPage() {
     navigate("/vehicleDetails", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
   };
 
+  /** Deletes this booking and returns to the bookings list. */
   const handleCancelBooking = async () => {
     setIsCancelling(true);
     setError(null);

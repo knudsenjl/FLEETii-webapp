@@ -11,6 +11,17 @@ import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
 type Vehicle = DisplayVehicle;
 
+/**
+ * Admin "Administration af køretøjer" page ("/fleet-table"): lists every
+ * vehicle in the admin's own department (filtered by `afdeling`), lets them
+ * select one and jump to VehicleDetailsPage/HandleVehiclePage, or create a
+ * new one via NewVehiclePage.
+ *
+ * KNOWN LIMITATION: "Slet køretøj" only removes the vehicle from local
+ * component state — there is no backend call, so the vehicle reappears the
+ * next time `vehicles` is recomputed from the VehicleContext data (e.g. on
+ * navigation back to this page).
+ */
 export function VehiclesPage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();
@@ -32,6 +43,7 @@ export function VehiclesPage() {
     );
   }, [twoHireVehicles, afdeling]);
 
+  /** Removes the pending vehicle from local state only — see the KNOWN LIMITATION note on VehiclesPage above. */
   const handleDeleteVehicle = () => {
     if (!pendingDelete) return;
     setVehicles((prev) => prev.filter((v) => v.vehicleId !== pendingDelete.vehicleId));
