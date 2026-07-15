@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
+import { PHONE_PATTERN } from "../lib/validation";
 
 /**
  * Admin "Opret nyt køretøj" page ("/new-vehicle"): rather than creating the
@@ -24,13 +25,15 @@ export function NewVehiclePage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
 
+  const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(kontaktnummer.trim());
+
   const canSend =
     nummerplade.trim().length > 0 &&
     brand.trim().length > 0 &&
     maerke.trim().length > 0 &&
     aargang.trim().length > 0 &&
     kontaktperson.trim().length > 0 &&
-    kontaktnummer.trim().length > 0 &&
+    PHONE_PATTERN.test(kontaktnummer.trim()) &&
     !isSending;
 
   /** Posts the vehicle-request form to send-vehicle-request, authenticated with the current session's access token. Shows a server-supplied error message (or a generic connection-failure one) inline on failure. */
@@ -101,9 +104,11 @@ export function NewVehiclePage() {
                   <RequiredFieldRow label="Mærke:" value={maerke} onChange={setMaerke} />
                   <RequiredFieldRow label="Årgang:" value={aargang} onChange={setAargang} />
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
-                  <RequiredFieldRow label="Kontaktnummer:" value={kontaktnummer} onChange={setKontaktnummer} />
+                  <RequiredFieldRow label="Kontaktnummer:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
                 </div>
               </div>
+
+              {phoneFormatInvalid && <p className="text-xs text-red-600">Ugyldigt telefonnummer.</p>}
 
               <p className="text-right text-xs text-brand-500">
                 <span className="text-red-600">*</span> Feltet skal udfyldes

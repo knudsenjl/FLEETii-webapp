@@ -52,11 +52,19 @@ $$;
 -- profiles
 --
 -- App usage today: every logged-in user reads their own row (AuthContext).
--- Admin-only pages (DepartmentPage, AllBookingsPage's filter, UserDetailsPage's
--- email-exists check) read across all profiles. Only DepartmentPage deletes a
--- profile (admin only). Profile creation goes exclusively through the
--- create-user Netlify function using the service-role key, which bypasses
--- RLS entirely — so there is deliberately no INSERT/UPDATE policy here.
+-- Admin-only pages (DepartmentPage, AllBookingsPage's filter) read across
+-- their own department's profiles. Only DepartmentPage deletes a profile
+-- (admin only). Profile creation goes exclusively through the create-user
+-- Netlify function using the service-role key, which bypasses RLS entirely
+-- — so there is deliberately no INSERT/UPDATE policy here.
+--
+-- Note: UserDetailsPage's live "email already taken" check also reads
+-- `profiles` by email, but only ever sees same-department matches now (an
+-- admin can no longer see other departments' rows at all, see below) — a
+-- cross-department duplicate is still caught, just later, when create-user's
+-- inviteUserByEmail() call hits Supabase Auth's own global email-uniqueness
+-- constraint and returns a real error. Not a data-integrity gap, just a
+-- slightly less proactive UX check.
 -- ---------------------------------------------------------------------------
 
 alter table public.profiles enable row level security;
@@ -67,11 +75,17 @@ create policy "profiles_select_own" on public.profiles
   to authenticated
   using (auth.uid() = id);
 
+-- Admins may only read profiles within their own department, mirroring the
+-- department-scoped list DepartmentPage actually shows them (this used to
+-- be `using (public.is_admin())` with no department check at all, letting
+-- any admin read every user's profile — name/phone/email/role — company
+-- wide via a direct API call; tightened to match the sibling delete policy
+-- below).
 drop policy if exists "profiles_select_admin_all" on public.profiles;
-create policy "profiles_select_admin_all" on public.profiles
+create policy "profiles_select_admin_own_department" on public.profiles
   for select
   to authenticated
-  using (public.is_admin());
+  using (public.is_admin() and department = public.current_department());
 
 -- Admins may only delete users within their own department, mirroring the
 -- department-scoped list DepartmentPage actually shows them.

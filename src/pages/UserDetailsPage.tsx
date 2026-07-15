@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
+import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
 /** A row from the `profiles` table. When reached with one pre-filled via router state (DepartmentPage's "Rediger"), the form is meant to edit it — see the KNOWN LIMITATION below. */
 type ProfileRow = {
@@ -30,7 +31,7 @@ type ProfileRow = {
  * is no actual edit/update path today.
  */
 export function UserDetailsPage() {
-  const { session } = useAuth();
+  const { session, afdeling } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const user = (location.state as { user?: ProfileRow } | null)?.user ?? null;
@@ -38,8 +39,11 @@ export function UserDetailsPage() {
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [department, setDepartment] = useState(user?.department ?? "");
-  const [role, setRole] = useState(user?.role ?? "");
+  // Defaults to the admin's own department/"Bruger" — new users are almost
+  // always created in the admin's own department with the regular role;
+  // admin creation is the rare exception, not the default.
+  const [department, setDepartment] = useState(user?.department ?? afdeling ?? "");
+  const [role, setRole] = useState(user?.role ?? "user");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
   const [pendingAction, setPendingAction] = useState<"create" | "close" | null>(null);
@@ -71,11 +75,14 @@ export function UserDetailsPage() {
     return () => clearTimeout(handle);
   }, [email]);
 
+  const emailFormatInvalid = email.trim().length > 0 && !EMAIL_PATTERN.test(email.trim());
+  const phoneFormatInvalid = phone.trim().length > 0 && !PHONE_PATTERN.test(phone.trim());
+
   const canCreate =
     fullName.trim().length > 0 &&
-    email.trim().length > 0 &&
+    EMAIL_PATTERN.test(email.trim()) &&
     emailExists === false &&
-    phone.trim().length > 0 &&
+    PHONE_PATTERN.test(phone.trim()) &&
     department.trim().length > 0 &&
     role.trim().length > 0;
 
@@ -146,8 +153,8 @@ export function UserDetailsPage() {
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
                   <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
-                  <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} />
-                  <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} />
+                  <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
+                  <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />
                   <RequiredFieldRow label="Afdeling:" value={department} onChange={setDepartment} />
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
@@ -167,6 +174,9 @@ export function UserDetailsPage() {
                   </div>
                 </div>
               </div>
+
+              {emailFormatInvalid && <p className="text-xs text-red-600">Ugyldigt e-mailformat.</p>}
+              {phoneFormatInvalid && <p className="text-xs text-red-600">Ugyldigt telefonnummer.</p>}
 
               <p className="text-right text-xs text-brand-500">
                 <span className="text-red-600">*</span> Feltet skal udfyldes

@@ -14,6 +14,8 @@ interface RequiredFieldRowProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  /** HTML input type, e.g. "email" for the browser's built-in email keyboard/format hinting. Defaults to "text". */
+  type?: string;
   /** Overrides the row wrapper's classes (default: tight two-column grid). */
   className?: string;
   /** Overrides the <input>'s classes (default: matches the tight admin-table style). */
@@ -26,6 +28,7 @@ export function RequiredFieldRow({
   value,
   onChange,
   placeholder,
+  type = "text",
   className = DEFAULT_ROW_CLASSNAME,
   inputClassName = DEFAULT_INPUT_CLASSNAME,
 }: RequiredFieldRowProps) {
@@ -35,7 +38,7 @@ export function RequiredFieldRow({
         {label} <span className="ml-0.5 text-red-600">*</span>
       </label>
       <input
-        type="text"
+        type={type}
         required
         aria-required="true"
         placeholder={placeholder}
