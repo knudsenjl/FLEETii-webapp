@@ -23,17 +23,23 @@ import { VehiclesPage } from "./pages/VehiclesPage";
 import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
 import { NewVehiclePage } from "./pages/NewVehiclePage";
 import { AboutPage } from "./pages/AboutPage";
+import { SetPasswordPage } from "./pages/SetPasswordPage";
 
 /**
  * The "/" route. Once the initial auth check finishes, sends a signed-in
- * user straight to their role's home page (admin dashboard vs. bookings
- * list) instead of showing the login form again. Renders LoginPage while
- * loading or once it's confirmed there's no session.
+ * user to "/set-password" if they still have the shared default password
+ * (see create-user.mts), otherwise straight to their role's home page
+ * (admin dashboard vs. bookings list) instead of showing the login form
+ * again. Renders LoginPage while loading or once it's confirmed there's no
+ * session.
  */
 function RootRoute() {
-  const { loading, isFullyAuthenticated, profile } = useAuth();
+  const { loading, isFullyAuthenticated, profile, mustChangePassword } = useAuth();
 
   if (!loading && isFullyAuthenticated) {
+    if (mustChangePassword) {
+      return <Navigate to="/set-password" replace />;
+    }
     return (
       <Navigate
         to={profile?.role === "admin" ? "/admin" : "/bookings"}
@@ -161,6 +167,14 @@ function App() {
             element={
               <ProtectedRoute requireAdmin>
                 <NewVehiclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/set-password"
+            element={
+              <ProtectedRoute>
+                <SetPasswordPage />
               </ProtectedRoute>
             }
           />

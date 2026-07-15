@@ -1,22 +1,28 @@
-// Shared server-side authorization check for Netlify Functions. Both
-// create-user.mts and send-vehicle-request.mts require the caller to be a
-// logged-in admin; this is the one place that logic lives, so a new
-// admin-only function can reuse it instead of re-implementing its own check.
-import { createClient } from "@supabase/supabase-js";
+// Shared server-side authorization checks for Netlify Functions. Every
+// function that needs to know WHO is calling (not just trust the
+// service-role key, which bypasses RLS and says nothing about identity)
+// reuses requireUser() here; admin-only functions layer requireAdmin()'s
+// extra role check on top instead of re-implementing either check.
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+
+/** Result of requireUser(): either the verified caller's user id (plus a Supabase client scoped to their own token, so RLS applies), or an HTTP status + Danish error message ready to return to the client as-is. */
+export type UserCheckResult =
+  | { ok: true; userId: string; client: SupabaseClient }
+  | { ok: false; status: 401 | 500; error: string };
 
 /** Result of requireAdmin(): either the verified admin's user id, or an HTTP status + Danish error message ready to return to the client as-is. */
 export type AdminCheckResult = { ok: true; userId: string } | { ok: false; status: 401 | 403 | 500; error: string };
 
 /**
  * Verifies that the bearer token on an incoming Netlify Function request
- * belongs to a logged-in Supabase user whose profile has role "admin".
- * Netlify Functions authenticate to Supabase with the service-role key for
- * their own privileged work, but that key bypasses RLS entirely and says
- * nothing about WHO is calling the function — this checks the caller's own
- * identity via the anon key instead, so the profiles "read your own row" RLS
- * policy still applies.
+ * belongs to a logged-in Supabase user. Netlify Functions authenticate to
+ * Supabase with the service-role key for their own privileged work, but
+ * that key bypasses RLS entirely and says nothing about WHO is calling —
+ * this checks the caller's own identity via the anon key instead, so the
+ * profiles "read your own row" RLS policy still applies for anything the
+ * caller does with the returned client.
  */
-export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
+export async function requireUser(req: Request): Promise<UserCheckResult> {
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
   const anonKey = process.env.VITE_SUPABASE_ANON_KEY;
   if (!supabaseUrl || !anonKey) {
@@ -38,15 +44,25 @@ export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
     return { ok: false, status: 401, error: "Ugyldig session. Log venligst ind igen." };
   }
 
-  const { data: profile, error: profileError } = await client
+  return { ok: true, userId: userData.user.id, client };
+}
+
+/** Verifies the caller (via requireUser()) and additionally that their profile has role "admin". */
+export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
+  const userResult = await requireUser(req);
+  if (!userResult.ok) {
+    return userResult;
+  }
+
+  const { data: profile, error: profileError } = await userResult.client
     .from("profiles")
     .select("role")
-    .eq("id", userData.user.id)
+    .eq("id", userResult.userId)
     .maybeSingle<{ role: string }>();
 
   if (profileError || profile?.role !== "admin") {
     return { ok: false, status: 403, error: "Kun administratorer har adgang til denne handling." };
   }
 
-  return { ok: true, userId: userData.user.id };
+  return { ok: true, userId: userResult.userId };
 }

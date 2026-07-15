@@ -33,6 +33,8 @@ interface AuthContextValue {
   afdeling: string | null;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
+  /** True if this account was created with the shared default password and hasn't set a real one yet (see create-user.mts/SetPasswordPage.tsx). ProtectedRoute forces such a session to /set-password before anything else. */
+  mustChangePassword: boolean;
   loading: boolean;
   signOut: () => Promise<void>;
 }
@@ -123,6 +125,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         afdeling: profile?.department ?? null,
         isFullyAuthenticated,
+        mustChangePassword: session?.user.app_metadata?.must_change_password === true,
         loading,
         signOut,
       }}
