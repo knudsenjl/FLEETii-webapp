@@ -27,7 +27,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 /**
  * Reservation detail view ("/bookingDetails"): the booking's period/usage,
  * the vehicle's current fuel/mileage/status (looked up live from
- * VehicleContext by plate, not stored on the booking itself), a map of its
+ * VehicleContext by vehicleId, not stored on the booking itself), a map of its
  * last known position, and a "Slet reservation" cancel flow. The vehicle is
  * passed in via router state — there is no direct-URL/refresh support.
  */
@@ -42,8 +42,8 @@ export function BookingDetailsPage() {
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
-  const position = booking ? resolveVehicleGpsPosition(booking.vehicle, vehicles, gpsPositions) : null;
-  const twoHireVehicle = booking ? vehicles.find((v) => v.alias === booking.vehicle) : undefined;
+  const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
+  const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
 
   useEffect(() => {
     if (!booking) {
@@ -65,7 +65,7 @@ export function BookingDetailsPage() {
     setIsCancelling(true);
     setError(null);
 
-    const { error: deleteError } = await supabase.from("Bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
+    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
 
     if (deleteError) {
       setError(deleteError.message);
@@ -145,7 +145,7 @@ export function BookingDetailsPage() {
                   zoom={position ? 13 : 7}
                   showMarker={Boolean(position)}
                   markerClickable={false}
-                  markerTooltip={booking.vehicle}
+                  markerTooltip={twoHireVehicle?.alias ?? booking.vehicle}
                   onMarkerClick={goToVehicleDetails}
                   className="absolute inset-0"
                 />

@@ -1,4 +1,11 @@
--- Row Level Security policies for FLEETii's "profiles" and "Bookings" tables.
+-- Row Level Security policies for FLEETii's "user_profiles" and "bookings" tables.
+--
+-- "user_profiles" is FLEETii's own user-record table (name/phone/department/
+-- role), keyed by user_id = auth.users.id — NOT the same table as
+-- Supabase's own auth.users, which lives in a different schema and is
+-- untouched by any of this. Was named "profiles" (with a plain "id" column)
+-- until supabase/rename_profiles_table.sql, then "users" until
+-- supabase/rename_users_table.sql.
 --
 -- Run this in the Supabase SQL editor (Project -> SQL Editor -> New query).
 -- It is safe to run more than once (helper functions use CREATE OR REPLACE,
@@ -6,13 +13,13 @@
 --
 -- Context: the app's anon key is public (shipped in the browser bundle), so
 -- it cannot be used as the security boundary. These policies restrict what
--- an *authenticated Supabase user* may do, based on their own profiles row
+-- an *authenticated Supabase user* may do, based on their own user_profiles row
 -- (role/department) — matching how the app's role/afdeling model already
 -- works client-side, but now enforced server-side too.
 
 -- ---------------------------------------------------------------------------
--- Helper functions (SECURITY DEFINER so they can read `profiles` without
--- recursing into the very policies that use them).
+-- Helper functions (SECURITY DEFINER so they can read `user_profiles`
+-- without recursing into the very policies that use them).
 -- ---------------------------------------------------------------------------
 
 create or replace function public.is_admin()
@@ -23,8 +30,8 @@ set search_path = public
 stable
 as $$
   select exists (
-    select 1 from public.profiles
-    where id = auth.uid() and role = 'admin'
+    select 1 from public.user_profiles
+    where user_id = auth.uid() and role = 'admin'
   );
 $$;
 
@@ -35,7 +42,7 @@ security definer
 set search_path = public
 stable
 as $$
-  select department from public.profiles where id = auth.uid();
+  select department from public.user_profiles where user_id = auth.uid();
 $$;
 
 create or replace function public.current_email()
@@ -45,58 +52,65 @@ security definer
 set search_path = public
 stable
 as $$
-  select email from public.profiles where id = auth.uid();
+  select email from public.user_profiles where user_id = auth.uid();
 $$;
 
 -- ---------------------------------------------------------------------------
--- profiles
+-- user_profiles
 --
 -- App usage today: every logged-in user reads their own row (AuthContext).
 -- Admin-only pages (DepartmentPage, AllBookingsPage's filter) read across
--- their own department's profiles. Only DepartmentPage deletes a profile
--- (admin only). Profile creation goes exclusively through the create-user
+-- their own department's users. Only DepartmentPage deletes a user row
+-- (admin only). User creation goes exclusively through the create-user
 -- Netlify function using the service-role key, which bypasses RLS entirely
 -- — so there is deliberately no INSERT/UPDATE policy here.
 --
 -- Note: UserDetailsPage's live "email already taken" check also reads
--- `profiles` by email, but only ever sees same-department matches now (an
--- admin can no longer see other departments' rows at all, see below) — a
--- cross-department duplicate is still caught, just later, when create-user's
--- inviteUserByEmail() call hits Supabase Auth's own global email-uniqueness
--- constraint and returns a real error. Not a data-integrity gap, just a
--- slightly less proactive UX check.
+-- `user_profiles` by email, but only ever sees same-department matches now
+-- (an admin can no longer see other departments' rows at all, see below) —
+-- a cross-department duplicate is still caught, just later, when
+-- create-user's createUser() call hits Supabase Auth's own global
+-- email-uniqueness constraint and returns a real error. Not a
+-- data-integrity gap, just a slightly less proactive UX check.
 -- ---------------------------------------------------------------------------
 
-alter table public.profiles enable row level security;
+alter table public.user_profiles enable row level security;
 
-drop policy if exists "profiles_select_own" on public.profiles;
-create policy "profiles_select_own" on public.profiles
+drop policy if exists "profiles_select_own" on public.user_profiles;
+drop policy if exists "users_select_own" on public.user_profiles;
+drop policy if exists "user_profiles_select_own" on public.user_profiles;
+create policy "user_profiles_select_own" on public.user_profiles
   for select
   to authenticated
-  using (auth.uid() = id);
+  using (auth.uid() = user_id);
 
--- Admins may only read profiles within their own department, mirroring the
+-- Admins may only read users within their own department, mirroring the
 -- department-scoped list DepartmentPage actually shows them (this used to
 -- be `using (public.is_admin())` with no department check at all, letting
--- any admin read every user's profile — name/phone/email/role — company
--- wide via a direct API call; tightened to match the sibling delete policy
+-- any admin read every user's row — name/phone/email/role — company wide
+-- via a direct API call; tightened to match the sibling delete policy
 -- below).
-drop policy if exists "profiles_select_admin_all" on public.profiles;
-create policy "profiles_select_admin_own_department" on public.profiles
+drop policy if exists "profiles_select_admin_all" on public.user_profiles;
+drop policy if exists "profiles_select_admin_own_department" on public.user_profiles;
+drop policy if exists "users_select_admin_own_department" on public.user_profiles;
+drop policy if exists "user_profiles_select_admin_own_department" on public.user_profiles;
+create policy "user_profiles_select_admin_own_department" on public.user_profiles
   for select
   to authenticated
   using (public.is_admin() and department = public.current_department());
 
 -- Admins may only delete users within their own department, mirroring the
 -- department-scoped list DepartmentPage actually shows them.
-drop policy if exists "profiles_delete_admin_own_department" on public.profiles;
-create policy "profiles_delete_admin_own_department" on public.profiles
+drop policy if exists "profiles_delete_admin_own_department" on public.user_profiles;
+drop policy if exists "users_delete_admin_own_department" on public.user_profiles;
+drop policy if exists "user_profiles_delete_admin_own_department" on public.user_profiles;
+create policy "user_profiles_delete_admin_own_department" on public.user_profiles
   for delete
   to authenticated
   using (public.is_admin() and department = public.current_department());
 
 -- ---------------------------------------------------------------------------
--- "Bookings"  (capitalized table name — quote it exactly like this)
+-- bookings
 --
 -- App usage today: AvailablePage reads ALL bookings' vehicle/time windows
 -- (across every department) to compute vehicle availability — this is a
@@ -109,15 +123,15 @@ create policy "profiles_delete_admin_own_department" on public.profiles
 -- can see). There is no client-side UPDATE anywhere.
 -- ---------------------------------------------------------------------------
 
-alter table public."Bookings" enable row level security;
+alter table public.bookings enable row level security;
 
 -- Left open to any authenticated user (not just the row's owner) because the
 -- availability check genuinely needs to see other users'/departments'
 -- booking windows. If you want to lock this down further later, move the
 -- availability check into a SECURITY DEFINER RPC that returns only
 -- free/busy — then this policy can be tightened to "own rows only".
-drop policy if exists "bookings_select_authenticated" on public."Bookings";
-create policy "bookings_select_authenticated" on public."Bookings"
+drop policy if exists "bookings_select_authenticated" on public.bookings;
+create policy "bookings_select_authenticated" on public.bookings
   for select
   to authenticated
   using (true);
@@ -125,8 +139,8 @@ create policy "bookings_select_authenticated" on public."Bookings"
 -- A booking's department must match the creator's own department. A
 -- non-admin may only book for themselves; an admin may book on behalf of
 -- anyone (still constrained to their own department).
-drop policy if exists "bookings_insert_own_department" on public."Bookings";
-create policy "bookings_insert_own_department" on public."Bookings"
+drop policy if exists "bookings_insert_own_department" on public.bookings;
+create policy "bookings_insert_own_department" on public.bookings
   for insert
   to authenticated
   with check (
@@ -136,8 +150,8 @@ create policy "bookings_insert_own_department" on public."Bookings"
 
 -- A user may delete their own booking; an admin may delete any booking
 -- within their own department.
-drop policy if exists "bookings_delete_own_or_department_admin" on public."Bookings";
-create policy "bookings_delete_own_or_department_admin" on public."Bookings"
+drop policy if exists "bookings_delete_own_or_department_admin" on public.bookings;
+create policy "bookings_delete_own_or_department_admin" on public.bookings
   for delete
   to authenticated
   using (

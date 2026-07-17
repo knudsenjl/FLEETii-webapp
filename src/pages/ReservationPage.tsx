@@ -35,13 +35,13 @@ export function ReservationPage() {
     profile?.role === "admin" ? "" : session?.user.email ?? "",
   );
   const [anvendelse, setAnvendelse] = useState("");
-  const [users, setUsers] = useState<{ id: string; email: string; department: string | null }[]>([]);
+  const [users, setUsers] = useState<{ user_id: string; email: string; department: string | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
-      .from("profiles")
-      .select("id, email, department")
+      .from("user_profiles")
+      .select("user_id, email, department")
       .order("email")
       .then(({ data, error: usersError }) => {
         if (usersError) {
@@ -50,7 +50,7 @@ export function ReservationPage() {
         }
         setUsers(
           (data ?? []).filter(
-            (u): u is { id: string; email: string; department: string | null } => Boolean(u.email),
+            (u): u is { user_id: string; email: string; department: string | null } => Boolean(u.email),
           ),
         );
       });
@@ -200,7 +200,7 @@ export function ReservationPage() {
                       >
                         <option value="">Vælg bruger</option>
                         {departmentUsers.map((u) => (
-                          <option key={u.id} value={u.email}>
+                          <option key={u.user_id} value={u.email}>
                             {u.email}
                           </option>
                         ))}

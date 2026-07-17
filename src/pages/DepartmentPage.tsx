@@ -6,9 +6,9 @@ import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
-/** A row from the `profiles` table, as listed/selected on this page. */
+/** A row from the `user_profiles` table, as listed/selected on this page. */
 type ProfileRow = {
-  id: string;
+  user_id: string;
   email: string | null;
   full_name: string | null;
   phone: string | null;
@@ -25,7 +25,7 @@ type ProfileRow = {
  * the existing user, but that page's form only ever calls create-user
  * (which always invites a brand-new auth user) — there is no actual update
  * path, so editing an existing user does not work today. "Slet" also only
- * deletes the `profiles` row, not the underlying Supabase Auth account, so a
+ * deletes the `user_profiles` row, not the underlying Supabase Auth account, so a
  * "deleted" user can still log in.
  */
 export function DepartmentPage() {
@@ -47,8 +47,8 @@ export function DepartmentPage() {
       setError(null);
 
       const { data, error: fetchError } = await supabase
-        .from("profiles")
-        .select("id, email, full_name, phone, department, role")
+        .from("user_profiles")
+        .select("user_id, email, full_name, phone, department, role")
         .order("full_name", { ascending: true })
         .returns<ProfileRow[]>();
 
@@ -66,16 +66,16 @@ export function DepartmentPage() {
   }, []);
 
   const departmentUsers = users.filter((u) => u.department === afdeling);
-  const selectedUser = departmentUsers.find((u) => u.id === selectedUserId) ?? null;
+  const selectedUser = departmentUsers.find((u) => u.user_id === selectedUserId) ?? null;
 
-  /** Deletes the pending user's `profiles` row (does NOT revoke their Supabase Auth account — see the KNOWN LIMITATION note on DepartmentPage above) and removes them from the local list. */
+  /** Deletes the pending user's `user_profiles` row (does NOT revoke their Supabase Auth account — see the KNOWN LIMITATION note on DepartmentPage above) and removes them from the local list. */
   const handleDeleteUser = async () => {
     if (!pendingDelete) return;
 
     setIsDeleting(true);
     setDeleteError(null);
 
-    const { error: deleteErr } = await supabase.from("profiles").delete().eq("id", pendingDelete.id);
+    const { error: deleteErr } = await supabase.from("user_profiles").delete().eq("user_id", pendingDelete.user_id);
 
     if (deleteErr) {
       setDeleteError(deleteErr.message);
@@ -83,8 +83,8 @@ export function DepartmentPage() {
       return;
     }
 
-    setUsers((prev) => prev.filter((u) => u.id !== pendingDelete.id));
-    if (selectedUserId === pendingDelete.id) setSelectedUserId(null);
+    setUsers((prev) => prev.filter((u) => u.user_id !== pendingDelete.user_id));
+    if (selectedUserId === pendingDelete.user_id) setSelectedUserId(null);
     setIsDeleting(false);
     setPendingDelete(null);
   };
@@ -111,52 +111,73 @@ export function DepartmentPage() {
                 Afdeling: {afdeling ?? "—"}
               </h2>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                  <div className="truncate border-r border-brand-200 pr-1">Navn</div>
-                  <div className="truncate border-r border-brand-200 px-1">E-mail</div>
-                  <div className="truncate border-r border-brand-200 px-1">Afdeling</div>
-                  <div className="truncate px-1">Rolle</div>
-                </div>
-
-                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
-                  {loading && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser brugere…</div>
-                  )}
-                  {!loading && error && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
-                  )}
-                  {!loading && !error && departmentUsers.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen brugere fundet.</div>
-                  )}
-                  {!loading &&
-                    !error &&
-                    departmentUsers.map((user, index) => {
-                      const isAlternate = index % 2 === 1;
-                      const isSelected = user.id === selectedUserId;
-                      return (
-                        <button
-                          key={user.id}
-                          type="button"
-                          onClick={() =>
-                            setSelectedUserId((current) => (current === user.id ? null : user.id))
-                          }
-                          className={`grid w-full grid-cols-[minmax(0,1fr)_minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
-                            isSelected
-                              ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
-                              : isAlternate
-                                ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                : "bg-white text-brand-700 hover:bg-brand-50"
-                          }`}
-                        >
-                          <div className="truncate border-r border-brand-100 pr-1 font-medium">{user.full_name ?? "—"}</div>
-                          <div className="truncate border-r border-brand-100 px-1">{user.email ?? "—"}</div>
-                          <div className="truncate border-r border-brand-100 px-1">{user.department ?? "—"}</div>
-                          <div className="truncate px-1">{user.role}</div>
-                        </button>
-                      );
-                    })}
-                </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+                {/* A real <table> (not the CSS-grid-per-row layout used elsewhere)
+                    so column widths are computed once across the header AND every
+                    row together — table-layout:auto sizes each column to fit its
+                    widest actual content, rather than a fixed/1fr split. */}
+                <table className="w-full border-collapse text-[0.7rem]">
+                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <tr>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">E-mail</th>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
+                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Rolle</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
+                    {loading && (
+                      <tr>
+                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
+                      </tr>
+                    )}
+                    {!loading && error && (
+                      <tr>
+                        <td colSpan={4} className="px-2 py-3 text-center text-red-600">{error}</td>
+                      </tr>
+                    )}
+                    {!loading && !error && departmentUsers.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Ingen brugere fundet.</td>
+                      </tr>
+                    )}
+                    {!loading &&
+                      !error &&
+                      departmentUsers.map((user, index) => {
+                        const isAlternate = index % 2 === 1;
+                        const isSelected = user.user_id === selectedUserId;
+                        const toggleSelected = () =>
+                          setSelectedUserId((current) => (current === user.user_id ? null : user.user_id));
+                        return (
+                          <tr
+                            key={user.user_id}
+                            role="button"
+                            tabIndex={0}
+                            aria-pressed={isSelected}
+                            onClick={toggleSelected}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleSelected();
+                              }
+                            }}
+                            className={`cursor-pointer transition ${
+                              isSelected
+                                ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
+                                : isAlternate
+                                  ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                  : "bg-white text-brand-700 hover:bg-brand-50"
+                            }`}
+                          >
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.email ?? "—"}</td>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department ?? "—"}</td>
+                            <td className="whitespace-nowrap px-2 py-0.5">{user.role}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex gap-2">

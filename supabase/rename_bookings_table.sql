@@ -1,0 +1,14 @@
+-- One-time migration: renames the "Bookings" table (capitalized, quoted
+-- identifier) to bookings (lowercase, unquoted), matching every other
+-- table's naming convention (users, vehicle_signals).
+--
+-- Run this in the Supabase SQL editor. RLS policies, indexes, and foreign
+-- keys are attached to the table itself and survive a rename automatically —
+-- nothing else needs to be recreated afterward.
+--
+-- IMPORTANT: the app's code has already been updated to query "bookings"
+-- (lowercase). Run this migration and deploy the code together — if the
+-- table is renamed without deploying the code, or the code is deployed
+-- without renaming the table, every booking-related query in the app will
+-- fail until both sides match.
+alter table if exists public."Bookings" rename to bookings;

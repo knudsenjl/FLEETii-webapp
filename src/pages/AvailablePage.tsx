@@ -62,7 +62,7 @@ export function AvailablePage() {
 
   useEffect(() => {
     supabase
-      .from("Bookings")
+      .from("bookings")
       .select(`${VEHICLE_ID_COLUMN}, start, end`)
       .then(({ data, error }) => {
         if (error) {
@@ -81,9 +81,9 @@ export function AvailablePage() {
   const twoHireVehicles = use2hireVehicle();
   const availableVehicles: AvailableVehicle[] = twoHireVehicles
     .filter((v) => v.tags === afdeling)
-    .filter((v) => isVehicleAvailable(v.alias, bookings, state?.start ?? null, state?.end ?? null))
+    .filter((v) => isVehicleAvailable(v.vehicleId, bookings, state?.start ?? null, state?.end ?? null))
     .map((v) => {
-      const freePeriod = computeFreePeriod(v.alias, bookings, referenceStart, referenceEnd);
+      const freePeriod = computeFreePeriod(v.vehicleId, bookings, referenceStart, referenceEnd);
       return {
         id: v.vehicleId,
         vehicle: `${v.brand} ${v.model}`,
@@ -125,50 +125,65 @@ export function AvailablePage() {
                 )}
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_10rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                    <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
-                    <div className="truncate px-1 text-center">Ledig periode</div>
-                  </div>
-
-                  <div className="divide-y divide-brand-100 bg-white">
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+                <table className="w-full border-collapse text-[0.7rem]">
+                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <tr>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
+                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Ledig periode</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
                     {loadingBookings && (
-                      <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Henter ledige køretøjer…</div>
+                      <tr>
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Henter ledige køretøjer…</td>
+                      </tr>
                     )}
                     {!loadingBookings && bookingsError && (
-                      <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{bookingsError}</div>
+                      <tr>
+                        <td colSpan={2} className="px-2 py-3 text-center text-red-600">{bookingsError}</td>
+                      </tr>
                     )}
                     {!loadingBookings && !bookingsError && availableVehicles.length === 0 && (
-                      <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen ledige køretøjer.</div>
+                      <tr>
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Ingen ledige køretøjer.</td>
+                      </tr>
                     )}
                     {!loadingBookings &&
                       !bookingsError &&
                       availableVehicles.map((vehicle, index) => {
-                      const selected = selectedVehicleId === vehicle.id;
-                      const isAlternate = index % 2 === 1;
-                      return (
-                        <button
-                          key={vehicle.id}
-                          type="button"
-                          onClick={() => setSelectedVehicleId(vehicle.id)}
-                          className={`grid w-full grid-cols-[minmax(0,1fr)_10rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
-                            selected
-                              ? "bg-brand-100 text-brand-800"
-                              : index === 0
-                                ? "bg-white text-brand-700 hover:bg-brand-50"
-                                : isAlternate
-                                  ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                  : "bg-white text-brand-700 hover:bg-brand-50"
-                          }`}
-                        >
-                          <div className="truncate border-r border-brand-100 pr-1 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</div>
-                          <div className="truncate px-1 text-center">{vehicle.ledigPeriode}</div>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
+                        const selected = selectedVehicleId === vehicle.id;
+                        const isAlternate = index % 2 === 1;
+                        return (
+                          <tr
+                            key={vehicle.id}
+                            role="button"
+                            tabIndex={0}
+                            aria-pressed={selected}
+                            onClick={() => setSelectedVehicleId(vehicle.id)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                setSelectedVehicleId(vehicle.id);
+                              }
+                            }}
+                            className={`cursor-pointer transition ${
+                              selected
+                                ? "bg-brand-100 text-brand-800"
+                                : index === 0
+                                  ? "bg-white text-brand-700 hover:bg-brand-50"
+                                  : isAlternate
+                                    ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                    : "bg-white text-brand-700 hover:bg-brand-50"
+                            }`}
+                          >
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
+                            <td className="whitespace-nowrap px-2 py-0.5 text-center">{vehicle.ledigPeriode}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">

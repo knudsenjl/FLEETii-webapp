@@ -8,14 +8,14 @@
 -- PRIVILEGE ESCALATION FIX (most important change in this file):
 -- handle_new_user()
 --
--- Previously inserted the new profiles row using role/department taken
+-- Previously inserted the new user_profiles row using role/department taken
 -- straight from raw_user_meta_data — which is exactly the field
 -- supabase.auth.signUp()'s `options.data` lets ANY caller set directly, via
 -- Supabase's public Auth REST API, independent of anything this app's own
 -- frontend does. Since this trigger fires on every auth.users insert, not
 -- just admin-driven invites, anyone able to reach the project (the anon key
 -- is public by design) could previously self-register with
--- `data: { role: "admin" }` and be granted a real admin profiles row,
+-- `data: { role: "admin" }` and be granted a real admin user_profiles row,
 -- completely bypassing netlify/functions/create-user.mts's requireAdmin()
 -- gate.
 --
@@ -41,7 +41,7 @@ security definer
 set search_path to 'public'
 as $function$
 begin
-  insert into public.profiles (id, email, full_name, phone, department, role)
+  insert into public.user_profiles (user_id, email, full_name, phone, department, role)
   values (
     new.id,
     new.email,
@@ -50,7 +50,7 @@ begin
     null,
     'user'
   )
-  on conflict (id) do nothing;
+  on conflict (user_id) do nothing;
   return new;
 end;
 $function$;
@@ -68,7 +68,8 @@ $function$;
 revoke execute on function public.handle_new_user() from anon, authenticated;
 
 -- ---------------------------------------------------------------------------
--- function_search_path_mutable: touch_profiles_updated_at
+-- function_search_path_mutable: touch_users_updated_at
+-- (renamed from touch_profiles_updated_at in rename_profiles_table.sql)
 --
 -- A function with a mutable search_path is vulnerable to search_path
 -- hijacking (a caller could get it to resolve an unqualified table/function
@@ -76,7 +77,7 @@ revoke execute on function public.handle_new_user() from anon, authenticated;
 -- knowing the function body.
 -- ---------------------------------------------------------------------------
 
-alter function public.touch_profiles_updated_at() set search_path = public;
+alter function public.touch_users_updated_at() set search_path = public;
 
 -- ---------------------------------------------------------------------------
 -- extension_in_public: btree_gist
@@ -125,7 +126,7 @@ revoke execute on function public.current_email() from anon;
 -- handle_auth_user_email_change()
 --
 -- Trigger function (RETURNS trigger) that syncs an auth.users email change
--- into public.profiles. Returns-trigger functions can only be invoked by
+-- into public.user_profiles. Returns-trigger functions can only be invoked by
 -- Postgres's own trigger mechanism — calling one directly via a normal
 -- SQL/RPC call raises "trigger functions can only be called as triggers"
 -- regardless of grants — and trigger firing itself isn't gated by the

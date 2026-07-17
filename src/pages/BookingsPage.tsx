@@ -70,7 +70,7 @@ export function BookingsPage() {
     setError(null);
 
     const baseQuery = supabase
-      .from("Bookings")
+      .from("bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
       .gte("end", nowIsoString())
       .order("start", { ascending: true });
@@ -97,7 +97,7 @@ export function BookingsPage() {
   const handleCancel = async (booking: Booking) => {
     setCancelError(null);
     setCancellingId(booking.id);
-    const { error: deleteError } = await supabase.from("Bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
+    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
     setCancellingId(null);
 
     if (deleteError) {
@@ -112,21 +112,21 @@ export function BookingsPage() {
 
   /** Shared column-header row for both the "next" and "other" booking tables below. */
   const bookingTableHeaderRow = (
-    <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-      <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
-      <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
-      <div className="whitespace-nowrap px-1 text-center">Slut</div>
-    </div>
+    <tr>
+      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
+      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Start</th>
+      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Slut</th>
+    </tr>
   );
 
-  /** Renders one booking row — a plain (non-interactive) div for the "next" booking, or a clickable/selectable button when `options.onClick` is given (the "other" bookings list). */
+  /** Renders one booking row — a plain (non-interactive) row for the "next" booking, or a clickable/selectable/keyboard-activatable row when `options.onClick` is given (the "other" bookings list). */
   const renderBookingRow = (
     booking: Booking,
     isAlternate: boolean,
     options?: { isSelected?: boolean; onClick?: () => void },
   ) => {
     const interactive = Boolean(options?.onClick);
-    const rowClassName = `grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
+    const rowClassName = `transition ${interactive ? "cursor-pointer" : ""} ${
       options?.isSelected
         ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
         : isAlternate
@@ -135,24 +135,38 @@ export function BookingsPage() {
     }`;
     const rowContent = (
       <>
-        <div className="truncate border-r border-brand-100 pr-1 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</div>
-        <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
-        <div className="whitespace-nowrap px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
+        <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</td>
+        <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right">{`${booking.startDate} ${booking.start}`}</td>
+        <td className="whitespace-nowrap px-2 py-0.5 text-right">{`${booking.endDate} ${booking.end}`}</td>
       </>
     );
 
     if (!options?.onClick) {
       return (
-        <div key={booking.id} className={rowClassName}>
+        <tr key={booking.id} className={rowClassName}>
           {rowContent}
-        </div>
+        </tr>
       );
     }
 
+    const onClick = options.onClick;
     return (
-      <button key={booking.id} type="button" onClick={options.onClick} className={rowClassName}>
+      <tr
+        key={booking.id}
+        role="button"
+        tabIndex={0}
+        aria-pressed={options.isSelected}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={rowClassName}
+      >
         {rowContent}
-      </button>
+      </tr>
     );
   };
 
@@ -203,20 +217,30 @@ export function BookingsPage() {
                 "next",
                 "Du kan først låse bilen, eller låse den op 5 min. før/efter reservationsperioden",
               )}
-              <div className="flex flex-col overflow-hidden rounded-none border border-brand-100">
-                {bookingTableHeaderRow}
-                <div className="divide-y divide-brand-100 bg-white">
-                  {loading && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser reservationer…</div>
-                  )}
-                  {!loading && error && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
-                  )}
-                  {!loading && !error && !nextBooking && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen kommende reservation.</div>
-                  )}
-                  {!loading && !error && nextBooking && renderBookingRow(nextBooking, false)}
-                </div>
+              <div className="flex flex-col overflow-auto rounded-none border border-brand-100">
+                <table className="w-full border-collapse text-[0.7rem]">
+                  <thead className="bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    {bookingTableHeaderRow}
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
+                    {loading && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                      </tr>
+                    )}
+                    {!loading && error && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
+                      </tr>
+                    )}
+                    {!loading && !error && !nextBooking && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Ingen kommende reservation.</td>
+                      </tr>
+                    )}
+                    {!loading && !error && nextBooking && renderBookingRow(nextBooking, false)}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex gap-2">
@@ -268,29 +292,38 @@ export function BookingsPage() {
                 "other",
                 "Vælg en af disse reservationer for at kunne se detaljer, rette reservationen, eller aflyse reservationen",
               )}
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                {bookingTableHeaderRow}
-
-                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
-                  {loading && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser reservationer…</div>
-                  )}
-                  {!loading && error && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
-                  )}
-                  {!loading && !error && remainingBookings.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen øvrige reservationer.</div>
-                  )}
-                  {!loading &&
-                    !error &&
-                    remainingBookings.map((booking, index) =>
-                      renderBookingRow(booking, index % 2 === 1, {
-                        isSelected: booking.id === selectedBookingId,
-                        onClick: () =>
-                          setSelectedBookingId((current) => (current === booking.id ? null : booking.id)),
-                      }),
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+                <table className="w-full border-collapse text-[0.7rem]">
+                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    {bookingTableHeaderRow}
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
+                    {loading && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                      </tr>
                     )}
-                </div>
+                    {!loading && error && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
+                      </tr>
+                    )}
+                    {!loading && !error && remainingBookings.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Ingen øvrige reservationer.</td>
+                      </tr>
+                    )}
+                    {!loading &&
+                      !error &&
+                      remainingBookings.map((booking, index) =>
+                        renderBookingRow(booking, index % 2 === 1, {
+                          isSelected: booking.id === selectedBookingId,
+                          onClick: () =>
+                            setSelectedBookingId((current) => (current === booking.id ? null : booking.id)),
+                        }),
+                      )}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex gap-2">

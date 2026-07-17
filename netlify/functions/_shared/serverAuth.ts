@@ -19,7 +19,7 @@ export type AdminCheckResult = { ok: true; userId: string } | { ok: false; statu
  * Supabase with the service-role key for their own privileged work, but
  * that key bypasses RLS entirely and says nothing about WHO is calling —
  * this checks the caller's own identity via the anon key instead, so the
- * profiles "read your own row" RLS policy still applies for anything the
+ * user_profiles "read your own row" RLS policy still applies for anything the
  * caller does with the returned client.
  */
 export async function requireUser(req: Request): Promise<UserCheckResult> {
@@ -55,9 +55,9 @@ export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
   }
 
   const { data: profile, error: profileError } = await userResult.client
-    .from("profiles")
+    .from("user_profiles")
     .select("role")
-    .eq("id", userResult.userId)
+    .eq("user_id", userResult.userId)
     .maybeSingle<{ role: string }>();
 
   if (profileError || profile?.role !== "admin") {

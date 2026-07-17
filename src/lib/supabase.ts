@@ -72,7 +72,7 @@ const rememberAwareStorage = {
   },
 };
 
-/** The shared Supabase client used everywhere in the app (auth, `profiles`, `Bookings`). Import this rather than calling createClient() again elsewhere. */
+/** The shared Supabase client used everywhere in the app (auth, `user_profiles`, `bookings`). Import this rather than calling createClient() again elsewhere. */
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     storage: rememberAwareStorage,

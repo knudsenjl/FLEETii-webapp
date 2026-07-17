@@ -24,7 +24,7 @@ type ReservationVehicle = {
  * the reservation about to be made and, on confirmation, re-checks
  * availability (closing most of the window for a race against another
  * booking — see handleConfirm) before actually inserting the row into
- * Supabase's "Bookings" table. Redirects to the fleet's/own bookings list on
+ * Supabase's "bookings" table. Redirects to the fleet's/own bookings list on
  * success depending on role.
  */
 export function ConfirmPage() {
@@ -70,7 +70,7 @@ export function ConfirmPage() {
     setError(null);
 
     const { data: existingBookings, error: fetchError } = await supabase
-      .from("Bookings")
+      .from("bookings")
       .select(`${VEHICLE_ID_COLUMN}, start, end`);
 
     if (fetchError) {
@@ -80,7 +80,7 @@ export function ConfirmPage() {
     }
 
     const stillAvailable = isVehicleAvailable(
-      vehicle.plate,
+      vehicle.id,
       (existingBookings ?? []) as BookingWindow[],
       reservationStart,
       reservationEnd,
@@ -92,8 +92,8 @@ export function ConfirmPage() {
       return;
     }
 
-    const { error: insertError } = await supabase.from("Bookings").insert({
-      [VEHICLE_ID_COLUMN]: vehicle.plate,
+    const { error: insertError } = await supabase.from("bookings").insert({
+      [VEHICLE_ID_COLUMN]: vehicle.id,
       start: reservationStart,
       end: reservationEnd,
       usage: anvendelse,

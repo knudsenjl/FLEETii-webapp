@@ -15,7 +15,6 @@ import {
   type BookingRow,
   type BookingWindow,
   type GpsPosition,
-  type VehicleIdLookup,
   type VehicleLookup,
 } from "./bookings";
 
@@ -75,7 +74,7 @@ describe("nowIsoString", () => {
 describe("mapBookingRow", () => {
   const row: BookingRow = {
     booking_id: 42,
-    vehicle_id: "AB12345",
+    vehicle_id: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
     start: "2026-07-09T09:00:00",
     end: "2026-07-09T12:00:00",
     usage: "Kundebesøg",
@@ -90,7 +89,7 @@ describe("mapBookingRow", () => {
   it("maps every other field correctly", () => {
     expect(mapBookingRow(row)).toEqual({
       id: 42,
-      vehicle: "AB12345",
+      vehicle: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
       startDate: "09.07.2026",
       start: "09:00",
       endDate: "09.07.2026",
@@ -284,31 +283,25 @@ describe("formatFreePeriod", () => {
 });
 
 describe("formatVehicleLabel", () => {
-  const vehicles: VehicleLookup[] = [{ alias: "ET83472", brand: "VOLVO", model: "V60 (Breakout)" }];
+  const vehicles: VehicleLookup[] = [{ vehicleId: "veh-1", alias: "ET83472", brand: "VOLVO", model: "V60 (Breakout)" }];
 
-  it("formats as 'plate: brand model' when the plate matches a known vehicle", () => {
-    expect(formatVehicleLabel("ET83472", vehicles)).toBe("ET83472: VOLVO V60 (Breakout)");
+  it("formats as 'plate: brand model' when the vehicleId matches a known vehicle", () => {
+    expect(formatVehicleLabel("veh-1", vehicles)).toBe("ET83472: VOLVO V60 (Breakout)");
   });
 
-  it("falls back to just the plate when there is no matching vehicle", () => {
-    expect(formatVehicleLabel("UNKNOWN1", vehicles)).toBe("UNKNOWN1");
+  it("falls back to just the raw vehicleId when there is no matching vehicle", () => {
+    expect(formatVehicleLabel("veh-unknown", vehicles)).toBe("veh-unknown");
   });
 });
 
 describe("resolveVehicleGpsPosition", () => {
-  const vehicles: VehicleIdLookup[] = [{ alias: "ET83472", vehicleId: "veh-1" }];
   const positions: GpsPosition[] = [{ vehicleId: "veh-1", lat: 55.6761, lng: 12.5683 }];
 
-  it("resolves the GPS position via the vehicle's alias -> vehicleId -> position chain", () => {
-    expect(resolveVehicleGpsPosition("ET83472", vehicles, positions)).toEqual({ lat: 55.6761, lng: 12.5683 });
+  it("resolves the GPS position for a matching vehicleId", () => {
+    expect(resolveVehicleGpsPosition("veh-1", positions)).toEqual({ lat: 55.6761, lng: 12.5683 });
   });
 
-  it("returns null when the plate has no matching vehicle", () => {
-    expect(resolveVehicleGpsPosition("UNKNOWN1", vehicles, positions)).toBeNull();
-  });
-
-  it("returns null when the matched vehicle has no GPS position", () => {
-    const otherVehicles: VehicleIdLookup[] = [{ alias: "ET83472", vehicleId: "veh-missing" }];
-    expect(resolveVehicleGpsPosition("ET83472", otherVehicles, positions)).toBeNull();
+  it("returns null when there is no position for that vehicleId", () => {
+    expect(resolveVehicleGpsPosition("veh-missing", positions)).toBeNull();
   });
 });

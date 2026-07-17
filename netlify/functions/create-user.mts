@@ -7,10 +7,10 @@
 // shouldn't depend on email working at all. The user sets their own real
 // password on first login, via SetPasswordPage.tsx (see
 // netlify/functions/complete-password-change.mts for how that flag gets
-// cleared). Also upserts a matching `profiles` row, using the service-role
-// key — which bypasses RLS entirely, so the requireAdmin() check below is
-// this function's actual authorization boundary (RLS's INSERT policy on
-// `profiles` is deliberately absent, precisely because writes are meant to
+// cleared). Also upserts a matching `user_profiles` row, using the
+// service-role key — which bypasses RLS entirely, so the requireAdmin()
+// check below is this function's actual authorization boundary (RLS's
+// INSERT policy on `user_profiles` is deliberately absent, precisely because writes are meant to
 // only ever happen here). Reached from UserDetailsPage.tsx.
 import { createClient, isAuthRetryableFetchError } from "@supabase/supabase-js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
@@ -27,7 +27,7 @@ type CreateUserBody = {
 const ALLOWED_ROLES = ["user", "admin"] as const;
 type Role = (typeof ALLOWED_ROLES)[number];
 
-/** True if `value` is exactly "user" or "admin" — the only valid `profiles.role` values. */
+/** True if `value` is exactly "user" or "admin" — the only valid `user_profiles.role` values. */
 function isAllowedRole(value: string): value is Role {
   return (ALLOWED_ROLES as readonly string[]).includes(value);
 }
@@ -122,10 +122,10 @@ export default async (req: Request) => {
   }
 
   // Upsert rather than update: covers both the case where a DB trigger
-  // already created the profiles row from auth.users, and the case where
-  // it didn't.
-  const { error: profileError } = await admin.from("profiles").upsert({
-    id: created.user.id,
+  // already created the user_profiles row from auth.users, and the case
+  // where it didn't.
+  const { error: profileError } = await admin.from("user_profiles").upsert({
+    user_id: created.user.id,
     email,
     full_name: body.full_name ?? null,
     phone: body.phone ?? null,

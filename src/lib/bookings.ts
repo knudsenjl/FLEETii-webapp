@@ -1,12 +1,12 @@
 // Shared, framework-free helpers for working with bookings and 2hire
-// vehicles: column-name constants for the Supabase "Bookings" table, mapping
+// vehicles: column-name constants for the Supabase "bookings" table, mapping
 // raw DB rows to display shapes, availability/free-period computation, and
 // Danish date/time formatting. Kept dependency-free (no React) so it's
 // usable from both pages and (via the requestValidation-style .js extension
 // import trick) Netlify Functions.
 import type { Vehicle2Hire } from "./vehicleDataSource";
 
-// The "Bookings" table's columns are named differently from the local field
+// The "bookings" table's columns are named differently from the local field
 // names pages use (see MappedBooking) — these constants are the single
 // source of truth for the actual DB column names so a rename only needs to
 // happen in one place.
@@ -35,9 +35,10 @@ export function toDisplayVehicle(v: Vehicle2Hire): DisplayVehicle {
   };
 }
 
-/** Raw shape of a row selected with BOOKINGS_SELECT_COLUMNS, straight off the Supabase "Bookings" table. */
+/** Raw shape of a row selected with BOOKINGS_SELECT_COLUMNS, straight off the Supabase "bookings" table. */
 export type BookingRow = {
   booking_id: number;
+  /** The vehicle's real 2hire UUID vehicleId (see supabase/rename_vehicle_id_to_uuid.sql) — NOT the license plate. */
   vehicle_id: string;
   start: string;
   end: string;
@@ -84,7 +85,7 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
   };
 }
 
-/** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle id plus its reserved start/end. */
+/** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle's 2hire vehicleId plus its reserved start/end. */
 export type BookingWindow = { vehicle_id: string; start: string; end: string };
 
 /**
@@ -121,7 +122,7 @@ function isoPrefix(iso: string): string {
  * allowed.
  */
 export function isVehicleAvailable(
-  plate: string,
+  vehicleId: string,
   bookings: BookingWindow[],
   reservationStart: string | null,
   reservationEnd: string | null,
@@ -130,7 +131,7 @@ export function isVehicleAvailable(
 
   const start = isoPrefix(reservationStart);
   const end = isoPrefix(reservationEnd);
-  const carBookings = bookings.filter((b) => b.vehicle_id === plate);
+  const carBookings = bookings.filter((b) => b.vehicle_id === vehicleId);
   return carBookings.every((b) => isoPrefix(b.start) >= end || isoPrefix(b.end) <= start);
 }
 
@@ -145,12 +146,12 @@ export type FreePeriod = { start: string | null; end: string | null };
  * (i.e. the caller already confirmed availability via isVehicleAvailable).
  */
 export function computeFreePeriod(
-  plate: string,
+  vehicleId: string,
   bookings: BookingWindow[],
   referenceStart: string,
   referenceEnd: string,
 ): FreePeriod | null {
-  const carBookings = bookings.filter((b) => b.vehicle_id === plate);
+  const carBookings = bookings.filter((b) => b.vehicle_id === vehicleId);
   if (carBookings.length === 0) return null;
 
   const refStart = isoPrefix(referenceStart);
@@ -195,39 +196,29 @@ export function formatFreePeriod(period: FreePeriod): string {
   return "—";
 }
 
-/** Minimal vehicle shape needed to render a "{plate}: {brand} {model}" label. */
-export type VehicleLookup = { alias: string; brand: string; model: string };
+/** Minimal vehicle shape needed to render a "{plate}: {brand} {model}" label from a 2hire vehicleId. */
+export type VehicleLookup = { vehicleId: string; alias: string; brand: string; model: string };
 
 /**
  * Formats a "Køretøj" field as "{plate}: {brand} {model}", matching the
- * Available page's format. Falls back to just the plate if it has no match
- * in the 2hire vehicle list (e.g. a real booking's plate isn't in the mock data).
+ * Available page's format. Falls back to just the raw vehicleId if it has no
+ * match in the 2hire vehicle list (e.g. a real booking's vehicle isn't in the
+ * mock data).
  */
-export function formatVehicleLabel(plate: string, vehicles: VehicleLookup[]): string {
-  const match = vehicles.find((v) => v.alias === plate);
-  return match ? `${plate}: ${match.brand} ${match.model}` : plate;
+export function formatVehicleLabel(vehicleId: string, vehicles: VehicleLookup[]): string {
+  const match = vehicles.find((v) => v.vehicleId === vehicleId);
+  return match ? `${match.alias}: ${match.brand} ${match.model}` : vehicleId;
 }
 
-/** Minimal vehicle shape needed to resolve a booking's plate to its 2hire vehicleId. */
-export type VehicleIdLookup = { alias: string; vehicleId: string };
 /** A single vehicle's live GPS fix. */
 export type GpsPosition = { vehicleId: string; lat: number; lng: number };
 
 /**
- * Resolves a booking's plate to its vehicle's live GPS position, via the
- * 2hire vehicle list (alias -> vehicleId) and the 2hire GPS list
- * (vehicleId -> lat/lng). Returns null if either lookup has no match (e.g. a
- * real booking's plate isn't in the mock 2hire vehicle list), so callers can
- * fall back to a default position.
+ * Resolves a booking's vehicleId directly to its live GPS position via the
+ * 2hire GPS list. Returns null if there's no position for that vehicle, so
+ * callers can fall back to a default position.
  */
-export function resolveVehicleGpsPosition(
-  plate: string,
-  vehicles: VehicleIdLookup[],
-  positions: GpsPosition[],
-): { lat: number; lng: number } | null {
-  const matchedVehicle = vehicles.find((v) => v.alias === plate);
-  if (!matchedVehicle) return null;
-
-  const position = positions.find((p) => p.vehicleId === matchedVehicle.vehicleId);
+export function resolveVehicleGpsPosition(vehicleId: string, positions: GpsPosition[]): { lat: number; lng: number } | null {
+  const position = positions.find((p) => p.vehicleId === vehicleId);
   return position ? { lat: position.lat, lng: position.lng } : null;
 }

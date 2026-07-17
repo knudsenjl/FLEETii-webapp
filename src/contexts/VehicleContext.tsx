@@ -1,7 +1,7 @@
 // App-wide context for 2hire vehicle telemetry (fleet list + live GPS
 // positions). The actual data comes from whichever VehicleDataSource
-// getVehicleDataSource() resolves to (mock fixtures today; a real 2hire API
-// integration is the intended future "live" implementation — see
+// getVehicleDataSource() resolves to — static mock fixtures, or the real
+// vehicle_profiles/vehicle_signals Supabase tables (see
 // src/lib/vehicleDataSource/). Pages read this via use2hireVehicle()/
 // use2hireGPS() instead of calling the data source directly.
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";

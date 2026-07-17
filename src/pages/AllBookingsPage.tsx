@@ -51,7 +51,7 @@ export function AllBookingsPage() {
   const [cancelError, setCancelError] = useState<string | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const [users, setUsers] = useState<{ id: string; email: string; department: string | null }[]>([]);
+  const [users, setUsers] = useState<{ user_id: string; email: string; department: string | null }[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -71,7 +71,7 @@ export function AllBookingsPage() {
   }, [filterOpen]);
 
   const departmentBookings = bookings.filter(
-    (b) => vehicles.find((v) => v.alias === b.vehicle)?.tags === afdeling,
+    (b) => vehicles.find((v) => v.vehicleId === b.vehicle)?.tags === afdeling,
   );
   const vehicleOptions = Array.from(new Set(departmentBookings.map((b) => b.vehicle))).sort();
   const filteredBookings = departmentBookings.filter(
@@ -82,13 +82,13 @@ export function AllBookingsPage() {
 
   useEffect(() => {
     supabase
-      .from("profiles")
-      .select("id, email, department")
+      .from("user_profiles")
+      .select("user_id, email, department")
       .order("email")
       .then(({ data }) => {
         setUsers(
           (data ?? []).filter(
-            (u): u is { id: string; email: string; department: string | null } => Boolean(u.email),
+            (u): u is { user_id: string; email: string; department: string | null } => Boolean(u.email),
           ),
         );
       });
@@ -100,7 +100,7 @@ export function AllBookingsPage() {
     setError(null);
 
     const { data, error: fetchError } = await supabase
-      .from("Bookings")
+      .from("bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
       .gte("end", nowIsoString())
       .order("start", { ascending: true })
@@ -124,7 +124,7 @@ export function AllBookingsPage() {
   const handleCancel = async (booking: Booking) => {
     setCancelError(null);
     setCancellingId(booking.id);
-    const { error: deleteError } = await supabase.from("Bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
+    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
     setCancellingId(null);
 
     if (deleteError) {
@@ -188,7 +188,7 @@ export function AllBookingsPage() {
                             >
                               <option value="">Alle brugere</option>
                               {departmentUsers.map((u) => (
-                                <option key={u.id} value={u.email}>
+                                <option key={u.user_id} value={u.email}>
                                   {u.email}
                                 </option>
                               ))}
@@ -243,54 +243,74 @@ export function AllBookingsPage() {
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="grid grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                  <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
-                  <div className="whitespace-nowrap border-r border-brand-200 px-1 text-center">Start</div>
-                  <div className="whitespace-nowrap px-1 text-center">Slut</div>
-                </div>
-
-                <div className="min-h-0 flex-1 divide-y divide-brand-100 overflow-y-auto bg-white">
-                  {loading && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Indlæser reservationer…</div>
-                  )}
-                  {!loading && error && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-red-600">{error}</div>
-                  )}
-                  {!loading && !error && filteredBookings.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">
-                      {filterUser || filterVehicle
-                        ? "Ingen reservationer matcher filteret."
-                        : "Ingen aktive reservationer."}
-                    </div>
-                  )}
-                  {!loading &&
-                    !error &&
-                    filteredBookings.map((booking, index) => {
-                      const isAlternate = index % 2 === 1;
-                      const isSelected = booking.id === selectedBookingId;
-                      return (
-                        <button
-                          key={booking.id}
-                          type="button"
-                          onClick={() =>
-                            setSelectedBookingId((current) => (current === booking.id ? null : booking.id))
-                          }
-                          className={`grid w-full grid-cols-[minmax(0,1fr)_7.5rem_7.5rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
-                            isSelected
-                              ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
-                              : isAlternate
-                                ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                : "bg-white text-brand-700 hover:bg-brand-50"
-                          }`}
-                        >
-                          <div className="truncate border-r border-brand-100 pr-1 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</div>
-                          <div className="whitespace-nowrap border-r border-brand-100 px-1 text-right">{`${booking.startDate} ${booking.start}`}</div>
-                          <div className="whitespace-nowrap px-1 text-right">{`${booking.endDate} ${booking.end}`}</div>
-                        </button>
-                      );
-                    })}
-                </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+                {/* Real <table> (table-layout:auto) so column widths are computed
+                    once across the header AND every row together, fitting each
+                    column to its widest actual content instead of a fixed split. */}
+                <table className="w-full border-collapse text-[0.7rem]">
+                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <tr>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Start</th>
+                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Slut</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
+                    {loading && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                      </tr>
+                    )}
+                    {!loading && error && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
+                      </tr>
+                    )}
+                    {!loading && !error && filteredBookings.length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                          {filterUser || filterVehicle
+                            ? "Ingen reservationer matcher filteret."
+                            : "Ingen aktive reservationer."}
+                        </td>
+                      </tr>
+                    )}
+                    {!loading &&
+                      !error &&
+                      filteredBookings.map((booking, index) => {
+                        const isAlternate = index % 2 === 1;
+                        const isSelected = booking.id === selectedBookingId;
+                        const toggleSelected = () =>
+                          setSelectedBookingId((current) => (current === booking.id ? null : booking.id));
+                        return (
+                          <tr
+                            key={booking.id}
+                            role="button"
+                            tabIndex={0}
+                            aria-pressed={isSelected}
+                            onClick={toggleSelected}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" || e.key === " ") {
+                                e.preventDefault();
+                                toggleSelected();
+                              }
+                            }}
+                            className={`cursor-pointer transition ${
+                              isSelected
+                                ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
+                                : isAlternate
+                                  ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                  : "bg-white text-brand-700 hover:bg-brand-50"
+                            }`}
+                          >
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</td>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right">{`${booking.startDate} ${booking.start}`}</td>
+                            <td className="whitespace-nowrap px-2 py-0.5 text-right">{`${booking.endDate} ${booking.end}`}</td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex gap-2">

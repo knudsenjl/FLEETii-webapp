@@ -8,9 +8,9 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
-/** A row from the `profiles` table. When reached with one pre-filled via router state (DepartmentPage's "Rediger"), the form is meant to edit it — see the KNOWN LIMITATION below. */
+/** A row from the `user_profiles` table. When reached with one pre-filled via router state (DepartmentPage's "Rediger"), the form is meant to edit it — see the KNOWN LIMITATION below. */
 type ProfileRow = {
-  id: string;
+  user_id: string;
   email: string | null;
   full_name: string | null;
   phone: string | null;
@@ -21,7 +21,7 @@ type ProfileRow = {
 /**
  * Admin "create/edit user" form ("/user-details"). Validates every field is
  * filled and that the email isn't already taken (debounced live check
- * against `profiles`) before enabling "Opret bruger", which calls the
+ * against `user_profiles`) before enabling "Opret bruger", which calls the
  * create-user Netlify Function (authenticated with the current session).
  *
  * KNOWN LIMITATION: this form only ever creates a new user — reached via
@@ -59,10 +59,10 @@ export function UserDetailsPage() {
 
     const handle = setTimeout(async () => {
       const { data, error } = await supabase
-        .from("profiles")
-        .select("id")
+        .from("user_profiles")
+        .select("user_id")
         .eq("email", trimmed)
-        .maybeSingle<{ id: string }>();
+        .maybeSingle<{ user_id: string }>();
 
       if (error) {
         setEmailExists(null);

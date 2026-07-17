@@ -7,7 +7,7 @@
 --
 -- Context: netlify/functions/2hire-webhook.mts is the only writer, using the
 -- service-role key (bypasses RLS) after validating 2hire's webhook
--- signature — so, like "profiles" in rls_policies.sql, there is deliberately
+-- signature — so, like "user_profiles" in rls_policies.sql, there is deliberately
 -- no INSERT/UPDATE policy here. Any authenticated FLEETii user may read the
 -- table (src/lib/vehicleDataSource/liveVehicleDataSource.ts queries it
 -- directly from the browser), since today's mock 2hire data is equally
@@ -19,7 +19,7 @@
 -- vice versa.
 
 create table if not exists public.vehicle_signals (
-  vehicle_id text primary key,
+  vehicle_id uuid primary key,
   online boolean,
   online_updated_at timestamptz,
   autonomy_percentage numeric,

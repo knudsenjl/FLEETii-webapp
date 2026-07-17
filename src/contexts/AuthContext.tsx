@@ -1,5 +1,5 @@
 // App-wide authentication/authorization context. Wraps Supabase Auth's
-// session with the app's own `profiles` row (name/phone/department/role),
+// session with the app's own `user_profiles` row (name/phone/department/role),
 // which is the source of truth for role-based UI (admin vs. regular user)
 // and department scoping (Afdeling) used throughout the app. Every page that
 // needs to know "who is logged in" or "are they an admin" reads this via
@@ -14,9 +14,9 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 
-/** A row from the `profiles` table — the app's own user record, keyed by the Supabase auth.users id. */
+/** A row from the `user_profiles` table — the app's own user record, keyed by the Supabase auth.users id. */
 export interface Profile {
-  id: string;
+  user_id: string;
   email: string | null;
   full_name: string | null;
   phone: string | null;
@@ -47,7 +47,7 @@ export function formatRoleLabel(role?: string | null): string {
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 /**
- * Provides the current Supabase session and matching `profiles` row to the
+ * Provides the current Supabase session and matching `user_profiles` row to the
  * whole app. Mount once near the root (see App.tsx) — everything under it
  * can call useAuth() to read session/profile/afdeling/role state.
  */
@@ -57,15 +57,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isFullyAuthenticated, setIsFullyAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
 
-  /** Fetches the `profiles` row for the given auth user id. Returns null (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
+  /** Fetches the `user_profiles` row for the given auth user id. Returns null (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
   const loadProfile = async (userId: string): Promise<Profile | null> => {
     const { data, error } = await supabase
-      .from("profiles")
-      .select("id, email, full_name, phone, department, role")
-      .eq("id", userId)
+      .from("user_profiles")
+      .select("user_id, email, full_name, phone, department, role")
+      .eq("user_id", userId)
       .maybeSingle<Profile>();
     if (error) {
-      console.error("[AuthContext] profiles select failed:", error);
+      console.error("[AuthContext] user_profiles select failed:", error);
     }
     return data ?? null;
   };

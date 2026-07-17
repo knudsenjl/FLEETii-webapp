@@ -7,6 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
 type Vehicle = DisplayVehicle;
@@ -16,11 +17,6 @@ type Vehicle = DisplayVehicle;
  * vehicle in the admin's own department (filtered by `afdeling`), lets them
  * select one and jump to VehicleDetailsPage/HandleVehiclePage, or create a
  * new one via NewVehiclePage.
- *
- * KNOWN LIMITATION: "Slet køretøj" only removes the vehicle from local
- * component state — there is no backend call, so the vehicle reappears the
- * next time `vehicles` is recomputed from the VehicleContext data (e.g. on
- * navigation back to this page).
  */
 export function VehiclesPage() {
   const { afdeling } = useAuth();
@@ -30,6 +26,8 @@ export function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const [pendingDelete, setPendingDelete] = useState<Vehicle | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
   const selectedVehicle = vehicles.find((v) => v.vehicleId === selectedVehicleId) ?? null;
@@ -43,11 +41,45 @@ export function VehiclesPage() {
     );
   }, [twoHireVehicles, afdeling]);
 
-  /** Removes the pending vehicle from local state only — see the KNOWN LIMITATION note on VehiclesPage above. */
-  const handleDeleteVehicle = () => {
+  /**
+   * Deletes the pending vehicle's vehicle_signals row (if any) and then its
+   * vehicle_profiles row — in that order, since vehicle_signals.vehicle_id
+   * has a foreign key to vehicle_profiles.vehicle_id, and its on-delete
+   * behavior isn't known here (see supabase/rename_vehicle_id_to_uuid.sql's
+   * header), so the child row is removed explicitly rather than assumed to
+   * cascade.
+   */
+  const handleDeleteVehicle = async () => {
     if (!pendingDelete) return;
+
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    const { error: signalsError } = await supabase
+      .from("vehicle_signals")
+      .delete()
+      .eq("vehicle_id", pendingDelete.vehicleId);
+
+    if (signalsError) {
+      setDeleteError(signalsError.message);
+      setIsDeleting(false);
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from("vehicle_profiles")
+      .delete()
+      .eq("vehicle_id", pendingDelete.vehicleId);
+
+    if (profileError) {
+      setDeleteError(profileError.message);
+      setIsDeleting(false);
+      return;
+    }
+
     setVehicles((prev) => prev.filter((v) => v.vehicleId !== pendingDelete.vehicleId));
     if (selectedVehicleId === pendingDelete.vehicleId) setSelectedVehicleId(null);
+    setIsDeleting(false);
     setPendingDelete(null);
   };
 
@@ -71,49 +103,60 @@ export function VehiclesPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-4">
               <h2 className="text-xl font-semibold text-brand-800">Administration af køretøjer</h2>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border border-brand-100">
-                <div className="min-h-0 flex-1 overflow-y-auto">
-                  <div className="sticky top-0 z-10 grid grid-cols-[minmax(0,1fr)_1.75rem] bg-brand-50 px-1 py-0.5 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                    <div className="truncate border-r border-brand-200 pr-1">Køretøj</div>
-                    <div className="truncate px-1 text-center"></div>
-                  </div>
-
-                  <div className="divide-y divide-brand-100 bg-white">
-                  {vehicles.length === 0 && (
-                    <div className="px-2 py-3 text-center text-[0.7rem] text-brand-500">Ingen køretøjer fundet.</div>
-                  )}
-                  {vehicles.map((vehicle, index) => {
-                    const isAlternate = index % 2 === 1;
-                    const isSelected = vehicle.vehicleId === selectedVehicleId;
-                    return (
-                      <button
-                        key={vehicle.vehicleId}
-                        type="button"
-                        onClick={() =>
-                          setSelectedVehicleId((current) => (current === vehicle.vehicleId ? null : vehicle.vehicleId))
-                        }
-                        className={`grid w-full grid-cols-[minmax(0,1fr)_1.75rem] px-1 py-0.5 text-left text-[0.7rem] transition ${
-                          isSelected
-                            ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
-                            : isAlternate
-                              ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                              : "bg-white text-brand-700 hover:bg-brand-50"
-                        }`}
-                      >
-                        <div className="truncate border-r border-brand-100 pr-1 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</div>
-                        <div className="flex items-center justify-center">
-                          <span
-                            className={`h-2.5 w-2.5 rounded-full ${
-                              vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"
-                            }`}
-                            title={vehicle.status}
-                          />
-                        </div>
-                      </button>
-                    );
-                  })}
-                  </div>
-                </div>
+              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+                <table className="w-full border-collapse text-[0.7rem]">
+                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <tr>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
+                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
+                    {vehicles.length === 0 && (
+                      <tr>
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Ingen køretøjer fundet.</td>
+                      </tr>
+                    )}
+                    {vehicles.map((vehicle, index) => {
+                      const isAlternate = index % 2 === 1;
+                      const isSelected = vehicle.vehicleId === selectedVehicleId;
+                      const toggleSelected = () =>
+                        setSelectedVehicleId((current) => (current === vehicle.vehicleId ? null : vehicle.vehicleId));
+                      return (
+                        <tr
+                          key={vehicle.vehicleId}
+                          role="button"
+                          tabIndex={0}
+                          aria-pressed={isSelected}
+                          onClick={toggleSelected}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleSelected();
+                            }
+                          }}
+                          className={`cursor-pointer transition ${
+                            isSelected
+                              ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
+                              : isAlternate
+                                ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                : "bg-white text-brand-700 hover:bg-brand-50"
+                          }`}
+                        >
+                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
+                          <td className="px-2 py-0.5">
+                            <span
+                              className={`mx-auto block h-2.5 w-2.5 rounded-full ${
+                                vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"
+                              }`}
+                              title={vehicle.status}
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
 
               <div className="flex gap-2">
@@ -185,8 +228,11 @@ export function VehiclesPage() {
       {pendingDelete && (
         <ConfirmDialog
           message="Er du sikker på, at du vil slette dette køretøj?"
+          error={deleteError}
           onCancel={() => setPendingDelete(null)}
-          onConfirm={handleDeleteVehicle}
+          onConfirm={() => void handleDeleteVehicle()}
+          isPending={isDeleting}
+          confirmPendingLabel="Sletter…"
         />
       )}
     </div>
