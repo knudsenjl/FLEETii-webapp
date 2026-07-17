@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
-import { BOOKING_ID_COLUMN, formatVehicleLabel, resolveVehicleGpsPosition, toDisplayVehicle } from "../lib/bookings";
+import {
+  BOOKING_ID_COLUMN,
+  formatBookingPeriod,
+  formatVehicleLabel,
+  resolveVehicleGpsPosition,
+  shortSignalTimestamp,
+  toDisplayVehicle,
+} from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LeafletMap } from "../components/LeafletMap";
@@ -25,7 +33,7 @@ type BookingDetails = {
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
- * Reservation detail view ("/bookingDetails"): the booking's period/usage,
+ * Reservation detail view ("/booking-details"): the booking's period/usage,
  * the vehicle's current fuel/mileage/status (looked up live from
  * VehicleContext by vehicleId, not stored on the booking itself), a map of its
  * last known position, and a "Slet reservation" cancel flow. The vehicle is
@@ -34,6 +42,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 export function BookingDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { profile, afdeling } = useAuth();
   const booking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
 
   const [isCancelling, setIsCancelling] = useState(false);
@@ -44,6 +53,19 @@ export function BookingDetailsPage() {
   const gpsPositions = use2hireGPS();
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
+
+  /** Whether a non-admin user is allowed to delete their own reservation, per settings.bruger_slet_reservation (see BookingsPage). Admins can always delete regardless. */
+  const [userMayDeleteBooking, setUserMayDeleteBooking] = useState(false);
+  const canShowDeleteButton = profile?.role === "admin" || userMayDeleteBooking;
+
+  useEffect(() => {
+    const query = supabase.from("settings").select("value").eq("name", "Bruger_slet_reservation");
+    (afdeling ? query.eq("department", afdeling) : query.is("department", null))
+      .maybeSingle<{ value: string[] }>()
+      .then(({ data }) => {
+        setUserMayDeleteBooking(data?.value?.[0] === "Tilladt");
+      });
+  }, [afdeling]);
 
   useEffect(() => {
     if (!booking) {
@@ -57,7 +79,7 @@ export function BookingDetailsPage() {
 
   const goToVehicleDetails = () => {
     if (!twoHireVehicle) return;
-    navigate("/vehicleDetails", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
+    navigate("/vehicle-details", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
   };
 
   /** Deletes this booking and returns to the bookings list. */
@@ -101,9 +123,8 @@ export function BookingDetailsPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
-                    <span className="text-sm text-brand-800">
-                      {booking.startDate} {booking.start} -{" "}
-                      {booking.startDate === booking.endDate ? booking.end : `${booking.endDate} ${booking.end}`}
+                    <span className="text-sm text-brand-800" title={formatBookingPeriod(booking)}>
+                      {formatBookingPeriod(booking, true)}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
@@ -118,21 +139,39 @@ export function BookingDetailsPage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle?.autonomyPercentage ?? "—"}
-                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? ` (${twoHireVehicle.autonomyPercentageUpdatedAt})` : ""}
+                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? (
+                        <span title={twoHireVehicle.autonomyPercentageUpdatedAt}>
+                          {` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`}
+                        </span>
+                      ) : (
+                        ""
+                      )}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle?.distanceCovered ?? "—"}
-                      {twoHireVehicle?.distanceCoveredUpdatedAt ? ` (${twoHireVehicle.distanceCoveredUpdatedAt})` : ""}
+                      {twoHireVehicle?.distanceCoveredUpdatedAt ? (
+                        <span title={twoHireVehicle.distanceCoveredUpdatedAt}>
+                          {` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`}
+                        </span>
+                      ) : (
+                        ""
+                      )}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Status:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
-                      {twoHireVehicle?.onlineUpdatedAt ? ` (opdateret ${twoHireVehicle.onlineUpdatedAt})` : ""}
+                      {twoHireVehicle?.onlineUpdatedAt ? (
+                        <span title={twoHireVehicle.onlineUpdatedAt}>
+                          {` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`}
+                        </span>
+                      ) : (
+                        ""
+                      )}
                     </span>
                   </div>
                 </div>
@@ -183,14 +222,16 @@ export function BookingDetailsPage() {
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
-              <button
-                type="button"
-                onClick={() => setShowCancelConfirm(true)}
-                disabled={isCancelling}
-                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isCancelling ? "Aflyser…" : "Slet reservation"}
-              </button>
+              {canShowDeleteButton && (
+                <button
+                  type="button"
+                  onClick={() => setShowCancelConfirm(true)}
+                  disabled={isCancelling}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isCancelling ? "Aflyser…" : "Slet reservation"}
+                </button>
+              )}
             </div>
           </section>
         </motion.main>

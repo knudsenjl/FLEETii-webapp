@@ -17,7 +17,7 @@ export function InlinePopup({ visible, message, align = "left" }: InlinePopupPro
 
   return (
     <div
-      className={`animate-fade-in absolute top-full z-10 mt-2 w-56 rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs text-brand-700 shadow-lg ${
+      className={`animate-fade-in absolute top-full z-20 mt-2 w-56 rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs text-brand-700 shadow-lg ${
         align === "right" ? "right-0" : "left-0"
       }`}
     >

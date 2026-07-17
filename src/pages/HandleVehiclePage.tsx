@@ -1,14 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { shortSignalTimestamp } from "../lib/bookings";
 
-/** The DisplayVehicle shape, as passed in via router state from VehiclesPage's "Rediger køretøj" button. */
+/** The DisplayVehicle shape, as passed in via router state from VehicleDetailsPage's "Rediger køretøj" button. */
 type Vehicle = {
-  vehicle: string;
   plate: string;
+  brand: string;
+  model: string;
   department: string;
   status: string;
   version?: string;
@@ -20,9 +22,14 @@ type Vehicle = {
 };
 
 /**
- * Admin "edit vehicle" page ("/handleVehicle", reached via VehiclesPage's
- * "Rediger køretøj"). Currently read-only/display-only — lock/unlock buttons
- * are stubbed ("not implemented"), and there is no actual edit form yet.
+ * Admin "edit vehicle" page ("/edit-vehicle", reached via
+ * VehicleDetailsPage's "Rediger køretøj"). Nummerplade/Mærke/Model/Årgang are
+ * editable (they're the vehicle_profiles-backed fields an admin actually
+ * manages); Brændstofniveau/Kilometerstand/Status stay read-only since
+ * they're live telemetry written by the 2hire webhook — editing them
+ * wouldn't persist past the next signal update anyway. "Gem ændringer" is
+ * still stubbed ("not implemented" — there is no actual save/update call
+ * yet); "Fortryd" navigates back to VehicleDetailsPage without saving.
  */
 export function HandleVehiclePage() {
   const navigate = useNavigate();
@@ -30,6 +37,11 @@ export function HandleVehiclePage() {
   const state = location.state as { vehicle?: Vehicle } | null;
   const vehicle = state?.vehicle ?? null;
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
+
+  const [plate, setPlate] = useState(vehicle?.plate ?? "");
+  const [make, setMake] = useState(vehicle?.brand ?? "");
+  const [model, setModel] = useState(vehicle?.model ?? "");
+  const [year, setYear] = useState(vehicle?.version ?? "");
 
   useEffect(() => {
     if (!vehicle) {
@@ -41,15 +53,16 @@ export function HandleVehiclePage() {
     return null;
   }
 
-  const rows: [string, string][] = [
-    ["Nummerplade:", vehicle.plate],
-    ["Mærke:", vehicle.version ? `${vehicle.vehicle} - årgang: ${vehicle.version}` : vehicle.vehicle],
+  /** [label, short value (visible), full value (hover tooltip)] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM", full "dd/mm/yyyy HH.MM" available on hover. */
+  const readOnlyRows: [string, string, string][] = [
     [
       "Brændstofniveau:",
+      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`,
       `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}`,
     ],
     [
       "Kilometerstand:",
+      `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
       `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${vehicle.distanceCoveredUpdatedAt})` : ""}`,
     ],
   ];
@@ -76,17 +89,56 @@ export function HandleVehiclePage() {
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  {rows.map(([label, value]) => (
+                  <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Nummerplade:</label>
+                    <input
+                      type="text"
+                      value={plate}
+                      onChange={(e) => setPlate(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Mærke:</label>
+                    <input
+                      type="text"
+                      value={make}
+                      onChange={(e) => setMake(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Model:</label>
+                    <input
+                      type="text"
+                      value={model}
+                      onChange={(e) => setModel(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Årgang:</label>
+                    <input
+                      type="text"
+                      value={year}
+                      onChange={(e) => setYear(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  {readOnlyRows.map(([label, shortValue, fullValue]) => (
                     <div key={label} className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-[0.7rem] text-brand-700">
                       <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">{label}</div>
-                      <div className="whitespace-nowrap px-1">{value}</div>
+                      <div className="whitespace-nowrap px-1" title={fullValue}>{shortValue}</div>
                     </div>
                   ))}
                   <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-[0.7rem] text-brand-700">
                     <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Status:</div>
-                    <div className="whitespace-nowrap px-1">
+                    <div
+                      className="whitespace-nowrap px-1"
+                      title={vehicle.onlineUpdatedAt ? `${vehicle.status} (opdateret ${vehicle.onlineUpdatedAt})` : undefined}
+                    >
                       {vehicle.status}
-                      {vehicle.onlineUpdatedAt ? ` (opdateret ${vehicle.onlineUpdatedAt})` : ""}
+                      {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                     </div>
                   </div>
                 </div>
@@ -96,22 +148,21 @@ export function HandleVehiclePage() {
                 <div className="relative flex-1">
                   <button
                     type="button"
-                    onClick={() => triggerNotImplemented("laas")}
+                    onClick={() => triggerNotImplemented("gem")}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Lås
+                    Gem ændringer
                   </button>
-                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" />
+                  <InlinePopup visible={notImplementedKey === "gem"} message="Endnu ikke implementeret" />
                 </div>
                 <div className="relative flex-1">
                   <button
                     type="button"
-                    onClick={() => triggerNotImplemented("laas-op")}
+                    onClick={() => navigate(-1)}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Lås op
+                    Fortryd
                   </button>
-                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" align="right" />
                 </div>
               </div>
             </div>

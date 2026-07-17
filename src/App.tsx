@@ -99,7 +99,7 @@ function App() {
             }
           />
           <Route
-            path="/bookingDetails"
+            path="/booking-details"
             element={
               <ProtectedRoute>
                 <BookingDetailsPage />
@@ -131,7 +131,7 @@ function App() {
             }
           />
           <Route
-            path="/handleVehicle"
+            path="/edit-vehicle"
             element={
               <ProtectedRoute requireAdmin>
                 <HandleVehiclePage />
@@ -155,7 +155,7 @@ function App() {
             }
           />
           <Route
-            path="/vehicleDetails"
+            path="/vehicle-details"
             element={
               <ProtectedRoute>
                 <VehicleDetailsPage />

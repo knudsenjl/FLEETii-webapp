@@ -1,22 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
-import { useTimedFlag } from "../hooks/useTimedFlag";
-import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
 type Vehicle = DisplayVehicle;
 
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table"): lists every
- * vehicle in the admin's own department (filtered by `afdeling`), lets them
- * select one and jump to VehicleDetailsPage/HandleVehiclePage, or create a
- * new one via NewVehiclePage.
+ * vehicle in the admin's own department (filtered by `afdeling`); clicking a
+ * row navigates straight to VehicleDetailsPage (editing/deleting a vehicle
+ * both live there too), or create a new one via NewVehiclePage.
  */
 export function VehiclesPage() {
   const { afdeling } = useAuth();
@@ -24,13 +21,29 @@ export function VehiclesPage() {
   const twoHireVehicles = use2hireVehicle();
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
-  const [pendingDelete, setPendingDelete] = useState<Vehicle | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const selectedVehicle = vehicles.find((v) => v.vehicleId === selectedVehicleId) ?? null;
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [filterAlias, setFilterAlias] = useState("");
+  const [filterStatus, setFilterStatus] = useState("");
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!filterOpen) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
+        setFilterOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [filterOpen]);
+
+  const aliasOptions = Array.from(new Set(vehicles.map((v) => v.alias))).sort();
+  const filteredVehicles = vehicles.filter(
+    (v) => (!filterAlias || v.alias === filterAlias) && (!filterStatus || v.status === filterStatus),
+  );
 
   useEffect(() => {
     setVehicles(
@@ -41,48 +54,6 @@ export function VehiclesPage() {
     );
   }, [twoHireVehicles, afdeling]);
 
-  /**
-   * Deletes the pending vehicle's vehicle_signals row (if any) and then its
-   * vehicle_profiles row — in that order, since vehicle_signals.vehicle_id
-   * has a foreign key to vehicle_profiles.vehicle_id, and its on-delete
-   * behavior isn't known here (see supabase/rename_vehicle_id_to_uuid.sql's
-   * header), so the child row is removed explicitly rather than assumed to
-   * cascade.
-   */
-  const handleDeleteVehicle = async () => {
-    if (!pendingDelete) return;
-
-    setIsDeleting(true);
-    setDeleteError(null);
-
-    const { error: signalsError } = await supabase
-      .from("vehicle_signals")
-      .delete()
-      .eq("vehicle_id", pendingDelete.vehicleId);
-
-    if (signalsError) {
-      setDeleteError(signalsError.message);
-      setIsDeleting(false);
-      return;
-    }
-
-    const { error: profileError } = await supabase
-      .from("vehicle_profiles")
-      .delete()
-      .eq("vehicle_id", pendingDelete.vehicleId);
-
-    if (profileError) {
-      setDeleteError(profileError.message);
-      setIsDeleting(false);
-      return;
-    }
-
-    setVehicles((prev) => prev.filter((v) => v.vehicleId !== pendingDelete.vehicleId));
-    if (selectedVehicleId === pendingDelete.vehicleId) setSelectedVehicleId(null);
-    setIsDeleting(false);
-    setPendingDelete(null);
-  };
-
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -90,20 +61,86 @@ export function VehiclesPage() {
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
+      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4">
-              <h2 className="text-xl font-semibold text-brand-800">Administration af køretøjer</h2>
+          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="text-xl font-semibold text-brand-800">Administration af køretøjer</h2>
+                <div className="relative" ref={filterRef}>
+                  <button
+                    type="button"
+                    onClick={() => setFilterOpen((prev) => !prev)}
+                    aria-label="Filtrer"
+                    className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
+                      filterAlias || filterStatus
+                        ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                        : "border-brand-300 text-brand-600 hover:bg-brand-50"
+                    }`}
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                      <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
+                    </svg>
+                  </button>
+                  <InlinePopup
+                    visible={filterOpen}
+                    align="right"
+                    message={
+                      <>
+                        <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
+                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                          Alias
+                          <select
+                            value={filterAlias}
+                            onChange={(e) => setFilterAlias(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                          >
+                            <option value="">Alle</option>
+                            {aliasOptions.map((alias) => (
+                              <option key={alias} value={alias}>
+                                {alias}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        <label className="block text-[0.7rem] font-medium text-brand-700">
+                          Status
+                          <select
+                            value={filterStatus}
+                            onChange={(e) => setFilterStatus(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                          >
+                            <option value="">Alle</option>
+                            <option value="Online">Online</option>
+                            <option value="Offline">Offline</option>
+                          </select>
+                        </label>
+                        {(filterAlias || filterStatus) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilterAlias("");
+                              setFilterStatus("");
+                            }}
+                            className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
+                          >
+                            Nulstil filter
+                          </button>
+                        )}
+                      </>
+                    }
+                  />
+                </div>
+              </div>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
@@ -112,35 +149,32 @@ export function VehiclesPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
-                    {vehicles.length === 0 && (
+                    {filteredVehicles.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Ingen køretøjer fundet.</td>
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
+                          {filterAlias || filterStatus ? "Ingen køretøjer matcher filteret." : "Ingen køretøjer fundet."}
+                        </td>
                       </tr>
                     )}
-                    {vehicles.map((vehicle, index) => {
+                    {filteredVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;
-                      const isSelected = vehicle.vehicleId === selectedVehicleId;
-                      const toggleSelected = () =>
-                        setSelectedVehicleId((current) => (current === vehicle.vehicleId ? null : vehicle.vehicleId));
+                      const goToVehicle = () => navigate("/vehicle-details", { state: { vehicle } });
                       return (
                         <tr
                           key={vehicle.vehicleId}
                           role="button"
                           tabIndex={0}
-                          aria-pressed={isSelected}
-                          onClick={toggleSelected}
+                          onClick={goToVehicle}
                           onKeyDown={(e) => {
                             if (e.key === "Enter" || e.key === " ") {
                               e.preventDefault();
-                              toggleSelected();
+                              goToVehicle();
                             }
                           }}
                           className={`cursor-pointer transition ${
-                            isSelected
-                              ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
-                              : isAlternate
-                                ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                : "bg-white text-brand-700 hover:bg-brand-50"
+                            isAlternate
+                              ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                              : "bg-white text-brand-700 hover:bg-brand-50"
                           }`}
                         >
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
@@ -159,60 +193,6 @@ export function VehiclesPage() {
                 </table>
               </div>
 
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled={!selectedVehicle}
-                    onClick={() => triggerNotImplemented("laas-op")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Lås op
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" />
-                </div>
-                <div className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled={!selectedVehicle}
-                    onClick={() => triggerNotImplemented("laas")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Lås
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" />
-                </div>
-                <div className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled={!selectedVehicle}
-                    onClick={() => selectedVehicle && navigate("/vehicleDetails", { state: { vehicle: selectedVehicle } })}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Vis køretøj
-                  </button>
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={!selectedVehicle}
-                  onClick={() => selectedVehicle && navigate("/handleVehicle", { state: { vehicle: selectedVehicle } })}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Rediger køretøj
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedVehicle}
-                  onClick={() => selectedVehicle && setPendingDelete(selectedVehicle)}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Slet køretøj
-                </button>
-              </div>
-
               <button
                 type="button"
                 onClick={() => navigate("/new-vehicle")}
@@ -224,17 +204,6 @@ export function VehiclesPage() {
           </section>
         </motion.main>
       </div>
-
-      {pendingDelete && (
-        <ConfirmDialog
-          message="Er du sikker på, at du vil slette dette køretøj?"
-          error={deleteError}
-          onCancel={() => setPendingDelete(null)}
-          onConfirm={() => void handleDeleteVehicle()}
-          isPending={isDeleting}
-          confirmPendingLabel="Sletter…"
-        />
-      )}
     </div>
   );
 }

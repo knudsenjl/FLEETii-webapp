@@ -68,6 +68,29 @@ export function splitIsoDateTime(iso: string): { date: string; time: string } {
   return { date, time: timePart ? timePart.slice(0, 5) : "" };
 }
 
+/**
+ * "dd.mm.yyyy" -> "dd/mm" (drops the year). Used app-wide to show a compact
+ * date in constrained spaces (table columns) while the full date (with year)
+ * is kept available as a hover tooltip — never shown as the only copy of the
+ * date, since the year is genuinely useful information, just not always
+ * space-affordable.
+ */
+export function shortDanishDate(danishDate: string): string {
+  return danishDate.slice(0, 5).replace(".", "/");
+}
+
+/**
+ * "dd/mm/yyyy HH.MM" -> "dd/mm HH.MM" (drops the year). Same idea as
+ * shortDanishDate, but for 2hire's raw wire-format timestamps (see
+ * liveVehicleDataSource.ts's formatSignalTimestamp / the mock 2hire data),
+ * which already use "/" as the date separator and "." between hour/minute.
+ */
+export function shortSignalTimestamp(fullTimestamp: string): string {
+  const [datePart, timePart] = fullTimestamp.split(" ");
+  const [day, month] = datePart.split("/");
+  return `${day}/${month} ${timePart}`;
+}
+
 /** Converts a raw BookingRow (DB column names, single ISO start/end strings) into the MappedBooking shape pages actually render. */
 export function mapBookingRow(row: BookingRow): MappedBooking {
   const { date: startDate, time: start } = splitIsoDateTime(row.start);
@@ -87,6 +110,25 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
 
 /** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle's 2hire vehicleId plus its reserved start/end. */
 export type BookingWindow = { vehicle_id: string; start: string; end: string };
+
+/** The minimal shape needed to format a booking's period — already-split Danish date/time strings (see MappedBooking). */
+export type BookingPeriod = { startDate: string; start: string; endDate: string; end: string };
+
+/**
+ * Formats a booking's start/end as one compact period, omitting the
+ * repeated date when both fall on the same day (e.g. "17.07.2026 22:45 -
+ * 03:00" vs "17.07.2026 22:45 - 18.07.2026 03:00"). Pass `short: true` for
+ * "dd/mm" dates instead of the full "dd.mm.yyyy" — pair that with the
+ * default (full) call as a hover tooltip, rather than showing only the
+ * short form.
+ */
+export function formatBookingPeriod(period: BookingPeriod, short = false): string {
+  const startDate = short ? shortDanishDate(period.startDate) : period.startDate;
+  const endDate = short ? shortDanishDate(period.endDate) : period.endDate;
+  return period.startDate === period.endDate
+    ? `${startDate} ${period.start} - ${period.end}`
+    : `${startDate} ${period.start} - ${endDate} ${period.end}`;
+}
 
 /**
  * The current moment as a naive "YYYY-MM-DDTHH:mm:ss" string (no timezone
@@ -175,24 +217,26 @@ export function computeFreePeriod(
   return { start: freeStart, end: freeEnd };
 }
 
-/** Formats one FreePeriod bound as "dd.mm.yyyy HH:mm". */
-function formatFreePeriodBound(iso: string): string {
+/** Formats one FreePeriod bound as "dd.mm.yyyy HH:mm" (or "dd/mm HH:mm" when `short`). */
+function formatFreePeriodBound(iso: string, short: boolean): string {
   const { date, time } = splitIsoDateTime(iso);
-  return `${date} ${time}`;
+  return `${short ? shortDanishDate(date) : date} ${time}`;
 }
 
 /**
  * Formats a FreePeriod for display. When start and end fall on the same day,
- * the end bound omits the (repeated) date and shows only the time.
+ * the end bound omits the (repeated) date and shows only the time. Pass
+ * `short: true` for "dd/mm" dates instead of the full "dd.mm.yyyy" — pair
+ * that with the default (full) call as a hover tooltip.
  */
-export function formatFreePeriod(period: FreePeriod): string {
+export function formatFreePeriod(period: FreePeriod, short = false): string {
   if (period.start && period.end) {
     const sameDay = period.start.slice(0, 10) === period.end.slice(0, 10);
-    const endFormatted = sameDay ? splitIsoDateTime(period.end).time : formatFreePeriodBound(period.end);
-    return `${formatFreePeriodBound(period.start)} - ${endFormatted}`;
+    const endFormatted = sameDay ? splitIsoDateTime(period.end).time : formatFreePeriodBound(period.end, short);
+    return `${formatFreePeriodBound(period.start, short)} - ${endFormatted}`;
   }
-  if (period.start) return `Fra ${formatFreePeriodBound(period.start)}`;
-  if (period.end) return `Til ${formatFreePeriodBound(period.end)}`;
+  if (period.start) return `Fra ${formatFreePeriodBound(period.start, short)}`;
+  if (period.end) return `Til ${formatFreePeriodBound(period.end, short)}`;
   return "—";
 }
 

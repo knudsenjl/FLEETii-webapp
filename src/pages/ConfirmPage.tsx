@@ -8,6 +8,7 @@ import {
   DEPARTMENT_COLUMN,
   VEHICLE_ID_COLUMN,
   isVehicleAvailable,
+  shortDanishDate,
   splitIsoDateTime,
   type BookingWindow,
 } from "../lib/bookings";
@@ -52,9 +53,10 @@ export function ConfirmPage() {
     return null;
   }
 
-  const formatDanishDateTime = (isoDateTime: string) => {
+  /** "dd.mm.yyyy HH:mm" (or "dd/mm HH:mm" when `short`) — short pairs with the full version as a hover tooltip. */
+  const formatDanishDateTime = (isoDateTime: string, short = false) => {
     const { date, time } = splitIsoDateTime(isoDateTime);
-    return `${date} ${time}`;
+    return `${short ? shortDanishDate(date) : date} ${time}`;
   };
 
   /**
@@ -119,12 +121,21 @@ export function ConfirmPage() {
     navigate(profile?.role === "admin" ? "/allbookings" : "/bookings", { replace: true });
   };
 
-  const rows: [string, string][] = [
-    ["Reserveret til:", bruger],
-    ["Anvendelse:", anvendelse],
-    ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`],
-    ["Start:", reservationStart ? formatDanishDateTime(reservationStart) : ""],
-    ["Slut:", reservationEnd ? formatDanishDateTime(reservationEnd) : ""],
+  /** [label, short value (visible), full value (hover tooltip)] — Start/Slut show "dd/mm" with the full "dd.mm.yyyy" available on hover; other rows just repeat the same value in both slots. */
+  const rows: [string, string, string][] = [
+    ["Reserveret til:", bruger, bruger],
+    ["Anvendelse:", anvendelse, anvendelse],
+    ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`, `${vehicle.plate}: ${vehicle.vehicle}`],
+    [
+      "Start:",
+      reservationStart ? formatDanishDateTime(reservationStart, true) : "",
+      reservationStart ? formatDanishDateTime(reservationStart) : "",
+    ],
+    [
+      "Slut:",
+      reservationEnd ? formatDanishDateTime(reservationEnd, true) : "",
+      reservationEnd ? formatDanishDateTime(reservationEnd) : "",
+    ],
   ];
 
   return (
@@ -149,10 +160,10 @@ export function ConfirmPage() {
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  {rows.map(([label, value]) => (
+                  {rows.map(([label, shortValue, fullValue]) => (
                     <div key={label} className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-[0.7rem] text-brand-700">
                       <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">{label}</div>
-                      <div className="whitespace-nowrap px-1">{value}</div>
+                      <div className="whitespace-nowrap px-1" title={fullValue}>{shortValue}</div>
                     </div>
                   ))}
                 </div>

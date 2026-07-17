@@ -8,7 +8,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
-/** A row from the `user_profiles` table. When reached with one pre-filled via router state (DepartmentPage's "Rediger"), the form is meant to edit it — see the KNOWN LIMITATION below. */
+/** A row from the `user_profiles` table. When reached with one pre-filled via router state (clicking a row on DepartmentPage), the form is meant to edit it — see the KNOWN LIMITATION below. */
 type ProfileRow = {
   user_id: string;
   email: string | null;
@@ -23,12 +23,14 @@ type ProfileRow = {
  * filled and that the email isn't already taken (debounced live check
  * against `user_profiles`) before enabling "Opret bruger", which calls the
  * create-user Netlify Function (authenticated with the current session).
+ * When reached with an existing user (via DepartmentPage), also shows
+ * "Slet", which deletes that user's `user_profiles` row.
  *
- * KNOWN LIMITATION: this form only ever creates a new user — reached via
- * DepartmentPage's "Rediger" with an existing user's data pre-filled, the
- * live email-exists check will always find that user's own (unchanged)
- * email and treat it as taken, so the submit button never enables and there
- * is no actual edit/update path today.
+ * KNOWN LIMITATION: this form's "Opret bruger" action only ever creates a
+ * new user — reached via DepartmentPage with an existing user's data
+ * pre-filled, the live email-exists check will always find that user's own
+ * (unchanged) email and treat it as taken, so that button never enables;
+ * there is no actual field-edit/update path today, only delete.
  */
 export function UserDetailsPage() {
   const { session, afdeling } = useAuth();
@@ -46,7 +48,7 @@ export function UserDetailsPage() {
   const [role, setRole] = useState(user?.role ?? "user");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
-  const [pendingAction, setPendingAction] = useState<"create" | "close" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"create" | "close" | "delete" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
@@ -86,10 +88,35 @@ export function UserDetailsPage() {
     department.trim().length > 0 &&
     role.trim().length > 0;
 
+  /** Deletes this user's `user_profiles` row (does NOT revoke their Supabase Auth account — a "deleted" user can still log in) and returns to DepartmentPage. */
+  const handleDelete = async () => {
+    if (!user) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    const { error: deleteError } = await supabase.from("user_profiles").delete().eq("user_id", user.user_id);
+
+    if (deleteError) {
+      setSubmitError(deleteError.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setIsSubmitting(false);
+    setPendingAction(null);
+    navigate("/department");
+  };
+
   /** Calls create-user with the form's values, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleConfirm = async () => {
     if (pendingAction === "close") {
       navigate("/department");
+      return;
+    }
+
+    if (pendingAction === "delete") {
+      await handleDelete();
       return;
     }
 
@@ -148,7 +175,9 @@ export function UserDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Bruger oplysninger</h2>
+              <h2 className="text-xl font-semibold text-brand-800">
+                {user ? "Opdater bruger oplysninger" : "Ny bruger oplysninger"}
+              </h2>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
@@ -184,23 +213,42 @@ export function UserDetailsPage() {
 
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setPendingAction("create")}
-                  disabled={!canCreate}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Opret bruger
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setPendingAction("close")}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Luk
-                </button>
-              </div>
+              {user ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction("close")}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Opdater bruger
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction("delete")}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Slet bruger
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction("create")}
+                    disabled={!canCreate}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Opret bruger
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPendingAction("close")}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Fortryd
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         </motion.main>
@@ -211,13 +259,15 @@ export function UserDetailsPage() {
           message={
             pendingAction === "create"
               ? "Er du sikker på, at du vil oprette denne bruger?"
-              : "Er du sikker på, at du vil lukke uden at gemme?"
+              : pendingAction === "delete"
+                ? "Er du sikker på, at du vil slette denne bruger?"
+                : "Er du sikker på, at du vil lukke uden at gemme?"
           }
           error={submitError}
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void handleConfirm()}
           isPending={isSubmitting}
-          confirmPendingLabel="Vent…"
+          confirmPendingLabel={pendingAction === "delete" ? "Sletter…" : "Vent…"}
         />
       )}
     </div>

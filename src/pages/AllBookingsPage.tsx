@@ -4,13 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
-import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import {
   BOOKINGS_SELECT_COLUMNS,
-  BOOKING_ID_COLUMN,
+  formatBookingPeriod,
   formatVehicleLabel,
   mapBookingRow,
   nowIsoString,
@@ -32,10 +31,12 @@ type Booking = {
 /**
  * Admin-only "Aktive reservationer" page ("/allbookings"): every upcoming
  * booking in the admin's department, with a user/vehicle filter popover.
- * This is the admin equivalent of BookingsPage (which shows a regular user
- * their own bookings, or an admin's own "next booking" home view) — the two
- * share most of their fetch/cancel/render logic but haven't been
- * consolidated into one component.
+ * Clicking a row navigates straight to BookingDetailsPage (view/cancel a
+ * booking from there) — this page itself is display/filter-only. This is
+ * the admin equivalent of BookingsPage (which shows a regular user their
+ * own bookings, or an admin's own "next booking" home view) — the two share
+ * most of their fetch/render logic but haven't been consolidated into one
+ * component.
  */
 export function AllBookingsPage() {
   const { afdeling } = useAuth();
@@ -45,10 +46,6 @@ export function AllBookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [selectedBookingId, setSelectedBookingId] = useState<number | null>(null);
-  const [cancellingId, setCancellingId] = useState<number | null>(null);
-  const [pendingCancel, setPendingCancel] = useState<Booking | null>(null);
-  const [cancelError, setCancelError] = useState<string | null>(null);
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
   const [users, setUsers] = useState<{ user_id: string; email: string; department: string | null }[]>([]);
@@ -77,7 +74,6 @@ export function AllBookingsPage() {
   const filteredBookings = departmentBookings.filter(
     (b) => (!filterUser || b.user === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
-  const selectedBooking = filteredBookings.find((b) => b.id === selectedBookingId) ?? null;
   const departmentUsers = users.filter((u) => u.department === afdeling);
 
   useEffect(() => {
@@ -94,7 +90,7 @@ export function AllBookingsPage() {
       });
   }, []);
 
-  /** Fetches every not-yet-ended booking (across all departments — filtered client-side to the admin's own department below) and replaces `bookings`. Called on mount and again after a cancellation. */
+  /** Fetches every not-yet-ended booking (across all departments — filtered client-side to the admin's own department below) and replaces `bookings`. Called on mount. */
   const loadBookings = async () => {
     setLoading(true);
     setError(null);
@@ -120,23 +116,6 @@ export function AllBookingsPage() {
     void loadBookings();
   }, []);
 
-  /** Deletes the given booking and reloads the list. */
-  const handleCancel = async (booking: Booking) => {
-    setCancelError(null);
-    setCancellingId(booking.id);
-    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
-    setCancellingId(null);
-
-    if (deleteError) {
-      setCancelError(deleteError.message);
-      return;
-    }
-
-    setPendingCancel(null);
-    if (selectedBookingId === booking.id) setSelectedBookingId(null);
-    await loadBookings();
-  };
-
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -144,17 +123,17 @@ export function AllBookingsPage() {
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
+      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4">
+          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
                 <div className="flex items-center gap-2">
@@ -186,7 +165,7 @@ export function AllBookingsPage() {
                               onChange={(e) => setFilterUser(e.target.value)}
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
-                              <option value="">Alle brugere</option>
+                              <option value="">Alle</option>
                               {departmentUsers.map((u) => (
                                 <option key={u.user_id} value={u.email}>
                                   {u.email}
@@ -201,7 +180,7 @@ export function AllBookingsPage() {
                               onChange={(e) => setFilterVehicle(e.target.value)}
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
-                              <option value="">Alle køretøjer</option>
+                              <option value="">Alle</option>
                               {vehicleOptions.map((v) => (
                                 <option key={v} value={v}>
                                   {formatVehicleLabel(v, vehicles)}
@@ -243,32 +222,31 @@ export function AllBookingsPage() {
                 </div>
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Real <table> (table-layout:auto) so column widths are computed
-                    once across the header AND every row together, fitting each
-                    column to its widest actual content instead of a fixed split. */}
-                <table className="w-full border-collapse text-[0.7rem]">
+              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+                {/* table-fixed + a fixed Periode width, so Køretøj absorbs
+                    whatever space is left over instead of a hardcoded cap —
+                    see BookingsPage for the same pattern. */}
+                <table className="w-full table-fixed border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Start</th>
-                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Slut</th>
+                      <th className="w-44 whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Periode</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={2} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
                           {filterUser || filterVehicle
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
@@ -279,84 +257,39 @@ export function AllBookingsPage() {
                       !error &&
                       filteredBookings.map((booking, index) => {
                         const isAlternate = index % 2 === 1;
-                        const isSelected = booking.id === selectedBookingId;
-                        const toggleSelected = () =>
-                          setSelectedBookingId((current) => (current === booking.id ? null : booking.id));
+                        const goToBooking = () => navigate("/booking-details", { state: { booking } });
                         return (
                           <tr
                             key={booking.id}
                             role="button"
                             tabIndex={0}
-                            aria-pressed={isSelected}
-                            onClick={toggleSelected}
+                            onClick={goToBooking}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" || e.key === " ") {
                                 e.preventDefault();
-                                toggleSelected();
+                                goToBooking();
                               }
                             }}
                             className={`cursor-pointer transition ${
-                              isSelected
-                                ? "bg-accent-50 text-brand-800 ring-1 ring-inset ring-accent-500"
-                                : isAlternate
-                                  ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                  : "bg-white text-brand-700 hover:bg-brand-50"
+                              isAlternate
+                                ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                : "bg-white text-brand-700 hover:bg-brand-50"
                             }`}
                           >
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{formatVehicleLabel(booking.vehicle, vehicles)}</td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right">{`${booking.startDate} ${booking.start}`}</td>
-                            <td className="whitespace-nowrap px-2 py-0.5 text-right">{`${booking.endDate} ${booking.end}`}</td>
+                            <td
+                              className="truncate border-r border-brand-100 px-2 py-0.5 font-medium"
+                              title={formatVehicleLabel(booking.vehicle, vehicles)}
+                            >
+                              {formatVehicleLabel(booking.vehicle, vehicles)}
+                            </td>
+                            <td className="whitespace-nowrap px-2 py-0.5 text-right" title={formatBookingPeriod(booking)}>
+                              {formatBookingPeriod(booking, true)}
+                            </td>
                           </tr>
                         );
                       })}
                   </tbody>
                 </table>
-              </div>
-
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled={!selectedBooking}
-                    onClick={() => triggerNotImplemented("laas-op")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Lås op
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" />
-                </div>
-                <div className="relative flex-1">
-                  <button
-                    type="button"
-                    disabled={!selectedBooking}
-                    onClick={() => triggerNotImplemented("laas")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Lås
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" align="right" />
-                </div>
-              </div>
-
-              <div className="flex gap-2">
-                <button
-                  type="button"
-                  disabled={!selectedBooking}
-                  onClick={() =>
-                    selectedBooking && navigate("/bookingDetails", { state: { booking: selectedBooking } })
-                  }
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Vis reservation
-                </button>
-                <button
-                  type="button"
-                  disabled={!selectedBooking}
-                  onClick={() => selectedBooking && setPendingCancel(selectedBooking)}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Slet reservation
-                </button>
               </div>
 
               <div className="mt-auto flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
@@ -372,17 +305,6 @@ export function AllBookingsPage() {
           </section>
         </motion.main>
       </div>
-
-      {pendingCancel && (
-        <ConfirmDialog
-          message="Er du sikker på, at du vil aflyse denne reservation?"
-          error={cancelError}
-          onCancel={() => setPendingCancel(null)}
-          onConfirm={() => void handleCancel(pendingCancel)}
-          isPending={cancellingId === pendingCancel.id}
-          confirmPendingLabel="Aflyser…"
-        />
-      )}
     </div>
   );
 }

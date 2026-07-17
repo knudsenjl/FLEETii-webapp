@@ -5,12 +5,15 @@ import {
   DEPARTMENT_COLUMN,
   VEHICLE_ID_COLUMN,
   computeFreePeriod,
+  formatBookingPeriod,
   formatFreePeriod,
   formatVehicleLabel,
   isVehicleAvailable,
   mapBookingRow,
   nowIsoString,
   resolveVehicleGpsPosition,
+  shortDanishDate,
+  shortSignalTimestamp,
   splitIsoDateTime,
   type BookingRow,
   type BookingWindow,
@@ -279,6 +282,45 @@ describe("formatFreePeriod", () => {
 
   it("falls back to a dash when both bounds are missing", () => {
     expect(formatFreePeriod({ start: null, end: null })).toBe("—");
+  });
+
+  it("uses short 'dd/mm' dates when short is true", () => {
+    expect(formatFreePeriod({ start: "2026-07-09T08:00:00", end: "2026-07-10T14:00:00" }, true)).toBe(
+      "09/07 08:00 - 10/07 14:00",
+    );
+  });
+});
+
+describe("shortDanishDate", () => {
+  it("drops the year and replaces '.' with '/'", () => {
+    expect(shortDanishDate("09.07.2026")).toBe("09/07");
+  });
+});
+
+describe("shortSignalTimestamp", () => {
+  it("drops the year from a 2hire wire-format timestamp", () => {
+    expect(shortSignalTimestamp("09/07/2026 14.05")).toBe("09/07 14.05");
+  });
+});
+
+describe("formatBookingPeriod", () => {
+  const sameDay = { startDate: "09.07.2026", start: "08:00", endDate: "09.07.2026", end: "14:00" };
+  const crossDay = { startDate: "09.07.2026", start: "22:45", endDate: "10.07.2026", end: "03:00" };
+
+  it("omits the repeated end date when start and end fall on the same day", () => {
+    expect(formatBookingPeriod(sameDay)).toBe("09.07.2026 08:00 - 14:00");
+  });
+
+  it("shows the full end date when start and end fall on different days", () => {
+    expect(formatBookingPeriod(crossDay)).toBe("09.07.2026 22:45 - 10.07.2026 03:00");
+  });
+
+  it("uses short 'dd/mm' dates when short is true, same-day case", () => {
+    expect(formatBookingPeriod(sameDay, true)).toBe("09/07 08:00 - 14:00");
+  });
+
+  it("uses short 'dd/mm' dates when short is true, cross-day case", () => {
+    expect(formatBookingPeriod(crossDay, true)).toBe("09/07 22:45 - 10/07 03:00");
   });
 });
 

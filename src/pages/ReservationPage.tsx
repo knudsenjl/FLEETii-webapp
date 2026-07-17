@@ -21,6 +21,9 @@ function ceilToQuarterHour(date: Date): Date {
   return new Date(Math.ceil(date.getTime() / ms) * ms);
 }
 
+/** The one "Anvendelse" option that prompts for a free-text reason instead of being used as-is. */
+const ANDET_VALUE = "Andet (angiv årsag)";
+
 /**
  * Step 1 of the booking flow ("/reservation"): pick who the reservation is
  * for (admins pick from their department's users; regular users always book
@@ -34,7 +37,11 @@ export function ReservationPage() {
   const [bruger, setBruger] = useState(
     profile?.role === "admin" ? "" : session?.user.email ?? "",
   );
-  const [anvendelse, setAnvendelse] = useState("");
+  const [anvendelseOption, setAnvendelseOption] = useState("");
+  const [anvendelseCustom, setAnvendelseCustom] = useState("");
+  /** The actual "anvendelse" value used downstream — the selected option, or (when ANDET_VALUE is picked) the user's own free-text reason. */
+  const anvendelse = anvendelseOption === ANDET_VALUE ? anvendelseCustom : anvendelseOption;
+  const [anvendelseOptions, setAnvendelseOptions] = useState<string[]>([]);
   const [users, setUsers] = useState<{ user_id: string; email: string; department: string | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -53,6 +60,22 @@ export function ReservationPage() {
             (u): u is { user_id: string; email: string; department: string | null } => Boolean(u.email),
           ),
         );
+      });
+  }, []);
+
+  /** Loads the "Anvendelse" dropdown's options from settings.value (a text[]). */
+  useEffect(() => {
+    supabase
+      .from("settings")
+      .select("value")
+      .eq("name", "Anvendelse")
+      .maybeSingle<{ value: string[] }>()
+      .then(({ data, error: settingsError }) => {
+        if (settingsError) {
+          setError(settingsError.message);
+          return;
+        }
+        setAnvendelseOptions(data?.value ?? []);
       });
   }, []);
 
@@ -215,14 +238,35 @@ export function ReservationPage() {
                       />
                     )}
                   </div>
-                  <RequiredFieldRow
-                    label="Anvendelse"
-                    value={anvendelse}
-                    onChange={setAnvendelse}
-                    placeholder="Beskrivelse"
-                    className="grid grid-cols-2 gap-3 p-3 sm:p-4"
-                    inputClassName="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                  />
+                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                    <label className="flex items-center text-sm font-medium text-brand-700">
+                      Anvendelse <span className="ml-0.5 text-red-600">*</span>
+                    </label>
+                    <select
+                      required
+                      aria-required="true"
+                      value={anvendelseOption}
+                      onChange={(e) => setAnvendelseOption(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    >
+                      <option value="">Vælg anvendelse</option>
+                      {anvendelseOptions.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  {anvendelseOption === ANDET_VALUE && (
+                    <RequiredFieldRow
+                      label="Angiv årsag"
+                      value={anvendelseCustom}
+                      onChange={setAnvendelseCustom}
+                      placeholder="Beskrivelse"
+                      className="grid grid-cols-2 gap-3 p-3 sm:p-4"
+                      inputClassName="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  )}
                   <div className="relative grid grid-cols-[4rem_1fr_1fr] items-center gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Start

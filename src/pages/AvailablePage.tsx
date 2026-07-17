@@ -14,12 +14,13 @@ import {
   type BookingWindow,
 } from "../lib/bookings";
 
-/** A vehicle available for the requested period, plus a human-readable description of its free window. */
+/** A vehicle available for the requested period, plus a human-readable description of its free window (short "dd/mm" dates for display, full "dd.mm.yyyy" dates for the hover tooltip). */
 type AvailableVehicle = {
   id: string;
   vehicle: string;
   plate: string;
   ledigPeriode: string;
+  ledigPeriodeFull: string;
 };
 
 function formatDanishTime(date: Date): string {
@@ -32,6 +33,13 @@ function formatDanishDateTime(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
   return `${day}.${month}.${date.getFullYear()} ${formatDanishTime(date)}`;
+}
+
+/** Same as formatDanishDateTime, but "dd/mm" instead of "dd.mm.yyyy" — pairs with the full version as a hover tooltip. */
+function formatDanishDateTimeShort(date: Date): string {
+  const day = String(date.getDate()).padStart(2, "0");
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  return `${day}/${month} ${formatDanishTime(date)}`;
 }
 
 /** True if two Dates fall on the same calendar day (used to decide whether to repeat the date in the period display). */
@@ -88,7 +96,8 @@ export function AvailablePage() {
         id: v.vehicleId,
         vehicle: `${v.brand} ${v.model}`,
         plate: v.alias,
-        ledigPeriode: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod),
+        ledigPeriode: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod, true),
+        ledigPeriodeFull: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod),
       };
     });
 
@@ -102,30 +111,37 @@ export function AvailablePage() {
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
+      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
+          className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4">
+          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Ledige køretøjer</h2>
                 {reservationStart && reservationEnd && (
-                  <span className="text-[0.7rem] text-brand-600">
-                    Periode: {formatDanishDateTime(reservationStart)} -{" "}
+                  <span
+                    className="text-[0.7rem] text-brand-600"
+                    title={`${formatDanishDateTime(reservationStart)} - ${
+                      isSameDate(reservationStart, reservationEnd)
+                        ? formatDanishTime(reservationEnd)
+                        : formatDanishDateTime(reservationEnd)
+                    }`}
+                  >
+                    Periode: {formatDanishDateTimeShort(reservationStart)} -{" "}
                     {isSameDate(reservationStart, reservationEnd)
                       ? formatDanishTime(reservationEnd)
-                      : formatDanishDateTime(reservationEnd)}
+                      : formatDanishDateTimeShort(reservationEnd)}
                   </span>
                 )}
               </div>
 
-              <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
@@ -178,7 +194,9 @@ export function AvailablePage() {
                             }`}
                           >
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
-                            <td className="whitespace-nowrap px-2 py-0.5 text-center">{vehicle.ledigPeriode}</td>
+                            <td className="whitespace-nowrap px-2 py-0.5 text-center" title={vehicle.ledigPeriodeFull}>
+                              {vehicle.ledigPeriode}
+                            </td>
                           </tr>
                         );
                       })}

@@ -43,7 +43,7 @@ export function FleetManagementPage() {
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
     if (!twoHireVehicle) return;
-    navigate("/vehicleDetails", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
+    navigate("/vehicle-details", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
   };
 
   return (

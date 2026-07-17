@@ -1,11 +1,14 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { use2hireGPS } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LeafletMap } from "../components/LeafletMap";
 import { InlinePopup } from "../components/InlinePopup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { shortSignalTimestamp } from "../lib/bookings";
+import { supabase } from "../lib/supabase";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
 type Vehicle = {
@@ -26,11 +29,13 @@ type Vehicle = {
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
- * Read-only vehicle detail view ("/vehicleDetails"): plate, model, fuel
- * level, mileage, status, and a map showing its last known GPS position (or
- * a "no GPS available" overlay if none exists). The vehicle itself is passed
- * in via router state — there is no direct-URL/refresh support, so it
- * redirects to the fleet table if state is missing (e.g. a hard refresh).
+ * Vehicle detail view ("/vehicle-details"): plate, model, fuel level,
+ * mileage, status, and a map showing its last known GPS position (or a "no
+ * GPS available" overlay if none exists), plus "Rediger køretøj" (to
+ * HandleVehiclePage) and "Slet køretøj" (both moved here from VehiclesPage).
+ * The vehicle itself is passed in via router state — there is no
+ * direct-URL/refresh support, so it redirects to the fleet table if state is
+ * missing (e.g. a hard refresh).
  */
 export function VehicleDetailsPage() {
   const navigate = useNavigate();
@@ -39,6 +44,10 @@ export function VehicleDetailsPage() {
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
   const gpsPositions = use2hireGPS();
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
+
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!vehicle) {
@@ -49,6 +58,45 @@ export function VehicleDetailsPage() {
   if (!vehicle) {
     return null;
   }
+
+  /**
+   * Deletes this vehicle's vehicle_signals row (if any) and then its
+   * vehicle_profiles row — in that order, since vehicle_signals.vehicle_id
+   * has a foreign key to vehicle_profiles.vehicle_id, and its on-delete
+   * behavior isn't known here (see supabase/rename_vehicle_id_to_uuid.sql's
+   * header), so the child row is removed explicitly rather than assumed to
+   * cascade. Returns to the fleet table on success, since this page has
+   * nothing left to show.
+   */
+  const handleDeleteVehicle = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    const { error: signalsError } = await supabase
+      .from("vehicle_signals")
+      .delete()
+      .eq("vehicle_id", vehicle.vehicleId);
+
+    if (signalsError) {
+      setDeleteError(signalsError.message);
+      setIsDeleting(false);
+      return;
+    }
+
+    const { error: profileError } = await supabase
+      .from("vehicle_profiles")
+      .delete()
+      .eq("vehicle_id", vehicle.vehicleId);
+
+    if (profileError) {
+      setDeleteError(profileError.message);
+      setIsDeleting(false);
+      return;
+    }
+
+    setIsDeleting(false);
+    navigate("/fleet-table", { replace: true });
+  };
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -84,9 +132,16 @@ export function VehicleDetailsPage() {
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
-                    <span className="text-sm text-brand-800">
+                    <span
+                      className="text-sm text-brand-800"
+                      title={
+                        vehicle.autonomyPercentage && vehicle.autonomyPercentageUpdatedAt
+                          ? `${vehicle.autonomyPercentage} (${vehicle.autonomyPercentageUpdatedAt})`
+                          : undefined
+                      }
+                    >
                       {vehicle.autonomyPercentage ? (
-                        `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}`
+                        `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
                       ) : (
                         <span className="italic">Ingen information</span>
                       )}
@@ -94,9 +149,16 @@ export function VehicleDetailsPage() {
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
-                    <span className="text-sm text-brand-800">
+                    <span
+                      className="text-sm text-brand-800"
+                      title={
+                        vehicle.distanceCovered && vehicle.distanceCoveredUpdatedAt
+                          ? `${vehicle.distanceCovered} (${vehicle.distanceCoveredUpdatedAt})`
+                          : undefined
+                      }
+                    >
                       {vehicle.distanceCovered ? (
-                        `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${vehicle.distanceCoveredUpdatedAt})` : ""}`
+                        `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
                       ) : (
                         <span className="italic">Ingen information</span>
                       )}
@@ -104,9 +166,12 @@ export function VehicleDetailsPage() {
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Status:</label>
-                    <span className="text-sm text-brand-800">
+                    <span
+                      className="text-sm text-brand-800"
+                      title={vehicle.onlineUpdatedAt ? `${vehicle.status} (opdateret ${vehicle.onlineUpdatedAt})` : undefined}
+                    >
                       {vehicle.status}
-                      {vehicle.onlineUpdatedAt ? ` (opdateret ${vehicle.onlineUpdatedAt})` : ""}
+                      {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                     </span>
                   </div>
                 </div>
@@ -153,10 +218,38 @@ export function VehicleDetailsPage() {
                   <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" align="right" />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
+                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Rediger køretøj
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Slet køretøj
+                </button>
+              </div>
             </div>
           </section>
         </motion.main>
       </div>
+
+      {showDeleteConfirm && (
+        <ConfirmDialog
+          message="Er du sikker på, at du vil slette dette køretøj?"
+          error={deleteError}
+          onCancel={() => setShowDeleteConfirm(false)}
+          onConfirm={() => void handleDeleteVehicle()}
+          isPending={isDeleting}
+          confirmPendingLabel="Sletter…"
+        />
+      )}
     </div>
   );
 }
