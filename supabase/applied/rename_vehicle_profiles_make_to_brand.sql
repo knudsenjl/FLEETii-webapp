@@ -1,3 +1,7 @@
+-- ARCHIVED: already applied to the live database. Kept only as a historical
+-- record of why the column is "brand" not "make" — not needed to reproduce
+-- the current schema (see the files directly under supabase/ for that).
+--
 -- One-time migration: renames vehicle_profiles.make to brand.
 -- Guarded so it's safe to re-run once already applied.
 

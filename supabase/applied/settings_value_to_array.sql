@@ -1,3 +1,7 @@
+-- ARCHIVED: already applied to the live database. Kept only as a historical
+-- record of why settings.value is text[] not text — not needed to reproduce
+-- the current schema (see the files directly under supabase/ for that).
+--
 -- One-time migration: converts settings.value from a comma-separated text
 -- string to a real text[] array, splitting (and trimming) each existing
 -- value on "," so e.g. "Kundebesøg, Levering, Andet (angiv årsag)" becomes

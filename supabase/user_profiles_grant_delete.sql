@@ -1,0 +1,25 @@
+-- Grants DELETE on user_profiles to the authenticated role. Confirmed via
+-- information_schema.role_table_grants that authenticated currently has
+-- only SELECT on this table — no INSERT/UPDATE/DELETE at all — which is why
+-- "Slet bruger" on UserDetailsPage.tsx fails with "permission denied for
+-- table user_profiles" (a base GRANT/privilege error, evaluated BEFORE row
+-- level security even runs — distinct from an RLS policy simply not
+-- matching a row, which fails silently with 0 rows deleted instead). Likely
+-- lost somewhere across the profiles -> users -> user_profiles renames
+-- (supabase/applied/rename_profiles_table.sql, supabase/rename_users_table.sql),
+-- since those never included a GRANT step.
+--
+-- This does NOT bypass the existing RLS policy
+-- (user_profiles_delete_admin_own_department, see rls_policies.sql) — that
+-- still restricts WHICH rows an admin can delete (their own department
+-- only). This grant only lets the DELETE be attempted at all.
+--
+-- Deliberately does NOT also grant INSERT/UPDATE — user creation goes
+-- exclusively through create-user.mts's service-role key by design (see
+-- rls_policies.sql's header comment), and there is no client-side UPDATE
+-- path today ("Opdater bruger" on UserDetailsPage.tsx is a known stub that
+-- doesn't actually persist anything yet).
+--
+-- Safe to re-run: GRANT is idempotent.
+
+grant delete on public.user_profiles to authenticated;

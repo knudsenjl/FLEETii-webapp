@@ -1,3 +1,8 @@
+-- ARCHIVED: already applied to the live database. Kept only as a historical
+-- record of why vehicle_id is uuid (and the plate->vehicleId backfill map
+-- used) — not needed to reproduce the current schema (see the files
+-- directly under supabase/ for that).
+--
 -- One-time migration: converts vehicle_id columns from text to uuid.
 --
 -- Two different tables have a "vehicle_id" column, holding two DIFFERENT

@@ -1,3 +1,7 @@
+-- ARCHIVED: already applied to the live database. Kept only as a historical
+-- record of why "bookings" has its current name — not needed to reproduce
+-- the current schema (see the files directly under supabase/ for that).
+--
 -- One-time migration: renames the "Bookings" table (capitalized, quoted
 -- identifier) to bookings (lowercase, unquoted), matching every other
 -- table's naming convention (users, vehicle_signals).

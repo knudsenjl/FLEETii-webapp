@@ -1,3 +1,14 @@
+-- ARCHIVED — DO NOT RE-RUN: this table was renamed a SECOND time after this
+-- file ("users" -> "user_profiles", see rename_users_table.sql, which is
+-- NOT archived and stays live). The is_admin()/current_department()/
+-- current_email()/handle_new_user() bodies below still point at
+-- "public.users", which no longer exists — re-running this file would
+-- overwrite those functions with these stale, broken bodies and take down
+-- every RLS-protected read/write in the app. Kept only as a historical
+-- record of the first rename step; rls_policies.sql and
+-- rename_users_table.sql are the current, correct source for these
+-- functions.
+--
 -- One-time migration: renames the "profiles" table to "users", and its "id"
 -- column to "user_id". Safe to run regardless of whether the table/column
 -- rename has already been done manually (e.g. via Supabase's Table Editor
