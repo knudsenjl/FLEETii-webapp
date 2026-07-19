@@ -23,7 +23,7 @@ export function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
 
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filterAlias, setFilterAlias] = useState("");
+  const [filterPlate, setFilterPlate] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -40,9 +40,9 @@ export function VehiclesPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterOpen]);
 
-  const aliasOptions = Array.from(new Set(vehicles.map((v) => v.alias))).sort();
+  const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter(
-    (v) => (!filterAlias || v.alias === filterAlias) && (!filterStatus || v.status === filterStatus),
+    (v) => (!filterPlate || v.plate === filterPlate) && (!filterStatus || v.status === filterStatus),
   );
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export function VehiclesPage() {
       twoHireVehicles
         .filter((v) => v.tags === afdeling)
         .map(toDisplayVehicle)
-        .sort((a, b) => a.alias.localeCompare(b.alias)),
+        .sort((a, b) => a.plate.localeCompare(b.plate)),
     );
   }, [twoHireVehicles, afdeling]);
 
@@ -80,7 +80,7 @@ export function VehiclesPage() {
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterAlias || filterStatus
+                      filterPlate || filterStatus
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -96,16 +96,16 @@ export function VehiclesPage() {
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Alias
+                          Nummerplade
                           <select
-                            value={filterAlias}
-                            onChange={(e) => setFilterAlias(e.target.value)}
+                            value={filterPlate}
+                            onChange={(e) => setFilterPlate(e.target.value)}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                           >
                             <option value="">Alle</option>
-                            {aliasOptions.map((alias) => (
-                              <option key={alias} value={alias}>
-                                {alias}
+                            {plateOptions.map((plate) => (
+                              <option key={plate} value={plate}>
+                                {plate}
                               </option>
                             ))}
                           </select>
@@ -122,11 +122,11 @@ export function VehiclesPage() {
                             <option value="Offline">Offline</option>
                           </select>
                         </label>
-                        {(filterAlias || filterStatus) && (
+                        {(filterPlate || filterStatus) && (
                           <button
                             type="button"
                             onClick={() => {
-                              setFilterAlias("");
+                              setFilterPlate("");
                               setFilterStatus("");
                             }}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
@@ -152,7 +152,7 @@ export function VehiclesPage() {
                     {filteredVehicles.length === 0 && (
                       <tr>
                         <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                          {filterAlias || filterStatus ? "Ingen køretøjer matcher filteret." : "Ingen køretøjer fundet."}
+                          {filterPlate || filterStatus ? "Ingen køretøjer matcher filteret." : "Ingen køretøjer fundet."}
                         </td>
                       </tr>
                     )}

@@ -63,7 +63,7 @@ function formatPercentage(percentage: number | null): string {
  */
 function toVehicle2Hire(profile: VehicleProfileRow, signal: VehicleSignalRow | undefined): Vehicle2Hire {
   return {
-    alias: profile.number_plate ?? "",
+    plate: profile.number_plate ?? "",
     vehicleId: profile.vehicle_id,
     connectivityProvider: "",
     iotIdentifier: profile.iot_id ?? "",

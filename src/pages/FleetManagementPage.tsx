@@ -74,12 +74,12 @@ export function FleetManagementPage() {
                   lng={center.lng}
                   zoom={primary ? 13 : 7}
                   showMarker={Boolean(primary)}
-                  markerTooltip={primary ? twoHireVehicles.find((v) => v.vehicleId === primary.vehicleId)?.alias : undefined}
+                  markerTooltip={primary ? twoHireVehicles.find((v) => v.vehicleId === primary.vehicleId)?.plate : undefined}
                   onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}
                   extraMarkers={rest.map((g) => ({
                     lat: g.lat,
                     lng: g.lng,
-                    tooltip: twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.alias,
+                    tooltip: twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.plate,
                     onClick: () => goToVehicleDetails(g.vehicleId),
                   }))}
                   cluster

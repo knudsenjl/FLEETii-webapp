@@ -4,9 +4,9 @@
 // VehicleDataSource is the interface both the mock and live implementations
 // satisfy.
 
-/** A single vehicle's full 2hire telemetry snapshot (fleet metadata + live diagnostic warnings). All fields are strings, matching 2hire's raw API response format. */
+/** A single vehicle's full 2hire telemetry snapshot (fleet metadata + live diagnostic warnings). All fields are strings, matching 2hire's raw API response format — except `plate`, deliberately renamed from 2hire's own "alias" field for clarity throughout this app (mapped in both mockVehicleDataSource.ts and liveVehicleDataSource.ts). */
 export interface Vehicle2Hire {
-  alias: string;
+  plate: string;
   vehicleId: string;
   connectivityProvider: string;
   iotIdentifier: string;
