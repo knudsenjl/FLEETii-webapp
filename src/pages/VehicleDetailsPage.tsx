@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LeafletMap } from "../components/LeafletMap";
-import { InlinePopup } from "../components/InlinePopup";
-import { useTimedFlag } from "../hooks/useTimedFlag";
+import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { shortSignalTimestamp } from "../lib/bookings";
 import { supabase } from "../lib/supabase";
 
@@ -25,29 +25,49 @@ type Vehicle = {
   onlineUpdatedAt?: string;
 };
 
+/** The regular user's own reservation for this vehicle, if reached via BookingDetailsPage's map marker — see useVehicleLockState. Only ever present for a non-admin; admin navigation paths (VehiclesPage, FleetManagementPage) don't pass one. */
+type RouterBooking = { id: number; startIso: string; endIso: string | null };
+
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
  * Vehicle detail view ("/vehicle-details"): plate, model, fuel level,
- * mileage, status, and a map showing its last known GPS position (or a "no
- * GPS available" overlay if none exists), plus "Rediger køretøj" (to
- * HandleVehiclePage) and "Slet køretøj" (both moved here from VehiclesPage).
- * The vehicle itself is passed in via router state — there is no
- * direct-URL/refresh support, so it redirects to the fleet table if state is
- * missing (e.g. a hard refresh).
+ * mileage, status, and (admin-only) a map showing its last known GPS
+ * position (or a "no GPS available" overlay if none exists), plus (also
+ * admin-only) "Rediger køretøj" (to HandleVehiclePage) and "Slet køretøj"
+ * (both moved here from VehiclesPage). The vehicle itself is passed in via
+ * router state — there is no direct-URL/refresh support, so it redirects to
+ * the fleet table if state is missing (e.g. a hard refresh). A regular user
+ * can land here too (e.g. via their own booking's map marker on
+ * BookingDetailsPage), so the map and both actions are gated on profile.role
+ * rather than the route itself.
  */
 export function VehicleDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const vehicle = (location.state as { vehicle?: Vehicle } | null)?.vehicle ?? null;
-  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
+  const { profile } = useAuth();
+  const isAdmin = profile?.role === "admin";
+  const state = location.state as { vehicle?: Vehicle; booking?: RouterBooking } | null;
+  const vehicle = state?.vehicle ?? null;
+  const booking = state?.booking ?? null;
   const gpsPositions = use2hireGPS();
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const bookingContext: VehicleLockBookingContext | null = booking
+    ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso }
+    : null;
+  const {
+    lockEnabled,
+    unlockEnabled,
+    loading: lockStateLoading,
+    setLock,
+    error: lockError,
+  } = useVehicleLockState(vehicle?.vehicleId ?? "", bookingContext, isAdmin);
 
   useEffect(() => {
     if (!vehicle) {
@@ -177,64 +197,74 @@ export function VehicleDetailsPage() {
                 </div>
               </div>
 
-              <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                <LeafletMap
-                  lat={position?.lat ?? DENMARK_CENTER.lat}
-                  lng={position?.lng ?? DENMARK_CENTER.lng}
-                  zoom={position ? 13 : 7}
-                  showMarker={Boolean(position)}
-                  markerClickable={false}
-                  markerTooltip={vehicle.plate}
-                  className="absolute inset-0"
-                />
-                {!position && (
-                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                      Der er ingen GPS position tilgængelig for dette køretøj
+              {isAdmin && (
+                <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
+                  <LeafletMap
+                    lat={position?.lat ?? DENMARK_CENTER.lat}
+                    lng={position?.lng ?? DENMARK_CENTER.lng}
+                    zoom={position ? 17 : 7}
+                    showMarker={Boolean(position)}
+                    markerClickable={false}
+                    markerTooltip={vehicle.plate}
+                    className="absolute inset-0"
+                  />
+                  {!position && (
+                    <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
+                      <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
+                        Der er ingen GPS position tilgængelig for dette køretøj
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => triggerNotImplemented("laas")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Lås
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" />
+                  )}
                 </div>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => triggerNotImplemented("laas-op")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Lås op
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" align="right" />
-                </div>
-              </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  onClick={() => void setLock(true)}
+                  disabled={!lockEnabled || lockStateLoading}
+                  aria-label="Lås"
+                  className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Rediger køretøj
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
                 </button>
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  onClick={() => void setLock(false)}
+                  disabled={!unlockEnabled || lockStateLoading}
+                  aria-label="Lås op"
+                  className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Slet køretøj
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                  </svg>
                 </button>
               </div>
+
+              {lockError && <p className="text-sm text-red-600">{lockError}</p>}
+
+              {isAdmin && (
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Rediger køretøj
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(true)}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Slet køretøj
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         </motion.main>

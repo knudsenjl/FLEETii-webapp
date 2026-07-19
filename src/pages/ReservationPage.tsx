@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { TimeSelect } from "../components/TimeSelect";
 import { supabase } from "../lib/supabase";
+import { fetchSettingValue } from "../lib/settings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
 /** Every quarter-hour of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns. */
@@ -63,35 +64,14 @@ export function ReservationPage() {
       });
   }, []);
 
-  /** Loads the "Anvendelse" dropdown's options from settings.value (a text[]). */
+  /** Loads the "Anvendelse" dropdown's options from settings.value (a text[]) — not department-scoped, matching this setting's existing (unscoped) design; a per-user override row still takes precedence if one exists (see fetchSettingValue). */
   useEffect(() => {
-    supabase
-      .from("settings")
-      .select("value")
-      .eq("name", "Anvendelse")
-      .maybeSingle<{ value: string[] }>()
-      .then(({ data, error: settingsError }) => {
-        if (settingsError) {
-          setError(settingsError.message);
-          return;
-        }
-        setAnvendelseOptions(data?.value ?? []);
-      });
-  }, []);
+    void fetchSettingValue("Anvendelse", profile?.user_id).then((value) => {
+      setAnvendelseOptions(value ?? []);
+    });
+  }, [profile?.user_id]);
 
   const departmentUsers = users.filter((u) => u.department === afdeling);
-
-  const hasSelectedInitialBruger = useRef(false);
-  useEffect(() => {
-    if (
-      profile?.role === "admin" &&
-      !hasSelectedInitialBruger.current &&
-      departmentUsers.length > 0
-    ) {
-      hasSelectedInitialBruger.current = true;
-      setBruger(departmentUsers[0].email);
-    }
-  }, [profile?.role, departmentUsers]);
 
   const now = ceilToQuarterHour(new Date());
   const end = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -122,6 +102,12 @@ export function ReservationPage() {
   const [endDate, setEndDate] = useState(toIsoDate(end));
   const [startTime, setStartTime] = useState(formatTime(now));
   const [endTime, setEndTime] = useState(formatTime(end));
+  /** When true (the "Nu" clock icon button is pressed/active), Start is locked to the current moment and its fields are disabled — see handleNowToggle. */
+  const [startIsNow, setStartIsNow] = useState(false);
+  /** When true, End is cleared and its fields are replaced by an "Ingen slutdato" label — see handleEndIgnoreToggle. */
+  const [endIgnored, setEndIgnored] = useState(false);
+  /** The End date/time as they were right before "ignore" was turned on, restored if it's turned back off. */
+  const ignoredEndRef = useRef<{ date: string; time: string } | null>(null);
   const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
 
   /**
@@ -176,13 +162,75 @@ export function ReservationPage() {
     setEndTime(time);
   };
 
+  /**
+   * Locks Start to the current moment (disabling its fields) when the "Nu"
+   * button is pressed on, or just re-enables editing (leaving the last value
+   * in place) when pressed off. Doesn't go through applyStartDateTime: that
+   * function rejects "past" candidates and rounds up to the next quarter
+   * hour, but a value computed as `new Date()` right now would almost always
+   * be judged already in the past by the time the comparison runs a moment
+   * later — rounding it up instead of keeping the exact current moment "Nu"
+   * is supposed to mean.
+   */
+  const handleNowToggle = (nowActive: boolean) => {
+    setStartIsNow(nowActive);
+    if (!nowActive) return;
+
+    const current = new Date();
+    const endMoment = new Date(current.getTime() + 3 * 60 * 60 * 1000);
+
+    setStartDate(toIsoDate(current));
+    setStartTime(formatTime(current));
+    // Matches the page's own initial default (now -> now+3h) — un-ignores
+    // End if it was ignored, since "Nu" is establishing a fresh, concrete
+    // booking window.
+    setEndIgnored(false);
+    setEndDate(toIsoDate(endMoment));
+    setEndTime(formatTime(endMoment));
+  };
+
+  /**
+   * Clears End and swaps its date/time inputs for an "Ingen slutdato" label
+   * when turned on, or restores whatever End held right before it was
+   * turned on. Unlike "Nu", there's no live value to keep computing while
+   * ignored — an ignored End just stays empty until turned back off.
+   */
+  const handleEndIgnoreToggle = () => {
+    if (endIgnored) {
+      const restored = ignoredEndRef.current;
+      if (restored) {
+        setEndDate(restored.date);
+        setEndTime(restored.time);
+      }
+      setEndIgnored(false);
+      return;
+    }
+
+    ignoredEndRef.current = { date: endDate, time: endTime };
+    setEndDate("");
+    setEndTime("");
+    setEndIgnored(true);
+  };
+
   const handleFindAvailable = () => {
+    // Recomputed fresh here (not read from possibly-stale state) so a delay
+    // between checking "Nu" and pressing "Find ledige" can't submit a start
+    // time that's already slipped into the past.
+    const current = new Date();
+    const start = startIsNow
+      ? `${toIsoDate(current)}T${formatTime(current)}:00`
+      : `${startDate}T${startTime}:00`;
+    // An ignored End means "no end constraint" — pass null rather than a
+    // malformed "T:00" string, matching how AvailablePage/bookings.ts
+    // already treat a null start/end as unbounded (see isVehicleAvailable).
+    const end = endIgnored ? null : `${endDate}T${endTime}:00`;
+
     navigate("/available", {
       state: {
         user: bruger,
         use: anvendelse,
-        start: `${startDate}T${startTime}:00`,
-        end: `${endDate}T${endTime}:00`,
+        start,
+        end,
       },
     });
   };
@@ -213,7 +261,7 @@ export function ReservationPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Bruger
+                      Bruger {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
                     {profile?.role === "admin" ? (
                       <select
@@ -267,20 +315,38 @@ export function ReservationPage() {
                       inputClassName="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
                   )}
-                  <div className="relative grid grid-cols-[4rem_1fr_1fr] items-center gap-3 p-3 sm:p-4">
+                  <div className="relative grid grid-cols-[4rem_3.5rem_1fr_1fr] items-center gap-0.5 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Start
                     </label>
+                    <button
+                      type="button"
+                      onClick={() => handleNowToggle(!startIsNow)}
+                      aria-pressed={startIsNow}
+                      aria-label="Nu"
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                        startIsNow
+                          ? "border-brand-600 bg-brand-600 text-white"
+                          : "border-brand-200 bg-brand-50/60 text-brand-700 hover:bg-brand-100"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <circle cx="12" cy="12" r="10" />
+                        <polyline points="12 6 12 12 16 14" />
+                      </svg>
+                    </button>
                     <input
                       type="date"
                       value={startDate}
+                      disabled={startIsNow}
                       onChange={(e) => applyStartDateTime(e.target.value, startTime, true)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <TimeSelect
                       value={startTime}
                       options={TIME_OPTIONS}
                       onChange={(t) => applyStartDateTime(startDate, t, false)}
+                      disabled={startIsNow}
                     />
                     {warningKey === "start" && (
                       <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
@@ -288,21 +354,45 @@ export function ReservationPage() {
                       </div>
                     )}
                   </div>
-                  <div className="relative grid grid-cols-[4rem_1fr_1fr] items-center gap-3 p-3 sm:p-4">
+                  <div className="relative grid grid-cols-[4rem_3.5rem_1fr_1fr] items-center gap-0.5 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Slut
                     </label>
-                    <input
-                      type="date"
-                      value={endDate}
-                      onChange={(e) => applyEndDateTime(e.target.value, endTime)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                    <TimeSelect
-                      value={endTime}
-                      options={TIME_OPTIONS.filter((t) => startDate !== endDate || t > startTime)}
-                      onChange={(t) => applyEndDateTime(endDate, t)}
-                    />
+                    <button
+                      type="button"
+                      onClick={handleEndIgnoreToggle}
+                      aria-pressed={endIgnored}
+                      aria-label="Ignorer slut"
+                      className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
+                        endIgnored
+                          ? "border-brand-600 bg-brand-600 text-white"
+                          : "border-brand-200 bg-brand-50/60 text-brand-700 hover:bg-brand-100"
+                      }`}
+                    >
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+                      </svg>
+                    </button>
+                    {endIgnored ? (
+                      <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm italic text-brand-600">
+                        Ingen slutdato
+                      </div>
+                    ) : (
+                      <>
+                        <input
+                          type="date"
+                          value={endDate}
+                          onChange={(e) => applyEndDateTime(e.target.value, endTime)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                        <TimeSelect
+                          value={endTime}
+                          options={TIME_OPTIONS.filter((t) => startDate !== endDate || t > startTime)}
+                          onChange={(t) => applyEndDateTime(endDate, t)}
+                        />
+                      </>
+                    )}
                     {warningKey === "end" && (
                       <div className="absolute bottom-full left-0 z-10 mb-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
                         Slut kan ikke være før Start

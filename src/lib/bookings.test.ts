@@ -4,10 +4,14 @@ import {
   BOOKING_ID_COLUMN,
   DEPARTMENT_COLUMN,
   VEHICLE_ID_COLUMN,
+  addMinutesToIso,
   computeFreePeriod,
+  computeLockButtonState,
+  findAdjacentBookings,
   formatBookingPeriod,
   formatFreePeriod,
   formatVehicleLabel,
+  isMapVisible,
   isVehicleAvailable,
   mapBookingRow,
   nowIsoString,
@@ -15,6 +19,7 @@ import {
   shortDanishDate,
   shortSignalTimestamp,
   splitIsoDateTime,
+  type BookingNeighbor,
   type BookingRow,
   type BookingWindow,
   type GpsPosition,
@@ -97,6 +102,8 @@ describe("mapBookingRow", () => {
       start: "09:00",
       endDate: "09.07.2026",
       end: "12:00",
+      startIso: "2026-07-09T09:00:00",
+      endIso: "2026-07-09T12:00:00",
       use: "Kundebesøg",
       user: "user@example.com",
       department: "FLEETii",
@@ -109,6 +116,22 @@ describe("mapBookingRow", () => {
 
   it("passes through a null department unchanged", () => {
     expect(mapBookingRow({ ...row, department: null }).department).toBeNull();
+  });
+
+  it("maps a null end (open-ended booking) to null endDate/end/endIso, without calling splitIsoDateTime on it", () => {
+    expect(mapBookingRow({ ...row, end: null })).toEqual({
+      id: 42,
+      vehicle: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
+      startDate: "09.07.2026",
+      start: "09:00",
+      endDate: null,
+      end: null,
+      startIso: "2026-07-09T09:00:00",
+      endIso: null,
+      use: "Kundebesøg",
+      user: "user@example.com",
+      department: "FLEETii",
+    });
   });
 });
 
@@ -197,6 +220,16 @@ describe("isVehicleAvailable", () => {
     ];
     expect(isVehicleAvailable("AB12345", bookings, reservationStart, reservationEnd)).toBe(true);
   });
+
+  it("is unavailable for any period at or after an open-ended booking's start", () => {
+    const bookings: BookingWindow[] = [{ vehicle_id: "AB12345", start: "2026-07-09T06:00:00", end: null }];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, reservationEnd)).toBe(false);
+  });
+
+  it("is available for a period that ends before an open-ended booking starts", () => {
+    const bookings: BookingWindow[] = [{ vehicle_id: "AB12345", start: "2026-07-09T14:00:00", end: null }];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, reservationEnd)).toBe(true);
+  });
 });
 
 describe("computeFreePeriod", () => {
@@ -256,6 +289,28 @@ describe("computeFreePeriod", () => {
       { vehicle_id: "OTHER99", start: "2026-07-09T06:00:00", end: "2026-07-09T08:00:00" },
     ];
     expect(computeFreePeriod("AB12345", bookings, referenceStart, referenceEnd)).toBeNull();
+  });
+
+  it("bounds freeEnd via an open-ended booking's start, same as any other booking", () => {
+    const bookings: BookingWindow[] = [{ vehicle_id: "AB12345", start: "2026-07-09T14:00:00", end: null }];
+    expect(computeFreePeriod("AB12345", bookings, referenceStart, referenceEnd)).toEqual({
+      start: null,
+      end: "2026-07-09T14:00:00",
+    });
+  });
+
+  it("never treats an open-ended booking as the nearest earlier ended booking", () => {
+    const bookings: BookingWindow[] = [
+      { vehicle_id: "AB12345", start: "2026-07-09T06:00:00", end: null },
+      { vehicle_id: "AB12345", start: "2026-07-09T14:00:00", end: "2026-07-09T16:00:00" },
+    ];
+    // The open-ended booking above would actually make this reference period
+    // unavailable in practice (see isVehicleAvailable) — this test only
+    // checks computeFreePeriod's own null-end handling in isolation.
+    expect(computeFreePeriod("AB12345", bookings, referenceStart, referenceEnd)).toEqual({
+      start: null,
+      end: "2026-07-09T14:00:00",
+    });
   });
 });
 
@@ -322,10 +377,20 @@ describe("formatBookingPeriod", () => {
   it("uses short 'dd/mm' dates when short is true, cross-day case", () => {
     expect(formatBookingPeriod(crossDay, true)).toBe("09/07 22:45 - 10/07 03:00");
   });
+
+  it("renders an open-ended booking (null endDate/end) as 'Fra {start}', full date", () => {
+    const openEnded = { startDate: "09.07.2026", start: "08:00", endDate: null, end: null };
+    expect(formatBookingPeriod(openEnded)).toBe("Fra 09.07.2026 08:00");
+  });
+
+  it("renders an open-ended booking as 'Fra {start}' with a short date when short is true", () => {
+    const openEnded = { startDate: "09.07.2026", start: "08:00", endDate: null, end: null };
+    expect(formatBookingPeriod(openEnded, true)).toBe("Fra 09/07 08:00");
+  });
 });
 
 describe("formatVehicleLabel", () => {
-  const vehicles: VehicleLookup[] = [{ vehicleId: "veh-1", alias: "ET83472", brand: "VOLVO", model: "V60 (Breakout)" }];
+  const vehicles: VehicleLookup[] = [{ vehicleId: "veh-1", plate: "ET83472", brand: "VOLVO", model: "V60 (Breakout)" }];
 
   it("formats as 'plate: brand model' when the vehicleId matches a known vehicle", () => {
     expect(formatVehicleLabel("veh-1", vehicles)).toBe("ET83472: VOLVO V60 (Breakout)");
@@ -345,5 +410,176 @@ describe("resolveVehicleGpsPosition", () => {
 
   it("returns null when there is no position for that vehicleId", () => {
     expect(resolveVehicleGpsPosition("veh-missing", positions)).toBeNull();
+  });
+});
+
+describe("findAdjacentBookings", () => {
+  const sequence: BookingNeighbor[] = [
+    { booking_id: 1, start: "2026-07-09T06:00:00", end: "2026-07-09T08:00:00" },
+    { booking_id: 2, start: "2026-07-09T09:00:00", end: "2026-07-09T12:00:00" },
+    { booking_id: 3, start: "2026-07-09T14:00:00", end: "2026-07-09T16:00:00" },
+  ];
+
+  it("returns both neighbors for a booking in the middle of the sequence", () => {
+    expect(findAdjacentBookings(sequence, 2)).toEqual({ previous: sequence[0], next: sequence[2] });
+  });
+
+  it("returns no previous for the first booking in the sequence", () => {
+    expect(findAdjacentBookings(sequence, 1)).toEqual({ previous: null, next: sequence[1] });
+  });
+
+  it("returns no next for the last booking in the sequence", () => {
+    expect(findAdjacentBookings(sequence, 3)).toEqual({ previous: sequence[1], next: null });
+  });
+
+  it("returns no neighbors when the vehicle has only one booking", () => {
+    expect(findAdjacentBookings([sequence[1]], 2)).toEqual({ previous: null, next: null });
+  });
+
+  it("returns no neighbors when the current booking id isn't in the list", () => {
+    expect(findAdjacentBookings(sequence, 999)).toEqual({ previous: null, next: null });
+  });
+
+  it("sorts out-of-order input before finding neighbors", () => {
+    const shuffled = [sequence[2], sequence[0], sequence[1]];
+    expect(findAdjacentBookings(shuffled, 2)).toEqual({ previous: sequence[0], next: sequence[2] });
+  });
+});
+
+describe("computeLockButtonState", () => {
+  const booking = { start: "2026-07-09T09:00:00", end: "2026-07-09T12:00:00" };
+
+  it("disables both buttons before the reservation's start time", () => {
+    expect(computeLockButtonState("2026-07-09T08:59:59", booking, null, null, true)).toEqual({
+      lockEnabled: false,
+      unlockEnabled: false,
+    });
+  });
+
+  it("enables both buttons once started, with no previous booking and the vehicle locked", () => {
+    expect(computeLockButtonState("2026-07-09T09:00:00", booking, null, null, true)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: true,
+    });
+  });
+
+  it("disables unlock when the previous booking hasn't expired yet", () => {
+    const previous = { end: "2026-07-09T09:30:00" };
+    expect(computeLockButtonState("2026-07-09T09:15:00", booking, previous, null, true)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: false,
+    });
+  });
+
+  it("enables unlock once the previous booking has expired", () => {
+    const previous = { end: "2026-07-09T09:00:00" };
+    expect(computeLockButtonState("2026-07-09T09:15:00", booking, previous, null, true)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: true,
+    });
+  });
+
+  it("disables unlock when the vehicle is already unlocked, even after the previous booking expired", () => {
+    const previous = { end: "2026-07-09T09:00:00" };
+    expect(computeLockButtonState("2026-07-09T09:15:00", booking, previous, null, false)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: false,
+    });
+  });
+
+  it("keeps lock enabled after this reservation expires when the next reservation hasn't begun", () => {
+    const next = { start: "2026-07-09T14:00:00" };
+    expect(computeLockButtonState("2026-07-09T13:00:00", booking, null, next, true)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: true,
+    });
+  });
+
+  it("disables lock once this reservation has expired and the next reservation has begun", () => {
+    const next = { start: "2026-07-09T12:00:00" };
+    expect(computeLockButtonState("2026-07-09T12:30:00", booking, null, next, true)).toEqual({
+      lockEnabled: false,
+      unlockEnabled: true,
+    });
+  });
+
+  it("keeps lock enabled at the exact expiry moment if the next reservation hasn't started yet", () => {
+    const next = { start: "2026-07-09T12:30:00" };
+    expect(computeLockButtonState("2026-07-09T12:00:00", booking, null, next, true).lockEnabled).toBe(true);
+  });
+
+  it("never expires an open-ended booking, so lock stays enabled far past what would've been an expiry", () => {
+    const openEnded = { start: "2026-07-09T09:00:00", end: null };
+    expect(computeLockButtonState("2027-01-01T00:00:00", openEnded, null, null, true)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: true,
+    });
+  });
+
+  it("permanently blocks unlock if the previous booking was itself open-ended (defensive — shouldn't occur in practice)", () => {
+    const previous = { end: null };
+    expect(computeLockButtonState("2027-01-01T00:00:00", booking, previous, null, true).unlockEnabled).toBe(false);
+  });
+});
+
+describe("addMinutesToIso", () => {
+  it("adds positive minutes, rolling over the hour", () => {
+    expect(addMinutesToIso("2026-07-09T09:50:00", 15)).toBe("2026-07-09T10:05:00");
+  });
+
+  it("subtracts minutes when given a negative value, rolling back the hour", () => {
+    expect(addMinutesToIso("2026-07-09T09:05:00", -15)).toBe("2026-07-09T08:50:00");
+  });
+
+  it("rolls over the calendar day when the shift crosses midnight", () => {
+    expect(addMinutesToIso("2026-07-09T23:55:00", 15)).toBe("2026-07-10T00:10:00");
+  });
+
+  it("ignores a timezone suffix entirely rather than converting it — regression test for a real bug where the map on BookingDetailsPage stayed hidden because a Supabase-round-tripped '+00:00' value got shifted by the local UTC offset before the 15-minute window was even applied", () => {
+    expect(addMinutesToIso("2026-07-19T11:22:00+00:00", -15)).toBe("2026-07-19T11:07:00");
+    expect(addMinutesToIso("2026-07-19T14:22:00+00:00", 15)).toBe("2026-07-19T14:37:00");
+  });
+
+  it("returns the input unchanged if it doesn't match the expected ISO shape", () => {
+    expect(addMinutesToIso("not-a-date", 15)).toBe("not-a-date");
+  });
+});
+
+describe("isMapVisible", () => {
+  const booking = { start: "2026-07-09T09:00:00", end: "2026-07-09T12:00:00" };
+
+  it("is not visible more than 15 minutes before the start", () => {
+    expect(isMapVisible("2026-07-09T08:44:00", booking)).toBe(false);
+  });
+
+  it("becomes visible exactly 15 minutes before the start", () => {
+    expect(isMapVisible("2026-07-09T08:45:00", booking)).toBe(true);
+  });
+
+  it("stays visible during the booking", () => {
+    expect(isMapVisible("2026-07-09T10:00:00", booking)).toBe(true);
+  });
+
+  it("stays visible exactly 15 minutes after the end", () => {
+    expect(isMapVisible("2026-07-09T12:15:00", booking)).toBe(true);
+  });
+
+  it("is not visible more than 15 minutes after the end", () => {
+    expect(isMapVisible("2026-07-09T12:16:00", booking)).toBe(false);
+  });
+
+  it("stays visible indefinitely after starting for an open-ended booking", () => {
+    const openEnded = { start: "2026-07-09T09:00:00", end: null };
+    expect(isMapVisible("2027-01-01T00:00:00", openEnded)).toBe(true);
+  });
+
+  it("still respects the 15-minutes-before-start lower bound for an open-ended booking", () => {
+    const openEnded = { start: "2026-07-09T09:00:00", end: null };
+    expect(isMapVisible("2026-07-09T08:44:00", openEnded)).toBe(false);
+  });
+
+  it("is visible mid-booking even when start/end carry a timezone suffix (Supabase timestamptz round-trip) — regression test for the real bug where this returned false", () => {
+    const suffixed = { start: "2026-07-19T11:22:00+00:00", end: "2026-07-19T14:22:00+00:00" };
+    expect(isMapVisible("2026-07-19T11:43:00", suffixed)).toBe(true);
   });
 });

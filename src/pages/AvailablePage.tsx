@@ -95,7 +95,7 @@ export function AvailablePage() {
       return {
         id: v.vehicleId,
         vehicle: `${v.brand} ${v.model}`,
-        plate: v.alias,
+        plate: v.plate,
         ledigPeriode: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod, true),
         ledigPeriodeFull: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod),
       };

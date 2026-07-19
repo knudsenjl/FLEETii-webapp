@@ -22,8 +22,8 @@ type Booking = {
   vehicle: string;
   startDate: string;
   start: string;
-  endDate: string;
-  end: string;
+  endDate: string | null;
+  end: string | null;
   use: string;
   user: string | null;
 };
@@ -98,7 +98,9 @@ export function AllBookingsPage() {
     const { data, error: fetchError } = await supabase
       .from("bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
-      .gte("end", nowIsoString())
+      // "end >= now" OR "end is null" — a plain .gte() would silently drop
+      // every open-ended booking, since NULL >= x is NULL/falsy in Postgres.
+      .or(`end.gte.${nowIsoString()},end.is.null`)
       .order("start", { ascending: true })
       .returns<BookingRow[]>();
 

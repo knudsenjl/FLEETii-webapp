@@ -6,6 +6,7 @@ import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
+import { isSettingTilladt } from "../lib/settings";
 import {
   BOOKINGS_SELECT_COLUMNS,
   formatBookingPeriod,
@@ -21,8 +22,8 @@ type Booking = {
   vehicle: string;
   startDate: string;
   start: string;
-  endDate: string;
-  end: string;
+  endDate: string | null;
+  end: string | null;
   use: string;
   department: string | null;
 };
@@ -56,13 +57,8 @@ export function BookingsPage() {
   const canShowNewBookingButton = isAdmin || userMayCreateBooking;
 
   useEffect(() => {
-    const query = supabase.from("settings").select("value").eq("name", "Bruger_ny_reservation");
-    (afdeling ? query.eq("department", afdeling) : query.is("department", null))
-      .maybeSingle<{ value: string[] }>()
-      .then(({ data }) => {
-        setUserMayCreateBooking(data?.value?.[0] === "Tilladt");
-      });
-  }, [afdeling]);
+    void isSettingTilladt("Bruger_ny_reservation", profile?.user_id, afdeling).then(setUserMayCreateBooking);
+  }, [profile?.user_id, afdeling]);
 
   /** Fetches every not-yet-ended booking visible to the current user (own bookings, or all department bookings if admin) and replaces `activeBookings`. Called on mount, whenever user/role changes, and again after a cancellation. */
   const loadBookings = async () => {
@@ -79,7 +75,9 @@ export function BookingsPage() {
     const baseQuery = supabase
       .from("bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
-      .gte("end", nowIsoString())
+      // "end >= now" OR "end is null" — a plain .gte() would silently drop
+      // every open-ended booking, since NULL >= x is NULL/falsy in Postgres.
+      .or(`end.gte.${nowIsoString()},end.is.null`)
       .order("start", { ascending: true });
 
     const { data, error: fetchError } = await (isAdmin ? baseQuery : baseQuery.eq("user", user)).returns<

@@ -133,8 +133,8 @@ export function ConfirmPage() {
     ],
     [
       "Slut:",
-      reservationEnd ? formatDanishDateTime(reservationEnd, true) : "",
-      reservationEnd ? formatDanishDateTime(reservationEnd) : "",
+      reservationEnd ? formatDanishDateTime(reservationEnd, true) : "Ingen slutdato",
+      reservationEnd ? formatDanishDateTime(reservationEnd) : "Ingen slutdato",
     ],
   ];
 

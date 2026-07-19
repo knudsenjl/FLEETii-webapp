@@ -7,6 +7,8 @@ import {
   BOOKING_ID_COLUMN,
   formatBookingPeriod,
   formatVehicleLabel,
+  isMapVisible,
+  nowIsoString,
   resolveVehicleGpsPosition,
   shortSignalTimestamp,
   toDisplayVehicle,
@@ -14,9 +16,9 @@ import {
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LeafletMap } from "../components/LeafletMap";
-import { InlinePopup } from "../components/InlinePopup";
-import { useTimedFlag } from "../hooks/useTimedFlag";
+import { useVehicleLockState } from "../hooks/useVehicleLockState";
 import { supabase } from "../lib/supabase";
+import { isSettingTilladt } from "../lib/settings";
 
 /** A booking as passed in via router state from BookingsPage/AllBookingsPage. */
 type BookingDetails = {
@@ -24,9 +26,12 @@ type BookingDetails = {
   vehicle: string;
   startDate: string;
   start: string;
-  endDate: string;
-  end: string;
+  endDate: string | null;
+  end: string | null;
+  startIso: string;
+  endIso: string | null;
   use: string;
+  user: string | null;
 };
 
 /** Fallback map center used when the booked vehicle has no GPS fix. */
@@ -36,7 +41,9 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * Reservation detail view ("/booking-details"): the booking's period/usage,
  * the vehicle's current fuel/mileage/status (looked up live from
  * VehicleContext by vehicleId, not stored on the booking itself), a map of its
- * last known position, and a "Slet reservation" cancel flow. The vehicle is
+ * last known position (only shown from 15 minutes before the booking's start
+ * to 15 minutes after its end — see isMapVisible — outside that window it's
+ * not rendered at all), and a "Slet reservation" cancel flow. The vehicle is
  * passed in via router state — there is no direct-URL/refresh support.
  */
 export function BookingDetailsPage() {
@@ -48,24 +55,31 @@ export function BookingDetailsPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
+  const isAdmin = profile?.role === "admin";
 
-  /** Whether a non-admin user is allowed to delete their own reservation, per settings.bruger_slet_reservation (see BookingsPage). Admins can always delete regardless. */
+  /** "Slet reservation" is always shown for role=admin; for role=user, only when settings.Bruger_slet_reservation is ["Tilladt"] for this department. */
   const [userMayDeleteBooking, setUserMayDeleteBooking] = useState(false);
-  const canShowDeleteButton = profile?.role === "admin" || userMayDeleteBooking;
+  const canShowDeleteButton = isAdmin || userMayDeleteBooking;
+
+  const {
+    lockEnabled,
+    unlockEnabled,
+    loading: lockStateLoading,
+    setLock,
+    error: lockError,
+  } = useVehicleLockState(
+    booking?.vehicle ?? "",
+    booking ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso } : null,
+    isAdmin,
+  );
 
   useEffect(() => {
-    const query = supabase.from("settings").select("value").eq("name", "Bruger_slet_reservation");
-    (afdeling ? query.eq("department", afdeling) : query.is("department", null))
-      .maybeSingle<{ value: string[] }>()
-      .then(({ data }) => {
-        setUserMayDeleteBooking(data?.value?.[0] === "Tilladt");
-      });
-  }, [afdeling]);
+    void isSettingTilladt("Bruger_slet_reservation", profile?.user_id, afdeling).then(setUserMayDeleteBooking);
+  }, [profile?.user_id, afdeling]);
 
   useEffect(() => {
     if (!booking) {
@@ -77,10 +91,18 @@ export function BookingDetailsPage() {
     return null;
   }
 
-  const goToVehicleDetails = () => {
-    if (!twoHireVehicle) return;
-    navigate("/vehicle-details", { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
-  };
+  /** Only admins can navigate from the map marker to VehicleDetailsPage (which is itself admin-gated for its map/edit/delete actions — see VehicleDetailsPage.tsx). */
+  const goToVehicleDetails = isAdmin
+    ? () => {
+        if (!twoHireVehicle) return;
+        navigate("/vehicle-details", {
+          state: {
+            vehicle: toDisplayVehicle(twoHireVehicle),
+            booking: { id: booking.id, startIso: booking.startIso, endIso: booking.endIso },
+          },
+        });
+      }
+    : undefined;
 
   /** Deletes this booking and returns to the bookings list. */
   const handleCancelBooking = async () => {
@@ -127,6 +149,12 @@ export function BookingDetailsPage() {
                       {formatBookingPeriod(booking, true)}
                     </span>
                   </div>
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
+                      <span className="text-sm text-brand-800">{booking.user ?? "—"}</span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Anvendelse:</label>
                     <span className="text-sm text-brand-800">{booking.use}</span>
@@ -177,48 +205,56 @@ export function BookingDetailsPage() {
                 </div>
               </div>
 
-              <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                <LeafletMap
-                  lat={position?.lat ?? DENMARK_CENTER.lat}
-                  lng={position?.lng ?? DENMARK_CENTER.lng}
-                  zoom={position ? 13 : 7}
-                  showMarker={Boolean(position)}
-                  markerClickable={false}
-                  markerTooltip={twoHireVehicle?.alias ?? booking.vehicle}
-                  onMarkerClick={goToVehicleDetails}
-                  className="absolute inset-0"
-                />
-                {!position && (
-                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                      Der er ingen GPS position tilgængelig for dette køretøj
+              {isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) && (
+                <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
+                  <LeafletMap
+                    lat={position?.lat ?? DENMARK_CENTER.lat}
+                    lng={position?.lng ?? DENMARK_CENTER.lng}
+                    zoom={position ? 17 : 7}
+                    showMarker={Boolean(position)}
+                    markerClickable={false}
+                    markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
+                    onMarkerClick={goToVehicleDetails}
+                    className="absolute inset-0"
+                  />
+                  {!position && (
+                    <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
+                      <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
+                        Der er ingen GPS position tilgængelig for dette køretøj
+                      </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => triggerNotImplemented("laas")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Lås
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas"} message="Endnu ikke implementeret" />
-                </div>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => triggerNotImplemented("laas-op")}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Lås op
-                  </button>
-                  <InlinePopup visible={notImplementedKey === "laas-op"} message="Endnu ikke implementeret" align="right" />
-                </div>
+                <button
+                  type="button"
+                  onClick={() => void setLock(true)}
+                  disabled={!lockEnabled || lockStateLoading}
+                  aria-label="Lås"
+                  className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void setLock(false)}
+                  disabled={!unlockEnabled || lockStateLoading}
+                  aria-label="Lås op"
+                  className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                  </svg>
+                </button>
               </div>
+
+              {lockError && <p className="text-sm text-red-600">{lockError}</p>}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
