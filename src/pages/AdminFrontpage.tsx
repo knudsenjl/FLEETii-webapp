@@ -53,17 +53,17 @@ export function AdminFrontpage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("/department")}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Administration af brugere
-                </button>
-                <button
-                  type="button"
                   onClick={() => navigate("/fleet-table")}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Administration af køretøjer
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/department")}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Administration af brugere
                 </button>
               </div>
             </div>

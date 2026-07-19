@@ -12,7 +12,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { isPasswordRecoveryCallback, supabase } from "../lib/supabase";
 
 /** A row from the `user_profiles` table — the app's own user record, keyed by the Supabase auth.users id. */
 export interface Profile {
@@ -35,8 +35,14 @@ interface AuthContextValue {
   isFullyAuthenticated: boolean;
   /** True if this account was created with the shared default password and hasn't set a real one yet (see create-user.mts/SetPasswordPage.tsx). ProtectedRoute forces such a session to /set-password before anything else. */
   mustChangePassword: boolean;
+  /** True once Supabase has fired a PASSWORD_RECOVERY auth event — i.e. the current session came from clicking a "reset password" email link (LoginPage.tsx's resetPasswordForEmail), not a normal sign-in. Supabase auto-signs the user in the moment that link's tokens land in the URL, WITHOUT changing the password — without this flag, ProtectedRoute would just let a password-reset click log someone in with their old password unchanged, defeating the whole point. Cleared via clearPasswordRecovery() once SetPasswordPage.tsx has handled it. */
+  isPasswordRecovery: boolean;
+  /** Clears isPasswordRecovery — call after SetPasswordPage.tsx successfully sets a new password for a recovery session, before navigating away, so ProtectedRoute stops redirecting back to /set-password. */
+  clearPasswordRecovery: () => void;
   loading: boolean;
   signOut: () => Promise<void>;
+  /** Refreshes the session and applies it to session/profile state directly (awaited), so it's safe to navigate immediately after — see the implementation's comment for why this exists instead of just calling supabase.auth.refreshSession(). */
+  refreshProfile: () => Promise<void>;
 }
 
 /** Renders a role string as the Danish label shown in page headers ("Administrator" / "Bruger"). Any non-"admin" value (including null/undefined) is treated as a regular user. */
@@ -56,6 +62,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isFullyAuthenticated, setIsFullyAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
+  // Seeded from the URL itself (see supabase.ts's comment) rather than
+  // starting false and waiting for supabase-js's PASSWORD_RECOVERY event,
+  // which is too late to rely on — that event has already fired (and been
+  // missed) by the time this provider's effect below subscribes to it.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
 
   /** Fetches the `user_profiles` row for the given auth user id. Returns null (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
   const loadProfile = async (userId: string): Promise<Profile | null> => {
@@ -99,7 +110,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    const { data: listener } = supabase.auth.onAuthStateChange((event, newSession) => {
+      // Secondary signal only — isPasswordRecoveryCallback (the useState
+      // initializer above) is the one this app actually relies on, since
+      // this event is usually already missed by the time this listener
+      // subscribes. Kept as a backup for the rare case a recovery session
+      // gets established later in the tab's lifetime instead of on load.
+      if (event === "PASSWORD_RECOVERY") {
+        setIsPasswordRecovery(true);
+      }
       const requestId = ++latestRequestId;
       void applyAuthState(newSession, requestId);
     });
@@ -116,6 +135,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setIsFullyAuthenticated(false);
+    setIsPasswordRecovery(false);
+  };
+
+  /**
+   * Refreshes the Supabase session (to pick up server-side auth changes —
+   * e.g. app_metadata.must_change_password cleared by
+   * complete-password-change.mts, which a plain supabase.auth.refreshSession()
+   * call doesn't reflect anywhere by itself) and applies the result to
+   * session/profile state directly, awaited, before returning. Callers that
+   * navigate right after a server-side auth change (SetPasswordPage.tsx)
+   * MUST await this rather than calling supabase.auth.refreshSession()
+   * themselves and navigating immediately after — that raced against this
+   * same update happening asynchronously via the onAuthStateChange listener
+   * below, so ProtectedRoute's mustChangePassword check could still see the
+   * stale value and redirect straight back to /set-password.
+   */
+  const refreshProfile = async () => {
+    const { data } = await supabase.auth.refreshSession();
+    const nextProfile = data.session ? await loadProfile(data.session.user.id) : null;
+    setSession(data.session);
+    setProfile(nextProfile);
+    setIsFullyAuthenticated(Boolean(data.session));
   };
 
   return (
@@ -126,8 +167,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         afdeling: profile?.department ?? null,
         isFullyAuthenticated,
         mustChangePassword: session?.user.app_metadata?.must_change_password === true,
+        isPasswordRecovery,
+        clearPasswordRecovery: () => setIsPasswordRecovery(false),
         loading,
         signOut,
+        refreshProfile,
       }}
     >
       {children}

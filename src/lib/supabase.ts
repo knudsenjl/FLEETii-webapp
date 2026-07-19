@@ -15,6 +15,20 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// Captured HERE, synchronously, before createClient() below even runs — not
+// derived from supabase-js's own PASSWORD_RECOVERY auth event. That event
+// is racy: createClient()'s constructor kicks off its own async URL-token
+// processing (default flowType is "implicit", so a password-reset email's
+// tokens land in the URL hash as "#access_token=...&type=recovery"), which
+// typically finishes — parsing AND stripping the hash via
+// history.replaceState — before AuthContext.tsx's useEffect gets a chance
+// to subscribe via onAuthStateChange, so the event fires into an empty
+// listener list and is silently lost. Reading the raw hash right now, at
+// module load, is synchronous and therefore race-free: nothing async can
+// have touched the URL yet.
+export const isPasswordRecoveryCallback =
+  typeof window !== "undefined" && window.location.hash.includes("type=recovery");
+
 const REMEMBER_ME_KEY = "fleetii_remember_me";
 
 /** Persists the user's "remember me" choice (called from LoginPage before signing in), which rememberAwareStorage below reads to decide where to keep the session. Silently no-ops if storage is unavailable. */

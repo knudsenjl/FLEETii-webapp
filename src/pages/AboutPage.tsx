@@ -8,6 +8,8 @@ import { PageHeader } from "../components/PageHeader";
 
 /** Static "About FLEETii" page: product description, a Brugermanual link, and contact info. Content is static Danish copy — no data fetching. */
 export function AboutPage() {
+  const manualUrl = import.meta.env.VITE_BRUGERMANUAL_URL;
+
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -28,14 +30,16 @@ export function AboutPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Om FLEETii</h2>
-                <a
-                  href="https://claude.ai/code/artifact/551c70d8-157a-49d6-962e-0c94cf585700"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  Brugermanual
-                </a>
+                {manualUrl && (
+                  <a
+                    href={manualUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Brugermanual
+                  </a>
+                )}
               </div>
 
               <p className="text-sm text-brand-700">

@@ -24,7 +24,11 @@ type ProfileRow = {
  * against `user_profiles`) before enabling "Opret bruger", which calls the
  * create-user Netlify Function (authenticated with the current session).
  * When reached with an existing user (via DepartmentPage), also shows
- * "Slet", which deletes that user's `user_profiles` row.
+ * "Slet", which calls the delete-user Netlify Function to remove both that
+ * user's `user_profiles` row AND their underlying Supabase Auth account —
+ * not just the profile row, so a "deleted" user can no longer log in
+ * either (see delete-user.mts's header for why this needs the service-role
+ * key and can't be a direct client-side delete).
  *
  * KNOWN LIMITATION: this form's "Opret bruger" action only ever creates a
  * new user — reached via DepartmentPage with an existing user's data
@@ -33,7 +37,7 @@ type ProfileRow = {
  * there is no actual field-edit/update path today, only delete.
  */
 export function UserDetailsPage() {
-  const { session, afdeling } = useAuth();
+  const { session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const user = (location.state as { user?: ProfileRow } | null)?.user ?? null;
@@ -41,16 +45,25 @@ export function UserDetailsPage() {
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  // Defaults to the admin's own department/"Bruger" — new users are almost
-  // always created in the admin's own department with the regular role;
-  // admin creation is the rare exception, not the default.
-  const [department, setDepartment] = useState(user?.department ?? afdeling ?? "");
+  // No default department — the admin must explicitly pick one from the
+  // dropdown rather than it silently pre-filling to their own afdeling.
+  const [department, setDepartment] = useState(user?.department ?? "");
   const [role, setRole] = useState(user?.role ?? "user");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
   const [pendingAction, setPendingAction] = useState<"create" | "close" | "delete" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+
+  useEffect(() => {
+    void supabase
+      .from("departments")
+      .select("name")
+      .order("name", { ascending: true })
+      .returns<{ name: string }[]>()
+      .then(({ data }) => setDepartmentOptions((data ?? []).map((d) => d.name)));
+  }, []);
 
   useEffect(() => {
     const trimmed = email.trim();
@@ -88,17 +101,31 @@ export function UserDetailsPage() {
     department.trim().length > 0 &&
     role.trim().length > 0;
 
-  /** Deletes this user's `user_profiles` row (does NOT revoke their Supabase Auth account — a "deleted" user can still log in) and returns to DepartmentPage. */
+  /** Deletes this user's `user_profiles` row AND their Supabase Auth account via delete-user.mts (a real client-side delete can't reach auth.users at all — that requires the service-role key), then returns to DepartmentPage. */
   const handleDelete = async () => {
     if (!user) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const { error: deleteError } = await supabase.from("user_profiles").delete().eq("user_id", user.user_id);
+    try {
+      const response = await fetch("/.netlify/functions/delete-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ userId: user.user_id }),
+      });
 
-    if (deleteError) {
-      setSubmitError(deleteError.message);
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setSubmitError(result.error ?? "Kunne ikke slette bruger.");
+        setIsSubmitting(false);
+        return;
+      }
+    } catch {
+      setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
       setIsSubmitting(false);
       return;
     }
@@ -139,22 +166,23 @@ export function UserDetailsPage() {
         }),
       });
 
-      const result = (await response.json()) as { id?: string; error?: string };
+      const result = (await response.json()) as { id?: string; emailSent?: boolean; error?: string };
 
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke oprette bruger.");
         setIsSubmitting(false);
         return;
       }
+
+      setIsSubmitting(false);
+      setPendingAction(null);
+      navigate("/department", { state: { emailWarning: result.emailSent === false } });
+      return;
     } catch {
       setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
       setIsSubmitting(false);
       return;
     }
-
-    setIsSubmitting(false);
-    setPendingAction(null);
-    navigate("/department");
   };
 
   return (
@@ -184,7 +212,25 @@ export function UserDetailsPage() {
                   <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
                   <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
                   <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />
-                  <RequiredFieldRow label="Afdeling:" value={department} onChange={setDepartment} />
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">
+                      Afdeling: <span className="ml-0.5 text-red-600">*</span>
+                    </label>
+                    <select
+                      required
+                      aria-required="true"
+                      value={department}
+                      onChange={(e) => setDepartment(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    >
+                      <option value="">Vælg afdeling</option>
+                      {departmentOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Rolle: <span className="ml-0.5 text-red-600">*</span>

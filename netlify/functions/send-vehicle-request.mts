@@ -2,9 +2,13 @@
 // vehicle" request on behalf of an admin (there's no vehicle-provisioning
 // API to call directly — a human sets the device up). Reached from
 // NewVehiclePage.tsx.
-import { Resend } from "resend";
+//
+// Mail transport (SMTP vs. Resend) lives in _shared/mailer.ts, shared with
+// create-user.mts's welcome email. RESEND_MAIL_RECIEVER is this function's
+// own recipient (FLEETii staff) — unrelated to who create-user.mts emails.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
+import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
@@ -15,15 +19,6 @@ type SendVehicleRequestBody = {
   kontaktperson?: string;
   kontaktnummer?: string;
 };
-
-/** Escapes the five HTML-significant characters so user-supplied form values can't break out of the generated email's markup. */
-function escapeHtml(value: string): string {
-  return value
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
 
 /** Builds the HTML table of vehicle-request fields that becomes the email body. */
 function buildHtmlBody(fields: {
@@ -53,18 +48,11 @@ function buildHtmlBody(fields: {
     </table>`;
 }
 
-// Sender defaults to Resend's shared onboarding domain, which requires no
-// DNS setup but can only deliver to the Resend account's own email address.
-// Once a real domain is verified in Resend (Domains → Add Domain → add the
-// SPF/DKIM records they give you), set RESEND_FROM to an address on that
-// domain (e.g. "FLEETii <noreply@mh3.dk>") to lift that restriction.
-const DEFAULT_FROM = "FLEETii <onboarding@resend.dev>";
-
 /**
  * POST { afdeling?, nummerplade, brand, maerke, aargang, kontaktperson,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates
  * every field is a non-empty string, then emails the request to
- * RESEND_MAIL_RECIEVER via Resend.
+ * RESEND_MAIL_RECIEVER — via SMTP or Resend, see sendMail.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -76,13 +64,9 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const apiKey = process.env.RESEND_API_KEY;
   const mailReceiver = process.env.RESEND_MAIL_RECIEVER;
-  if (!apiKey || !mailReceiver) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler RESEND_API_KEY/RESEND_MAIL_RECIEVER." }),
-      { status: 500 },
-    );
+  if (!mailReceiver) {
+    return new Response(JSON.stringify({ error: "Serveren mangler RESEND_MAIL_RECIEVER." }), { status: 500 });
   }
 
   let body: SendVehicleRequestBody;
@@ -109,17 +93,14 @@ export default async (req: Request) => {
 
   const afdeling = asTrimmedString(body.afdeling) || "—";
 
-  const resend = new Resend(apiKey);
-
-  const { error } = await resend.emails.send({
-    from: process.env.RESEND_FROM ?? DEFAULT_FROM,
+  const result = await sendMail({
     to: mailReceiver,
     subject: "Create new vehicle",
     html: buildHtmlBody({ afdeling, nummerplade, brand, maerke, aargang, kontaktperson, kontaktnummer }),
   });
 
-  if (error) {
-    return new Response(JSON.stringify({ error: `Kunne ikke sende mail: ${error.message}` }), { status: 502 });
+  if (!result.ok) {
+    return new Response(JSON.stringify({ error: `Kunne ikke sende mail: ${result.error}` }), { status: 502 });
   }
 
   return new Response(JSON.stringify({ ok: true }), {

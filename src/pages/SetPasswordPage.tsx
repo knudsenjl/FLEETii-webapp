@@ -1,8 +1,12 @@
-// Forced "set a real password" page ("/set-password"). Every account
-// created via create-user.mts starts with the shared default password and
-// app_metadata.must_change_password = true; ProtectedRoute/RootRoute (see
-// App.tsx) send such a session here before anywhere else in the app,
-// admin routes included.
+// Forced "set a real password" page ("/set-password"). Reached two ways —
+// ProtectedRoute/RootRoute (see App.tsx) send a session here before
+// anywhere else in the app, admin routes included, if EITHER is true:
+// (1) it's still on the shared default password from create-user.mts
+// (app_metadata.must_change_password), or (2) it's a "reset password" email
+// link's session (AuthContext.tsx's isPasswordRecovery) — Supabase signs
+// the user in the moment that link's tokens land in the URL, WITHOUT
+// changing the password, so without this gate a recovery-email click would
+// just log someone in with their unchanged old password.
 import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -15,12 +19,15 @@ const MIN_PASSWORD_LENGTH = 8;
 /**
  * Lets the current user set a real password, then clears
  * app_metadata.must_change_password via complete-password-change.mts (a
- * server-only field the client can't clear itself) and refreshes the
- * session so ProtectedRoute/RootRoute see the change immediately — no
- * manual log-out/in required.
+ * server-only field the client can't clear itself — harmless to call even
+ * when it was already false, e.g. for a password-recovery session) and
+ * refreshes the session so ProtectedRoute/RootRoute see the change
+ * immediately — no manual log-out/in required. Also clears
+ * isPasswordRecovery so a recovery session doesn't get bounced right back
+ * here after navigating away.
  */
 export function SetPasswordPage() {
-  const { session } = useAuth();
+  const { session, refreshProfile, clearPasswordRecovery, isPasswordRecovery } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -68,7 +75,8 @@ export function SetPasswordPage() {
       return;
     }
 
-    await supabase.auth.refreshSession();
+    await refreshProfile();
+    clearPasswordRecovery();
     setIsSubmitting(false);
     navigate("/");
   };
@@ -98,7 +106,9 @@ export function SetPasswordPage() {
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4 p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-brand-900">Vælg en adgangskode</h2>
           <p className="text-sm text-brand-600">
-            Din konto blev oprettet med en midlertidig adgangskode. Vælg din egen adgangskode for at fortsætte.
+            {isPasswordRecovery
+              ? "Vælg en ny adgangskode for at fortsætte."
+              : "Din konto blev oprettet med en midlertidig adgangskode. Vælg din egen adgangskode for at fortsætte."}
           </p>
 
           <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">

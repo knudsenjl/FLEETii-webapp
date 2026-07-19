@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
@@ -28,6 +28,8 @@ type ProfileRow = {
 export function DepartmentPage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -80,6 +82,12 @@ export function DepartmentPage() {
               <h2 className="text-xl font-semibold text-brand-800">
                 Afdeling: {afdeling ?? "—"}
               </h2>
+
+              {emailWarning && (
+                <p className="text-sm text-red-600">
+                  Brugeren blev oprettet, men velkomstmailen med login-oplysninger kunne ikke sendes. Giv brugeren adgangskoden på anden vis.
+                </p>
+              )}
 
               <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
                 {/* A real <table> (not the CSS-grid-per-row layout used elsewhere)

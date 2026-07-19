@@ -33,13 +33,14 @@ function ForbiddenNotice() {
 /**
  * Wraps a route element: shows a loading placeholder while the initial auth
  * check runs, redirects to "/" if there's no session, forces a session that
- * still has must_change_password set to "/set-password" (before anything
- * else, including admin routes), shows ForbiddenNotice if `requireAdmin` is
- * set and the user's profile role isn't "admin", and otherwise renders
- * `children` normally.
+ * still has must_change_password set OR came from a "reset password" email
+ * link (isPasswordRecovery — see AuthContext.tsx) to "/set-password" (before
+ * anything else, including admin routes), shows ForbiddenNotice if
+ * `requireAdmin` is set and the user's profile role isn't "admin", and
+ * otherwise renders `children` normally.
  */
 export function ProtectedRoute({ children, requireAdmin = false }: { children: ReactNode; requireAdmin?: boolean }) {
-  const { loading, isFullyAuthenticated, profile, mustChangePassword } = useAuth();
+  const { loading, isFullyAuthenticated, profile, mustChangePassword, isPasswordRecovery } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -54,7 +55,7 @@ export function ProtectedRoute({ children, requireAdmin = false }: { children: R
     return <Navigate to="/" replace />;
   }
 
-  if (mustChangePassword && location.pathname !== "/set-password") {
+  if ((mustChangePassword || isPasswordRecovery) && location.pathname !== "/set-password") {
     return <Navigate to="/set-password" replace />;
   }
 
