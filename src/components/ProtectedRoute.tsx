@@ -1,10 +1,12 @@
 // Route guard used in App.tsx's route table: gates every non-public route
 // behind "must be logged in", "must have set a real password" (not still on
 // the shared default from create-user.mts), and, for admin-only routes,
-// "must have role admin or FLEETii admin" (requireAdmin) or, for the
-// FLEETii-admin-only route, "must have role FLEETii admin exactly"
-// (requireFleetiiAdmin). This is the app's client-side authorization
-// boundary — the corresponding server-side boundary is Supabase RLS
+// "must have role admin or FLEETii admin" (requireAdmin) or, for a route
+// restricted to one exact role (the three per-role settings pages, the
+// FLEETii-admin dashboard), "must have exactly this role" (requireRole —
+// unlike requireAdmin, "FLEETii admin" does NOT satisfy requireRole="admin",
+// and vice versa). This is the app's client-side authorization boundary —
+// the corresponding server-side boundary is Supabase RLS
 // (supabase/rls_policies.sql) plus the requireAdmin() check in
 // netlify/functions/_shared/serverAuth.ts for the Netlify Functions.
 import { useEffect } from "react";
@@ -14,7 +16,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { Modal } from "./Modal";
 
-/** Shown when a non-admin lands on an admin-only route. Auto-redirects to "/" after 5 seconds. */
+/** Shown when a user's role doesn't satisfy a route's requireAdmin/requireRole check. Auto-redirects to "/" after 5 seconds. Deliberately role-agnostic wording — this guards routes restricted to admins, to "FLEETii admin" exactly, and (for the per-role settings pages) to "user" exactly, so it can't claim the page is "for administrators" when that isn't always true. */
 function ForbiddenNotice() {
   const navigate = useNavigate();
 
@@ -26,7 +28,7 @@ function ForbiddenNotice() {
   return (
     <Modal>
       <p className="text-center text-sm font-medium text-brand-800">
-        Du har ikke tilladelse til at tilgå denne side. Siden er udelukkende tilgængelig for administratorer.
+        Du har ikke tilladelse til at tilgå denne side.
       </p>
     </Modal>
   );
@@ -40,18 +42,18 @@ function ForbiddenNotice() {
  * anything else, including admin routes), shows ForbiddenNotice if
  * `requireAdmin` is set and the user's profile role isn't "admin" or
  * "FLEETii admin" (the latter is a superset of "admin" — see App.tsx's
- * RootRoute) — or if `requireFleetiiAdmin` is set and the role isn't
- * exactly "FLEETii admin" (unlike requireAdmin, plain "admin" does NOT
- * satisfy this one) — and otherwise renders `children` normally.
+ * RootRoute) — or if `requireRole` is set and the role isn't exactly that
+ * value (unlike requireAdmin, no superset here — e.g. requireRole="admin"
+ * rejects "FLEETii admin" too) — and otherwise renders `children` normally.
  */
 export function ProtectedRoute({
   children,
   requireAdmin = false,
-  requireFleetiiAdmin = false,
+  requireRole,
 }: {
   children: ReactNode;
   requireAdmin?: boolean;
-  requireFleetiiAdmin?: boolean;
+  requireRole?: string;
 }) {
   const { loading, isFullyAuthenticated, profile, mustChangePassword, isPasswordRecovery } = useAuth();
   const location = useLocation();
@@ -76,7 +78,7 @@ export function ProtectedRoute({
     return <ForbiddenNotice />;
   }
 
-  if (requireFleetiiAdmin && profile?.role !== "FLEETii admin") {
+  if (requireRole !== undefined && profile?.role !== requireRole) {
     return <ForbiddenNotice />;
   }
 

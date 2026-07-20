@@ -1,12 +1,13 @@
-// The "FLEETii admin" home page ("/fleetii-admin" — where RootRoute sends a
-// user with role "FLEETii admin" after login, instead of the regular admin
-// dashboard). Empty shell for now — same page frame as AdminFrontpage, no
-// content yet.
+// The "FLEETii admin" settings page ("/settings-superadmin" — reached via
+// the round settings button in PageHeader.tsx, only for role "FLEETii
+// admin"; see SettingsAdminPage.tsx/SettingsUserPage.tsx for the other two
+// roles' variants). Empty shell for now, same page frame as
+// AdminFrontpage/FleetiiAdministrationPage, no content yet.
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 
-/** FLEETii admin dashboard. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
-export function FleetiiAdministrationPage() {
+/** Settings page for role "FLEETii admin". */
+export function SettingsSuperadminPage() {
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -24,12 +25,10 @@ export function FleetiiAdministrationPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">FLEETii administration @ MøldrupAxelsen</h2>
+            <h2 className="text-xl font-semibold text-brand-800">Indstillinger</h2>
             <p className="text-sm text-red-600">Denne side er ikke designet endnu.</p>
             <p className="text-sm text-red-600">
-              Denne side skal indeholde de funktionaliteter, som Robert skal bruge for at kunne administrare
-              kunder, deres afdelinger, og deres biler, herunder bestillinge af indsættelse/udtagning af 2hire
-              boards.
+              Denne side skal indeholde de indstillinger, der er nødvendige for Robert.
             </p>
           </section>
         </motion.main>

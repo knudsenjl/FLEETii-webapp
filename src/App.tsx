@@ -24,6 +24,9 @@ import { VehiclesPage } from "./pages/VehiclesPage";
 import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
 import { NewVehiclePage } from "./pages/NewVehiclePage";
 import { AboutPage } from "./pages/AboutPage";
+import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
+import { SettingsAdminPage } from "./pages/SettingsAdminPage";
+import { SettingsUserPage } from "./pages/SettingsUserPage";
 import { SetPasswordPage } from "./pages/SetPasswordPage";
 
 /**
@@ -125,7 +128,7 @@ function App() {
           <Route
             path="/fleetii-admin"
             element={
-              <ProtectedRoute requireFleetiiAdmin>
+              <ProtectedRoute requireRole="FLEETii admin">
                 <FleetiiAdministrationPage />
               </ProtectedRoute>
             }
@@ -191,6 +194,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <SetPasswordPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings-superadmin"
+            element={
+              <ProtectedRoute requireRole="FLEETii admin">
+                <SettingsSuperadminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings-admin"
+            element={
+              <ProtectedRoute requireRole="admin">
+                <SettingsAdminPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/settings-user"
+            element={
+              <ProtectedRoute requireRole="user">
+                <SettingsUserPage />
               </ProtectedRoute>
             }
           />
