@@ -1,7 +1,9 @@
 // Route guard used in App.tsx's route table: gates every non-public route
 // behind "must be logged in", "must have set a real password" (not still on
 // the shared default from create-user.mts), and, for admin-only routes,
-// "must have role admin". This is the app's client-side authorization
+// "must have role admin or FLEETii admin" (requireAdmin) or, for the
+// FLEETii-admin-only route, "must have role FLEETii admin exactly"
+// (requireFleetiiAdmin). This is the app's client-side authorization
 // boundary — the corresponding server-side boundary is Supabase RLS
 // (supabase/rls_policies.sql) plus the requireAdmin() check in
 // netlify/functions/_shared/serverAuth.ts for the Netlify Functions.
@@ -36,10 +38,21 @@ function ForbiddenNotice() {
  * still has must_change_password set OR came from a "reset password" email
  * link (isPasswordRecovery — see AuthContext.tsx) to "/set-password" (before
  * anything else, including admin routes), shows ForbiddenNotice if
- * `requireAdmin` is set and the user's profile role isn't "admin", and
- * otherwise renders `children` normally.
+ * `requireAdmin` is set and the user's profile role isn't "admin" or
+ * "FLEETii admin" (the latter is a superset of "admin" — see App.tsx's
+ * RootRoute) — or if `requireFleetiiAdmin` is set and the role isn't
+ * exactly "FLEETii admin" (unlike requireAdmin, plain "admin" does NOT
+ * satisfy this one) — and otherwise renders `children` normally.
  */
-export function ProtectedRoute({ children, requireAdmin = false }: { children: ReactNode; requireAdmin?: boolean }) {
+export function ProtectedRoute({
+  children,
+  requireAdmin = false,
+  requireFleetiiAdmin = false,
+}: {
+  children: ReactNode;
+  requireAdmin?: boolean;
+  requireFleetiiAdmin?: boolean;
+}) {
   const { loading, isFullyAuthenticated, profile, mustChangePassword, isPasswordRecovery } = useAuth();
   const location = useLocation();
 
@@ -59,7 +72,11 @@ export function ProtectedRoute({ children, requireAdmin = false }: { children: R
     return <Navigate to="/set-password" replace />;
   }
 
-  if (requireAdmin && profile?.role !== "admin") {
+  if (requireAdmin && profile?.role !== "admin" && profile?.role !== "FLEETii admin") {
+    return <ForbiddenNotice />;
+  }
+
+  if (requireFleetiiAdmin && profile?.role !== "FLEETii admin") {
     return <ForbiddenNotice />;
   }
 

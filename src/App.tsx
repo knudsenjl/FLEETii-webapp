@@ -15,6 +15,7 @@ import { BookingsPage } from "./pages/BookingsPage";
 import { AllBookingsPage } from "./pages/AllBookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
+import { FleetiiAdministrationPage } from "./pages/FleetiiAdministrationPage";
 import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
 import { HandleVehiclePage } from "./pages/HandleVehiclePage";
@@ -32,8 +33,10 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
  * link (isPasswordRecovery — see AuthContext.tsx; this is also where a
  * clicked recovery link's redirect_to actually lands), otherwise straight
  * to their role's home page (admin dashboard vs. bookings list) instead of
- * showing the login form again. Renders LoginPage while loading or once
- * it's confirmed there's no session.
+ * showing the login form again. A "FLEETii admin" role lands on
+ * "/fleetii-admin" instead of the regular admin dashboard (it's a superset
+ * of "admin" — see ProtectedRoute's requireAdmin check). Renders LoginPage
+ * while loading or once it's confirmed there's no session.
  */
 function RootRoute() {
   const { loading, isFullyAuthenticated, profile, mustChangePassword, isPasswordRecovery } = useAuth();
@@ -41,6 +44,9 @@ function RootRoute() {
   if (!loading && isFullyAuthenticated) {
     if (mustChangePassword || isPasswordRecovery) {
       return <Navigate to="/set-password" replace />;
+    }
+    if (profile?.role === "FLEETii admin") {
+      return <Navigate to="/fleetii-admin" replace />;
     }
     return (
       <Navigate
@@ -113,6 +119,14 @@ function App() {
             element={
               <ProtectedRoute requireAdmin>
                 <AdminFrontpage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleetii-admin"
+            element={
+              <ProtectedRoute requireFleetiiAdmin>
+                <FleetiiAdministrationPage />
               </ProtectedRoute>
             }
           />

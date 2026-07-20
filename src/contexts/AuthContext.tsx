@@ -45,8 +45,9 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
 }
 
-/** Renders a role string as the Danish label shown in page headers ("Administrator" / "Bruger"). Any non-"admin" value (including null/undefined) is treated as a regular user. */
+/** Renders a role string as the Danish label shown in page headers ("FLEETii Administrator" / "Administrator" / "Bruger"). Any value other than "admin"/"FLEETii admin" (including null/undefined) is treated as a regular user. */
 export function formatRoleLabel(role?: string | null): string {
+  if (role === "FLEETii admin") return "FLEETii Administrator";
   return role === "admin" ? "Administrator" : "Bruger";
 }
 
