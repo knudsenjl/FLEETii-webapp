@@ -120,11 +120,12 @@ function buildWelcomeEmailHtml(args: {
 
 /**
  * POST { email, full_name?, phone?, department?, role? } as an
- * authenticated admin. Validates the caller (requireAdmin), the email, and
- * the role (must be "user"/"admin", default "user"), creates the auth user
- * with the shared default password, upserts their profile, and rolls back
- * the created account if the profile write fails so the email doesn't end
- * up permanently "stuck".
+ * authenticated admin. Validates the caller (requireAdmin), the email, the
+ * role (must be "user"/"admin", default "user"), and that the requested
+ * department matches the caller's own, creates the auth user with the
+ * shared default password, upserts their profile, and rolls back the
+ * created account if the profile write fails so the email doesn't end up
+ * permanently "stuck".
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -169,6 +170,23 @@ export default async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
+  // An admin may only create users within their own department — mirrors
+  // delete-user.mts's identical check. Service-role bypasses RLS entirely,
+  // so without this, any department-scoped admin could create an account
+  // (including another admin) in any other department simply by picking a
+  // different one from UserDetailsPage's dropdown, which lists every
+  // department, not just the caller's own.
+  const requestedDepartment = asTrimmedString(body.department) || null;
+  const { data: caller } = await admin
+    .from("user_profiles")
+    .select("department")
+    .eq("user_id", authResult.userId)
+    .maybeSingle<{ department: string | null }>();
+
+  if (!caller || requestedDepartment !== caller.department) {
+    return new Response(JSON.stringify({ error: "Du kan kun oprette brugere i din egen afdeling." }), { status: 403 });
+  }
+
   // Creates the auth.users row directly with the shared default password
   // (email_confirm: true since there's no confirmation-link email to click
   // — an admin creating the account IS the verification) and marks it as
@@ -210,7 +228,7 @@ export default async (req: Request) => {
     email,
     full_name: body.full_name ?? null,
     phone: body.phone ?? null,
-    department: body.department ?? null,
+    department: requestedDepartment,
     role,
   });
 
