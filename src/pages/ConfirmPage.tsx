@@ -94,13 +94,29 @@ export function ConfirmPage() {
       return;
     }
 
+    // bookings.department_id is a uuid referencing departments.department_id
+    // (see supabase/bookings_department_to_department_id.sql), not the
+    // department name directly — afdeling (the current user's department
+    // name) needs resolving to that id right before the insert.
+    const { data: departmentRow, error: departmentError } = await supabase
+      .from("departments")
+      .select("department_id")
+      .eq("name", afdeling)
+      .maybeSingle<{ department_id: string }>();
+
+    if (departmentError || !departmentRow) {
+      setError("Kunne ikke finde din afdeling. Kontakt en administrator.");
+      setIsSubmitting(false);
+      return;
+    }
+
     const { error: insertError } = await supabase.from("bookings").insert({
       [VEHICLE_ID_COLUMN]: vehicle.id,
       start: reservationStart,
       end: reservationEnd,
       usage: anvendelse,
       user: bruger || session?.user.email || null,
-      [DEPARTMENT_COLUMN]: afdeling,
+      [DEPARTMENT_COLUMN]: departmentRow.department_id,
     });
 
     if (insertError) {

@@ -39,14 +39,14 @@ describe("VEHICLE_ID_COLUMN", () => {
 });
 
 describe("DEPARTMENT_COLUMN", () => {
-  it("references the department column", () => {
-    expect(DEPARTMENT_COLUMN).toBe("department");
+  it("references the department_id column", () => {
+    expect(DEPARTMENT_COLUMN).toBe("department_id");
   });
 });
 
 describe("BOOKINGS_SELECT_COLUMNS", () => {
-  it("selects booking_id, vehicle_id, and department", () => {
-    expect(BOOKINGS_SELECT_COLUMNS).toBe("booking_id, vehicle_id, start, end, usage, user, department");
+  it("selects booking_id, vehicle_id, and department_id", () => {
+    expect(BOOKINGS_SELECT_COLUMNS).toBe("booking_id, vehicle_id, start, end, usage, user, department_id");
   });
 });
 
@@ -81,22 +81,22 @@ describe("nowIsoString", () => {
 
 describe("mapBookingRow", () => {
   const row: BookingRow = {
-    booking_id: 42,
+    booking_id: "42",
     vehicle_id: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
     start: "2026-07-09T09:00:00",
     end: "2026-07-09T12:00:00",
     usage: "Kundebesøg",
     user: "user@example.com",
-    department: "FLEETii",
+    department_id: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
   };
 
   it("maps the booking_id column onto the local id field", () => {
-    expect(mapBookingRow(row).id).toBe(42);
+    expect(mapBookingRow(row).id).toBe("42");
   });
 
   it("maps every other field correctly", () => {
     expect(mapBookingRow(row)).toEqual({
-      id: 42,
+      id: "42",
       vehicle: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
       startDate: "09.07.2026",
       start: "09:00",
@@ -106,7 +106,7 @@ describe("mapBookingRow", () => {
       endIso: "2026-07-09T12:00:00",
       use: "Kundebesøg",
       user: "user@example.com",
-      department: "FLEETii",
+      departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
     });
   });
 
@@ -114,13 +114,13 @@ describe("mapBookingRow", () => {
     expect(mapBookingRow({ ...row, user: null }).user).toBeNull();
   });
 
-  it("passes through a null department unchanged", () => {
-    expect(mapBookingRow({ ...row, department: null }).department).toBeNull();
+  it("passes through a null department_id unchanged", () => {
+    expect(mapBookingRow({ ...row, department_id: null }).departmentId).toBeNull();
   });
 
   it("maps a null end (open-ended booking) to null endDate/end/endIso, without calling splitIsoDateTime on it", () => {
     expect(mapBookingRow({ ...row, end: null })).toEqual({
-      id: 42,
+      id: "42",
       vehicle: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
       startDate: "09.07.2026",
       start: "09:00",
@@ -130,7 +130,7 @@ describe("mapBookingRow", () => {
       endIso: null,
       use: "Kundebesøg",
       user: "user@example.com",
-      department: "FLEETii",
+      departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
     });
   });
 });
@@ -415,34 +415,34 @@ describe("resolveVehicleGpsPosition", () => {
 
 describe("findAdjacentBookings", () => {
   const sequence: BookingNeighbor[] = [
-    { booking_id: 1, start: "2026-07-09T06:00:00", end: "2026-07-09T08:00:00" },
-    { booking_id: 2, start: "2026-07-09T09:00:00", end: "2026-07-09T12:00:00" },
-    { booking_id: 3, start: "2026-07-09T14:00:00", end: "2026-07-09T16:00:00" },
+    { booking_id: "1", start: "2026-07-09T06:00:00", end: "2026-07-09T08:00:00" },
+    { booking_id: "2", start: "2026-07-09T09:00:00", end: "2026-07-09T12:00:00" },
+    { booking_id: "3", start: "2026-07-09T14:00:00", end: "2026-07-09T16:00:00" },
   ];
 
   it("returns both neighbors for a booking in the middle of the sequence", () => {
-    expect(findAdjacentBookings(sequence, 2)).toEqual({ previous: sequence[0], next: sequence[2] });
+    expect(findAdjacentBookings(sequence, "2")).toEqual({ previous: sequence[0], next: sequence[2] });
   });
 
   it("returns no previous for the first booking in the sequence", () => {
-    expect(findAdjacentBookings(sequence, 1)).toEqual({ previous: null, next: sequence[1] });
+    expect(findAdjacentBookings(sequence, "1")).toEqual({ previous: null, next: sequence[1] });
   });
 
   it("returns no next for the last booking in the sequence", () => {
-    expect(findAdjacentBookings(sequence, 3)).toEqual({ previous: sequence[1], next: null });
+    expect(findAdjacentBookings(sequence, "3")).toEqual({ previous: sequence[1], next: null });
   });
 
   it("returns no neighbors when the vehicle has only one booking", () => {
-    expect(findAdjacentBookings([sequence[1]], 2)).toEqual({ previous: null, next: null });
+    expect(findAdjacentBookings([sequence[1]], "2")).toEqual({ previous: null, next: null });
   });
 
   it("returns no neighbors when the current booking id isn't in the list", () => {
-    expect(findAdjacentBookings(sequence, 999)).toEqual({ previous: null, next: null });
+    expect(findAdjacentBookings(sequence, "999")).toEqual({ previous: null, next: null });
   });
 
   it("sorts out-of-order input before finding neighbors", () => {
     const shuffled = [sequence[2], sequence[0], sequence[1]];
-    expect(findAdjacentBookings(shuffled, 2)).toEqual({ previous: sequence[0], next: sequence[2] });
+    expect(findAdjacentBookings(shuffled, "2")).toEqual({ previous: sequence[0], next: sequence[2] });
   });
 });
 

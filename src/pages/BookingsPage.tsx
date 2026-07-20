@@ -18,14 +18,14 @@ import {
 
 /** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). */
 type Booking = {
-  id: number;
+  id: string;
   vehicle: string;
   startDate: string;
   start: string;
   endDate: string | null;
   end: string | null;
   use: string;
-  department: string | null;
+  departmentId: string | null;
 };
 
 /**
@@ -47,7 +47,8 @@ export function BookingsPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = profile?.role === "admin";
-  const departmentBookings = activeBookings.filter((b) => b.department === afdeling);
+  const [myDepartmentId, setMyDepartmentId] = useState<string | null>(null);
+  const departmentBookings = activeBookings.filter((b) => b.departmentId === myDepartmentId);
   const [nextBooking, ...remainingBookings] = departmentBookings;
 
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
@@ -59,6 +60,24 @@ export function BookingsPage() {
   useEffect(() => {
     void isSettingTilladt("Bruger_ny_reservation", profile?.user_id, afdeling).then(setUserMayCreateBooking);
   }, [profile?.user_id, afdeling]);
+
+  // Resolves the current user's department NAME (afdeling) to its
+  // departments.department_id — bookings are now scoped by that uuid (see
+  // supabase/bookings_department_to_department_id.sql), not the name
+  // directly, so this is needed to filter activeBookings down to "my
+  // department" below.
+  useEffect(() => {
+    if (!afdeling) {
+      setMyDepartmentId(null);
+      return;
+    }
+    void supabase
+      .from("departments")
+      .select("department_id")
+      .eq("name", afdeling)
+      .maybeSingle<{ department_id: string }>()
+      .then(({ data }) => setMyDepartmentId(data?.department_id ?? null));
+  }, [afdeling]);
 
   /** Fetches every not-yet-ended booking visible to the current user (own bookings, or all department bookings if admin) and replaces `activeBookings`. Called on mount, whenever user/role changes, and again after a cancellation. */
   const loadBookings = async () => {

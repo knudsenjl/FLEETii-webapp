@@ -45,6 +45,24 @@ as $$
   select department from public.user_profiles where user_id = auth.uid();
 $$;
 
+-- bookings.department_id (uuid, see bookings_department_to_department_id.sql)
+-- has no direct counterpart on user_profiles, which still stores the
+-- department as a plain text name — so this resolves the caller's own
+-- department name to its departments.department_id via a join, rather than
+-- requiring user_profiles to also carry a department_id column.
+create or replace function public.current_department_id()
+returns uuid
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select d.department_id
+  from public.user_profiles u
+  join public.departments d on d.name = u.department
+  where u.user_id = auth.uid();
+$$;
+
 create or replace function public.current_email()
 returns text
 language sql
@@ -121,6 +139,11 @@ create policy "user_profiles_delete_admin_own_department" on public.user_profile
 -- themselves. Deletes happen from BookingDetailsPage/BookingsPage (a user
 -- cancelling their own booking) and AllBookingsPage (admin, any booking they
 -- can see). There is no client-side UPDATE anywhere.
+--
+-- bookings.department_id is a uuid (see
+-- bookings_department_to_department_id.sql) — compared via
+-- current_department_id(), NOT current_department() (that one's for
+-- user_profiles.department, still a text name).
 -- ---------------------------------------------------------------------------
 
 alter table public.bookings enable row level security;
@@ -144,7 +167,7 @@ create policy "bookings_insert_own_department" on public.bookings
   for insert
   to authenticated
   with check (
-    department = public.current_department()
+    department_id = public.current_department_id()
     and (public.is_admin() or "user" = public.current_email())
   );
 
@@ -156,5 +179,5 @@ create policy "bookings_delete_own_or_department_admin" on public.bookings
   to authenticated
   using (
     "user" = public.current_email()
-    or (public.is_admin() and department = public.current_department())
+    or (public.is_admin() and department_id = public.current_department_id())
   );

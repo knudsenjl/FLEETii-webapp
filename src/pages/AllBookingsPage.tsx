@@ -18,7 +18,7 @@ import {
 
 /** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). */
 type Booking = {
-  id: number;
+  id: string;
   vehicle: string;
   startDate: string;
   start: string;

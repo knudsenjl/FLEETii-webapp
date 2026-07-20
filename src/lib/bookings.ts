@@ -12,7 +12,8 @@ import type { Vehicle2Hire } from "./vehicleDataSource";
 // happen in one place.
 export const BOOKING_ID_COLUMN = "booking_id";
 export const VEHICLE_ID_COLUMN = "vehicle_id";
-export const DEPARTMENT_COLUMN = "department";
+/** References departments.department_id (uuid) — NOT a department name. See supabase/bookings_department_to_department_id.sql. */
+export const DEPARTMENT_COLUMN = "department_id";
 
 /** Column list for a `.select(...)` that needs every field mapBookingRow() consumes. */
 export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, user, ${DEPARTMENT_COLUMN}`;
@@ -35,19 +36,20 @@ export function toDisplayVehicle(v: Vehicle2Hire): DisplayVehicle {
 
 /** Raw shape of a row selected with BOOKINGS_SELECT_COLUMNS, straight off the Supabase "bookings" table. A null "end" means the booking is open-ended — it occupies the vehicle indefinitely from "start" onward, with no known end. */
 export type BookingRow = {
-  booking_id: number;
+  booking_id: string;
   /** The vehicle's real 2hire UUID vehicleId (see supabase/rename_vehicle_id_to_uuid.sql) — NOT the license plate. */
   vehicle_id: string;
   start: string;
   end: string | null;
   usage: string;
   user: string | null;
-  department: string | null;
+  /** References departments.department_id — NOT a department name (see supabase/bookings_department_to_department_id.sql). */
+  department_id: string | null;
 };
 
 /** A BookingRow reshaped for display: DB column names replaced with the local field names pages use, and start/end pre-split into separate Danish date/time strings. startIso/endIso are the original, unsplit ISO values — kept alongside the display strings for callers that need real timestamp comparisons (e.g. computeLockButtonState) rather than reconstructing a timestamp from "dd.mm.yyyy"/"HH:mm". A null endDate/end/endIso means the booking is open-ended (see BookingRow). */
 export type MappedBooking = {
-  id: number;
+  id: string;
   vehicle: string;
   startDate: string;
   start: string;
@@ -57,7 +59,8 @@ export type MappedBooking = {
   endIso: string | null;
   use: string;
   user: string | null;
-  department: string | null;
+  /** References departments.department_id — NOT a department name. */
+  departmentId: string | null;
 };
 
 /** Splits an ISO datetime into a Danish "dd.mm.yyyy" date and an "HH:mm" time. Tolerates a bare date (no "T") or an empty string by falling back to an empty time instead of throwing. */
@@ -106,7 +109,7 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
     endIso: row.end,
     use: row.usage,
     user: row.user,
-    department: row.department,
+    departmentId: row.department_id,
   };
 }
 
@@ -306,7 +309,7 @@ export function resolveVehicleGpsPosition(vehicleId: string, positions: GpsPosit
 }
 
 /** The minimal shape needed to find a booking's chronological neighbors — its id plus raw ISO start/end (not MappedBooking's split display strings). A null end means the booking is open-ended; unused by this function itself (only start is read), kept nullable so callers can pass real booking data straight through without a cast. */
-export type BookingNeighbor = { booking_id: number; start: string; end: string | null };
+export type BookingNeighbor = { booking_id: string; start: string; end: string | null };
 
 /**
  * Given a vehicle's other bookings and the current booking's id, returns the
@@ -319,7 +322,7 @@ export type BookingNeighbor = { booking_id: number; start: string; end: string |
  */
 export function findAdjacentBookings(
   vehicleBookings: BookingNeighbor[],
-  currentBookingId: number,
+  currentBookingId: string,
 ): { previous: BookingNeighbor | null; next: BookingNeighbor | null } {
   const sorted = [...vehicleBookings].sort((a, b) => isoPrefix(a.start).localeCompare(isoPrefix(b.start)));
   const index = sorted.findIndex((b) => b.booking_id === currentBookingId);

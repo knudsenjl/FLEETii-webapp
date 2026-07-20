@@ -17,7 +17,7 @@ import {
 } from "../lib/bookings";
 
 /** The current user's own reservation for this vehicle, if any — the context computeLockButtonState needs. A null endIso means the booking is open-ended (see bookings.ts's BookingRow doc comment), not "no booking" — don't treat it as missing context. */
-export type VehicleLockBookingContext = { bookingId: number; startIso: string; endIso: string | null };
+export type VehicleLockBookingContext = { bookingId: string; startIso: string; endIso: string | null };
 
 export type VehicleLockState = {
   /** null while still loading, or if the vehicle has no vehicle_signals row yet (treated as locked by default). */

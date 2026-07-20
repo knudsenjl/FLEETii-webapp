@@ -22,7 +22,7 @@ import { isSettingTilladt } from "../lib/settings";
 
 /** A booking as passed in via router state from BookingsPage/AllBookingsPage. */
 type BookingDetails = {
-  id: number;
+  id: string;
   vehicle: string;
   startDate: string;
   start: string;

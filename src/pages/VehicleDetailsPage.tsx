@@ -26,7 +26,7 @@ type Vehicle = {
 };
 
 /** The regular user's own reservation for this vehicle, if reached via BookingDetailsPage's map marker — see useVehicleLockState. Only ever present for a non-admin; admin navigation paths (VehiclesPage, FleetManagementPage) don't pass one. */
-type RouterBooking = { id: number; startIso: string; endIso: string | null };
+type RouterBooking = { id: string; startIso: string; endIso: string | null };
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
