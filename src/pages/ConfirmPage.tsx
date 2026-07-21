@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 import {
   DEPARTMENT_COLUMN,
+  USER_ID_COLUMN,
   VEHICLE_ID_COLUMN,
   isVehicleAvailable,
   shortDanishDate,
@@ -29,14 +30,26 @@ type ReservationVehicle = {
  * success depending on role.
  */
 export function ConfirmPage() {
-  const { session, profile, afdeling } = useAuth();
+  const { session, profile, afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
-    | { vehicle?: ReservationVehicle; user?: string; use?: string; start?: string; end?: string }
+    | {
+        vehicle?: ReservationVehicle;
+        user?: string;
+        userLabel?: string;
+        use?: string;
+        start?: string;
+        end?: string;
+      }
     | null;
   const vehicle = state?.vehicle ?? null;
+  // bruger is a user_id (uuid) now, not an email (see
+  // supabase/bookings_user_to_user_id.sql) — brugerLabel is the display-ready
+  // email ReservationPage/AvailablePage already resolved and carried through
+  // via router state, so no fresh lookup is needed here just to show it.
   const bruger = state?.user ?? "";
+  const brugerLabel = state?.userLabel ?? "";
   const anvendelse = state?.use ?? "";
   const reservationStart = state?.start ?? null;
   const reservationEnd = state?.end ?? null;
@@ -94,17 +107,7 @@ export function ConfirmPage() {
       return;
     }
 
-    // bookings.department_id is a uuid referencing departments.department_id
-    // (see supabase/bookings_department_to_department_id.sql), not the
-    // department name directly — afdeling (the current user's department
-    // name) needs resolving to that id right before the insert.
-    const { data: departmentRow, error: departmentError } = await supabase
-      .from("departments")
-      .select("department_id")
-      .eq("name", afdeling)
-      .maybeSingle<{ department_id: string }>();
-
-    if (departmentError || !departmentRow) {
+    if (!afdelingId) {
       setError("Kunne ikke finde din afdeling. Kontakt en administrator.");
       setIsSubmitting(false);
       return;
@@ -115,8 +118,8 @@ export function ConfirmPage() {
       start: reservationStart,
       end: reservationEnd,
       usage: anvendelse,
-      user: bruger || session?.user.email || null,
-      [DEPARTMENT_COLUMN]: departmentRow.department_id,
+      [USER_ID_COLUMN]: bruger || session?.user.id || null,
+      [DEPARTMENT_COLUMN]: afdelingId,
     });
 
     if (insertError) {
@@ -139,7 +142,7 @@ export function ConfirmPage() {
 
   /** [label, short value (visible), full value (hover tooltip)] — Start/Slut show "dd/mm" with the full "dd.mm.yyyy" available on hover; other rows just repeat the same value in both slots. */
   const rows: [string, string, string][] = [
-    ["Reserveret til:", bruger, bruger],
+    ["Reserveret til:", brugerLabel, brugerLabel],
     ["Anvendelse:", anvendelse, anvendelse],
     ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`, `${vehicle.plate}: ${vehicle.vehicle}`],
     [

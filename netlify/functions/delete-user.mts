@@ -50,14 +50,14 @@ export default async (req: Request) => {
   });
 
   const [{ data: caller }, { data: target }] = await Promise.all([
-    admin.from("user_profiles").select("department").eq("user_id", authResult.userId).maybeSingle<{ department: string | null }>(),
-    admin.from("user_profiles").select("department").eq("user_id", targetUserId).maybeSingle<{ department: string | null }>(),
+    admin.from("user_profiles").select("department_id").eq("user_id", authResult.userId).maybeSingle<{ department_id: string | null }>(),
+    admin.from("user_profiles").select("department_id").eq("user_id", targetUserId).maybeSingle<{ department_id: string | null }>(),
   ]);
 
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
-  if (!caller || caller.department !== target.department) {
+  if (!caller || caller.department_id !== target.department_id) {
     return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
   }
 

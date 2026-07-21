@@ -1,9 +1,9 @@
 // App-wide authentication/authorization context. Wraps Supabase Auth's
-// session with the app's own `user_profiles` row (name/phone/department/role),
-// which is the source of truth for role-based UI (admin vs. regular user)
-// and department scoping (Afdeling) used throughout the app. Every page that
-// needs to know "who is logged in" or "are they an admin" reads this via
-// useAuth() rather than talking to Supabase directly.
+// session with the app's own `user_profiles` row (name/phone/department_id/
+// role), which is the source of truth for role-based UI (admin vs. regular
+// user) and department scoping (Afdeling) used throughout the app. Every
+// page that needs to know "who is logged in" or "are they an admin" reads
+// this via useAuth() rather than talking to Supabase directly.
 import {
   createContext,
   useContext,
@@ -20,17 +20,31 @@ export interface Profile {
   email: string | null;
   full_name: string | null;
   phone: string | null;
-  department: string | null;
+  /** References departments.department_id (uuid) — NOT a department name (see supabase/applied/user_profiles_department_to_department_id.sql). Use afdeling (context value, below) for the display name. */
+  department_id: string | null;
   role: string;
 }
+
+/** Raw shape of a user_profiles row as selected by loadProfile, with the department name embedded via its department_id FK (Supabase/PostgREST resolves the relation automatically) — a single object, not an array, since department_id -> departments is many-to-one. */
+type ProfileRow = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  department_id: string | null;
+  role: string;
+  departments: { name: string } | null;
+};
 
 /** Shape of the value exposed by useAuth(). */
 interface AuthContextValue {
   session: Session | null;
-  /** Extra user data (name, phone, department, role) synced from auth.users. */
+  /** Extra user data (name, phone, department_id, role) synced from auth.users. */
   profile: Profile | null;
-  /** The logged-in user's department (Afdeling). Alias for profile?.department. */
+  /** The logged-in user's department NAME (Afdeling), resolved via the departments join — for display. Use afdelingId for permission/filtering comparisons instead (afdeling is a name, not comparable to other tables' department_id columns). */
   afdeling: string | null;
+  /** The logged-in user's department_id (uuid). Alias for profile?.department_id — compare this against other tables' department_id columns (bookings, settings), not afdeling. */
+  afdelingId: string | null;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
   /** True if this account was created with the shared default password and hasn't set a real one yet (see create-user.mts/SetPasswordPage.tsx). ProtectedRoute forces such a session to /set-password before anything else. */
@@ -61,6 +75,7 @@ const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [afdeling, setAfdeling] = useState<string | null>(null);
   const [isFullyAuthenticated, setIsFullyAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   // Seeded from the URL itself (see supabase.ts's comment) rather than
@@ -69,17 +84,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // missed) by the time this provider's effect below subscribes to it.
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
 
-  /** Fetches the `user_profiles` row for the given auth user id. Returns null (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
-  const loadProfile = async (userId: string): Promise<Profile | null> => {
+  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name via the department_id FK in the same query (one round-trip instead of a separate departments lookup). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
+  const loadProfile = async (userId: string): Promise<{ profile: Profile | null; afdeling: string | null }> => {
     const { data, error } = await supabase
       .from("user_profiles")
-      .select("user_id, email, full_name, phone, department, role")
+      .select("user_id, email, full_name, phone, department_id, role, departments(name)")
       .eq("user_id", userId)
-      .maybeSingle<Profile>();
+      .maybeSingle<ProfileRow>();
     if (error) {
       console.error("[AuthContext] user_profiles select failed:", error);
+      return { profile: null, afdeling: null };
     }
-    return data ?? null;
+    if (!data) {
+      return { profile: null, afdeling: null };
+    }
+    const { departments, ...profileFields } = data;
+    return { profile: profileFields, afdeling: departments?.name ?? null };
   };
 
   useEffect(() => {
@@ -97,10 +117,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // briefly redirects everyone to the default route before correcting
     // itself once the role-based redirect resolves.
     const applyAuthState = async (newSession: Session | null, requestId: number) => {
-      const nextProfile = newSession ? await loadProfile(newSession.user.id) : null;
+      const next = newSession ? await loadProfile(newSession.user.id) : { profile: null, afdeling: null };
       if (!mounted || requestId !== latestRequestId) return;
       setSession(newSession);
-      setProfile(nextProfile);
+      setProfile(next.profile);
+      setAfdeling(next.afdeling);
       setIsFullyAuthenticated(Boolean(newSession));
     };
 
@@ -135,6 +156,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await supabase.auth.signOut();
     setSession(null);
     setProfile(null);
+    setAfdeling(null);
     setIsFullyAuthenticated(false);
     setIsPasswordRecovery(false);
   };
@@ -154,9 +176,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const refreshProfile = async () => {
     const { data } = await supabase.auth.refreshSession();
-    const nextProfile = data.session ? await loadProfile(data.session.user.id) : null;
+    const next = data.session ? await loadProfile(data.session.user.id) : { profile: null, afdeling: null };
     setSession(data.session);
-    setProfile(nextProfile);
+    setProfile(next.profile);
+    setAfdeling(next.afdeling);
     setIsFullyAuthenticated(Boolean(data.session));
   };
 
@@ -165,7 +188,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         profile,
-        afdeling: profile?.department ?? null,
+        afdeling,
+        afdelingId: profile?.department_id ?? null,
         isFullyAuthenticated,
         mustChangePassword: session?.user.app_metadata?.must_change_password === true,
         isPasswordRecovery,

@@ -25,7 +25,8 @@ type Booking = {
   endDate: string | null;
   end: string | null;
   use: string;
-  user: string | null;
+  userId: string | null;
+  userEmail: string | null;
 };
 
 /**
@@ -39,7 +40,7 @@ type Booking = {
  * component.
  */
 export function AllBookingsPage() {
-  const { afdeling } = useAuth();
+  const { afdeling, afdelingId } = useAuth();
   const navigate = useNavigate();
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -48,7 +49,7 @@ export function AllBookingsPage() {
 
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const [users, setUsers] = useState<{ user_id: string; email: string; department: string | null }[]>([]);
+  const [users, setUsers] = useState<{ user_id: string; email: string; department_id: string | null }[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -72,19 +73,19 @@ export function AllBookingsPage() {
   );
   const vehicleOptions = Array.from(new Set(departmentBookings.map((b) => b.vehicle))).sort();
   const filteredBookings = departmentBookings.filter(
-    (b) => (!filterUser || b.user === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
+    (b) => (!filterUser || b.userId === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
-  const departmentUsers = users.filter((u) => u.department === afdeling);
+  const departmentUsers = users.filter((u) => u.department_id === afdelingId);
 
   useEffect(() => {
     supabase
       .from("user_profiles")
-      .select("user_id, email, department")
+      .select("user_id, email, department_id")
       .order("email")
       .then(({ data }) => {
         setUsers(
           (data ?? []).filter(
-            (u): u is { user_id: string; email: string; department: string | null } => Boolean(u.email),
+            (u): u is { user_id: string; email: string; department_id: string | null } => Boolean(u.email),
           ),
         );
       });
@@ -169,7 +170,7 @@ export function AllBookingsPage() {
                             >
                               <option value="">Alle</option>
                               {departmentUsers.map((u) => (
-                                <option key={u.user_id} value={u.email}>
+                                <option key={u.user_id} value={u.user_id}>
                                   {u.email}
                                 </option>
                               ))}

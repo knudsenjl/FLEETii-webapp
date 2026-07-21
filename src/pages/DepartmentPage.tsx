@@ -5,14 +5,26 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 
-/** A row from the `user_profiles` table, as listed/selected on this page. */
+/** A row from the `user_profiles` table, as listed/selected on this page. department_name is resolved via the department_id FK's embedded join (see loadUsers) — used both for display in the table and passed through via router state to UserDetailsPage's create-user form. */
 type ProfileRow = {
   user_id: string;
   email: string | null;
   full_name: string | null;
   phone: string | null;
-  department: string | null;
+  department_id: string | null;
+  department_name: string | null;
   role: string;
+};
+
+/** Raw shape of the Supabase query before flattening the embedded departments(name) relation into department_name. */
+type ProfileQueryRow = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  department_id: string | null;
+  role: string;
+  departments: { name: string } | null;
 };
 
 /**
@@ -26,7 +38,7 @@ type ProfileRow = {
  * one does, from UserDetailsPage).
  */
 export function DepartmentPage() {
-  const { afdeling } = useAuth();
+  const { afdeling, afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
@@ -42,9 +54,9 @@ export function DepartmentPage() {
 
       const { data, error: fetchError } = await supabase
         .from("user_profiles")
-        .select("user_id, email, full_name, phone, department, role")
+        .select("user_id, email, full_name, phone, department_id, role, departments(name)")
         .order("full_name", { ascending: true })
-        .returns<ProfileRow[]>();
+        .returns<ProfileQueryRow[]>();
 
       if (fetchError) {
         setError(fetchError.message);
@@ -52,14 +64,16 @@ export function DepartmentPage() {
         return;
       }
 
-      setUsers(data ?? []);
+      setUsers(
+        (data ?? []).map(({ departments, ...rest }) => ({ ...rest, department_name: departments?.name ?? null })),
+      );
       setLoading(false);
     }
 
     void loadUsers();
   }, []);
 
-  const departmentUsers = users.filter((u) => u.department === afdeling);
+  const departmentUsers = users.filter((u) => u.department_id === afdelingId);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -144,7 +158,7 @@ export function DepartmentPage() {
                           >
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.email ?? "—"}</td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department ?? "—"}</td>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">{user.role}</td>
                           </tr>
                         );

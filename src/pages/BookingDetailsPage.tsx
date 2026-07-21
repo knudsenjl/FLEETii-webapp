@@ -31,7 +31,7 @@ type BookingDetails = {
   startIso: string;
   endIso: string | null;
   use: string;
-  user: string | null;
+  userEmail: string | null;
 };
 
 /** Fallback map center used when the booked vehicle has no GPS fix. */
@@ -49,7 +49,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 export function BookingDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, afdeling } = useAuth();
+  const { profile, afdelingId } = useAuth();
   const booking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
 
   const [isCancelling, setIsCancelling] = useState(false);
@@ -78,8 +78,8 @@ export function BookingDetailsPage() {
   );
 
   useEffect(() => {
-    void isSettingTilladt("Bruger_slet_reservation", profile?.user_id, afdeling).then(setUserMayDeleteBooking);
-  }, [profile?.user_id, afdeling]);
+    void isSettingTilladt("Bruger_slet_reservation", profile?.user_id, afdelingId).then(setUserMayDeleteBooking);
+  }, [profile?.user_id, afdelingId]);
 
   useEffect(() => {
     if (!booking) {
@@ -152,7 +152,7 @@ export function BookingDetailsPage() {
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
-                      <span className="text-sm text-brand-800">{booking.user ?? "—"}</span>
+                      <span className="text-sm text-brand-800">{booking.userEmail ?? "—"}</span>
                     </div>
                   )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">

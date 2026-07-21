@@ -9,6 +9,7 @@ import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import {
   BOOKINGS_SELECT_COLUMNS,
+  USER_ID_COLUMN,
   formatBookingPeriod,
   formatVehicleLabel,
   mapBookingRow,
@@ -25,6 +26,8 @@ type Booking = {
   endDate: string | null;
   end: string | null;
   use: string;
+  userId: string | null;
+  userEmail: string | null;
   departmentId: string | null;
 };
 
@@ -38,17 +41,16 @@ type Booking = {
  * been consolidated.
  */
 export function BookingsPage() {
-  const { session, profile, afdeling } = useAuth();
+  const { session, profile, afdelingId } = useAuth();
   const navigate = useNavigate();
   const vehicles = use2hireVehicle();
-  const user = session?.user.email ?? "";
+  const user = session?.user.id ?? "";
   const [activeBookings, setActiveBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const isAdmin = profile?.role === "admin";
-  const [myDepartmentId, setMyDepartmentId] = useState<string | null>(null);
-  const departmentBookings = activeBookings.filter((b) => b.departmentId === myDepartmentId);
+  const departmentBookings = activeBookings.filter((b) => b.departmentId === afdelingId);
   const [nextBooking, ...remainingBookings] = departmentBookings;
 
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
@@ -58,26 +60,8 @@ export function BookingsPage() {
   const canShowNewBookingButton = isAdmin || userMayCreateBooking;
 
   useEffect(() => {
-    void isSettingTilladt("Bruger_ny_reservation", profile?.user_id, afdeling).then(setUserMayCreateBooking);
-  }, [profile?.user_id, afdeling]);
-
-  // Resolves the current user's department NAME (afdeling) to its
-  // departments.department_id — bookings are now scoped by that uuid (see
-  // supabase/bookings_department_to_department_id.sql), not the name
-  // directly, so this is needed to filter activeBookings down to "my
-  // department" below.
-  useEffect(() => {
-    if (!afdeling) {
-      setMyDepartmentId(null);
-      return;
-    }
-    void supabase
-      .from("departments")
-      .select("department_id")
-      .eq("name", afdeling)
-      .maybeSingle<{ department_id: string }>()
-      .then(({ data }) => setMyDepartmentId(data?.department_id ?? null));
-  }, [afdeling]);
+    void isSettingTilladt("Bruger_ny_reservation", profile?.user_id, afdelingId).then(setUserMayCreateBooking);
+  }, [profile?.user_id, afdelingId]);
 
   /** Fetches every not-yet-ended booking visible to the current user (own bookings, or all department bookings if admin) and replaces `activeBookings`. Called on mount, whenever user/role changes, and again after a cancellation. */
   const loadBookings = async () => {
@@ -99,7 +83,7 @@ export function BookingsPage() {
       .or(`end.gte.${nowIsoString()},end.is.null`)
       .order("start", { ascending: true });
 
-    const { data, error: fetchError } = await (isAdmin ? baseQuery : baseQuery.eq("user", user)).returns<
+    const { data, error: fetchError } = await (isAdmin ? baseQuery : baseQuery.eq(USER_ID_COLUMN, user)).returns<
       BookingRow[]
     >();
 

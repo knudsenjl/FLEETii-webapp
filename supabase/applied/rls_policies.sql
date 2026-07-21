@@ -35,21 +35,11 @@ as $$
   );
 $$;
 
-create or replace function public.current_department()
-returns text
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select department from public.user_profiles where user_id = auth.uid();
-$$;
-
--- bookings.department_id (uuid, see bookings_department_to_department_id.sql)
--- has no direct counterpart on user_profiles, which still stores the
--- department as a plain text name — so this resolves the caller's own
--- department name to its departments.department_id via a join, rather than
--- requiring user_profiles to also carry a department_id column.
+-- user_profiles.department_id (uuid, see
+-- user_profiles_department_to_department_id.sql) — reads directly, no join
+-- needed (it used to join user_profiles.department, a text name, to
+-- departments.department_id before user_profiles also converted to
+-- storing the id directly).
 create or replace function public.current_department_id()
 returns uuid
 language sql
@@ -57,20 +47,7 @@ security definer
 set search_path = public
 stable
 as $$
-  select d.department_id
-  from public.user_profiles u
-  join public.departments d on d.name = u.department
-  where u.user_id = auth.uid();
-$$;
-
-create or replace function public.current_email()
-returns text
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select email from public.user_profiles where user_id = auth.uid();
+  select department_id from public.user_profiles where user_id = auth.uid();
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -115,7 +92,7 @@ drop policy if exists "user_profiles_select_admin_own_department" on public.user
 create policy "user_profiles_select_admin_own_department" on public.user_profiles
   for select
   to authenticated
-  using (public.is_admin() and department = public.current_department());
+  using (public.is_admin() and department_id = public.current_department_id());
 
 -- Admins may only delete users within their own department, mirroring the
 -- department-scoped list DepartmentPage actually shows them.
@@ -125,7 +102,7 @@ drop policy if exists "user_profiles_delete_admin_own_department" on public.user
 create policy "user_profiles_delete_admin_own_department" on public.user_profiles
   for delete
   to authenticated
-  using (public.is_admin() and department = public.current_department());
+  using (public.is_admin() and department_id = public.current_department_id());
 
 -- ---------------------------------------------------------------------------
 -- bookings
@@ -133,17 +110,21 @@ create policy "user_profiles_delete_admin_own_department" on public.user_profile
 -- App usage today: AvailablePage reads ALL bookings' vehicle/time windows
 -- (across every department) to compute vehicle availability — this is a
 -- genuine cross-department read, not a bug. Non-admins query their own
--- bookings via .eq("user", email); admins query broadly and filter by
--- department client-side. ConfirmPage inserts a booking; admins may book on
--- behalf of another user in their own department, non-admins only for
--- themselves. Deletes happen from BookingDetailsPage/BookingsPage (a user
--- cancelling their own booking) and AllBookingsPage (admin, any booking they
--- can see). There is no client-side UPDATE anywhere.
+-- bookings via .eq("user_id", auth uid); admins query broadly and filter
+-- by department client-side. ConfirmPage inserts a booking; admins may
+-- book on behalf of another user in their own department, non-admins only
+-- for themselves. Deletes happen from BookingDetailsPage/BookingsPage (a
+-- user cancelling their own booking) and AllBookingsPage (admin, any
+-- booking they can see). There is no client-side UPDATE anywhere.
 --
 -- bookings.department_id is a uuid (see
 -- bookings_department_to_department_id.sql) — compared via
--- current_department_id(), NOT current_department() (that one's for
--- user_profiles.department, still a text name).
+-- current_department_id(), same helper user_profiles' own policies use
+-- now that user_profiles.department_id is also a uuid (see
+-- user_profiles_department_to_department_id.sql). bookings.user_id (see
+-- bookings_user_to_user_id.sql) is compared directly against auth.uid() —
+-- no helper function needed (unlike the old "user" = current_email()
+-- comparison), since auth.uid() already IS exactly what user_id stores.
 -- ---------------------------------------------------------------------------
 
 alter table public.bookings enable row level security;
@@ -168,7 +149,7 @@ create policy "bookings_insert_own_department" on public.bookings
   to authenticated
   with check (
     department_id = public.current_department_id()
-    and (public.is_admin() or "user" = public.current_email())
+    and (public.is_admin() or user_id = auth.uid())
   );
 
 -- A user may delete their own booking; an admin may delete any booking
@@ -178,6 +159,6 @@ create policy "bookings_delete_own_or_department_admin" on public.bookings
   for delete
   to authenticated
   using (
-    "user" = public.current_email()
+    user_id = auth.uid()
     or (public.is_admin() and department_id = public.current_department_id())
   );

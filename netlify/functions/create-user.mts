@@ -175,15 +175,21 @@ export default async (req: Request) => {
   // so without this, any department-scoped admin could create an account
   // (including another admin) in any other department simply by picking a
   // different one from UserDetailsPage's dropdown, which lists every
-  // department, not just the caller's own.
-  const requestedDepartment = asTrimmedString(body.department) || null;
-  const { data: caller } = await admin
-    .from("user_profiles")
-    .select("department")
-    .eq("user_id", authResult.userId)
-    .maybeSingle<{ department: string | null }>();
+  // department, not just the caller's own. body.department is a
+  // department NAME (from UserDetailsPage's dropdown, which is
+  // name-based) — resolved to its department_id here since user_profiles
+  // now stores that uuid, not the name (see
+  // supabase/applied/user_profiles_department_to_department_id.sql).
+  const requestedDepartmentName = asTrimmedString(body.department) || null;
+  const [{ data: caller }, { data: requestedDepartmentRow }] = await Promise.all([
+    admin.from("user_profiles").select("department_id").eq("user_id", authResult.userId).maybeSingle<{ department_id: string | null }>(),
+    requestedDepartmentName
+      ? admin.from("departments").select("department_id").eq("name", requestedDepartmentName).maybeSingle<{ department_id: string }>()
+      : Promise.resolve({ data: null }),
+  ]);
+  const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
 
-  if (!caller || requestedDepartment !== caller.department) {
+  if (!caller || requestedDepartmentId !== caller.department_id) {
     return new Response(JSON.stringify({ error: "Du kan kun oprette brugere i din egen afdeling." }), { status: 403 });
   }
 
@@ -228,7 +234,7 @@ export default async (req: Request) => {
     email,
     full_name: body.full_name ?? null,
     phone: body.phone ?? null,
-    department: requestedDepartment,
+    department_id: requestedDepartmentId,
     role,
   });
 

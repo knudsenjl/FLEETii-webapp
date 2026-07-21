@@ -33,23 +33,26 @@ const ANDET_VALUE = "Andet (angiv årsag)";
  * not a DB write yet) once "Find ledige" is pressed.
  */
 export function ReservationPage() {
-  const { session, profile, afdeling } = useAuth();
+  const { session, profile, afdelingId } = useAuth();
   const navigate = useNavigate();
+  // bruger is a user_id (uuid) now, not an email (see
+  // supabase/bookings_user_to_user_id.sql) — session.user.id is already
+  // exactly that for a non-admin booking for themselves.
   const [bruger, setBruger] = useState(
-    profile?.role === "admin" ? "" : session?.user.email ?? "",
+    profile?.role === "admin" ? "" : session?.user.id ?? "",
   );
   const [anvendelseOption, setAnvendelseOption] = useState("");
   const [anvendelseCustom, setAnvendelseCustom] = useState("");
   /** The actual "anvendelse" value used downstream — the selected option, or (when ANDET_VALUE is picked) the user's own free-text reason. */
   const anvendelse = anvendelseOption === ANDET_VALUE ? anvendelseCustom : anvendelseOption;
   const [anvendelseOptions, setAnvendelseOptions] = useState<string[]>([]);
-  const [users, setUsers] = useState<{ user_id: string; email: string; department: string | null }[]>([]);
+  const [users, setUsers] = useState<{ user_id: string; email: string; department_id: string | null }[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from("user_profiles")
-      .select("user_id, email, department")
+      .select("user_id, email, department_id")
       .order("email")
       .then(({ data, error: usersError }) => {
         if (usersError) {
@@ -58,7 +61,7 @@ export function ReservationPage() {
         }
         setUsers(
           (data ?? []).filter(
-            (u): u is { user_id: string; email: string; department: string | null } => Boolean(u.email),
+            (u): u is { user_id: string; email: string; department_id: string | null } => Boolean(u.email),
           ),
         );
       });
@@ -71,7 +74,7 @@ export function ReservationPage() {
     });
   }, [profile?.user_id]);
 
-  const departmentUsers = users.filter((u) => u.department === afdeling);
+  const departmentUsers = users.filter((u) => u.department_id === afdelingId);
 
   const now = ceilToQuarterHour(new Date());
   const end = new Date(now.getTime() + 3 * 60 * 60 * 1000);
@@ -224,10 +227,18 @@ export function ReservationPage() {
     // malformed "T:00" string, matching how AvailablePage/bookings.ts
     // already treat a null start/end as unbounded (see isVehicleAvailable).
     const end = endIgnored ? null : `${endDate}T${endTime}:00`;
+    // bruger is a user_id now — resolve a display-ready email to carry
+    // through router state too, so AvailablePage/ConfirmPage never need a
+    // fresh lookup just to show who the booking is for.
+    const brugerLabel =
+      profile?.role === "admin"
+        ? (departmentUsers.find((u) => u.user_id === bruger)?.email ?? "")
+        : (session?.user.email ?? "");
 
     navigate("/available", {
       state: {
         user: bruger,
+        userLabel: brugerLabel,
         use: anvendelse,
         start,
         end,
@@ -271,7 +282,7 @@ export function ReservationPage() {
                       >
                         <option value="">Vælg bruger</option>
                         {departmentUsers.map((u) => (
-                          <option key={u.user_id} value={u.email}>
+                          <option key={u.user_id} value={u.user_id}>
                             {u.email}
                           </option>
                         ))}

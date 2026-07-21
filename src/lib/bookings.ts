@@ -12,11 +12,13 @@ import type { Vehicle2Hire } from "./vehicleDataSource";
 // happen in one place.
 export const BOOKING_ID_COLUMN = "booking_id";
 export const VEHICLE_ID_COLUMN = "vehicle_id";
+/** References user_profiles.user_id (uuid) — NOT an email. See supabase/bookings_user_to_user_id.sql. */
+export const USER_ID_COLUMN = "user_id";
 /** References departments.department_id (uuid) — NOT a department name. See supabase/bookings_department_to_department_id.sql. */
 export const DEPARTMENT_COLUMN = "department_id";
 
-/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes. */
-export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, user, ${DEPARTMENT_COLUMN}`;
+/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email) via the user_id FK (PostgREST resolves it automatically) so callers get a display-ready email alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
+export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email), ${DEPARTMENT_COLUMN}`;
 
 export type DisplayVehicle = Vehicle2Hire & {
   vehicle: string;
@@ -42,7 +44,10 @@ export type BookingRow = {
   start: string;
   end: string | null;
   usage: string;
-  user: string | null;
+  /** References user_profiles.user_id — NOT an email (see supabase/bookings_user_to_user_id.sql). */
+  user_id: string | null;
+  /** The user_id FK's embedded relation (see BOOKINGS_SELECT_COLUMNS) — a single object, not an array, since user_id -> user_profiles is many-to-one. Null if user_id itself is null. */
+  user_profiles: { email: string } | null;
   /** References departments.department_id — NOT a department name (see supabase/bookings_department_to_department_id.sql). */
   department_id: string | null;
 };
@@ -58,7 +63,10 @@ export type MappedBooking = {
   startIso: string;
   endIso: string | null;
   use: string;
-  user: string | null;
+  /** References user_profiles.user_id — NOT an email. Use userEmail for display. */
+  userId: string | null;
+  /** The booking's user's email, resolved via user_id's embedded join — for display (e.g. BookingDetailsPage's "Bruger" row). Null if userId itself is null, or that user has no email. */
+  userEmail: string | null;
   /** References departments.department_id — NOT a department name. */
   departmentId: string | null;
 };
@@ -108,7 +116,8 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
     startIso: row.start,
     endIso: row.end,
     use: row.usage,
-    user: row.user,
+    userId: row.user_id,
+    userEmail: row.user_profiles?.email ?? null,
     departmentId: row.department_id,
   };
 }

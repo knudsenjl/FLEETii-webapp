@@ -58,8 +58,11 @@ export function AvailablePage() {
   const { afdeling } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { user?: string; use?: string; start?: string; end?: string } | null;
+  const state = location.state as
+    | { user?: string; userLabel?: string; use?: string; start?: string; end?: string }
+    | null;
   const bruger = state?.user ?? "";
+  const brugerLabel = state?.userLabel ?? "";
   const anvendelse = state?.use ?? "";
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
@@ -214,6 +217,7 @@ export function AvailablePage() {
                       state: {
                         vehicle: selectedVehicle,
                         user: bruger,
+                        userLabel: brugerLabel,
                         use: anvendelse,
                         start: state?.start,
                         end: state?.end,

@@ -14,7 +14,7 @@ type ProfileRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
-  department: string | null;
+  department_name: string | null;
   role: string;
 };
 
@@ -47,7 +47,7 @@ export function UserDetailsPage() {
   const [phone, setPhone] = useState(user?.phone ?? "");
   // No default department — the admin must explicitly pick one from the
   // dropdown rather than it silently pre-filling to their own afdeling.
-  const [department, setDepartment] = useState(user?.department ?? "");
+  const [department, setDepartment] = useState(user?.department_name ?? "");
   const [role, setRole] = useState(user?.role ?? "user");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);

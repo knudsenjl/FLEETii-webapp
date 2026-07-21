@@ -45,8 +45,10 @@ describe("DEPARTMENT_COLUMN", () => {
 });
 
 describe("BOOKINGS_SELECT_COLUMNS", () => {
-  it("selects booking_id, vehicle_id, and department_id", () => {
-    expect(BOOKINGS_SELECT_COLUMNS).toBe("booking_id, vehicle_id, start, end, usage, user, department_id");
+  it("selects booking_id, vehicle_id, user_id (with embedded user_profiles(email)), and department_id", () => {
+    expect(BOOKINGS_SELECT_COLUMNS).toBe(
+      "booking_id, vehicle_id, start, end, usage, user_id, user_profiles(email), department_id",
+    );
   });
 });
 
@@ -86,7 +88,8 @@ describe("mapBookingRow", () => {
     start: "2026-07-09T09:00:00",
     end: "2026-07-09T12:00:00",
     usage: "Kundebesøg",
-    user: "user@example.com",
+    user_id: "c2d3e4f5-6789-01bc-defa-2345678901bc",
+    user_profiles: { email: "user@example.com" },
     department_id: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
   };
 
@@ -105,13 +108,16 @@ describe("mapBookingRow", () => {
       startIso: "2026-07-09T09:00:00",
       endIso: "2026-07-09T12:00:00",
       use: "Kundebesøg",
-      user: "user@example.com",
+      userId: "c2d3e4f5-6789-01bc-defa-2345678901bc",
+      userEmail: "user@example.com",
       departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
     });
   });
 
-  it("passes through a null user unchanged", () => {
-    expect(mapBookingRow({ ...row, user: null }).user).toBeNull();
+  it("passes through a null user_id (and its null embedded user_profiles) unchanged", () => {
+    const mapped = mapBookingRow({ ...row, user_id: null, user_profiles: null });
+    expect(mapped.userId).toBeNull();
+    expect(mapped.userEmail).toBeNull();
   });
 
   it("passes through a null department_id unchanged", () => {
@@ -129,7 +135,8 @@ describe("mapBookingRow", () => {
       startIso: "2026-07-09T09:00:00",
       endIso: null,
       use: "Kundebesøg",
-      user: "user@example.com",
+      userId: "c2d3e4f5-6789-01bc-defa-2345678901bc",
+      userEmail: "user@example.com",
       departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
     });
   });
