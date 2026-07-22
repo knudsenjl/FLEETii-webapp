@@ -290,7 +290,7 @@ export function ReservationPage() {
                     ) : (
                       <input
                         type="text"
-                        value={bruger}
+                        value={session?.user.email ?? ""}
                         disabled
                         readOnly
                         className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"

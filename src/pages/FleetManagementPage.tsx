@@ -17,12 +17,12 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * markers. Clicking any marker jumps to VehicleDetailsPage for that vehicle.
  */
 export function FleetManagementPage() {
-  const { afdeling } = useAuth();
+  const { afdelingId } = useAuth();
   const navigate = useNavigate();
   const gpsPositions = use2hireGPS();
   const twoHireVehicles = use2hireVehicle();
   const departmentGpsPositions = gpsPositions.filter(
-    (g) => twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.tags === afdeling,
+    (g) => afdelingId !== null && twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.departmentIds.includes(afdelingId),
   );
   const [primary, ...rest] = departmentGpsPositions;
   const center = primary ?? DENMARK_CENTER;

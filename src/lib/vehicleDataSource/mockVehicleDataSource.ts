@@ -13,7 +13,7 @@ type RawVehicleJson = Omit<Vehicle2Hire, "plate"> & { alias: string };
 export const mockVehicleDataSource: VehicleDataSource = {
   getVehicles() {
     return Promise.resolve(
-      (vehicleData as RawVehicleJson[]).map(({ alias, ...rest }) => ({ ...rest, plate: alias })),
+      (vehicleData as RawVehicleJson[]).map(({ alias, ...rest }) => ({ ...rest, plate: alias, departmentIds: [] })),
     );
   },
   getGpsPositions() {

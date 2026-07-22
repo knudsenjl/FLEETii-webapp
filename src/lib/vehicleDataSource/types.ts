@@ -11,6 +11,8 @@ export interface Vehicle2Hire {
   connectivityProvider: string;
   iotIdentifier: string;
   tags: string;
+  /** department_id uuids (public.departments) this vehicle belongs to — NOT part of 2hire's real wire format, unlike every other field here. Populated from vehicle_departments by liveVehicleDataSource ([] for mockVehicleDataSource, which has no matching real departments). Compare against afdelingId, not afdeling/tags, matching this app's general "*Id for comparisons" convention (see AuthContext.tsx). */
+  departmentIds: string[];
   brand: string;
   model: string;
   version: string;

@@ -55,7 +55,7 @@ function isSameDate(a: Date, b: Date): boolean {
  * ConfirmPage — still no DB write at this point.
  */
 export function AvailablePage() {
-  const { afdeling } = useAuth();
+  const { afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -91,7 +91,7 @@ export function AvailablePage() {
 
   const twoHireVehicles = use2hireVehicle();
   const availableVehicles: AvailableVehicle[] = twoHireVehicles
-    .filter((v) => v.tags === afdeling)
+    .filter((v) => afdelingId !== null && v.departmentIds.includes(afdelingId))
     .filter((v) => isVehicleAvailable(v.vehicleId, bookings, state?.start ?? null, state?.end ?? null))
     .map((v) => {
       const freePeriod = computeFreePeriod(v.vehicleId, bookings, referenceStart, referenceEnd);

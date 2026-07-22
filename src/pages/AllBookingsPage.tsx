@@ -40,7 +40,7 @@ type Booking = {
  * component.
  */
 export function AllBookingsPage() {
-  const { afdeling, afdelingId } = useAuth();
+  const { afdelingId } = useAuth();
   const navigate = useNavigate();
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -69,7 +69,7 @@ export function AllBookingsPage() {
   }, [filterOpen]);
 
   const departmentBookings = bookings.filter(
-    (b) => vehicles.find((v) => v.vehicleId === b.vehicle)?.tags === afdeling,
+    (b) => afdelingId !== null && vehicles.find((v) => v.vehicleId === b.vehicle)?.departmentIds.includes(afdelingId),
   );
   const vehicleOptions = Array.from(new Set(departmentBookings.map((b) => b.vehicle))).sort();
   const filteredBookings = departmentBookings.filter(

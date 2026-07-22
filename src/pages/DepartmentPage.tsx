@@ -52,9 +52,14 @@ export function DepartmentPage() {
       setLoading(true);
       setError(null);
 
+      // Explicit !user_profiles_department_id_fkey disambiguates the embed:
+      // since user_departments_table.sql, PostgREST also sees an implicit
+      // many-to-many user_profiles<->departments relationship via
+      // user_departments, so a bare "departments(...)" is now ambiguous
+      // (PGRST201) and fails outright — this pins it to the direct FK.
       const { data, error: fetchError } = await supabase
         .from("user_profiles")
-        .select("user_id, email, full_name, phone, department_id, role, departments(name)")
+        .select("user_id, email, full_name, phone, department_id, role, departments!user_profiles_department_id_fkey(name)")
         .order("full_name", { ascending: true })
         .returns<ProfileQueryRow[]>();
 

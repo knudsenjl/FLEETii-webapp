@@ -11,12 +11,13 @@ type Vehicle = DisplayVehicle;
 
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table"): lists every
- * vehicle in the admin's own department (filtered by `afdeling`); clicking a
+ * vehicle in the admin's own department (filtered via vehicle_departments,
+ * see afdelingId); clicking a
  * row navigates straight to VehicleDetailsPage (editing/deleting a vehicle
  * both live there too), or create a new one via NewVehiclePage.
  */
 export function VehiclesPage() {
-  const { afdeling } = useAuth();
+  const { afdelingId } = useAuth();
   const navigate = useNavigate();
   const twoHireVehicles = use2hireVehicle();
 
@@ -48,11 +49,11 @@ export function VehiclesPage() {
   useEffect(() => {
     setVehicles(
       twoHireVehicles
-        .filter((v) => v.tags === afdeling)
+        .filter((v) => afdelingId !== null && v.departmentIds.includes(afdelingId))
         .map(toDisplayVehicle)
         .sort((a, b) => a.plate.localeCompare(b.plate)),
     );
-  }, [twoHireVehicles, afdeling]);
+  }, [twoHireVehicles, afdelingId]);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">

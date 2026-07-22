@@ -3,6 +3,7 @@
 // useAuth() rather than taking props, so every page can just render
 // <PageHeader /> with no wiring — this is the single source of truth for
 // that layout; changing it here changes it everywhere.
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { useTimedFlag } from "../hooks/useTimedFlag";
@@ -15,11 +16,25 @@ function settingsPathForRole(role?: string | null): string {
   return role === "admin" ? "/settings-admin" : "/settings-user";
 }
 
-/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — not implemented yet, shows a 3s InlinePopup), a role-specific settings link (only when logged in), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
+/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a role-specific settings link (only when logged in), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
 export function PageHeader() {
-  const { signOut, profile, afdeling, isFullyAuthenticated } = useAuth();
+  const { signOut, profile, afdeling, afdelingId, costumerName, availableDepartments, switchDepartment, isFullyAuthenticated } =
+    useAuth();
   const navigate = useNavigate();
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [switchError, setSwitchError] = useState<string | null>(null);
+
+  const otherDepartments = availableDepartments.filter((d) => d.department_id !== afdelingId);
+
+  const handleSwitch = async (departmentId: string) => {
+    setSwitcherOpen(false);
+    const error = await switchDepartment(departmentId);
+    if (error) {
+      setSwitchError(error);
+      triggerNotImplemented("switch-department-error");
+    }
+  };
 
   return (
     <div className="mb-2 flex flex-col gap-2">
@@ -38,7 +53,11 @@ export function PageHeader() {
             <div className="relative">
               <button
                 type="button"
-                onClick={() => triggerNotImplemented("change-department")}
+                onClick={() =>
+                  otherDepartments.length === 0
+                    ? triggerNotImplemented("no-other-departments")
+                    : setSwitcherOpen((open) => !open)
+                }
                 aria-label="Skift afdeling"
                 title="Skift afdeling"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
@@ -50,7 +69,25 @@ export function PageHeader() {
                   <path d="M20 17H9a5 5 0 0 1-5-5v-1" />
                 </svg>
               </button>
-              <InlinePopup visible={notImplementedKey === "change-department"} message="Endnu ikke implementeret" align="right" />
+              <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen andre afdelinger tilgængelige" align="right" />
+              <InlinePopup visible={notImplementedKey === "switch-department-error"} message={switchError ?? "Kunne ikke skifte afdeling."} align="right" />
+              {switcherOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />
+                  <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-brand-200 bg-white py-1 text-sm shadow-lg">
+                    {otherDepartments.map((department) => (
+                      <button
+                        key={department.department_id}
+                        type="button"
+                        onClick={() => void handleSwitch(department.department_id)}
+                        className="block w-full truncate px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
+                      >
+                        {department.name}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
           )}
           {isFullyAuthenticated && (
@@ -81,7 +118,10 @@ export function PageHeader() {
       {isFullyAuthenticated && (
         <div className="flex min-w-0 items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
-          <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">Afdeling: {afdeling ?? "—"}</p>
+          <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
+            Afdeling: {costumerName ? `${costumerName}/` : ""}
+            {afdeling ?? "—"}
+          </p>
         </div>
       )}
     </div>

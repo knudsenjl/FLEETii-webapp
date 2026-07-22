@@ -22,17 +22,32 @@ export interface Profile {
   phone: string | null;
   /** References departments.department_id (uuid) — NOT a department name (see supabase/applied/user_profiles_department_to_department_id.sql). Use afdeling (context value, below) for the display name. */
   department_id: string | null;
+  /** References costumers.costumer_id (uuid, see supabase/applied/user_profiles_add_costumer_id.sql). Use costumerName (context value, below) for the display name. */
+  costumer_id: string | null;
   role: string;
 }
 
-/** Raw shape of a user_profiles row as selected by loadProfile, with the department name embedded via its department_id FK (Supabase/PostgREST resolves the relation automatically) — a single object, not an array, since department_id -> departments is many-to-one. */
+/** Raw shape of a user_profiles row as selected by loadProfile, with the department name (and, nested one level further, its costumer's name via departments.costumer_id) embedded via FKs (Supabase/PostgREST resolves both relations automatically) — single objects, not arrays, since both FKs are many-to-one. */
 type ProfileRow = {
   user_id: string;
   email: string | null;
   full_name: string | null;
   phone: string | null;
   department_id: string | null;
+  costumer_id: string | null;
   role: string;
+  departments: { name: string; costumers: { name: string } | null } | null;
+};
+
+/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). */
+export interface DepartmentOption {
+  department_id: string;
+  name: string;
+}
+
+/** Raw shape of a user_departments row as selected by loadAvailableDepartments, with the department's name embedded via FK. */
+type UserDepartmentRow = {
+  department_id: string;
   departments: { name: string } | null;
 };
 
@@ -45,6 +60,14 @@ interface AuthContextValue {
   afdeling: string | null;
   /** The logged-in user's department_id (uuid). Alias for profile?.department_id — compare this against other tables' department_id columns (bookings, settings), not afdeling. */
   afdelingId: string | null;
+  /** The NAME of the costumer associated with the logged-in user's department (departments.costumer_id -> costumers.name), resolved via a nested join alongside afdeling. Null if the department has no costumer_id set. Display-only, like afdeling. */
+  costumerName: string | null;
+  /** The logged-in user's costumer_id (uuid). Alias for profile?.costumer_id — compare/scope queries against this (e.g. UserDetailsPage's department dropdown, DepartmentPage's department picker), not costumerName. */
+  costumerId: string | null;
+  /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by "Skift afdeling" (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
+  availableDepartments: DepartmentOption[];
+  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. */
+  switchDepartment: (departmentId: string) => Promise<string | null>;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
   /** True if this account was created with the shared default password and hasn't set a real one yet (see create-user.mts/SetPasswordPage.tsx). ProtectedRoute forces such a session to /set-password before anything else. */
@@ -76,6 +99,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [afdeling, setAfdeling] = useState<string | null>(null);
+  const [costumerName, setCostumerName] = useState<string | null>(null);
+  const [availableDepartments, setAvailableDepartments] = useState<DepartmentOption[]>([]);
   const [isFullyAuthenticated, setIsFullyAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
   // Seeded from the URL itself (see supabase.ts's comment) rather than
@@ -84,22 +109,51 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // missed) by the time this provider's effect below subscribes to it.
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
 
-  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name via the department_id FK in the same query (one round-trip instead of a separate departments lookup). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
-  const loadProfile = async (userId: string): Promise<{ profile: Profile | null; afdeling: string | null }> => {
+  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name (and, nested one level further, its costumer's name) via FKs in the same query (one round-trip instead of separate departments/costumers lookups). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
+  const loadProfile = async (
+    userId: string,
+  ): Promise<{ profile: Profile | null; afdeling: string | null; costumerName: string | null }> => {
     const { data, error } = await supabase
       .from("user_profiles")
-      .select("user_id, email, full_name, phone, department_id, role, departments(name)")
+      // Explicit !user_profiles_department_id_fkey disambiguates the embed:
+      // since user_departments_table.sql, PostgREST also sees an implicit
+      // many-to-many user_profiles<->departments relationship via
+      // user_departments, so a bare "departments(...)" is now ambiguous
+      // (PGRST201) and fails outright — this pins it to the direct FK.
+      .select(
+        "user_id, email, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name))",
+      )
       .eq("user_id", userId)
       .maybeSingle<ProfileRow>();
     if (error) {
       console.error("[AuthContext] user_profiles select failed:", error);
-      return { profile: null, afdeling: null };
+      return { profile: null, afdeling: null, costumerName: null };
     }
     if (!data) {
-      return { profile: null, afdeling: null };
+      return { profile: null, afdeling: null, costumerName: null };
     }
     const { departments, ...profileFields } = data;
-    return { profile: profileFields, afdeling: departments?.name ?? null };
+    return {
+      profile: profileFields,
+      afdeling: departments?.name ?? null,
+      costumerName: departments?.costumers?.name ?? null,
+    };
+  };
+
+  /** Fetches the departments the given user is allowed to switch into (user_departments, joined with departments for the display name). Returns [] (and logs) on any Supabase error, same degrade-gracefully approach as loadProfile. */
+  const loadAvailableDepartments = async (userId: string): Promise<DepartmentOption[]> => {
+    const { data, error } = await supabase
+      .from("user_departments")
+      .select("department_id, departments(name)")
+      .eq("user_id", userId)
+      .returns<UserDepartmentRow[]>();
+    if (error) {
+      console.error("[AuthContext] user_departments select failed:", error);
+      return [];
+    }
+    return (data ?? [])
+      .filter((row) => row.departments !== null)
+      .map((row) => ({ department_id: row.department_id, name: row.departments!.name }));
   };
 
   useEffect(() => {
@@ -117,11 +171,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // briefly redirects everyone to the default route before correcting
     // itself once the role-based redirect resolves.
     const applyAuthState = async (newSession: Session | null, requestId: number) => {
-      const next = newSession ? await loadProfile(newSession.user.id) : { profile: null, afdeling: null };
+      const next = newSession
+        ? await loadProfile(newSession.user.id)
+        : { profile: null, afdeling: null, costumerName: null };
+      const departments = newSession ? await loadAvailableDepartments(newSession.user.id) : [];
       if (!mounted || requestId !== latestRequestId) return;
       setSession(newSession);
       setProfile(next.profile);
       setAfdeling(next.afdeling);
+      setCostumerName(next.costumerName);
+      setAvailableDepartments(departments);
       setIsFullyAuthenticated(Boolean(newSession));
     };
 
@@ -157,6 +216,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setProfile(null);
     setAfdeling(null);
+    setCostumerName(null);
+    setAvailableDepartments([]);
     setIsFullyAuthenticated(false);
     setIsPasswordRecovery(false);
   };
@@ -176,11 +237,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   const refreshProfile = async () => {
     const { data } = await supabase.auth.refreshSession();
-    const next = data.session ? await loadProfile(data.session.user.id) : { profile: null, afdeling: null };
+    const next = data.session
+      ? await loadProfile(data.session.user.id)
+      : { profile: null, afdeling: null, costumerName: null };
+    const departments = data.session ? await loadAvailableDepartments(data.session.user.id) : [];
     setSession(data.session);
     setProfile(next.profile);
     setAfdeling(next.afdeling);
+    setCostumerName(next.costumerName);
+    setAvailableDepartments(departments);
     setIsFullyAuthenticated(Boolean(data.session));
+  };
+
+  /**
+   * Switches the user's active department by updating user_profiles.department_id
+   * directly (RLS restricts this to the department_id column and to a value
+   * present in the user's own user_departments grants — see
+   * user_profiles_update_own_department.sql — so an already-revoked or
+   * foreign department_id is rejected server-side, not just skipped
+   * client-side). Re-loads profile/afdeling/costumerName on success so
+   * PageHeader and every afdelingId comparison update immediately.
+   */
+  const switchDepartment = async (departmentId: string): Promise<string | null> => {
+    if (!session) return "Ikke logget ind.";
+    const { error: updateError } = await supabase
+      .from("user_profiles")
+      .update({ department_id: departmentId })
+      .eq("user_id", session.user.id);
+    if (updateError) return updateError.message;
+    const next = await loadProfile(session.user.id);
+    setProfile(next.profile);
+    setAfdeling(next.afdeling);
+    setCostumerName(next.costumerName);
+    return null;
   };
 
   return (
@@ -190,6 +279,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         profile,
         afdeling,
         afdelingId: profile?.department_id ?? null,
+        costumerName,
+        costumerId: profile?.costumer_id ?? null,
+        availableDepartments,
+        switchDepartment,
         isFullyAuthenticated,
         mustChangePassword: session?.user.app_metadata?.must_change_password === true,
         isPasswordRecovery,

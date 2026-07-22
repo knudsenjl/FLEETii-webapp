@@ -21,23 +21,18 @@ type ProfileRow = {
 /**
  * Admin "create/edit user" form ("/user-details"). Validates every field is
  * filled and that the email isn't already taken (debounced live check
- * against `user_profiles`) before enabling "Opret bruger", which calls the
- * create-user Netlify Function (authenticated with the current session).
- * When reached with an existing user (via DepartmentPage), also shows
- * "Slet", which calls the delete-user Netlify Function to remove both that
- * user's `user_profiles` row AND their underlying Supabase Auth account —
- * not just the profile row, so a "deleted" user can no longer log in
- * either (see delete-user.mts's header for why this needs the service-role
- * key and can't be a direct client-side delete).
- *
- * KNOWN LIMITATION: this form's "Opret bruger" action only ever creates a
- * new user — reached via DepartmentPage with an existing user's data
- * pre-filled, the live email-exists check will always find that user's own
- * (unchanged) email and treat it as taken, so that button never enables;
- * there is no actual field-edit/update path today, only delete.
+ * against `user_profiles`, ignoring the user's own row when editing) before
+ * enabling "Opret bruger"/"Opdater bruger", which call the create-user/
+ * update-user Netlify Functions respectively (authenticated with the
+ * current session). When reached with an existing user (via DepartmentPage),
+ * also shows "Slet", which calls the delete-user Netlify Function to remove
+ * both that user's `user_profiles` row AND their underlying Supabase Auth
+ * account — not just the profile row, so a "deleted" user can no longer log
+ * in either (see delete-user.mts's header for why this needs the
+ * service-role key and can't be a direct client-side delete).
  */
 export function UserDetailsPage() {
-  const { session } = useAuth();
+  const { session, costumerId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const user = (location.state as { user?: ProfileRow } | null)?.user ?? null;
@@ -45,25 +40,43 @@ export function UserDetailsPage() {
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  // No default department — the admin must explicitly pick one from the
-  // dropdown rather than it silently pre-filling to their own afdeling.
+  // No default department when there's a real choice to make (2+ options) —
+  // the admin must explicitly pick one from the dropdown. Auto-filled (and
+  // locked, see the departmentOptions effect below) only when their costumer
+  // has exactly one department, since there's no actual choice then.
   const [department, setDepartment] = useState(user?.department_name ?? "");
   const [role, setRole] = useState(user?.role ?? "user");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
-  const [pendingAction, setPendingAction] = useState<"create" | "close" | "delete" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"create" | "update" | "close" | "delete" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
 
+  // Scoped to the admin's own costumer (costumerId) — otherwise this listed
+  // every department across every costumer, letting an admin assign a new
+  // user to a department outside their own company.
   useEffect(() => {
+    if (!costumerId) {
+      setDepartmentOptions([]);
+      return;
+    }
     void supabase
       .from("departments")
       .select("name")
+      .eq("costumer_id", costumerId)
       .order("name", { ascending: true })
       .returns<{ name: string }[]>()
       .then(({ data }) => setDepartmentOptions((data ?? []).map((d) => d.name)));
-  }, []);
+  }, [costumerId]);
+
+  // A costumer with only one department has no real choice to make — force
+  // it and lock the field instead of showing a single-option dropdown.
+  useEffect(() => {
+    if (departmentOptions.length === 1) {
+      setDepartment(departmentOptions[0]);
+    }
+  }, [departmentOptions]);
 
   useEffect(() => {
     const trimmed = email.trim();
@@ -84,16 +97,18 @@ export function UserDetailsPage() {
         return;
       }
 
-      setEmailExists(Boolean(data));
+      // Editing an existing user: their own (unchanged) email is not a
+      // conflict — only a match belonging to a DIFFERENT user counts.
+      setEmailExists(Boolean(data) && data?.user_id !== user?.user_id);
     }, 400);
 
     return () => clearTimeout(handle);
-  }, [email]);
+  }, [email, user?.user_id]);
 
   const emailFormatInvalid = email.trim().length > 0 && !EMAIL_PATTERN.test(email.trim());
   const phoneFormatInvalid = phone.trim().length > 0 && !PHONE_PATTERN.test(phone.trim());
 
-  const canCreate =
+  const canSubmit =
     fullName.trim().length > 0 &&
     EMAIL_PATTERN.test(email.trim()) &&
     emailExists === false &&
@@ -135,6 +150,47 @@ export function UserDetailsPage() {
     navigate("/department");
   };
 
+  /** Calls update-user with the form's current values for this user, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
+  const handleUpdate = async () => {
+    if (!user) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch("/.netlify/functions/update-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          userId: user.user_id,
+          email: email.trim(),
+          full_name: fullName || null,
+          phone: phone || null,
+          department: department || null,
+          role: role || "user",
+        }),
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setSubmitError(result.error ?? "Kunne ikke opdatere bruger.");
+        setIsSubmitting(false);
+        return;
+      }
+    } catch {
+      setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    setIsSubmitting(false);
+    setPendingAction(null);
+    navigate("/department");
+  };
+
   /** Calls create-user with the form's values, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleConfirm = async () => {
     if (pendingAction === "close") {
@@ -144,6 +200,11 @@ export function UserDetailsPage() {
 
     if (pendingAction === "delete") {
       await handleDelete();
+      return;
+    }
+
+    if (pendingAction === "update") {
+      await handleUpdate();
       return;
     }
 
@@ -214,22 +275,32 @@ export function UserDetailsPage() {
                   <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Afdeling: <span className="ml-0.5 text-red-600">*</span>
+                      Afdeling: {departmentOptions.length !== 1 && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
-                    <select
-                      required
-                      aria-required="true"
-                      value={department}
-                      onChange={(e) => setDepartment(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    >
-                      <option value="">Vælg afdeling</option>
-                      {departmentOptions.map((name) => (
-                        <option key={name} value={name}>
-                          {name}
-                        </option>
-                      ))}
-                    </select>
+                    {departmentOptions.length === 1 ? (
+                      <input
+                        type="text"
+                        readOnly
+                        disabled
+                        value={departmentOptions[0]}
+                        className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
+                      />
+                    ) : (
+                      <select
+                        required
+                        aria-required="true"
+                        value={department}
+                        onChange={(e) => setDepartment(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="">Vælg afdeling</option>
+                        {departmentOptions.map((name) => (
+                          <option key={name} value={name}>
+                            {name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
@@ -260,14 +331,24 @@ export function UserDetailsPage() {
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
               {user ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("close")}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Opdater bruger
-                  </button>
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPendingAction("update")}
+                      disabled={!canSubmit}
+                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Opdater bruger
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPendingAction("close")}
+                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Fortryd
+                    </button>
+                  </div>
                   <button
                     type="button"
                     onClick={() => setPendingAction("delete")}
@@ -281,7 +362,7 @@ export function UserDetailsPage() {
                   <button
                     type="button"
                     onClick={() => setPendingAction("create")}
-                    disabled={!canCreate}
+                    disabled={!canSubmit}
                     className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret bruger
@@ -305,9 +386,11 @@ export function UserDetailsPage() {
           message={
             pendingAction === "create"
               ? "Er du sikker på, at du vil oprette denne bruger?"
-              : pendingAction === "delete"
-                ? "Er du sikker på, at du vil slette denne bruger?"
-                : "Er du sikker på, at du vil lukke uden at gemme?"
+              : pendingAction === "update"
+                ? "Er du sikker på, at du vil opdatere denne bruger?"
+                : pendingAction === "delete"
+                  ? "Er du sikker på, at du vil slette denne bruger?"
+                  : "Er du sikker på, at du vil lukke uden at gemme?"
           }
           error={submitError}
           onCancel={() => setPendingAction(null)}
