@@ -8,7 +8,10 @@
 // which bypasses RLS entirely — so the department-scoping the old
 // client-side delete relied on (user_profiles_delete_admin_own_department,
 // see supabase/rls_policies.sql) is re-checked explicitly here, otherwise
-// any admin could delete any department's user through this endpoint.
+// any admin could delete any department's user through this endpoint. Also
+// refuses to delete a department's last remaining admin — deleting them
+// would leave no one able to manage that department's users at all, since
+// only an admin can create another admin.
 import { createClient } from "@supabase/supabase-js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 
@@ -51,7 +54,11 @@ export default async (req: Request) => {
 
   const [{ data: caller }, { data: target }] = await Promise.all([
     admin.from("user_profiles").select("department_id").eq("user_id", authResult.userId).maybeSingle<{ department_id: string | null }>(),
-    admin.from("user_profiles").select("department_id").eq("user_id", targetUserId).maybeSingle<{ department_id: string | null }>(),
+    admin
+      .from("user_profiles")
+      .select("department_id, role")
+      .eq("user_id", targetUserId)
+      .maybeSingle<{ department_id: string | null; role: string }>(),
   ]);
 
   if (!target) {
@@ -59,6 +66,33 @@ export default async (req: Request) => {
   }
   if (!caller || caller.department_id !== target.department_id) {
     return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
+  }
+
+  // Refuse to delete the last remaining admin in the department — otherwise
+  // no one is left who can manage its users (create/delete/edit all
+  // require role "admin"), a state the UI has no way to recover from on its
+  // own (only an admin can create another admin).
+  if (target.role === "admin") {
+    let adminCountQuery = admin
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", "admin")
+      .neq("user_id", targetUserId);
+    adminCountQuery =
+      target.department_id === null
+        ? adminCountQuery.is("department_id", null)
+        : adminCountQuery.eq("department_id", target.department_id);
+    const { count: otherAdminCount, error: countError } = await adminCountQuery;
+
+    if (countError) {
+      return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
+    }
+    if (!otherAdminCount) {
+      return new Response(
+        JSON.stringify({ error: "Kan ikke slette den sidste administrator i afdelingen." }),
+        { status: 409 },
+      );
+    }
   }
 
   const { error: profileError } = await admin.from("user_profiles").delete().eq("user_id", targetUserId);

@@ -1,5 +1,5 @@
-// The standard "are you sure?" Nej/Ja confirmation dialog, built on top of
-// Modal. Every destructive/confirmable action in the app (deleting a
+// The standard "are you sure?" Fortryd/Ja confirmation dialog, built on top
+// of Modal. Every destructive/confirmable action in the app (deleting a
 // vehicle, cancelling a reservation, creating a user, etc.) renders one of
 // these instead of a bespoke modal, so behavior (disabling buttons while
 // pending, showing an error) stays consistent everywhere.
@@ -20,13 +20,13 @@ interface ConfirmDialogProps {
   isPending?: boolean;
 }
 
-/** A Nej/Ja confirmation modal with an optional error message and pending state. Both buttons render with identical styling — there is no visual "danger" distinction between confirm and cancel, so double-check the message text is clear about what confirming will do. */
+/** A Fortryd/Ja confirmation modal with an optional error message and pending state. Both buttons render with identical styling — there is no visual "danger" distinction between confirm and cancel, so double-check the message text is clear about what confirming will do. */
 export function ConfirmDialog({
   message,
   error,
   onCancel,
   onConfirm,
-  cancelLabel = "Nej",
+  cancelLabel = "Fortryd",
   confirmLabel = "Ja",
   confirmPendingLabel,
   isPending = false,

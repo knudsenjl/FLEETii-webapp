@@ -170,27 +170,37 @@ export default async (req: Request) => {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // An admin may only create users within their own department — mirrors
-  // delete-user.mts's identical check. Service-role bypasses RLS entirely,
-  // so without this, any department-scoped admin could create an account
-  // (including another admin) in any other department simply by picking a
-  // different one from UserDetailsPage's dropdown, which lists every
-  // department, not just the caller's own. body.department is a
-  // department NAME (from UserDetailsPage's dropdown, which is
-  // name-based) — resolved to its department_id here since user_profiles
-  // now stores that uuid, not the name (see
+  // An admin may only create users within their own costumer — mirrors
+  // update-user.mts's identical check (broadened from an earlier, stricter
+  // "own department only" check once UserDetailsPage's department dropdown
+  // itself became costumer-scoped, listing every department under the
+  // caller's costumer, not just their own — the stricter check would have
+  // rejected picking any other department in the same costumer). Service-
+  // role bypasses RLS entirely, so without this, any admin could create an
+  // account in any other costumer's department by hand-crafting a request.
+  // body.department is a department NAME (from UserDetailsPage's dropdown,
+  // which is name-based) — resolved to its department_id/costumer_id here
+  // since user_profiles now stores the uuid, not the name (see
   // supabase/applied/user_profiles_department_to_department_id.sql).
   const requestedDepartmentName = asTrimmedString(body.department) || null;
   const [{ data: caller }, { data: requestedDepartmentRow }] = await Promise.all([
-    admin.from("user_profiles").select("department_id").eq("user_id", authResult.userId).maybeSingle<{ department_id: string | null }>(),
+    admin
+      .from("user_profiles")
+      .select("costumer_id")
+      .eq("user_id", authResult.userId)
+      .maybeSingle<{ costumer_id: string | null }>(),
     requestedDepartmentName
-      ? admin.from("departments").select("department_id").eq("name", requestedDepartmentName).maybeSingle<{ department_id: string }>()
+      ? admin
+          .from("departments")
+          .select("department_id, costumer_id")
+          .eq("name", requestedDepartmentName)
+          .maybeSingle<{ department_id: string; costumer_id: string | null }>()
       : Promise.resolve({ data: null }),
   ]);
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
 
-  if (!caller || requestedDepartmentId !== caller.department_id) {
-    return new Response(JSON.stringify({ error: "Du kan kun oprette brugere i din egen afdeling." }), { status: 403 });
+  if (!caller?.costumer_id || requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
+    return new Response(JSON.stringify({ error: "Du kan kun oprette brugere hos din egen kunde." }), { status: 403 });
   }
 
   // Creates the auth.users row directly with the shared default password
@@ -228,13 +238,17 @@ export default async (req: Request) => {
 
   // Upsert rather than update: covers both the case where a DB trigger
   // already created the user_profiles row from auth.users, and the case
-  // where it didn't.
+  // where it didn't (that trigger, handle_new_user(), doesn't set
+  // costumer_id/department_id at all — see
+  // supabase/applied/fix_handle_new_user_department_column.sql — so this
+  // upsert is what actually populates them for a new user).
   const { error: profileError } = await admin.from("user_profiles").upsert({
     user_id: created.user.id,
     email,
     full_name: body.full_name ?? null,
     phone: body.phone ?? null,
     department_id: requestedDepartmentId,
+    costumer_id: caller.costumer_id,
     role,
   });
 

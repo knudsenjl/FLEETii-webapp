@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { InlinePopup } from "../components/InlinePopup";
+import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
@@ -32,7 +34,7 @@ type ProfileRow = {
  * service-role key and can't be a direct client-side delete).
  */
 export function UserDetailsPage() {
-  const { session, costumerId } = useAuth();
+  const { session, costumerId, afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const user = (location.state as { user?: ProfileRow } | null)?.user ?? null;
@@ -52,6 +54,8 @@ export function UserDetailsPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
+  const [isLastAdmin, setIsLastAdmin] = useState(false);
+  const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
 
   // Scoped to the admin's own costumer (costumerId) — otherwise this listed
   // every department across every costumer, letting an admin assign a new
@@ -77,6 +81,26 @@ export function UserDetailsPage() {
       setDepartment(departmentOptions[0]);
     }
   }, [departmentOptions]);
+
+  // Pre-checks whether this user is the last remaining admin in the
+  // (caller's own) department, so clicking "Slet bruger" can show a warning
+  // popup instead of "Er du sikker...?" for a deletion delete-user.mts will
+  // reject anyway. Mirrors that function's own guard — this is a UX
+  // pre-check only, not the authorization boundary (the server re-checks it
+  // regardless).
+  useEffect(() => {
+    if (!user || user.role !== "admin" || !afdelingId) {
+      setIsLastAdmin(false);
+      return;
+    }
+    void supabase
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("department_id", afdelingId)
+      .eq("role", "admin")
+      .neq("user_id", user.user_id)
+      .then(({ count }) => setIsLastAdmin((count ?? 0) === 0));
+  }, [user, afdelingId]);
 
   useEffect(() => {
     const trimmed = email.trim();
@@ -349,13 +373,22 @@ export function UserDetailsPage() {
                       Fortryd
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("delete")}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Slet bruger
-                  </button>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        isLastAdmin ? triggerWarning("last-admin") : setPendingAction("delete")
+                      }
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Slet bruger
+                    </button>
+                    <InlinePopup
+                      visible={warningKey === "last-admin"}
+                      message="Kan ikke slette den sidste administrator i afdelingen."
+                      variant="warning"
+                    />
+                  </div>
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
