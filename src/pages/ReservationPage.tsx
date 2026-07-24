@@ -1,20 +1,55 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { TimeSelect } from "../components/TimeSelect";
+import { InlinePopup } from "../components/InlinePopup";
 import { supabase } from "../lib/supabase";
-import { fetchSettingValue } from "../lib/settings";
+import {
+  ANDET_VALUE,
+  fetchSettingText,
+  fetchSettingUnion,
+  isSettingTilladt,
+  sortAnvendelserWithAndetLast,
+} from "../lib/settings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
-/** Every quarter-hour of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns. */
-const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, i) => {
-  const hours = Math.floor(i / 4);
-  const minutes = (i % 4) * 15;
-  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
-});
+/** The existing booking being edited, as passed in via router state from BookingDetailsPage's "Rediger reservation" button — carried forward through AvailablePage/ConfirmPage so confirming updates this row instead of inserting a new one. */
+type EditingBooking = {
+  bookingId: string;
+  userId: string | null;
+  userLabel: string | null;
+  anvendelse: string;
+  startIso: string;
+  endIso: string | null;
+};
+
+/** Hardcoded fallbacks used whenever "Standard varighed"/"Standard interval" (department_settings/user_settings, see StandardSettings.tsx) has no value for the current user/department. */
+const DEFAULT_DURATION_MINUTES = 3 * 60;
+const DEFAULT_INTERVAL_MINUTES = 15;
+
+/** Every `stepMinutes` of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns — step comes from "Standard interval" (falling back to DEFAULT_INTERVAL_MINUTES). */
+function buildTimeOptions(stepMinutes: number): string[] {
+  const count = Math.floor((24 * 60) / stepMinutes);
+  return Array.from({ length: count }, (_, i) => {
+    const totalMinutes = i * stepMinutes;
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  });
+}
+
+/** Parses a "Standard varighed" value ("HH:MM") into a minute count, or null if it's missing/malformed — callers fall back to DEFAULT_DURATION_MINUTES in that case. */
+function parseHHMMToMinutes(value: string): number | null {
+  const match = /^(\d{1,2}):(\d{2})$/.exec(value);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (minutes >= 60) return null;
+  return hours * 60 + minutes;
+}
 
 /** Rounds a Date up to the next quarter-hour boundary (used for the default "now" start time). */
 function ceilToQuarterHour(date: Date): Date {
@@ -22,24 +57,27 @@ function ceilToQuarterHour(date: Date): Date {
   return new Date(Math.ceil(date.getTime() / ms) * ms);
 }
 
-/** The one "Anvendelse" option that prompts for a free-text reason instead of being used as-is. */
-const ANDET_VALUE = "Andet (angiv årsag)";
-
 /**
  * Step 1 of the booking flow ("/reservation"): pick who the reservation is
  * for (admins pick from their department's users; regular users always book
  * for themselves), what it's for, and the start/end date+time. Defaults to
- * "now" through "+3 hours". Continues to AvailablePage (via router state,
+ * "now" through "+Standard varighed" (falling back to +3 hours when unset),
+ * with the Start/Slut TimeSelect stepping by "Standard interval" (falling
+ * back to 15 minutes) — see StandardSettings.tsx. Continues to AvailablePage (via router state,
  * not a DB write yet) once "Find ledige" is pressed.
  */
 export function ReservationPage() {
   const { session, profile, afdelingId } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
   // bruger is a user_id (uuid) now, not an email (see
   // supabase/bookings_user_to_user_id.sql) — session.user.id is already
-  // exactly that for a non-admin booking for themselves.
+  // exactly that for a non-admin booking for themselves. When editing an
+  // existing booking, editing.userId (whoever it was originally for) wins
+  // over both defaults.
   const [bruger, setBruger] = useState(
-    profile?.role === "admin" ? "" : session?.user.id ?? "",
+    editing?.userId ?? (profile?.role === "admin" ? "" : session?.user.id ?? ""),
   );
   const [anvendelseOption, setAnvendelseOption] = useState("");
   const [anvendelseCustom, setAnvendelseCustom] = useState("");
@@ -53,6 +91,7 @@ export function ReservationPage() {
     supabase
       .from("user_profiles")
       .select("user_id, email, department_id")
+      .is("deleted_at", null)
       .order("email")
       .then(({ data, error: usersError }) => {
         if (usersError) {
@@ -67,21 +106,70 @@ export function ReservationPage() {
       });
   }, []);
 
-  /** Loads the "Anvendelse" dropdown's options from settings.value (a text[]) — not department-scoped, matching this setting's existing (unscoped) design; a per-user override row still takes precedence if one exists (see fetchSettingValue). */
+  /** Loads the "Anvendelse" dropdown's options as the union of the user's own department's list (department_settings) and their personal extra options (user_settings) — see fetchSettingUnion. ANDET_VALUE is always sorted to the end, regardless of where it sits in the stored array. */
   useEffect(() => {
-    void fetchSettingValue("Anvendelse", profile?.user_id).then((value) => {
-      setAnvendelseOptions(value ?? []);
+    void fetchSettingUnion("Anvendelse", profile?.user_id, afdelingId)
+      .then(sortAnvendelserWithAndetLast)
+      .then(setAnvendelseOptions);
+  }, [profile?.user_id, afdelingId]);
+
+  const isAdmin = profile?.role === "admin";
+  /** Whether a non-admin user may create an open-ended ("Ingen slutdato") reservation, per Tillad_reservation_uden_sluttidspunkt. Admins can always do so regardless — see handleEndIgnoreToggle. */
+  const [userMayIgnoreEnd, setUserMayIgnoreEnd] = useState(false);
+  const canIgnoreEnd = isAdmin || userMayIgnoreEnd;
+  useEffect(() => {
+    void isSettingTilladt("Tillad_reservation_uden_sluttidspunkt", profile?.user_id, afdelingId).then(
+      setUserMayIgnoreEnd,
+    );
+  }, [profile?.user_id, afdelingId]);
+
+  /** "Standard varighed"/"Standard interval" overrides (see StandardSettings.tsx) — null while loading or when neither user_settings nor department_settings has a value, in which case DEFAULT_DURATION_MINUTES/DEFAULT_INTERVAL_MINUTES are used instead. */
+  const [standardDurationMinutes, setStandardDurationMinutes] = useState<number | null>(null);
+  const [standardIntervalMinutes, setStandardIntervalMinutes] = useState<number | null>(null);
+  useEffect(() => {
+    void fetchSettingText("Standard_varighed", profile?.user_id, afdelingId).then((raw) => {
+      setStandardDurationMinutes(raw ? parseHHMMToMinutes(raw) : null);
     });
-  }, [profile?.user_id]);
+    void fetchSettingText("Standard_interval", profile?.user_id, afdelingId).then((raw) => {
+      const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+      setStandardIntervalMinutes(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+    });
+  }, [profile?.user_id, afdelingId]);
+
+  const effectiveDurationMinutes = standardDurationMinutes ?? DEFAULT_DURATION_MINUTES;
+  const timeOptions = useMemo(
+    () => buildTimeOptions(standardIntervalMinutes ?? DEFAULT_INTERVAL_MINUTES),
+    [standardIntervalMinutes],
+  );
+
+  /** Pre-selects the booking-being-edited's Anvendelse once the options list has loaded — a plain "Anvendelse" match wins if the loaded list still has that exact option, otherwise it's treated as a free-text "Andet" reason (mirrors how the anvendelse getter below reconstructs the same distinction on submit). Guarded by editingPrefilled so a later options reload (e.g. afdelingId somehow changing) never clobbers a value the admin has since edited by hand. */
+  const editingAnvendelsePrefilled = useRef(false);
+  useEffect(() => {
+    if (!editing || editingAnvendelsePrefilled.current || anvendelseOptions.length === 0) return;
+    editingAnvendelsePrefilled.current = true;
+    if (anvendelseOptions.includes(editing.anvendelse)) {
+      setAnvendelseOption(editing.anvendelse);
+    } else {
+      setAnvendelseOption(ANDET_VALUE);
+      setAnvendelseCustom(editing.anvendelse);
+    }
+  }, [editing, anvendelseOptions]);
 
   const departmentUsers = users.filter((u) => u.department_id === afdelingId);
 
   const now = ceilToQuarterHour(new Date());
-  const end = new Date(now.getTime() + 3 * 60 * 60 * 1000);
+  const end = new Date(now.getTime() + effectiveDurationMinutes * 60 * 1000);
   const toIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const formatTime = (date: Date) =>
     `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
+  /** "date"/"time" parts of an ISO datetime string, for pre-filling Start/Slut from an existing booking being edited. */
+  const splitIso = (iso: string) => {
+    const d = new Date(iso);
+    return { date: toIsoDate(d), time: formatTime(d) };
+  };
+  const initialStart = editing ? splitIso(editing.startIso) : { date: toIsoDate(now), time: formatTime(now) };
+  const initialEnd = editing?.endIso ? splitIso(editing.endIso) : { date: toIsoDate(end), time: formatTime(end) };
   /** Adds minutes to a "HH:mm" time, reporting how many calendar days the result rolled over (can be negative). */
   const addMinutes = (time: string, minutes: number): { time: string; daysAdded: number } => {
     const [hours, mins] = time.split(":").map(Number);
@@ -101,17 +189,37 @@ export function ReservationPage() {
     return toIsoDate(date);
   };
 
-  const [startDate, setStartDate] = useState(toIsoDate(now));
-  const [endDate, setEndDate] = useState(toIsoDate(end));
-  const [startTime, setStartTime] = useState(formatTime(now));
-  const [endTime, setEndTime] = useState(formatTime(end));
+  const [startDate, setStartDate] = useState(initialStart.date);
+  const [endDate, setEndDate] = useState(initialEnd.date);
+  const [startTime, setStartTime] = useState(initialStart.time);
+  const [endTime, setEndTime] = useState(initialEnd.time);
   /** When true (the "Nu" clock icon button is pressed/active), Start is locked to the current moment and its fields are disabled — see handleNowToggle. */
   const [startIsNow, setStartIsNow] = useState(false);
-  /** When true, End is cleared and its fields are replaced by an "Ingen slutdato" label — see handleEndIgnoreToggle. */
-  const [endIgnored, setEndIgnored] = useState(false);
+  /** When true, End is cleared and its fields are replaced by an "Ingen slutdato" label — see handleEndIgnoreToggle. Starts true when editing a booking that was itself open-ended (endIso null). */
+  const [endIgnored, setEndIgnored] = useState(Boolean(editing && editing.endIso === null));
   /** The End date/time as they were right before "ignore" was turned on, restored if it's turned back off. */
   const ignoredEndRef = useRef<{ date: string; time: string } | null>(null);
   const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
+
+  /**
+   * Once "Standard varighed" has resolved (found or not — standardDurationMinutes
+   * is only null while still loading), re-applies End as Start + that
+   * duration — the initial `end`/initialEnd computed above already used
+   * effectiveDurationMinutes, but only as a useState *initializer*, which
+   * doesn't re-run once the async fetch settles after first render. Skipped
+   * when editing an existing booking (that already has its own concrete
+   * End) and guarded to run only once, so it can't clobber an End the user
+   * has since edited by hand.
+   */
+  const durationAppliedRef = useRef(false);
+  useEffect(() => {
+    if (editing || standardDurationMinutes === null || durationAppliedRef.current) return;
+    durationAppliedRef.current = true;
+    const start = new Date(`${startDate}T${startTime}:00`);
+    const newEnd = new Date(start.getTime() + standardDurationMinutes * 60 * 1000);
+    setEndDate(toIsoDate(newEnd));
+    setEndTime(formatTime(newEnd));
+  }, [editing, standardDurationMinutes]);
 
   /**
    * Commits a new start date/time. Rejects anything in the past (snapping
@@ -180,7 +288,7 @@ export function ReservationPage() {
     if (!nowActive) return;
 
     const current = new Date();
-    const endMoment = new Date(current.getTime() + 3 * 60 * 60 * 1000);
+    const endMoment = new Date(current.getTime() + effectiveDurationMinutes * 60 * 1000);
 
     setStartDate(toIsoDate(current));
     setStartTime(formatTime(current));
@@ -197,6 +305,9 @@ export function ReservationPage() {
    * when turned on, or restores whatever End held right before it was
    * turned on. Unlike "Nu", there's no live value to keep computing while
    * ignored — an ignored End just stays empty until turned back off.
+   * Turning it on requires Tillad_reservation_uden_sluttidspunkt (admins
+   * always may) — otherwise shows a warning instead, matching the
+   * start/end warnings above rather than just disabling the button.
    */
   const handleEndIgnoreToggle = () => {
     if (endIgnored) {
@@ -206,6 +317,11 @@ export function ReservationPage() {
         setEndTime(restored.time);
       }
       setEndIgnored(false);
+      return;
+    }
+
+    if (!canIgnoreEnd) {
+      triggerWarning("endBlocked");
       return;
     }
 
@@ -232,7 +348,7 @@ export function ReservationPage() {
     // fresh lookup just to show who the booking is for.
     const brugerLabel =
       profile?.role === "admin"
-        ? (departmentUsers.find((u) => u.user_id === bruger)?.email ?? "")
+        ? (departmentUsers.find((u) => u.user_id === bruger)?.email ?? editing?.userLabel ?? "")
         : (session?.user.email ?? "");
 
     navigate("/available", {
@@ -242,6 +358,7 @@ export function ReservationPage() {
         use: anvendelse,
         start,
         end,
+        editingBookingId: editing?.bookingId,
       },
     });
   };
@@ -265,7 +382,7 @@ export function ReservationPage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">
-                Opret reservation
+                {editing ? "Rediger reservation" : "Opret reservation"}
               </h2>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
@@ -355,15 +472,11 @@ export function ReservationPage() {
                     />
                     <TimeSelect
                       value={startTime}
-                      options={TIME_OPTIONS}
+                      options={timeOptions}
                       onChange={(t) => applyStartDateTime(startDate, t, false)}
                       disabled={startIsNow}
                     />
-                    {warningKey === "start" && (
-                      <div className="absolute left-0 top-full z-10 mt-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
-                        Start kan ikke være før nu
-                      </div>
-                    )}
+                    <InlinePopup visible={warningKey === "start"} message="Start kan ikke være før nu" variant="warning" />
                   </div>
                   <div className="relative grid grid-cols-[4rem_3.5rem_1fr_1fr] items-center gap-0.5 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
@@ -399,16 +512,17 @@ export function ReservationPage() {
                         />
                         <TimeSelect
                           value={endTime}
-                          options={TIME_OPTIONS.filter((t) => startDate !== endDate || t > startTime)}
+                          options={timeOptions.filter((t) => startDate !== endDate || t > startTime)}
                           onChange={(t) => applyEndDateTime(endDate, t)}
                         />
                       </>
                     )}
-                    {warningKey === "end" && (
-                      <div className="absolute bottom-full left-0 z-10 mb-1 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-medium text-red-700 shadow-md">
-                        Slut kan ikke være før Start
-                      </div>
-                    )}
+                    <InlinePopup visible={warningKey === "end"} message="Slut kan ikke være før Start" variant="warning" />
+                    <InlinePopup
+                      visible={warningKey === "endBlocked"}
+                      message="Du har ikke tilladelse til reservationer uden sluttid"
+                      variant="warning"
+                    />
                   </div>
                 </div>
               </div>

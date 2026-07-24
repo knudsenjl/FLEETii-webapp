@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabase";
 type Costumer = {
   costumer_id: string;
   name: string | null;
+  deactivated_at: string | null;
 };
 
 /** FLEETii admin dashboard. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
@@ -28,7 +29,7 @@ export function FleetiiAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("costumers")
-        .select("costumer_id, name")
+        .select("costumer_id, name, deactivated_at")
         .order("name", { ascending: true })
         .returns<Costumer[]>();
 
@@ -91,7 +92,8 @@ export function FleetiiAdministrationPage() {
                     !error &&
                     costumers.map((costumer, index) => {
                       const isAlternate = index % 2 === 1;
-                      const goToCostumer = () => navigate("/costumer-details", { state: { costumer } });
+                      const goToCostumer = () =>
+                        navigate(`/costumer-details/${costumer.costumer_id}`, { state: { costumer } });
                       return (
                         <tr
                           key={costumer.costumer_id}
@@ -110,7 +112,14 @@ export function FleetiiAdministrationPage() {
                               : "bg-white text-brand-700 hover:bg-brand-50"
                           }`}
                         >
-                          <td className="whitespace-nowrap px-2 py-0.5 font-medium">{costumer.name ?? "—"}</td>
+                          <td className="whitespace-nowrap px-2 py-0.5 font-medium">
+                            {costumer.name ?? "—"}
+                            {costumer.deactivated_at && (
+                              <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                Adgang blokeret
+                              </span>
+                            )}
+                          </td>
                         </tr>
                       );
                     })}

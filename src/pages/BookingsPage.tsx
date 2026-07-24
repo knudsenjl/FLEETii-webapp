@@ -55,12 +55,12 @@ export function BookingsPage() {
 
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  /** Whether a non-admin user is allowed to create a new reservation, per settings.Bruger_ny_reservation. Admins can always create one regardless (see AllBookingsPage). */
+  /** Whether a non-admin user is allowed to create a new reservation, per Tillad_ny_reservation. Admins can always create one regardless (see AllBookingsPage). */
   const [userMayCreateBooking, setUserMayCreateBooking] = useState(false);
   const canShowNewBookingButton = isAdmin || userMayCreateBooking;
 
   useEffect(() => {
-    void isSettingTilladt("Bruger_ny_reservation", profile?.user_id, afdelingId).then(setUserMayCreateBooking);
+    void isSettingTilladt("Tillad_ny_reservation", profile?.user_id, afdelingId).then(setUserMayCreateBooking);
   }, [profile?.user_id, afdelingId]);
 
   /** Fetches every not-yet-ended booking visible to the current user (own bookings, or all department bookings if admin) and replaces `activeBookings`. Called on mount, whenever user/role changes, and again after a cancellation. */
@@ -217,7 +217,7 @@ export function BookingsPage() {
                       !error &&
                       nextBooking &&
                       renderBookingRow(nextBooking, false, () =>
-                        navigate("/booking-details", { state: { booking: nextBooking } }),
+                        navigate(`/booking-details/${nextBooking.id}`, { state: { booking: nextBooking } }),
                       )}
                   </tbody>
                 </table>
@@ -253,7 +253,7 @@ export function BookingsPage() {
                       !error &&
                       remainingBookings.map((booking, index) =>
                         renderBookingRow(booking, index % 2 === 1, () =>
-                          navigate("/booking-details", { state: { booking } }),
+                          navigate(`/booking-details/${booking.id}`, { state: { booking } }),
                         ),
                       )}
                   </tbody>

@@ -29,13 +29,10 @@ type ProfileQueryRow = {
 
 /**
  * Admin "user management" page ("/department"): every user in the admin's
- * own department — click a row to open it in UserDetailsPage (edit or
- * delete from there), plus a link to create a new user.
- *
- * KNOWN LIMITATION: UserDetailsPage's form only ever calls create-user
- * (which always invites a brand-new auth user) — there is no actual update
- * path, so editing an existing user's fields does not work today (deleting
- * one does, from UserDetailsPage).
+ * own department — click a row to open it in UserDetailsPage, which
+ * handles editing (via update-user.mts, including that user's Rettigheder
+ * overrides) and deleting (via delete-user.mts) from there, plus a link to
+ * create a new user.
  */
 export function DepartmentPage() {
   const { afdeling, afdelingId } = useAuth();
@@ -60,6 +57,7 @@ export function DepartmentPage() {
       const { data, error: fetchError } = await supabase
         .from("user_profiles")
         .select("user_id, email, full_name, phone, department_id, role, departments!user_profiles_department_id_fkey(name)")
+        .is("deleted_at", null)
         .order("full_name", { ascending: true })
         .returns<ProfileQueryRow[]>();
 
@@ -76,7 +74,15 @@ export function DepartmentPage() {
     }
 
     void loadUsers();
-  }, []);
+    // Re-fetches whenever the active department changes (via PageHeader's
+    // "Skift afdeling") — user_profiles' SELECT RLS
+    // (user_profiles_select_admin_own_department) scopes rows to the
+    // admin's CURRENT department, so the previously-fetched list stops
+    // containing anything relevant the moment afdelingId changes; an empty
+    // dependency array left this page showing a stale (or empty, since none
+    // of the old rows match the new department_id) table until a hard
+    // refresh.
+  }, [afdelingId]);
 
   const departmentUsers = users.filter((u) => u.department_id === afdelingId);
 
@@ -99,7 +105,7 @@ export function DepartmentPage() {
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <h2 className="text-xl font-semibold text-brand-800">
-                Afdeling: {afdeling ?? "—"}
+                Brugeradministration: {afdeling ?? "—"}
               </h2>
 
               {emailWarning && (
@@ -142,7 +148,7 @@ export function DepartmentPage() {
                       !error &&
                       departmentUsers.map((user, index) => {
                         const isAlternate = index % 2 === 1;
-                        const goToUser = () => navigate("/user-details", { state: { user } });
+                        const goToUser = () => navigate(`/user-details/${user.user_id}`, { state: { user } });
                         return (
                           <tr
                             key={user.user_id}

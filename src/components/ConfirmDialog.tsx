@@ -18,6 +18,8 @@ interface ConfirmDialogProps {
   confirmPendingLabel?: string;
   /** Disables both buttons (e.g. while a request is in flight) and swaps in confirmPendingLabel. */
   isPending?: boolean;
+  /** Disables just the confirm button (cancel stays enabled) — for a precondition the confirm action itself can't proceed without yet, e.g. CostumerDetailsPage.tsx's type-the-name-to-confirm purge flow. */
+  confirmDisabled?: boolean;
 }
 
 /** A Fortryd/Ja confirmation modal with an optional error message and pending state. Both buttons render with identical styling — there is no visual "danger" distinction between confirm and cancel, so double-check the message text is clear about what confirming will do. */
@@ -30,6 +32,7 @@ export function ConfirmDialog({
   confirmLabel = "Ja",
   confirmPendingLabel,
   isPending = false,
+  confirmDisabled = false,
 }: ConfirmDialogProps) {
   return (
     <Modal>
@@ -47,7 +50,7 @@ export function ConfirmDialog({
         <button
           type="button"
           onClick={onConfirm}
-          disabled={isPending}
+          disabled={isPending || confirmDisabled}
           className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {isPending && confirmPendingLabel ? confirmPendingLabel : confirmLabel}

@@ -60,6 +60,16 @@ export function LeafletMap({
   // every unrelated re-render of the parent.
   const onMarkerClickRef = useRef(onMarkerClick);
   onMarkerClickRef.current = onMarkerClick;
+  // Content-based signature for extraMarkers, used as the effect's actual
+  // dependency below instead of the array reference — FleetManagementPage.tsx
+  // passes a fresh `.map()` array every render even when the underlying
+  // vehicle positions haven't moved, and depending on the array reference
+  // directly would tear down and rebuild the whole Leaflet map (losing pan/
+  // zoom, re-fitting bounds) on every one of those unrelated re-renders.
+  // Click-handler identity isn't part of the signature — those are rebound
+  // fresh every time the effect actually runs regardless, so their own
+  // per-render identity churn shouldn't force a rebuild.
+  const extraMarkersKey = extraMarkers.map((m) => `${m.lat}:${m.lng}:${m.tooltip ?? ""}`).join("|");
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
@@ -140,7 +150,13 @@ export function LeafletMap({
       map.remove();
       mapRef.current = null;
     };
-  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, cluster]);
+    // extraMarkers itself is intentionally omitted — extraMarkersKey (a
+    // content-based signature, see its own comment above) is the real
+    // dependency here, so the rule's raw "extraMarkers"/"extraMarkers.length"
+    // suggestion would be wrong (using the array reference directly would
+    // rebuild the whole map on every caller re-render, see the comment above).
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, cluster, extraMarkersKey]);
 
   return <div ref={containerRef} className={className} />;
 }

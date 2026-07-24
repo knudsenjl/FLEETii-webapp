@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 import {
+  BOOKING_ID_COLUMN,
   DEPARTMENT_COLUMN,
   USER_ID_COLUMN,
   VEHICLE_ID_COLUMN,
@@ -25,9 +26,11 @@ type ReservationVehicle = {
  * Final step of the booking flow ("/confirm"): shows a read-only summary of
  * the reservation about to be made and, on confirmation, re-checks
  * availability (closing most of the window for a race against another
- * booking — see handleConfirm) before actually inserting the row into
- * Supabase's "bookings" table. Redirects to the fleet's/own bookings list on
- * success depending on role.
+ * booking — see handleConfirm) before actually writing to Supabase's
+ * "bookings" table — inserting a new row normally, or updating the existing
+ * one when reached via BookingDetailsPage's "Rediger reservation" (carries
+ * editingBookingId through router state from ReservationPage/AvailablePage).
+ * Redirects to the fleet's/own bookings list on success depending on role.
  */
 export function ConfirmPage() {
   const { session, profile, afdelingId } = useAuth();
@@ -41,6 +44,7 @@ export function ConfirmPage() {
         use?: string;
         start?: string;
         end?: string;
+        editingBookingId?: string;
       }
     | null;
   const vehicle = state?.vehicle ?? null;
@@ -53,6 +57,7 @@ export function ConfirmPage() {
   const anvendelse = state?.use ?? "";
   const reservationStart = state?.start ?? null;
   const reservationEnd = state?.end ?? null;
+  const editingBookingId = state?.editingBookingId;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,11 +79,15 @@ export function ConfirmPage() {
 
   /**
    * Re-checks availability (the vehicle may have been booked by someone else
-   * since AvailablePage loaded) and, if still free, inserts the booking. The
-   * DB-level exclusion constraint (supabase/booking_overlap_constraint.sql)
-   * is the actual race-proof backstop — a 23P01 (exclusion_violation) error
-   * from the insert means this pre-check's race window was lost, and is
-   * shown with the same friendly message as the pre-check itself.
+   * since AvailablePage loaded) and, if still free, inserts the booking —
+   * or, when editingBookingId is set (the "Rediger reservation" flow),
+   * updates that existing row instead (see
+   * supabase/applied/bookings_update_policy.sql for the RLS that allows
+   * this). The DB-level exclusion constraint
+   * (supabase/booking_overlap_constraint.sql) is the actual race-proof
+   * backstop for both — a 23P01 (exclusion_violation) error means this
+   * pre-check's race window was lost, and is shown with the same friendly
+   * message as the pre-check itself.
    */
   const handleConfirm = async () => {
     setIsSubmitting(true);
@@ -86,7 +95,7 @@ export function ConfirmPage() {
 
     const { data: existingBookings, error: fetchError } = await supabase
       .from("bookings")
-      .select(`${VEHICLE_ID_COLUMN}, start, end`);
+      .select(`${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end`);
 
     if (fetchError) {
       setError(fetchError.message);
@@ -94,12 +103,14 @@ export function ConfirmPage() {
       return;
     }
 
-    const stillAvailable = isVehicleAvailable(
-      vehicle.id,
-      (existingBookings ?? []) as BookingWindow[],
-      reservationStart,
-      reservationEnd,
+    // Excludes the booking being edited (if any) from its own
+    // availability check — otherwise re-confirming the same vehicle/time
+    // it already occupies would always look unavailable.
+    const otherBookings = ((existingBookings ?? []) as BookingWindow[]).filter(
+      (b) => b.booking_id !== editingBookingId,
     );
+
+    const stillAvailable = isVehicleAvailable(vehicle.id, otherBookings, reservationStart, reservationEnd);
 
     if (!stillAvailable) {
       setError("Køretøjet er ikke længere ledigt i den valgte periode.");
@@ -113,25 +124,29 @@ export function ConfirmPage() {
       return;
     }
 
-    const { error: insertError } = await supabase.from("bookings").insert({
+    const bookingFields = {
       [VEHICLE_ID_COLUMN]: vehicle.id,
       start: reservationStart,
       end: reservationEnd,
       usage: anvendelse,
       [USER_ID_COLUMN]: bruger || session?.user.id || null,
       [DEPARTMENT_COLUMN]: afdelingId,
-    });
+    };
 
-    if (insertError) {
+    const { error: writeError } = editingBookingId
+      ? await supabase.from("bookings").update(bookingFields).eq(BOOKING_ID_COLUMN, editingBookingId)
+      : await supabase.from("bookings").insert(bookingFields);
+
+    if (writeError) {
       // 23P01 = Postgres exclusion_violation — the DB-level overlap
       // constraint (supabase/booking_overlap_constraint.sql) caught a race
       // the availability pre-check above missed (another booking for the
       // same vehicle/period was inserted in between). Show the same
       // friendly message as the pre-check instead of the raw DB error.
       setError(
-        insertError.code === "23P01"
+        writeError.code === "23P01"
           ? "Køretøjet er ikke længere ledigt i den valgte periode."
-          : insertError.message,
+          : writeError.message,
       );
       setIsSubmitting(false);
       return;
@@ -175,7 +190,9 @@ export function ConfirmPage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Ny reservation</h2>
+              <h2 className="text-xl font-semibold text-brand-800">
+                {editingBookingId ? "Rediger reservation" : "Ny reservation"}
+              </h2>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
@@ -205,7 +222,7 @@ export function ConfirmPage() {
                   disabled={isSubmitting}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isSubmitting ? "Bekræfter…" : "Bekræft reservation"}
+                  {isSubmitting ? "Bekræfter…" : editingBookingId ? "Bekræft ændring" : "Bekræft reservation"}
                 </button>
               </div>
             </div>

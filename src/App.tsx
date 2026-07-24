@@ -111,7 +111,7 @@ function App() {
             }
           />
           <Route
-            path="/booking-details"
+            path="/booking-details/:bookingId"
             element={
               <ProtectedRoute>
                 <BookingDetailsPage />
@@ -136,6 +136,14 @@ function App() {
           />
           <Route
             path="/costumer-details"
+            element={
+              <ProtectedRoute requireRole="FLEETii admin">
+                <CostumerDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/costumer-details/:costumerId"
             element={
               <ProtectedRoute requireRole="FLEETii admin">
                 <CostumerDetailsPage />
@@ -175,6 +183,14 @@ function App() {
             }
           />
           <Route
+            path="/user-details/:userId"
+            element={
+              <ProtectedRoute requireAdmin>
+                <UserDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/fleet-table"
             element={
               <ProtectedRoute requireAdmin>
@@ -183,7 +199,7 @@ function App() {
             }
           />
           <Route
-            path="/vehicle-details"
+            path="/vehicle-details/:vehicleId"
             element={
               <ProtectedRoute>
                 <VehicleDetailsPage />

@@ -10,7 +10,7 @@ export type UserCheckResult =
   | { ok: true; userId: string; client: SupabaseClient }
   | { ok: false; status: 401 | 500; error: string };
 
-/** Result of requireAdmin(): either the verified admin's user id, or an HTTP status + Danish error message ready to return to the client as-is. */
+/** Result of requireAdmin()/requireFleetiiAdmin(): either the verified caller's user id, or an HTTP status + Danish error message ready to return to the client as-is. */
 export type AdminCheckResult = { ok: true; userId: string } | { ok: false; status: 401 | 403 | 500; error: string };
 
 /**
@@ -47,8 +47,8 @@ export async function requireUser(req: Request): Promise<UserCheckResult> {
   return { ok: true, userId: userData.user.id, client };
 }
 
-/** Verifies the caller (via requireUser()) and additionally that their profile has role "admin". */
-export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
+/** Verifies the caller (via requireUser()) and additionally that their profile has the given role and isn't archived (deleted_at is null — see supabase/applied/user_profiles_add_deleted_at.sql) — an archived caller's still-valid JWT shouldn't keep passing this check just because the ban hasn't fully propagated yet. Shared by requireAdmin/requireFleetiiAdmin below rather than duplicating the same query per role. */
+async function requireRole(req: Request, role: string, errorMessage: string): Promise<AdminCheckResult> {
   const userResult = await requireUser(req);
   if (!userResult.ok) {
     return userResult;
@@ -58,11 +58,22 @@ export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
     .from("user_profiles")
     .select("role")
     .eq("user_id", userResult.userId)
+    .is("deleted_at", null)
     .maybeSingle<{ role: string }>();
 
-  if (profileError || profile?.role !== "admin") {
-    return { ok: false, status: 403, error: "Kun administratorer har adgang til denne handling." };
+  if (profileError || profile?.role !== role) {
+    return { ok: false, status: 403, error: errorMessage };
   }
 
   return { ok: true, userId: userResult.userId };
+}
+
+/** Verifies the caller has role "admin" (see requireRole). */
+export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
+  return requireRole(req, "admin", "Kun administratorer har adgang til denne handling.");
+}
+
+/** Verifies the caller has role "FLEETii admin" (see requireRole) — used by the costumer lifecycle functions (delete-costumer.mts), which only a FLEETii admin, not a regular department admin, may invoke. */
+export async function requireFleetiiAdmin(req: Request): Promise<AdminCheckResult> {
+  return requireRole(req, "FLEETii admin", "Kun FLEETii-administratorer har adgang til denne handling.");
 }

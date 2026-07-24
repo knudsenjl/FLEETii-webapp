@@ -10,6 +10,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { setRememberMe, supabase } from "../lib/supabase";
+import { fetchCostumerDeactivatedAt, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
 
@@ -25,6 +26,7 @@ const stepVariants = {
 /** The login form. Renders unauthenticated at "/" (see RootRoute) and also reachable, unauthenticated, via LoginPage's own "i" about-button linking to /about. */
 export function LoginPage() {
   const navigate = useNavigate();
+  const { deactivationMessage, clearDeactivationMessage } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -46,6 +48,18 @@ export function LoginPage() {
       /* ignore */
     }
   }, []);
+
+  // Covers the case where a costumer was deactivated while this tab already
+  // had an open session — AuthContext force-signs-out the moment its own
+  // profile reload notices (initial load, auth-state change, or a
+  // background token refresh) and leaves this message behind, since the
+  // sign-out already landed here (at "/") by the time it's read.
+  useEffect(() => {
+    if (deactivationMessage) {
+      setError(deactivationMessage);
+      clearDeactivationMessage();
+    }
+  }, [deactivationMessage, clearDeactivationMessage]);
 
   /** Validates the form, remembers the username/session-mode if requested, and signs in via Supabase Auth. Errors are shown inline; a successful sign-in is picked up by AuthContext, not handled here. */
   async function handleCredentialsSubmit(e: FormEvent) {
@@ -71,13 +85,26 @@ export function LoginPage() {
     }
 
     try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email: username,
         password,
       });
 
       if (signInError) {
         setError("Forkert brugernavn eller adgangskode.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Checked here, right after sign-in, rather than relying solely on
+      // AuthContext's own async profile load (below) — that load races
+      // against this function returning, so a deactivated costumer's user
+      // would otherwise see a brief flash of a signed-in app before being
+      // kicked back out.
+      const deactivatedAt = await fetchCostumerDeactivatedAt(signInData.user.id);
+      if (deactivatedAt) {
+        await supabase.auth.signOut();
+        setError("Din virksomheds adgang er blokeret. Kontakt FLEETii for detaljer.");
         setSubmitting(false);
         return;
       }

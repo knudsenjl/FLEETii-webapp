@@ -1,17 +1,20 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import {
   BOOKING_ID_COLUMN,
+  BOOKINGS_SELECT_COLUMNS,
   formatBookingPeriod,
   formatVehicleLabel,
   isMapVisible,
+  mapBookingRow,
   nowIsoString,
   resolveVehicleGpsPosition,
   shortSignalTimestamp,
   toDisplayVehicle,
+  type BookingRow,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -31,6 +34,7 @@ type BookingDetails = {
   startIso: string;
   endIso: string | null;
   use: string;
+  userId: string | null;
   userEmail: string | null;
 };
 
@@ -38,19 +42,29 @@ type BookingDetails = {
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
- * Reservation detail view ("/booking-details"): the booking's period/usage,
- * the vehicle's current fuel/mileage/status (looked up live from
- * VehicleContext by vehicleId, not stored on the booking itself), a map of its
- * last known position (only shown from 15 minutes before the booking's start
- * to 15 minutes after its end — see isMapVisible — outside that window it's
- * not rendered at all), and a "Slet reservation" cancel flow. The vehicle is
- * passed in via router state — there is no direct-URL/refresh support.
+ * Reservation detail view ("/booking-details/:bookingId"): the booking's
+ * period/usage, the vehicle's current fuel/mileage/status (looked up live
+ * from VehicleContext by vehicleId, not stored on the booking itself), a map
+ * of its last known position (only shown from 15 minutes before the
+ * booking's start to 15 minutes after its end — see isMapVisible — outside
+ * that window it's not rendered at all), a "Slet reservation" cancel flow,
+ * and a "Rediger reservation" flow that re-enters ReservationPage/
+ * AvailablePage/ConfirmPage pre-filled with this booking's data, updating it
+ * on confirm instead of creating a new one. Normally reached with the
+ * booking pre-filled via router state (BookingsPage/AllBookingsPage), which
+ * skips a round-trip; a direct URL/refresh/bookmark (no router state) falls
+ * back to fetching it by the :bookingId route param instead, redirecting to
+ * "/bookings" if it can't be found (deleted, or an invalid id).
  */
 export function BookingDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { bookingId } = useParams<{ bookingId: string }>();
   const { profile, afdelingId } = useAuth();
-  const booking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
+  const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
+  const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(false);
+  const booking = stateBooking ?? fetchedBooking;
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -61,9 +75,13 @@ export function BookingDetailsPage() {
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin";
 
-  /** "Slet reservation" is always shown for role=admin; for role=user, only when settings.Bruger_slet_reservation is ["Tilladt"] for this department. */
+  /** "Slet reservation" is always shown for role=admin; for role=user, only when Tillad_slet_reservation is true for this department. */
   const [userMayDeleteBooking, setUserMayDeleteBooking] = useState(false);
   const canShowDeleteButton = isAdmin || userMayDeleteBooking;
+
+  /** "Rediger reservation" is always shown for role=admin; for role=user, only when Tillad_rediger_reservation is true for this department. */
+  const [userMayEditBooking, setUserMayEditBooking] = useState(false);
+  const canShowEditButton = isAdmin || userMayEditBooking;
 
   const {
     lockEnabled,
@@ -78,24 +96,52 @@ export function BookingDetailsPage() {
   );
 
   useEffect(() => {
-    void isSettingTilladt("Bruger_slet_reservation", profile?.user_id, afdelingId).then(setUserMayDeleteBooking);
+    void isSettingTilladt("Tillad_slet_reservation", profile?.user_id, afdelingId).then(setUserMayDeleteBooking);
   }, [profile?.user_id, afdelingId]);
 
   useEffect(() => {
-    if (!booking) {
+    void isSettingTilladt("Tillad_rediger_reservation", profile?.user_id, afdelingId).then(setUserMayEditBooking);
+  }, [profile?.user_id, afdelingId]);
+
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark (no router state) — skipped entirely when stateBooking is already present, since that's the common, cheaper path. */
+  useEffect(() => {
+    if (stateBooking || !bookingId) return;
+
+    let cancelled = false;
+    setBookingLoading(true);
+    void supabase
+      .from("bookings")
+      .select(BOOKINGS_SELECT_COLUMNS)
+      .eq(BOOKING_ID_COLUMN, bookingId)
+      .maybeSingle<BookingRow>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setFetchedBooking(data ? mapBookingRow(data) : null);
+        setBookingLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookingId, stateBooking]);
+
+  useEffect(() => {
+    if (!booking && !bookingLoading) {
       navigate("/bookings", { replace: true });
     }
-  }, [booking, navigate]);
+  }, [booking, bookingLoading, navigate]);
 
   if (!booking) {
-    return null;
+    return bookingLoading ? (
+      <div className="flex h-dvh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>
+    ) : null;
   }
 
   /** Only admins can navigate from the map marker to VehicleDetailsPage (which is itself admin-gated for its map/edit/delete actions — see VehicleDetailsPage.tsx). */
   const goToVehicleDetails = isAdmin
     ? () => {
         if (!twoHireVehicle) return;
-        navigate("/vehicle-details", {
+        navigate(`/vehicle-details/${twoHireVehicle.vehicleId}`, {
           state: {
             vehicle: toDisplayVehicle(twoHireVehicle),
             booking: { id: booking.id, startIso: booking.startIso, endIso: booking.endIso },
@@ -103,6 +149,22 @@ export function BookingDetailsPage() {
         });
       }
     : undefined;
+
+  /** Starts the "Rediger reservation" flow: back through ReservationPage -> AvailablePage -> ConfirmPage, pre-filled with this booking's current bruger/anvendelse/start/end, carrying editingBookingId along so ConfirmPage updates this row instead of inserting a new one. */
+  const goToEditBooking = () => {
+    navigate("/reservation", {
+      state: {
+        editing: {
+          bookingId: booking.id,
+          userId: booking.userId,
+          userLabel: booking.userEmail,
+          anvendelse: booking.use,
+          startIso: booking.startIso,
+          endIso: booking.endIso,
+        },
+      },
+    });
+  };
 
   /** Deletes this booking and returns to the bookings list. */
   const handleCancelBooking = async () => {
@@ -258,15 +320,28 @@ export function BookingDetailsPage() {
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
-              {canShowDeleteButton && (
-                <button
-                  type="button"
-                  onClick={() => setShowCancelConfirm(true)}
-                  disabled={isCancelling}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isCancelling ? "Aflyser…" : "Slet reservation"}
-                </button>
+              {(canShowEditButton || canShowDeleteButton) && (
+                <div className="grid grid-cols-2 gap-3">
+                  {canShowEditButton && (
+                    <button
+                      type="button"
+                      onClick={goToEditBooking}
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Rediger reservation
+                    </button>
+                  )}
+                  {canShowDeleteButton && (
+                    <button
+                      type="button"
+                      onClick={() => setShowCancelConfirm(true)}
+                      disabled={isCancelling}
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isCancelling ? "Aflyser…" : "Slet reservation"}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </section>

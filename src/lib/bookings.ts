@@ -122,8 +122,8 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
   };
 }
 
-/** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle's 2hire vehicleId plus its reserved start/end. A null end means the booking is open-ended (see BookingRow). */
-export type BookingWindow = { vehicle_id: string; start: string; end: string | null };
+/** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle's 2hire vehicleId plus its reserved start/end. A null end means the booking is open-ended (see BookingRow). booking_id is optional (omitted by existing callers/tests that never needed it) — when present, it lets a caller exclude one specific booking from the check, e.g. the booking being edited in the "Rediger reservation" flow, so it doesn't conflict with its own existing slot. */
+export type BookingWindow = { booking_id?: string; vehicle_id: string; start: string; end: string | null };
 
 /** The minimal shape needed to format a booking's period — already-split Danish date/time strings (see MappedBooking). A null endDate/end means the booking is open-ended. */
 export type BookingPeriod = { startDate: string; start: string; endDate: string | null; end: string | null };

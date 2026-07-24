@@ -83,6 +83,16 @@
 }
 
 @layer base {
+  /* Chromium (Chrome/Edge) hides a number input's spin buttons at opacity:0
+     until hovered/focused — this keeps them permanently visible wherever
+     .number-spinner-always is applied (StandardSettings.tsx's "Standard
+     interval" field). Firefox needs no such override (see that field's own
+     -moz-appearance: number-input inline style instead). */
+  input.number-spinner-always::-webkit-inner-spin-button,
+  input.number-spinner-always::-webkit-outer-spin-button {
+    opacity: 1;
+  }
+
   html {
     font-family: var(--font-sans);
     font-size: 87.5%;

@@ -159,7 +159,7 @@ export function VehiclesPage() {
                     )}
                     {filteredVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;
-                      const goToVehicle = () => navigate("/vehicle-details", { state: { vehicle } });
+                      const goToVehicle = () => navigate(`/vehicle-details/${vehicle.vehicleId}`, { state: { vehicle } });
                       return (
                         <tr
                           key={vehicle.vehicleId}

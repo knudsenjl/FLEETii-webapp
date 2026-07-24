@@ -6,6 +6,7 @@ import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 import {
+  BOOKING_ID_COLUMN,
   VEHICLE_ID_COLUMN,
   computeFreePeriod,
   formatFreePeriod,
@@ -59,11 +60,19 @@ export function AvailablePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
-    | { user?: string; userLabel?: string; use?: string; start?: string; end?: string }
+    | {
+        user?: string;
+        userLabel?: string;
+        use?: string;
+        start?: string;
+        end?: string;
+        editingBookingId?: string;
+      }
     | null;
   const bruger = state?.user ?? "";
   const brugerLabel = state?.userLabel ?? "";
   const anvendelse = state?.use ?? "";
+  const editingBookingId = state?.editingBookingId;
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
 
@@ -74,17 +83,22 @@ export function AvailablePage() {
   useEffect(() => {
     supabase
       .from("bookings")
-      .select(`${VEHICLE_ID_COLUMN}, start, end`)
+      .select(`${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end`)
       .then(({ data, error }) => {
         if (error) {
           setBookingsError(error.message);
           setLoadingBookings(false);
           return;
         }
-        setBookings((data ?? []) as BookingWindow[]);
+        // Excludes the booking being edited (if any) from its own
+        // availability/free-period check — otherwise a "Rediger
+        // reservation" flow would always see its own current vehicle/time
+        // slot as occupied, since the row hasn't been updated yet.
+        const rows = (data ?? []) as BookingWindow[];
+        setBookings(editingBookingId ? rows.filter((b) => b.booking_id !== editingBookingId) : rows);
         setLoadingBookings(false);
       });
-  }, []);
+  }, [editingBookingId]);
 
   const referenceStart = state?.start ?? nowIsoString();
   const referenceEnd = state?.end ?? nowIsoString();
@@ -221,12 +235,13 @@ export function AvailablePage() {
                         use: anvendelse,
                         start: state?.start,
                         end: state?.end,
+                        editingBookingId,
                       },
                     })
                   }
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  Reserver
+                  {editingBookingId ? "Opdater" : "Reserver"}
                 </button>
               </div>
             </div>

@@ -81,6 +81,7 @@ export function AllBookingsPage() {
     supabase
       .from("user_profiles")
       .select("user_id, email, department_id")
+      .is("deleted_at", null)
       .order("email")
       .then(({ data }) => {
         setUsers(
@@ -260,7 +261,7 @@ export function AllBookingsPage() {
                       !error &&
                       filteredBookings.map((booking, index) => {
                         const isAlternate = index % 2 === 1;
-                        const goToBooking = () => navigate("/booking-details", { state: { booking } });
+                        const goToBooking = () => navigate(`/booking-details/${booking.id}`, { state: { booking } });
                         return (
                           <tr
                             key={booking.id}

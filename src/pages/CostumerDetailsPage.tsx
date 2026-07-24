@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -15,6 +16,7 @@ const DEFAULT_DEPARTMENT_NAME = "Alle køretøjer";
 type Costumer = {
   costumer_id: string;
   name: string | null;
+  deactivated_at: string | null;
 };
 
 /** A row from the `departments` table, scoped to this costumer. */
@@ -24,42 +26,82 @@ type Department = {
 };
 
 /**
- * Costumer view ("/costumer-details"), reachable only by role "FLEETii
- * admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx). Reads
- * an existing costumer (Navn, plus its departments) when reached with one
- * via router state (FleetiiAdministrationPage's table) — "Slet kunde"
- * deletes it; "Rediger kunde" switches it into an editable form in place
- * (in-place rather than a separate page like VehicleDetailsPage/
- * HandleVehiclePage, since costumers only have one editable field), which
- * is also where department management lives: click a department (in either
+ * Costumer view — plain "/costumer-details" (create, matches App.tsx's
+ * route with no :costumerId) or "/costumer-details/:costumerId" (edit) —
+ * reachable only by role "FLEETii admin" (see ProtectedRoute
+ * requireRole="FLEETii admin" in App.tsx). Reads an existing costumer (Navn,
+ * plus its departments) when reached with one pre-filled via router state
+ * (FleetiiAdministrationPage's row click, which skips a round-trip); a
+ * direct URL/refresh/bookmark to the :costumerId route (no router state)
+ * falls back to fetching it by id instead, redirecting to "/fleetii-admin"
+ * if it can't be found. "Rediger kunde" switches it into an editable form in
+ * place (in-place rather than a separate page like VehicleDetailsPage/
+ * HandleVehiclePage, since costumers only have one editable field), which is
+ * also where department management lives: click a department (in either
  * view) to select it, then "Slet afdeling" to remove it (same
  * click-to-select-then-act pattern as AvailablePage's vehicle list), or
  * "Ny afdeling" to add one — both only while editing. Reached without a
- * costumer (its "Ny kunde" button), shows a create form instead — inserting
- * a new costumers row auto-creates its first department (DEFAULT_DEPARTMENT_NAME)
- * via a DB trigger (see supabase/applied/departments_default_name_alle_koretojer.sql).
+ * costumer (its "Ny kunde" button, or the plain "/costumer-details" route),
+ * shows a create form instead — inserting a new costumers row auto-creates
+ * its first department (DEFAULT_DEPARTMENT_NAME) via a DB trigger (see
+ * supabase/applied/departments_default_name_alle_koretojer.sql).
  *
- * No ON DELETE CASCADE exists from departments.costumer_id, or from
- * anything referencing departments.department_id (bookings, settings,
- * user_profiles, user_departments, vehicle_departments all use plain FKs)
- * — deleting a costumer/department that still has dependents fails with
- * the foreign-key-violation error surfaced as-is, same as this app's other
- * delete flows don't attempt cascading cleanup either.
+ * Costumer lifecycle (see supabase/applied/costumers_add_deactivated_at.sql /
+ * costumer_purge_function.sql, and delete-costumer.mts):
+ *   - "Bloker kundens adgang" / "Genetabler kundens adgang" — reversible,
+ *     blocks login for every user under the costumer (disputes/non-payment).
+ *     Backed by costumers.deactivated_at (internal name — the UI-facing
+ *     wording is "blocked access", not "deactivated"). Plain client-side
+ *     update; no new RLS policy needed.
+ *   - "Slet kunden permanent" — the final, IRREVERSIBLE step, only shown
+ *     once the costumer's access is already blocked (alongside "Genetabler
+ *     kundens adgang" — "Rediger kunde" is hidden in this state instead,
+ *     since editing a costumer that's about to be purged isn't meaningful).
+ *     Requires typing the costumer's exact name to confirm, then calls
+ *     delete-costumer.mts, which purges every trace of the
+ *     costumer's data (bookings, vehicles, settings, departments, user
+ *     profiles, the costumer row) AND every affected user's Supabase Auth
+ *     account — a real client-side delete can't reach auth.users at all,
+ *     and the DB-side purge itself is only callable via the service-role
+ *     client, never directly from the browser.
  */
 export function CostumerDetailsPage() {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const location = useLocation();
+  const { costumerId } = useParams<{ costumerId: string }>();
   const state = location.state as { costumer?: Costumer } | null;
-  const costumer = state?.costumer ?? null;
+  const stateCostumer = state?.costumer ?? null;
+  const [fetchedCostumer, setFetchedCostumer] = useState<Costumer | null>(null);
+  const [costumerLoading, setCostumerLoading] = useState(false);
+  const costumer = stateCostumer ?? fetchedCostumer;
 
   const [name, setName] = useState("");
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(costumer?.name ?? "");
   const [pendingAction, setPendingAction] = useState<
-    "create" | "update" | "delete" | "close" | "create-department" | "delete-department" | null
+    | "create"
+    | "update"
+    | "delete"
+    | "close"
+    | "create-department"
+    | "delete-department"
+    | "deactivate"
+    | "reactivate"
+    | null
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // Local copy of costumer.deactivated_at, updated after a successful
+  // deactivate/reactivate — costumer itself comes from router state (set
+  // once at mount), so it wouldn't otherwise reflect a toggle made on this
+  // same page visit without navigating away and back.
+  const [deactivatedAt, setDeactivatedAt] = useState<string | null>(costumer?.deactivated_at ?? null);
+  // Bound to the "type the costumer's name to confirm" input in the purge
+  // ConfirmDialog — this is the one truly irreversible action in the app,
+  // unlike archiving a user (data survives) or deactivating a costumer
+  // (reversible), so a plain Ja/Fortryd dialog isn't enough friction.
+  const [purgeConfirmText, setPurgeConfirmText] = useState("");
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
@@ -69,7 +111,6 @@ export function CostumerDetailsPage() {
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [departmentError, setDepartmentError] = useState<string | null>(null);
   const { activeKey: departmentWarningKey, trigger: triggerDepartmentWarning } = useTimedFlag();
-  const { activeKey: kundeWarningKey, trigger: triggerKundeWarning } = useTimedFlag();
 
   const canSubmit = name.trim().length > 0;
   const canSubmitEdit = editName.trim().length > 0;
@@ -110,6 +151,50 @@ export function CostumerDetailsPage() {
     setDepartments(sorted);
     setDepartmentsLoading(false);
   };
+
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/costumer-details/:costumerId" (no router state) — skipped entirely when stateCostumer is already present. */
+  useEffect(() => {
+    if (stateCostumer || !costumerId) return;
+
+    let cancelled = false;
+    setCostumerLoading(true);
+    void supabase
+      .from("costumers")
+      .select("costumer_id, name, deactivated_at")
+      .eq("costumer_id", costumerId)
+      .maybeSingle<Costumer>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setFetchedCostumer(data ?? null);
+        setCostumerLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [costumerId, stateCostumer]);
+
+  // Populates editName/deactivatedAt once `costumer` resolves asynchronously
+  // (the fetch-by-id path above) — their useState initializers only run on
+  // the very first render, before that fetch can possibly have completed.
+  // Harmless no-op re-set on the (more common) router-state path, where
+  // `costumer` is already correct on the first render.
+  useEffect(() => {
+    if (!costumer) return;
+    setEditName(costumer.name ?? "");
+    setDeactivatedAt(costumer.deactivated_at ?? null);
+  }, [costumer]);
+
+  // Redirects back to the FLEETii-admin costumer list if a SPECIFIC costumer
+  // was requested (a :costumerId in the URL) but couldn't be loaded —
+  // mirrors BookingDetailsPage/VehicleDetailsPage/UserDetailsPage's same
+  // redirect-on-missing-data pattern. Never fires for the plain
+  // "/costumer-details" create route, which has no costumerId at all.
+  useEffect(() => {
+    if (costumerId && !costumer && !costumerLoading) {
+      navigate("/fleetii-admin", { replace: true });
+    }
+  }, [costumerId, costumer, costumerLoading, navigate]);
 
   useEffect(() => {
     if (costumer) {
@@ -159,13 +244,16 @@ export function CostumerDetailsPage() {
   };
 
   /**
-   * Deletes the costumer — but first, if its only remaining department is
-   * the auto-created default (DEFAULT_DEPARTMENT_NAME), deletes that too,
-   * since departments.costumer_id has no ON DELETE CASCADE and would
-   * otherwise reject the costumer delete with a foreign-key-violation
-   * error. Only reachable when otherDepartments is empty in the first
-   * place — see the "Slet kunde" button's onClick, which shows a warning
-   * popup instead of getting here at all when real departments remain.
+   * Permanently purges the costumer — every booking, vehicle, setting,
+   * department/user grant, user profile, department, and the costumer row
+   * itself, plus every affected user's Supabase Auth account — via
+   * delete-costumer.mts (a real client-side delete can't reach auth.users,
+   * and the DB-side purge_costumer function is deliberately unreachable
+   * from the browser — see both files' headers). Only reachable once
+   * deactivatedAt is set and purgeConfirmText matches the costumer's name
+   * exactly — both re-checked server-side regardless, this is just the
+   * client-side guard that avoids the round-trip for an obviously-blocked
+   * attempt.
    */
   const handleDelete = async () => {
     if (!costumer) return;
@@ -173,24 +261,24 @@ export function CostumerDetailsPage() {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const defaultDepartment = departments.find((d) => d.name === DEFAULT_DEPARTMENT_NAME);
-    if (defaultDepartment) {
-      const { error: departmentDeleteError } = await supabase
-        .from("departments")
-        .delete()
-        .eq("department_id", defaultDepartment.department_id);
+    try {
+      const response = await fetch("/.netlify/functions/delete-costumer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ costumerId: costumer.costumer_id, confirmName: purgeConfirmText }),
+      });
 
-      if (departmentDeleteError) {
-        setSubmitError(departmentDeleteError.message);
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setSubmitError(result.error ?? "Kunne ikke slette kunden.");
         setIsSubmitting(false);
         return;
       }
-    }
-
-    const { error } = await supabase.from("costumers").delete().eq("costumer_id", costumer.costumer_id);
-
-    if (error) {
-      setSubmitError(error.message);
+    } catch {
+      setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
       setIsSubmitting(false);
       return;
     }
@@ -198,6 +286,53 @@ export function CostumerDetailsPage() {
     setIsSubmitting(false);
     setPendingAction(null);
     navigate("/fleetii-admin");
+  };
+
+  /** Blocks login for every user under this costumer (see costumers_add_deactivated_at.sql — is_admin()/current_department_id()/current_costumer_id() also stop resolving for them, and AuthContext/LoginPage force a sign-out/refuse sign-in client-side). Reversible via handleReactivate. Plain client-side update — costumers_update_fleetii_admin already covers any column, no new RLS policy needed. */
+  const handleDeactivate = async () => {
+    if (!costumer) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    const now = new Date().toISOString();
+    const { error } = await supabase
+      .from("costumers")
+      .update({ deactivated_at: now })
+      .eq("costumer_id", costumer.costumer_id);
+
+    if (error) {
+      setSubmitError(error.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setDeactivatedAt(now);
+    setIsSubmitting(false);
+    setPendingAction(null);
+  };
+
+  /** Reverses handleDeactivate — restores login for this costumer's users. */
+  const handleReactivate = async () => {
+    if (!costumer) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    const { error } = await supabase
+      .from("costumers")
+      .update({ deactivated_at: null })
+      .eq("costumer_id", costumer.costumer_id);
+
+    if (error) {
+      setSubmitError(error.message);
+      setIsSubmitting(false);
+      return;
+    }
+
+    setDeactivatedAt(null);
+    setIsSubmitting(false);
+    setPendingAction(null);
   };
 
   const handleCreateDepartment = async () => {
@@ -268,6 +403,14 @@ export function CostumerDetailsPage() {
     }
     if (pendingAction === "delete") {
       await handleDelete();
+      return;
+    }
+    if (pendingAction === "deactivate") {
+      await handleDeactivate();
+      return;
+    }
+    if (pendingAction === "reactivate") {
+      await handleReactivate();
       return;
     }
     if (pendingAction === "create-department") {
@@ -396,6 +539,16 @@ export function CostumerDetailsPage() {
     </>
   );
 
+  // Only while a SPECIFIC costumer is being fetched by id (:costumerId
+  // present, no router state yet) — without this guard, the form would
+  // flash as "Ny kunde" (create mode) for a moment before the fetch resolves
+  // and `costumer` becomes non-null.
+  if (costumerId && !costumer && costumerLoading) {
+    return (
+      <div className="flex h-dvh items-center justify-center bg-brand-50 text-brand-600">Indlæser kunde…</div>
+    );
+  }
+
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -476,38 +629,60 @@ export function CostumerDetailsPage() {
                     </div>
                   </div>
 
+                  {deactivatedAt && (
+                    <p className="text-sm font-medium text-red-600">
+                      Kundens adgang er blokeret — alle brugere er låst ude.
+                    </p>
+                  )}
+
                   {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
                   <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditName(costumer.name ?? "");
-                        setIsEditing(true);
-                      }}
-                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                    >
-                      Rediger kunde
-                    </button>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          otherDepartments.length > 0
-                            ? triggerKundeWarning("other-departments")
-                            : setPendingAction("delete")
-                        }
-                        className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                      >
-                        Slet kunde
-                      </button>
-                      <InlinePopup
-                        visible={kundeWarningKey === "other-departments"}
-                        message={`Slet alle andre afdelinger end "${DEFAULT_DEPARTMENT_NAME}" først.`}
-                        variant="warning"
-                        align="right"
-                      />
-                    </div>
+                    {deactivatedAt ? (
+                      <>
+                        {/* Rediger kunde is intentionally hidden while access
+                            is blocked — only two actions are meaningful for a
+                            blocked costumer: restore access, or purge it for
+                            good. */}
+                        <button
+                          type="button"
+                          onClick={() => setPendingAction("reactivate")}
+                          className="col-span-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                        >
+                          Genetabler kundens adgang
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPurgeConfirmText("");
+                            setPendingAction("delete");
+                          }}
+                          className="col-span-2 rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                        >
+                          Slet kunden permanent
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditName(costumer.name ?? "");
+                            setIsEditing(true);
+                          }}
+                          className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                        >
+                          Rediger kunde
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPendingAction("deactivate")}
+                          className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                        >
+                          Bloker kundens adgang
+                        </button>
+                      </>
+                    )}
                   </div>
                 </>
               )
@@ -556,18 +731,48 @@ export function CostumerDetailsPage() {
               : pendingAction === "update"
                 ? "Er du sikker på, at du vil opdatere denne kunde?"
                 : pendingAction === "delete"
-                  ? "Er du sikker på, at du vil slette denne kunde?"
-                  : pendingAction === "create-department"
-                    ? "Er du sikker på, at du vil oprette denne afdeling?"
-                    : pendingAction === "delete-department"
-                      ? "Er du sikker på, at du vil slette denne afdeling?"
-                      : "Er du sikker på, at du vil lukke uden at gemme?"
+                  ? (
+                      <>
+                        <p>
+                          Dette sletter PERMANENT al data for "{costumer?.name ?? "denne kunde"}" — bookinger,
+                          køretøjer, indstillinger og brugerkonti. Kan ikke fortrydes.
+                        </p>
+                        <p className="mt-2">
+                          Skriv kundens navn for at bekræfte:
+                        </p>
+                        <input
+                          type="text"
+                          value={purgeConfirmText}
+                          onChange={(e) => setPurgeConfirmText(e.target.value)}
+                          placeholder={costumer?.name ?? ""}
+                          className="mt-1.5 w-full rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-1.5 text-sm text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                        />
+                      </>
+                    )
+                  : pendingAction === "deactivate"
+                    ? "Er du sikker på, at du vil blokere kundens adgang? Alle brugere under kunden bliver låst ude med det samme."
+                    : pendingAction === "reactivate"
+                      ? "Er du sikker på, at du vil genetablere kundens adgang? Alle brugere under kunden får adgang igen."
+                      : pendingAction === "create-department"
+                        ? "Er du sikker på, at du vil oprette denne afdeling?"
+                        : pendingAction === "delete-department"
+                          ? "Er du sikker på, at du vil slette denne afdeling?"
+                          : "Er du sikker på, at du vil lukke uden at gemme?"
           }
           error={pendingAction === "create-department" || pendingAction === "delete-department" ? departmentError : submitError}
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void handleConfirm()}
           isPending={isSubmitting}
-          confirmPendingLabel={pendingAction === "delete" || pendingAction === "delete-department" ? "Sletter…" : "Vent…"}
+          confirmDisabled={pendingAction === "delete" && purgeConfirmText.trim() !== (costumer?.name ?? "").trim()}
+          confirmPendingLabel={
+            pendingAction === "delete" || pendingAction === "delete-department"
+              ? "Sletter…"
+              : pendingAction === "deactivate"
+                ? "Blokerer…"
+                : pendingAction === "reactivate"
+                  ? "Genetablerer…"
+                  : "Vent…"
+          }
         />
       )}
     </div>

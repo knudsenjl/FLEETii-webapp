@@ -36,7 +36,7 @@ type ProfileRow = {
   department_id: string | null;
   costumer_id: string | null;
   role: string;
-  departments: { name: string; costumers: { name: string } | null } | null;
+  departments: { name: string; costumers: { name: string; deactivated_at: string | null } | null } | null;
 };
 
 /** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). */
@@ -76,6 +76,10 @@ interface AuthContextValue {
   isPasswordRecovery: boolean;
   /** Clears isPasswordRecovery — call after SetPasswordPage.tsx successfully sets a new password for a recovery session, before navigating away, so ProtectedRoute stops redirecting back to /set-password. */
   clearPasswordRecovery: () => void;
+  /** Set when a profile load discovers the logged-in user's costumer has been deactivated ("Deaktiver kunde", see CostumerDetailsPage.tsx/costumers_add_deactivated_at.sql) — the session is force-signed-out the moment this is detected (initial load, auth-state change, or a background token refresh), and this message is left behind for LoginPage.tsx to display since the sign-out itself already happened by the time it's read. Danish, user-facing. Null otherwise. */
+  deactivationMessage: string | null;
+  /** Clears deactivationMessage — call after LoginPage.tsx has displayed it, so it doesn't reappear on a later, legitimate login. */
+  clearDeactivationMessage: () => void;
   loading: boolean;
   signOut: () => Promise<void>;
   /** Refreshes the session and applies it to session/profile state directly (awaited), so it's safe to navigate immediately after — see the implementation's comment for why this exists instead of just calling supabase.auth.refreshSession(). */
@@ -89,6 +93,20 @@ export function formatRoleLabel(role?: string | null): string {
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+
+/** Standalone (usable outside the provider) check for whether the given user's costumer is currently deactivated — LoginPage.tsx calls this right after signInWithPassword, since waiting on the provider's own async onAuthStateChange-driven profile load would race against LoginPage's post-login navigation. Returns null (and logs) on any Supabase error, treated as "not deactivated" so a transient DB hiccup doesn't block a legitimate login. */
+export async function fetchCostumerDeactivatedAt(userId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("departments!user_profiles_department_id_fkey(costumers(deactivated_at))")
+    .eq("user_id", userId)
+    .maybeSingle<{ departments: { costumers: { deactivated_at: string | null } | null } | null }>();
+  if (error) {
+    console.error("[AuthContext] fetchCostumerDeactivatedAt failed:", error);
+    return null;
+  }
+  return data?.departments?.costumers?.deactivated_at ?? null;
+}
 
 /**
  * Provides the current Supabase session and matching `user_profiles` row to the
@@ -108,11 +126,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // which is too late to rely on — that event has already fired (and been
   // missed) by the time this provider's effect below subscribes to it.
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
+  const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
 
-  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name (and, nested one level further, its costumer's name) via FKs in the same query (one round-trip instead of separate departments/costumers lookups). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
+  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name (and, nested one level further, its costumer's name/deactivated_at) via FKs in the same query (one round-trip instead of separate departments/costumers lookups). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
   const loadProfile = async (
     userId: string,
-  ): Promise<{ profile: Profile | null; afdeling: string | null; costumerName: string | null }> => {
+  ): Promise<{
+    profile: Profile | null;
+    afdeling: string | null;
+    costumerName: string | null;
+    costumerDeactivatedAt: string | null;
+  }> => {
     const { data, error } = await supabase
       .from("user_profiles")
       // Explicit !user_profiles_department_id_fkey disambiguates the embed:
@@ -121,22 +145,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // user_departments, so a bare "departments(...)" is now ambiguous
       // (PGRST201) and fails outright — this pins it to the direct FK.
       .select(
-        "user_id, email, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name))",
+        "user_id, email, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
       )
       .eq("user_id", userId)
       .maybeSingle<ProfileRow>();
     if (error) {
       console.error("[AuthContext] user_profiles select failed:", error);
-      return { profile: null, afdeling: null, costumerName: null };
+      return { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     }
     if (!data) {
-      return { profile: null, afdeling: null, costumerName: null };
+      return { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     }
     const { departments, ...profileFields } = data;
     return {
       profile: profileFields,
       afdeling: departments?.name ?? null,
       costumerName: departments?.costumers?.name ?? null,
+      costumerDeactivatedAt: departments?.costumers?.deactivated_at ?? null,
     };
   };
 
@@ -151,9 +176,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("[AuthContext] user_departments select failed:", error);
       return [];
     }
+    // "Alle køretøjer" always sorts first (see
+    // supabase/applied/grant_admins_alle_koretojer_access.sql — every admin
+    // is guaranteed a grant for it), ahead of the rest in whatever order
+    // the query returned them.
     return (data ?? [])
       .filter((row) => row.departments !== null)
-      .map((row) => ({ department_id: row.department_id, name: row.departments!.name }));
+      .map((row) => ({ department_id: row.department_id, name: row.departments!.name }))
+      .sort((a, b) => {
+        if (a.name === "Alle køretøjer") return -1;
+        if (b.name === "Alle køretøjer") return 1;
+        return 0;
+      });
   };
 
   useEffect(() => {
@@ -173,7 +207,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const applyAuthState = async (newSession: Session | null, requestId: number) => {
       const next = newSession
         ? await loadProfile(newSession.user.id)
-        : { profile: null, afdeling: null, costumerName: null };
+        : { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
+      if (newSession && next.costumerDeactivatedAt) {
+        // Caught here rather than only at LoginPage's sign-in check so a
+        // costumer deactivated mid-session (an already-open tab, or the
+        // background token refresh supabase-js runs periodically) also gets
+        // force-signed-out, not just blocked at the next fresh login.
+        if (!mounted || requestId !== latestRequestId) return;
+        setSession(null);
+        setProfile(null);
+        setAfdeling(null);
+        setCostumerName(null);
+        setAvailableDepartments([]);
+        setIsFullyAuthenticated(false);
+        setDeactivationMessage("Din virksomheds adgang er blokeret. Kontakt FLEETii for detaljer.");
+        void supabase.auth.signOut();
+        return;
+      }
       const departments = newSession ? await loadAvailableDepartments(newSession.user.id) : [];
       if (!mounted || requestId !== latestRequestId) return;
       setSession(newSession);
@@ -239,7 +289,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data } = await supabase.auth.refreshSession();
     const next = data.session
       ? await loadProfile(data.session.user.id)
-      : { profile: null, afdeling: null, costumerName: null };
+      : { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     const departments = data.session ? await loadAvailableDepartments(data.session.user.id) : [];
     setSession(data.session);
     setProfile(next.profile);
@@ -287,6 +337,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         mustChangePassword: session?.user.app_metadata?.must_change_password === true,
         isPasswordRecovery,
         clearPasswordRecovery: () => setIsPasswordRecovery(false),
+        deactivationMessage,
+        clearDeactivationMessage: () => setDeactivationMessage(null),
         loading,
         signOut,
         refreshProfile,

@@ -1,13 +1,13 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { use2hireGPS } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { LeafletMap } from "../components/LeafletMap";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
-import { shortSignalTimestamp } from "../lib/bookings";
+import { shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
 import { supabase } from "../lib/supabase";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
@@ -28,35 +28,67 @@ type Vehicle = {
 /** The regular user's own reservation for this vehicle, if reached via BookingDetailsPage's map marker — see useVehicleLockState. Only ever present for a non-admin; admin navigation paths (VehiclesPage, FleetManagementPage) don't pass one. */
 type RouterBooking = { id: string; startIso: string; endIso: string | null };
 
+/** A department this vehicle belongs to, as shown in the read-only Afdeling(er) row below. */
+type VehicleDepartment = { department_id: string; name: string };
+
+/** Raw shape of a vehicle_departments row as selected here, with the department's name embedded via FK. */
+type VehicleDepartmentRow = { department_id: string; departments: { name: string } | null };
+
+/** Raw shape of the vehicle_profiles row fetched here for its home department — just the scalar department_id, resolved to a name via a separate departments lookup (see the fetch effect below for why this isn't a single embedded query). */
+type VehicleProfileHomeRow = { department_id: string | null };
+
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
- * Vehicle detail view ("/vehicle-details"): plate, model, fuel level,
- * mileage, status, and (admin-only) a map showing its last known GPS
- * position (or a "no GPS available" overlay if none exists), plus (also
- * admin-only) "Rediger køretøj" (to HandleVehiclePage) and "Slet køretøj"
- * (both moved here from VehiclesPage). The vehicle itself is passed in via
- * router state — there is no direct-URL/refresh support, so it redirects to
- * the fleet table if state is missing (e.g. a hard refresh). A regular user
- * can land here too (e.g. via their own booking's map marker on
- * BookingDetailsPage), so the map and both actions are gated on profile.role
- * rather than the route itself.
+ * Vehicle detail view ("/vehicle-details/:vehicleId"): plate, model, fuel
+ * level, mileage, status, a read-only Afdeling(er) row (the departments this
+ * vehicle belongs to, via vehicle_departments — "Alle køretøjer" always
+ * first), and (admin-only) a map showing its last known GPS position (or a
+ * "no GPS available" overlay if none exists), plus (also admin-only)
+ * "Rediger køretøj" (to HandleVehiclePage, where Afdeling(er) is actually
+ * editable) and "Slet køretøj" (both moved here from VehiclesPage). Normally
+ * reached with the vehicle pre-filled via router state (VehiclesPage/
+ * FleetManagementPage/BookingDetailsPage), which skips a round-trip; a
+ * direct URL/refresh/bookmark (no router state) falls back to looking the
+ * :vehicleId route param up in the already-loaded VehicleContext fleet list
+ * (see useVehiclesLoading — no extra fetch needed, the whole fleet is loaded
+ * on auth anyway), redirecting to the fleet table if it can't be found there
+ * either. A regular user can land here too (e.g. via their own booking's map
+ * marker on BookingDetailsPage), so the map and both actions are gated on
+ * profile.role rather than the route itself.
  */
 export function VehicleDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { vehicleId } = useParams<{ vehicleId: string }>();
   const { profile } = useAuth();
   const isAdmin = profile?.role === "admin";
   const state = location.state as { vehicle?: Vehicle; booking?: RouterBooking } | null;
-  const vehicle = state?.vehicle ?? null;
+  const stateVehicle = state?.vehicle ?? null;
   const booking = state?.booking ?? null;
+  const allVehicles = use2hireVehicle();
+  const vehiclesLoading = useVehiclesLoading();
+  // Stored in state (rather than derived inline from allVehicles.find(...) +
+  // toDisplayVehicle() on every render) so its reference stays stable once
+  // set — toDisplayVehicle() builds a brand-new object every call, and an
+  // inline derivation would hand a fresh `vehicle` reference to every effect
+  // below on every single render, re-triggering the vehicleDepartments fetch
+  // effect (which depends on [vehicle, isAdmin]) in an unnecessary loop.
+  const [fetchedVehicle, setFetchedVehicle] = useState<Vehicle | null>(null);
+  const vehicle = stateVehicle ?? fetchedVehicle;
   const gpsPositions = use2hireGPS();
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const [vehicleDepartments, setVehicleDepartments] = useState<VehicleDepartment[]>([]);
+  const [departmentsLoading, setDepartmentsLoading] = useState(true);
+  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
+  /** vehicle_profiles.department_id's own name (see supabase/applied/add_vehicle_profiles_costumer_and_department_fk.sql) — null if not yet set for this vehicle. Replaces the old vestigial DisplayVehicle.department field (toDisplayVehicle hardcodes that to "—" always). */
+  const [homeDepartmentName, setHomeDepartmentName] = useState<string | null>(null);
 
   const bookingContext: VehicleLockBookingContext | null = booking
     ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso }
@@ -69,14 +101,97 @@ export function VehicleDetailsPage() {
     error: lockError,
   } = useVehicleLockState(vehicle?.vehicleId ?? "", bookingContext, isAdmin);
 
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark (no router state) — looks the :vehicleId up in the already-loaded VehicleContext fleet list rather than issuing a new query (see useVehiclesLoading's doc comment for why vehiclesLoading matters here: allVehicles starts empty and this effect would otherwise resolve to "not found" before the context's own fetch has even finished). Skipped entirely when stateVehicle is already present. */
   useEffect(() => {
-    if (!vehicle) {
+    if (stateVehicle || !vehicleId || vehiclesLoading) return;
+    const twoHireVehicle = allVehicles.find((v) => v.vehicleId === vehicleId);
+    setFetchedVehicle(twoHireVehicle ? toDisplayVehicle(twoHireVehicle) : null);
+  }, [stateVehicle, vehicleId, vehiclesLoading, allVehicles]);
+
+  useEffect(() => {
+    if (!vehicle && !vehiclesLoading) {
       navigate("/fleet-table", { replace: true });
     }
-  }, [vehicle, navigate]);
+  }, [vehicle, vehiclesLoading, navigate]);
+
+  /**
+   * Loads the departments this vehicle currently belongs to
+   * (vehicle_departments, joined for the display name) and its own home
+   * department (vehicle_profiles.department_id) — both read-only here,
+   * unlike HandleVehiclePage's editable Afdeling(er)/Hjemmeafdeling. "Alle
+   * køretøjer" always sorts first among vehicleDepartments (see
+   * AuthContext.tsx's loadAvailableDepartments for the same convention).
+   *
+   * The home department's name is resolved via a second, separate query
+   * (fetch department_id, then look its name up in departments) rather than
+   * a single `vehicle_profiles.select("departments(name)")` embedded query
+   * — that embed reliably came back null despite department_id genuinely
+   * being set (confirmed via a direct diagnostic query), most likely
+   * PostgREST's schema cache not having picked up this FK yet (it was added
+   * via a later migration, see add_vehicle_profiles_costumer_and_department_fk.sql).
+   * Splitting into two plain queries sidesteps that relationship-detection
+   * entirely.
+   */
+  useEffect(() => {
+    if (!vehicle || !isAdmin) return;
+
+    let cancelled = false;
+    setDepartmentsLoading(true);
+    setDepartmentsError(null);
+
+    void Promise.all([
+      supabase
+        .from("vehicle_departments")
+        .select("department_id, departments(name)")
+        .eq("vehicle_id", vehicle.vehicleId)
+        .returns<VehicleDepartmentRow[]>(),
+      supabase
+        .from("vehicle_profiles")
+        .select("department_id")
+        .eq("vehicle_id", vehicle.vehicleId)
+        .maybeSingle<VehicleProfileHomeRow>(),
+    ]).then(async ([vehicleDepartmentsResult, homeResult]) => {
+      if (cancelled) return;
+      if (vehicleDepartmentsResult.error) {
+        setDepartmentsError(vehicleDepartmentsResult.error.message);
+        setDepartmentsLoading(false);
+        return;
+      }
+      const departments = (vehicleDepartmentsResult.data ?? [])
+        .filter((row): row is VehicleDepartmentRow & { departments: { name: string } } => row.departments !== null)
+        .map((row) => ({ department_id: row.department_id, name: row.departments.name }))
+        .sort((a, b) => {
+          if (a.name === "Alle køretøjer") return -1;
+          if (b.name === "Alle køretøjer") return 1;
+          return a.name.localeCompare(b.name);
+        });
+      setVehicleDepartments(departments);
+
+      const homeDepartmentId = homeResult.data?.department_id ?? null;
+      if (!homeDepartmentId) {
+        setHomeDepartmentName(null);
+        setDepartmentsLoading(false);
+        return;
+      }
+      const { data: homeDepartment } = await supabase
+        .from("departments")
+        .select("name")
+        .eq("department_id", homeDepartmentId)
+        .maybeSingle<{ name: string }>();
+      if (cancelled) return;
+      setHomeDepartmentName(homeDepartment?.name ?? null);
+      setDepartmentsLoading(false);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicle, isAdmin]);
 
   if (!vehicle) {
-    return null;
+    return vehiclesLoading ? (
+      <div className="flex h-dvh items-center justify-center bg-brand-50 text-brand-600">Indlæser køretøj…</div>
+    ) : null;
   }
 
   /**
@@ -194,6 +309,43 @@ export function VehicleDetailsPage() {
                       {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                     </span>
                   </div>
+                  {isAdmin && (
+                    <>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Hjemmeafdeling:</label>
+                        <span className="text-sm text-brand-800">
+                          {departmentsLoading ? (
+                            <span className="text-brand-500">Indlæser…</span>
+                          ) : (
+                            (homeDepartmentName ?? "—")
+                          )}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 items-start gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Afdeling(er):</label>
+                        <div className="text-sm text-brand-800">
+                          {departmentsLoading && <span className="text-brand-500">Indlæser…</span>}
+                          {!departmentsLoading && departmentsError && (
+                            <span className="text-red-600">{departmentsError}</span>
+                          )}
+                          {!departmentsLoading && !departmentsError && vehicleDepartments.length === 0 && (
+                            <span className="text-brand-500">—</span>
+                          )}
+                          {!departmentsLoading && !departmentsError && vehicleDepartments.length > 0 && (
+                            <table className="w-full border-collapse">
+                              <tbody>
+                                {vehicleDepartments.map((department) => (
+                                  <tr key={department.department_id}>
+                                    <td className="py-0">{department.name}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
 
