@@ -91,6 +91,18 @@ export function StandardSettings({ table, scopeColumn, scopeId }: StandardSettin
   const handleChange = async (name: string, inputType: "time" | "number", raw: string) => {
     if (!scopeId || raw === "") return;
 
+    // The native <input type="number" min={1} max={59}> only affects
+    // spinner/validity styling, not what actually gets typed — a pasted or
+    // spun-past value like "9999" reaches here unclamped, so it's rejected
+    // explicitly rather than saved verbatim.
+    if (inputType === "number") {
+      const parsed = Number(raw);
+      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 59) {
+        setErrorByName((prev) => ({ ...prev, [name]: "Skal være et tal mellem 1 og 59." }));
+        return;
+      }
+    }
+
     const formatted = formatValue(inputType, raw);
     setValues((prev) => ({ ...prev, [name]: formatted }));
     setErrorByName((prev) => ({ ...prev, [name]: "" }));

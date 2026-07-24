@@ -79,7 +79,12 @@ export default async (req: Request) => {
   if (!costumer.deactivated_at) {
     return new Response(JSON.stringify({ error: "Kundens adgang skal blokeres først." }), { status: 409 });
   }
-  if ((body.confirmName ?? "").trim() !== (costumer.name ?? "").trim()) {
+  // costumer.name is nullable in the schema — if it were ever null/empty,
+  // comparing against "" would let an empty confirmName trivially "match",
+  // defeating the whole point of requiring typed confirmation for the one
+  // irreversible action in the app. Refuse outright instead.
+  const trimmedName = (costumer.name ?? "").trim();
+  if (!trimmedName || (body.confirmName ?? "").trim() !== trimmedName) {
     return new Response(JSON.stringify({ error: "Det indtastede navn matcher ikke kundens navn." }), { status: 400 });
   }
 

@@ -3,7 +3,6 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
-import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { supabase } from "../lib/supabase";
@@ -163,11 +162,8 @@ export function ReservationPage() {
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
   const formatTime = (date: Date) =>
     `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  /** "date"/"time" parts of an ISO datetime string, for pre-filling Start/Slut from an existing booking being edited. */
-  const splitIso = (iso: string) => {
-    const d = new Date(iso);
-    return { date: toIsoDate(d), time: formatTime(d) };
-  };
+  /** "date"/"time" parts of an ISO datetime string, for pre-filling Start/Slut from an existing booking being edited. Deliberately string-sliced rather than `new Date(iso).getHours()` — editing.startIso/endIso are raw Supabase timestamptz values with a real UTC offset (e.g. "...T14:00:00+00:00"), and `new Date()` would apply an actual timezone conversion here, silently shifting the pre-filled time by the browser's UTC offset. Every other place in this codebase (lib/bookings.ts's isoPrefix/addMinutesToIso) avoids exactly this by treating these strings as naive wall-clock digits — same convention applied here. */
+  const splitIso = (iso: string) => ({ date: iso.slice(0, 10), time: iso.slice(11, 16) });
   const initialStart = editing ? splitIso(editing.startIso) : { date: toIsoDate(now), time: formatTime(now) };
   const initialEnd = editing?.endIso ? splitIso(editing.endIso) : { date: toIsoDate(end), time: formatTime(end) };
   /** Adds minutes to a "HH:mm" time, reporting how many calendar days the result rolled over (can be negative). */
@@ -414,35 +410,49 @@ export function ReservationPage() {
                       />
                     )}
                   </div>
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Anvendelse <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <select
-                      required
-                      aria-required="true"
-                      value={anvendelseOption}
-                      onChange={(e) => setAnvendelseOption(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    >
-                      <option value="">Vælg anvendelse</option>
-                      {anvendelseOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
+                  {/* Anvendelse + (conditionally) Angiv årsag are wrapped
+                      together in one div so they count as a SINGLE child of
+                      the parent's divide-y — that border only ever lands
+                      between direct children, so nesting both rows one level
+                      deeper guarantees no line can appear between them,
+                      rather than relying on a border-t-0 override to beat it
+                      on specificity. */}
+                  <div>
+                    <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Anvendelse <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <select
+                        required
+                        aria-required="true"
+                        value={anvendelseOption}
+                        onChange={(e) => setAnvendelseOption(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="">Vælg anvendelse</option>
+                        {anvendelseOptions.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {anvendelseOption === ANDET_VALUE && (
+                      <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
+                        <label className="flex items-center justify-end text-sm font-medium text-brand-700">
+                          Angiv årsag <span className="ml-0.5 text-red-600">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          aria-required="true"
+                          value={anvendelseCustom}
+                          onChange={(e) => setAnvendelseCustom(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                    )}
                   </div>
-                  {anvendelseOption === ANDET_VALUE && (
-                    <RequiredFieldRow
-                      label="Angiv årsag"
-                      value={anvendelseCustom}
-                      onChange={setAnvendelseCustom}
-                      placeholder="Beskrivelse"
-                      className="grid grid-cols-2 gap-3 p-3 sm:p-4"
-                      inputClassName="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  )}
                   <div className="relative grid grid-cols-[4rem_3.5rem_1fr_1fr] items-center gap-0.5 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Start

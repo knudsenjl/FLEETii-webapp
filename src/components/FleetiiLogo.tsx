@@ -11,10 +11,9 @@ interface FleetiiLogoProps {
   linkToHome?: boolean;
 }
 
-/** The role-appropriate home route for a given `user_profiles.role` — matches RootRoute's (App.tsx) and PageHeader's settingsPathForRole's handling of the same three roles. */
+/** The role-appropriate home route for a given `user_profiles.role` — matches RootRoute's (App.tsx) handling of the same roles: "FLEETii admin" now lands on "/admin" too, same as a regular admin (AdminFrontpage.tsx's own "FLEETii platform administration" button links onward to "/fleetii-admin" from there). */
 function homePathForRole(role?: string | null): string {
-  if (role === "FLEETii admin") return "/fleetii-admin";
-  return role === "admin" ? "/admin" : "/bookings";
+  return role === "admin" || role === "FLEETii admin" ? "/admin" : "/bookings";
 }
 
 /** Renders the FLEETii logo image, wrapped in a nav button when linkToHome is set. */

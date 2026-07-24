@@ -192,7 +192,12 @@ export function HandleVehiclePage() {
   ];
 
   const canSave =
-    !loading && plate.trim().length > 0 && make.trim().length > 0 && model.trim().length > 0 && year.trim().length > 0;
+    !loading &&
+    plate.trim().length > 0 &&
+    make.trim().length > 0 &&
+    model.trim().length > 0 &&
+    year.trim().length > 0 &&
+    Boolean(homeDepartmentId);
 
   const toggleDepartment = (department: DepartmentOption, checked: boolean) => {
     // "Alle køretøjer" is disabled in the UI (see the checkbox below), but
@@ -208,6 +213,16 @@ export function HandleVehiclePage() {
       }
       return next;
     });
+
+    // Clear the home department selection if its own department was just
+    // unchecked — otherwise handleSave would write vehicle_profiles.
+    // department_id to a department this vehicle is no longer assigned to
+    // via vehicle_departments (nothing else catches that inconsistency;
+    // canSave above now also requires a home department to be (re-)picked
+    // before saving is allowed at all).
+    if (!checked && department.department_id === homeDepartmentId) {
+      setHomeDepartmentId(null);
+    }
   };
 
   /**
@@ -234,7 +249,13 @@ export function HandleVehiclePage() {
     const trimmedModel = model.trim();
     const trimmedYear = year.trim();
 
-    const { error } = await supabase
+    // .select() so a row actually being updated can be confirmed — RLS
+    // (vehicle_profiles_update_policy.sql) silently returns 0 rows rather
+    // than an error if it doesn't match (e.g. the admin's active department
+    // changed in another tab between load and save), same as this app's
+    // other RLS gaps taught us to check for explicitly rather than assume a
+    // no-error response means success.
+    const { data: updatedRows, error } = await supabase
       .from("vehicle_profiles")
       .update({
         number_plate: trimmedPlate,
@@ -244,10 +265,16 @@ export function HandleVehiclePage() {
         department_id: homeDepartmentId,
         costumer_id: costumerId,
       })
-      .eq("vehicle_id", vehicle.vehicleId);
+      .eq("vehicle_id", vehicle.vehicleId)
+      .select("vehicle_id");
 
     if (error) {
       setSaveError(error.message);
+      setIsSaving(false);
+      return;
+    }
+    if (!updatedRows || updatedRows.length === 0) {
+      setSaveError("Køretøjet kunne ikke opdateres.");
       setIsSaving(false);
       return;
     }
@@ -255,10 +282,27 @@ export function HandleVehiclePage() {
     // Reconciles vehicle_departments against whatever was toggled — only
     // when the departments section itself loaded successfully, so a failed
     // fetch (departmentsError set) can't wipe out real assignments the
-    // admin never actually saw or touched.
+    // admin never actually saw or touched. Adds new grants BEFORE removing
+    // old ones (unlike a naive diff-and-apply in either order) — these two
+    // writes aren't wrapped in a real DB transaction, so if the second call
+    // fails partway through, this ordering leaves the vehicle with an EXTRA,
+    // stale department grant rather than having already lost access to one
+    // it should still have; the safer of the two possible partial-failure
+    // states.
     if (!departmentsError) {
       const toAdd = [...selectedDepartmentIds].filter((id) => !originalDepartmentIds.has(id));
       const toRemove = [...originalDepartmentIds].filter((id) => !selectedDepartmentIds.has(id));
+
+      if (toAdd.length > 0) {
+        const { error: addError } = await supabase
+          .from("vehicle_departments")
+          .insert(toAdd.map((department_id) => ({ vehicle_id: vehicle.vehicleId, department_id })));
+        if (addError) {
+          setSaveError(addError.message);
+          setIsSaving(false);
+          return;
+        }
+      }
 
       if (toRemove.length > 0) {
         const { error: removeError } = await supabase
@@ -268,17 +312,6 @@ export function HandleVehiclePage() {
           .in("department_id", toRemove);
         if (removeError) {
           setSaveError(removeError.message);
-          setIsSaving(false);
-          return;
-        }
-      }
-
-      if (toAdd.length > 0) {
-        const { error: addError } = await supabase
-          .from("vehicle_departments")
-          .insert(toAdd.map((department_id) => ({ vehicle_id: vehicle.vehicleId, department_id })));
-        if (addError) {
-          setSaveError(addError.message);
           setIsSaving(false);
           return;
         }

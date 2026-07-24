@@ -161,19 +161,31 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
   };
 
   const handleCreate = async () => {
+    const trimmed = fieldValue.trim();
+    if (anvendelser.some((value) => value.toLowerCase() === trimmed.toLowerCase())) {
+      setSubmitError("Denne anvendelse findes allerede.");
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
-    await saveAnvendelser([...anvendelser, fieldValue.trim()]);
+    await saveAnvendelser([...anvendelser, trimmed]);
   };
 
   const handleUpdate = async () => {
     if (editingOriginalValue === null) return;
     const index = anvendelser.indexOf(editingOriginalValue);
     if (index === -1) return;
+    const trimmed = fieldValue.trim();
+    // Excludes the row being edited itself from the duplicate check — renaming
+    // a value to its own unchanged text shouldn't be flagged as a collision.
+    if (anvendelser.some((value, i) => i !== index && value.toLowerCase() === trimmed.toLowerCase())) {
+      setSubmitError("Denne anvendelse findes allerede.");
+      return;
+    }
     setIsSubmitting(true);
     setSubmitError(null);
     const next = [...anvendelser];
-    next[index] = fieldValue.trim();
+    next[index] = trimmed;
     await saveAnvendelser(next);
   };
 
@@ -230,7 +242,15 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 const isSelected = index === selectedIndex;
                 return (
                   <tr
-                    key={anvendelse}
+                    // Position-based, not value-based — this component's own
+                    // selection model (selectedIndex, see above) already
+                    // identifies a row by its position in displayList, not
+                    // by its text, so this stays consistent with that AND
+                    // avoids a React key collision if the array ever
+                    // contains a duplicate value (handleCreate/handleUpdate
+                    // guard against creating new ones, but pre-existing data
+                    // could still have one).
+                    key={index}
                     role="button"
                     tabIndex={0}
                     aria-pressed={isSelected}
@@ -285,7 +305,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
             disabled={selectedIndex === null}
             className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Rediger anvendelser
+            Rediger anvendelse
           </button>
           <button
             type="button"

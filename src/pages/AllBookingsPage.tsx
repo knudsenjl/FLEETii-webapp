@@ -226,7 +226,7 @@ export function AllBookingsPage() {
                 </div>
               </div>
 
-              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
                 {/* table-fixed + a fixed Periode width, so Køretøj absorbs
                     whatever space is left over instead of a hardcoded cap —
                     see BookingsPage for the same pattern. */}
@@ -296,7 +296,7 @@ export function AllBookingsPage() {
                 </table>
               </div>
 
-              <div className="mt-auto flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
                   onClick={() => navigate("/reservation")}

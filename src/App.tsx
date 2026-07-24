@@ -37,10 +37,12 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
  * link (isPasswordRecovery — see AuthContext.tsx; this is also where a
  * clicked recovery link's redirect_to actually lands), otherwise straight
  * to their role's home page (admin dashboard vs. bookings list) instead of
- * showing the login form again. A "FLEETii admin" role lands on
- * "/fleetii-admin" instead of the regular admin dashboard (it's a superset
- * of "admin" — see ProtectedRoute's requireAdmin check). Renders LoginPage
- * while loading or once it's confirmed there's no session.
+ * showing the login form again. A "FLEETii admin" role now lands on "/admin"
+ * too, same as a regular admin (it's a superset of "admin" — see
+ * ProtectedRoute's requireAdmin check) — AdminFrontpage.tsx shows them an
+ * extra "FLEETii platform administration" button onward to "/fleetii-admin"
+ * when they actually need it, rather than defaulting there on every login.
+ * Renders LoginPage while loading or once it's confirmed there's no session.
  */
 function RootRoute() {
   const { loading, isFullyAuthenticated, profile, mustChangePassword, isPasswordRecovery } = useAuth();
@@ -49,12 +51,9 @@ function RootRoute() {
     if (mustChangePassword || isPasswordRecovery) {
       return <Navigate to="/set-password" replace />;
     }
-    if (profile?.role === "FLEETii admin") {
-      return <Navigate to="/fleetii-admin" replace />;
-    }
     return (
       <Navigate
-        to={profile?.role === "admin" ? "/admin" : "/bookings"}
+        to={profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/admin" : "/bookings"}
         replace
       />
     );

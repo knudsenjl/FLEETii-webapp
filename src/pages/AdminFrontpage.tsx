@@ -4,10 +4,12 @@
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { useAuth } from "../contexts/AuthContext";
 
-/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). */
+/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so an extra "FLEETii platform administration" button (visible only to that role) links onward to "/fleetii-admin". */
 export function AdminFrontpage() {
   const navigate = useNavigate();
+  const { profile } = useAuth();
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -28,6 +30,16 @@ export function AdminFrontpage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">Administration</h2>
+
+              {profile?.role === "FLEETii admin" && (
+                <button
+                  type="button"
+                  onClick={() => navigate("/fleetii-admin")}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  FLEETii platform administration
+                </button>
+              )}
 
               <div className="flex flex-col gap-3">
                 <button

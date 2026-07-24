@@ -763,7 +763,10 @@ export function CostumerDetailsPage() {
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void handleConfirm()}
           isPending={isSubmitting}
-          confirmDisabled={pendingAction === "delete" && purgeConfirmText.trim() !== (costumer?.name ?? "").trim()}
+          confirmDisabled={
+            pendingAction === "delete" &&
+            (!costumer?.name?.trim() || purgeConfirmText.trim() !== costumer.name.trim())
+          }
           confirmPendingLabel={
             pendingAction === "delete" || pendingAction === "delete-department"
               ? "Sletter…"

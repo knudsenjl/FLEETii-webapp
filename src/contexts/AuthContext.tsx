@@ -94,17 +94,18 @@ export function formatRoleLabel(role?: string | null): string {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/** Standalone (usable outside the provider) check for whether the given user's costumer is currently deactivated — LoginPage.tsx calls this right after signInWithPassword, since waiting on the provider's own async onAuthStateChange-driven profile load would race against LoginPage's post-login navigation. Returns null (and logs) on any Supabase error, treated as "not deactivated" so a transient DB hiccup doesn't block a legitimate login. */
+/** Standalone (usable outside the provider) check for whether the given user's costumer is currently deactivated — LoginPage.tsx calls this right after signInWithPassword, since waiting on the provider's own async onAuthStateChange-driven profile load would race against LoginPage's post-login navigation. Always returns null for role "FLEETii admin" — costumers_add_deactivated_at.sql deliberately leaves is_fleetii_admin() unaffected by deactivation so a FLEETii admin can keep managing a deactivated costumer's data (to reactivate or purge it); this client-side check must mirror that exemption, or a FLEETii admin account that happens to have a department_id/costumer_id under a deactivated costumer would get locked out entirely. Returns null (and logs) on any Supabase error, treated as "not deactivated" so a transient DB hiccup doesn't block a legitimate login. */
 export async function fetchCostumerDeactivatedAt(userId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("departments!user_profiles_department_id_fkey(costumers(deactivated_at))")
+    .select("role, departments!user_profiles_department_id_fkey(costumers(deactivated_at))")
     .eq("user_id", userId)
-    .maybeSingle<{ departments: { costumers: { deactivated_at: string | null } | null } | null }>();
+    .maybeSingle<{ role: string; departments: { costumers: { deactivated_at: string | null } | null } | null }>();
   if (error) {
     console.error("[AuthContext] fetchCostumerDeactivatedAt failed:", error);
     return null;
   }
+  if (data?.role === "FLEETii admin") return null;
   return data?.departments?.costumers?.deactivated_at ?? null;
 }
 
@@ -161,7 +162,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile: profileFields,
       afdeling: departments?.name ?? null,
       costumerName: departments?.costumers?.name ?? null,
-      costumerDeactivatedAt: departments?.costumers?.deactivated_at ?? null,
+      // "FLEETii admin" is exempt from the deactivation lockout, mirroring
+      // is_fleetii_admin() being left untouched by costumers_add_
+      // deactivated_at.sql — see fetchCostumerDeactivatedAt's doc comment
+      // for why.
+      costumerDeactivatedAt: profileFields.role === "FLEETii admin" ? null : (departments?.costumers?.deactivated_at ?? null),
     };
   };
 

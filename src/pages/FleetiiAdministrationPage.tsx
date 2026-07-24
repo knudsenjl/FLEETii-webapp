@@ -63,9 +63,9 @@ export function FleetiiAdministrationPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Kunder</h2>
+            <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
 
-            <div className="flex min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+            <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-[0.7rem]">
                 <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <tr>
