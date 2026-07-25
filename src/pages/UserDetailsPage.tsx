@@ -24,9 +24,6 @@ type ProfileRow = {
 /** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the admin's own costumer. */
 type DepartmentOption = { department_id: string; name: string };
 
-/** Always preselected and undeselectable in the Afdelinger table below, same treatment as HandleVehiclePage.tsx's vehicle Afdeling(er) list. */
-const ALLE_KORETOJER_NAME = "Alle køretøjer";
-
 /**
  * Admin "create/edit user" form. Validates every field is
  * filled and that the email isn't already taken (debounced live check
@@ -188,15 +185,7 @@ export function UserDetailsPage() {
       .order("name", { ascending: true })
       .returns<DepartmentOption[]>()
       .then(({ data }) => {
-        // "Alle køretøjer" always sorts first, ahead of the rest's
-        // alphabetical order — same convention as HandleVehiclePage.tsx/
-        // AuthContext.tsx's loadAvailableDepartments.
-        const options = [...(data ?? [])].sort((a, b) => {
-          if (a.name === "Alle køretøjer") return -1;
-          if (b.name === "Alle køretøjer") return 1;
-          return 0;
-        });
-        setDepartmentOptions(options);
+        setDepartmentOptions(data ?? []);
       });
   }, [costumerId]);
 
@@ -242,19 +231,12 @@ export function UserDetailsPage() {
     };
   }, [user]);
 
-  /** Self-heals the current home department into userDepartmentIds whenever either resolves/changes — a user's home department must always be one of their own grants, same invariant as vehicles always having "Alle køretøjer" (though here it just tracks whatever the current selection is, not one fixed name). Runs for a brand-new user too (not just when editing), so create-user.mts's insert below always has at least the chosen home department to seed. */
+  /** Self-heals the current home department into userDepartmentIds whenever either resolves/changes — a user's home department must always be one of their own grants. Runs for a brand-new user too (not just when editing), so create-user.mts's insert below always has at least the chosen home department to seed. */
   useEffect(() => {
     const homeId = departmentOptions.find((d) => d.name === department)?.department_id;
     if (!homeId) return;
     setUserDepartmentIds((prev) => (prev.has(homeId) ? prev : new Set(prev).add(homeId)));
   }, [department, departmentOptions]);
-
-  /** Self-heals "Alle køretøjer" into userDepartmentIds too — always preselected and undeselectable in the Afdelinger table below, same treatment as HandleVehiclePage.tsx's vehicle Afdeling(er) list. */
-  useEffect(() => {
-    const alleId = departmentOptions.find((d) => d.name === ALLE_KORETOJER_NAME)?.department_id;
-    if (!alleId) return;
-    setUserDepartmentIds((prev) => (prev.has(alleId) ? prev : new Set(prev).add(alleId)));
-  }, [departmentOptions]);
 
   // Pre-checks whether this user is the last remaining admin in the
   // (caller's own) department, so clicking "Arkiver bruger" can show a
@@ -317,9 +299,9 @@ export function UserDetailsPage() {
 
   const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
 
-  /** Toggles a department's Afdelinger grant — refuses the one matching the current home department (a user can't lose access to their own active home department) and "Alle køretøjer" (always granted, matching HandleVehiclePage.tsx's vehicle Afdeling(er) list), guarded here too rather than trusting only the checkbox's disabled attribute below. */
+  /** Toggles a department's Afdelinger grant — refuses the one matching the current home department (a user can't lose access to their own active home department), guarded here too rather than trusting only the checkbox's disabled attribute below. */
   const toggleUserDepartment = (option: DepartmentOption, checked: boolean) => {
-    if (option.department_id === homeDepartmentId || option.name === ALLE_KORETOJER_NAME) return;
+    if (option.department_id === homeDepartmentId) return;
 
     setUserDepartmentIds((prev) => {
       const next = new Set(prev);
@@ -560,6 +542,76 @@ export function UserDetailsPage() {
                   <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
+                      Rolle: <span className="ml-0.5 text-red-600">*</span>
+                    </label>
+                    <select
+                      required
+                      aria-required="true"
+                      value={role}
+                      onChange={(e) => setRole(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    >
+                      <option value="" className="bg-brand-100">Vælg rolle:</option>
+                      <option value="user">Bruger</option>
+                      <option value="admin">Administrator</option>
+                    </select>
+                  </div>
+                  {profile?.role === "admin" && (
+                    <div className="grid grid-cols-2 items-start gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Afdeling(er):</label>
+                      <div className="py-0.5">
+                        {grantsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
+                        {!grantsLoading && grantsError && <span className="text-sm text-red-600">{grantsError}</span>}
+                        {!grantsLoading && !grantsError && (
+                          <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
+                            <table className="w-full border-collapse text-[0.7rem]">
+                              <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                                <tr>
+                                  <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
+                                    Afdeling
+                                  </th>
+                                  <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
+                                    Tilladt
+                                  </th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-brand-100 bg-white">
+                                {departmentOptions.length === 0 && (
+                                  <tr>
+                                    <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
+                                      Ingen afdelinger fundet.
+                                    </td>
+                                  </tr>
+                                )}
+                                {departmentOptions.map((option) => {
+                                  const isHome = option.department_id === homeDepartmentId;
+                                  return (
+                                    <tr key={option.department_id}>
+                                      <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
+                                        {option.name}
+                                      </td>
+                                      <td className="px-2 py-0.5 text-center">
+                                        <input
+                                          type="checkbox"
+                                          checked={isHome || userDepartmentIds.has(option.department_id)}
+                                          disabled={isHome}
+                                          title={isHome ? "Kan ikke fjernes fra brugerens hjemmeafdeling" : undefined}
+                                          onChange={(e) => toggleUserDepartment(option, e.target.checked)}
+                                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                        />
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">
                       Hjemmeafdeling: {departmentOptions.length !== 1 && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
                     {departmentOptions.length === 1 ? (
@@ -604,84 +656,6 @@ export function UserDetailsPage() {
                       </select>
                     )}
                   </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Rolle: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
-                    <select
-                      required
-                      aria-required="true"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    >
-                      <option value="" className="bg-brand-100">Vælg rolle:</option>
-                      <option value="user">Bruger</option>
-                      <option value="admin">Administrator</option>
-                    </select>
-                  </div>
-                  {profile?.role === "admin" && (
-                    <div className="grid grid-cols-2 items-start gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Afdeling(er):</label>
-                      <div className="py-0.5">
-                        {grantsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
-                        {!grantsLoading && grantsError && <span className="text-sm text-red-600">{grantsError}</span>}
-                        {!grantsLoading && !grantsError && (
-                          <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
-                            <table className="w-full border-collapse text-[0.7rem]">
-                              <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                                <tr>
-                                  <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
-                                    Afdeling
-                                  </th>
-                                  <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
-                                    Tilladt
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-brand-100 bg-white">
-                                {departmentOptions.length === 0 && (
-                                  <tr>
-                                    <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
-                                      Ingen afdelinger fundet.
-                                    </td>
-                                  </tr>
-                                )}
-                                {departmentOptions.map((option) => {
-                                  const isHome = option.department_id === homeDepartmentId;
-                                  const isAlleKoretojer = option.name === ALLE_KORETOJER_NAME;
-                                  const isLocked = isHome || isAlleKoretojer;
-                                  return (
-                                    <tr key={option.department_id}>
-                                      <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
-                                        {option.name}
-                                      </td>
-                                      <td className="px-2 py-0.5 text-center">
-                                        <input
-                                          type="checkbox"
-                                          checked={isLocked || userDepartmentIds.has(option.department_id)}
-                                          disabled={isLocked}
-                                          title={
-                                            isAlleKoretojer
-                                              ? "Alle køretøjer kan ikke fjernes"
-                                              : isHome
-                                                ? "Kan ikke fjernes fra brugerens hjemmeafdeling"
-                                                : undefined
-                                          }
-                                          onChange={(e) => toggleUserDepartment(option, e.target.checked)}
-                                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                                        />
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 

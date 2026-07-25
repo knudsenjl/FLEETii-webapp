@@ -10,9 +10,6 @@ import { shortSignalTimestamp } from "../lib/bookings";
 /** A department the vehicle could be assigned to — scoped to the admin's own costumer (see the departments-loading effect below). */
 type DepartmentOption = { department_id: string; name: string };
 
-/** Every vehicle belongs to its costumer's "Alle køretøjer" department by definition (see supabase/applied/backfill_and_assign_vehicles_to_alle_koretojer.sql) — its checkbox below is always checked and disabled, never something this page's toggle can remove (the DB backstops this too, see vehicle_departments_protect_alle_koretojer_delete.sql). */
-const ALLE_KORETOJER_NAME = "Alle køretøjer";
-
 /** The DisplayVehicle shape, as passed in via router state from VehicleDetailsPage's "Rediger køretøj" button. Only vehicleId is actually used here — the editable fields (plate/brand/model/year) are fetched fresh from vehicle_profiles on mount instead of trusted from router state, since VehicleDetailsPage's own Vehicle type only carries an already-combined "brand model" display string, not the separate fields this form edits/saves. */
 type Vehicle = {
   vehicleId: string;
@@ -145,24 +142,8 @@ export function HandleVehiclePage() {
         setDepartmentsLoading(false);
         return;
       }
-      // "Alle køretøjer" always sorts first, ahead of the rest's alphabetical order (from the query's own .order("name")).
-      const options = [...(departmentsResult.data ?? [])].sort((a, b) => {
-        if (a.name === ALLE_KORETOJER_NAME) return -1;
-        if (b.name === ALLE_KORETOJER_NAME) return 1;
-        return 0;
-      });
-      setDepartmentOptions(options);
+      setDepartmentOptions(departmentsResult.data ?? []);
       const assigned = new Set((assignedResult.data ?? []).map((row) => row.department_id));
-      // Self-heals a vehicle that's somehow missing its (guaranteed)
-      // "Alle køretøjer" row yet — checked in the UI regardless (see
-      // ALLE_KORETOJER_NAME), so selectedDepartmentIds must already include
-      // it too, or saving would look like a no-op change instead of the
-      // insert that's actually needed. originalDepartmentIds stays the
-      // real DB snapshot so this still shows up correctly as a pending add.
-      const alleKoretojer = options.find((d) => d.name === ALLE_KORETOJER_NAME);
-      if (alleKoretojer) {
-        assigned.add(alleKoretojer.department_id);
-      }
       setSelectedDepartmentIds(assigned);
       setOriginalDepartmentIds(new Set((assignedResult.data ?? []).map((row) => row.department_id)));
       setDepartmentsLoading(false);
@@ -200,10 +181,6 @@ export function HandleVehiclePage() {
     Boolean(homeDepartmentId);
 
   const toggleDepartment = (department: DepartmentOption, checked: boolean) => {
-    // "Alle køretøjer" is disabled in the UI (see the checkbox below), but
-    // guard here too rather than trusting only the disabled attribute.
-    if (department.name === ALLE_KORETOJER_NAME) return;
-
     setSelectedDepartmentIds((prev) => {
       const next = new Set(prev);
       if (checked) {
@@ -414,23 +391,6 @@ export function HandleVehiclePage() {
                         {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </div>
                     </div>
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
-                      <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Hjemmeafdeling:</div>
-                      <select
-                        value={homeDepartmentId ?? ""}
-                        onChange={(e) => setHomeDepartmentId(e.target.value || null)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      >
-                        <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
-                        {departmentOptions
-                          .filter((department) => selectedDepartmentIds.has(department.department_id))
-                          .map((department) => (
-                            <option key={department.department_id} value={department.department_id}>
-                              {department.name}
-                            </option>
-                          ))}
-                      </select>
-                    </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-start px-1 py-0.5 text-[0.7rem] text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Afdeling(er):</label>
                       <div className="py-0.5">
@@ -459,31 +419,43 @@ export function HandleVehiclePage() {
                                     </td>
                                   </tr>
                                 )}
-                                {departmentOptions.map((department) => {
-                                  const isAlleKoretojer = department.name === ALLE_KORETOJER_NAME;
-                                  return (
-                                    <tr key={department.department_id}>
-                                      <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
-                                        {department.name}
-                                      </td>
-                                      <td className="px-2 py-0.5 text-center">
-                                        <input
-                                          type="checkbox"
-                                          checked={isAlleKoretojer || selectedDepartmentIds.has(department.department_id)}
-                                          disabled={isAlleKoretojer}
-                                          title={isAlleKoretojer ? "Alle køretøjer kan ikke fjernes" : undefined}
-                                          onChange={(e) => toggleDepartment(department, e.target.checked)}
-                                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                                        />
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
+                                {departmentOptions.map((department) => (
+                                  <tr key={department.department_id}>
+                                    <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
+                                      {department.name}
+                                    </td>
+                                    <td className="px-2 py-0.5 text-center">
+                                      <input
+                                        type="checkbox"
+                                        checked={selectedDepartmentIds.has(department.department_id)}
+                                        onChange={(e) => toggleDepartment(department, e.target.checked)}
+                                        className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                      />
+                                    </td>
+                                  </tr>
+                                ))}
                               </tbody>
                             </table>
                           </div>
                         )}
                       </div>
+                    </div>
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                      <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Hjemmeafdeling:</div>
+                      <select
+                        value={homeDepartmentId ?? ""}
+                        onChange={(e) => setHomeDepartmentId(e.target.value || null)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
+                        {departmentOptions
+                          .filter((department) => selectedDepartmentIds.has(department.department_id))
+                          .map((department) => (
+                            <option key={department.department_id} value={department.department_id}>
+                              {department.name}
+                            </option>
+                          ))}
+                      </select>
                     </div>
                   </div>
                 </div>

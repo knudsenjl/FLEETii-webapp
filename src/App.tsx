@@ -17,6 +17,7 @@ import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { FleetiiAdministrationPage } from "./pages/FleetiiAdministrationPage";
 import { CostumerDetailsPage } from "./pages/CostumerDetailsPage";
+import { DepartmentDetailsPage } from "./pages/DepartmentDetailsPage";
 import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
 import { HandleVehiclePage } from "./pages/HandleVehiclePage";
@@ -146,6 +147,14 @@ function App() {
             element={
               <ProtectedRoute requireRole="FLEETii admin">
                 <CostumerDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/department-details"
+            element={
+              <ProtectedRoute requireRole="FLEETii admin">
+                <DepartmentDetailsPage />
               </ProtectedRoute>
             }
           />

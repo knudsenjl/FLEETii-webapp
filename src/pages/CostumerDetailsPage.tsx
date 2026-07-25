@@ -5,12 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { InlinePopup } from "../components/InlinePopup";
-import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
-
-/** Name of the department costumers_create_default_department auto-creates for every new costumer (see departments_default_name_alle_koretojer.sql). Protected from deletion, both here (a popup instead of the confirm dialog) and at the DB layer (departments_protect_default_delete.sql). */
-const DEFAULT_DEPARTMENT_NAME = "Alle køretøjer";
 
 /** The costumer row, as passed in via router state from FleetiiAdministrationPage. Absent when reached via "Ny kunde" — see the KNOWN LIMITATION below. */
 type Costumer = {
@@ -24,12 +19,6 @@ type Costumer = {
   email: string | null;
 };
 
-/** A row from the `departments` table, scoped to this costumer. */
-type Department = {
-  department_id: string;
-  name: string | null;
-};
-
 /**
  * Costumer view — plain "/costumer-details" (create, matches App.tsx's
  * route with no :costumerId) or "/costumer-details/:costumerId" (edit) —
@@ -41,15 +30,14 @@ type Department = {
  * falls back to fetching it by id instead, redirecting to "/fleetii-admin"
  * if it can't be found. "Rediger kunde" switches it into an editable form in
  * place (in-place rather than a separate page like VehicleDetailsPage/
- * HandleVehiclePage, since costumers only have one editable field), which is
- * also where department management lives: click a department (in either
- * view) to select it, then "Slet afdeling" to remove it (same
- * click-to-select-then-act pattern as AvailablePage's vehicle list), or
- * "Ny afdeling" to add one — both only while editing. Reached without a
- * costumer (its "Ny kunde" button, or the plain "/costumer-details" route),
- * shows a create form instead — inserting a new costumers row auto-creates
- * its first department (DEFAULT_DEPARTMENT_NAME) via a DB trigger (see
- * supabase/applied/departments_default_name_alle_koretojer.sql).
+ * HandleVehiclePage, since costumers only have one editable field). Reached
+ * without a costumer (its "Ny kunde" button, or the plain "/costumer-details"
+ * route), shows a create form instead — inserting a new costumers row
+ * auto-creates its first department (see
+ * supabase/applied/departments_default_name_alle_koretojer.sql). Department
+ * management itself (create/select/delete) now lives on its own page — see
+ * DepartmentDetailsPage.tsx — reached via "Administration af afdelinger"
+ * below.
  *
  * Costumer lifecycle (see supabase/applied/costumers_add_deactivated_at.sql /
  * costumer_purge_function.sql, and delete-costumer.mts):
@@ -99,15 +87,7 @@ export function CostumerDetailsPage() {
   const [editPhone, setEditPhone] = useState(costumer?.phone ?? "");
   const [editEmail, setEditEmail] = useState(costumer?.email ?? "");
   const [pendingAction, setPendingAction] = useState<
-    | "create"
-    | "update"
-    | "delete"
-    | "close"
-    | "create-department"
-    | "delete-department"
-    | "deactivate"
-    | "reactivate"
-    | null
+    "create" | "update" | "delete" | "close" | "deactivate" | "reactivate" | null
   >(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -122,16 +102,6 @@ export function CostumerDetailsPage() {
   // (reversible), so a plain Ja/Fortryd dialog isn't enough friction.
   const [purgeConfirmText, setPurgeConfirmText] = useState("");
 
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [departmentsLoading, setDepartmentsLoading] = useState(true);
-  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(null);
-  const [isAddingDepartment, setIsAddingDepartment] = useState(false);
-  const [newDepartmentName, setNewDepartmentName] = useState("");
-  const [departmentError, setDepartmentError] = useState<string | null>(null);
-  const { activeKey: departmentWarningKey, trigger: triggerDepartmentWarning } = useTimedFlag();
-  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
-
   const canSubmit =
     name.trim().length > 0 &&
     cvr.trim().length > 0 &&
@@ -140,43 +110,6 @@ export function CostumerDetailsPage() {
     phone.trim().length > 0 &&
     email.trim().length > 0;
   const canSubmitEdit = editName.trim().length > 0;
-  const canSubmitDepartment = newDepartmentName.trim().length > 0;
-  // Other (non-default) departments still around — DB-enforced too (see
-  // departments_allow_delete_default_when_alone.sql): the default may only
-  // be deleted once it's the last department left for its costumer.
-  const otherDepartments = departments.filter((d) => d.name !== DEFAULT_DEPARTMENT_NAME);
-  const isDefaultDepartmentSelected =
-    departments.find((d) => d.department_id === selectedDepartmentId)?.name === DEFAULT_DEPARTMENT_NAME;
-  const blockDefaultDepartmentDelete = isDefaultDepartmentSelected && otherDepartments.length > 0;
-
-  const loadDepartments = async (costumerId: string) => {
-    setDepartmentsLoading(true);
-    setDepartmentsError(null);
-
-    const { data, error } = await supabase
-      .from("departments")
-      .select("department_id, name")
-      .eq("costumer_id", costumerId)
-      .order("name", { ascending: true })
-      .returns<Department[]>();
-
-    if (error) {
-      setDepartmentsError(error.message);
-      setDepartmentsLoading(false);
-      return;
-    }
-
-    // DEFAULT_DEPARTMENT_NAME always first, then the rest alphabetically
-    // (the query's own "order by name" alone would sort it wherever it
-    // falls alphabetically, e.g. after "Administration").
-    const sorted = [...(data ?? [])].sort((a, b) => {
-      if (a.name === DEFAULT_DEPARTMENT_NAME) return b.name === DEFAULT_DEPARTMENT_NAME ? 0 : -1;
-      if (b.name === DEFAULT_DEPARTMENT_NAME) return 1;
-      return (a.name ?? "").localeCompare(b.name ?? "");
-    });
-    setDepartments(sorted);
-    setDepartmentsLoading(false);
-  };
 
   /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/costumer-details/:costumerId" (no router state) — skipped entirely when stateCostumer is already present. */
   useEffect(() => {
@@ -226,13 +159,6 @@ export function CostumerDetailsPage() {
       navigate("/fleetii-admin", { replace: true });
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
-
-  useEffect(() => {
-    if (costumer) {
-      void loadDepartments(costumer.costumer_id);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [costumer?.costumer_id]);
 
   /** Inserts the new costumer row; the costumers_create_default_department trigger handles seeding its first department. */
   const handleCreate = async () => {
@@ -390,63 +316,6 @@ export function CostumerDetailsPage() {
     setPendingAction(null);
   };
 
-  const handleCreateDepartment = async () => {
-    if (!costumer) return;
-
-    setIsSubmitting(true);
-    setDepartmentError(null);
-
-    const { error } = await supabase
-      .from("departments")
-      .insert({ name: newDepartmentName.trim(), costumer_id: costumer.costumer_id });
-
-    if (error) {
-      setDepartmentError(error.message);
-      setIsSubmitting(false);
-      return;
-    }
-
-    setIsSubmitting(false);
-    setPendingAction(null);
-    setIsAddingDepartment(false);
-    setNewDepartmentName("");
-    await loadDepartments(costumer.costumer_id);
-  };
-
-  const handleDeleteDepartment = async () => {
-    if (!costumer || !selectedDepartmentId) return;
-
-    setIsSubmitting(true);
-    setDepartmentError(null);
-
-    // .select() so a row actually being deleted can be confirmed — RLS
-    // (departments_protect_default_delete.sql) silently returns 0 rows
-    // rather than an error if its "not the default department" check
-    // blocks this, same as this app's other RLS gaps taught us to check
-    // for explicitly rather than assume a no-error response means success.
-    const { data, error } = await supabase
-      .from("departments")
-      .delete()
-      .eq("department_id", selectedDepartmentId)
-      .select("department_id");
-
-    if (error) {
-      setDepartmentError(error.message);
-      setIsSubmitting(false);
-      return;
-    }
-    if (!data || data.length === 0) {
-      setDepartmentError("Denne afdeling kan ikke slettes.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    setIsSubmitting(false);
-    setPendingAction(null);
-    setSelectedDepartmentId(null);
-    await loadDepartments(costumer.costumer_id);
-  };
-
   const handleConfirm = async () => {
     if (pendingAction === "close") {
       navigate("/fleetii-admin");
@@ -468,131 +337,8 @@ export function CostumerDetailsPage() {
       await handleReactivate();
       return;
     }
-    if (pendingAction === "create-department") {
-      await handleCreateDepartment();
-      return;
-    }
-    if (pendingAction === "delete-department") {
-      await handleDeleteDepartment();
-      return;
-    }
     await handleCreate();
   };
-
-  /**
-   * Shown in both the view and "Rediger kunde" edit forms, but only
-   * clickable/selectable in the edit form (`selectable`) — selection only
-   * matters for "Ny afdeling"/"Slet afdeling", which live there now, not in
-   * the plain view. A click registered in the view (when it briefly WAS
-   * rendered as buttons there too) had nothing showing what got selected,
-   * so it looked like a department got selected "by itself" once the admin
-   * switched into edit mode.
-   */
-  function renderDepartmentsRow(selectable: boolean) {
-    return (
-      <div className="grid grid-cols-2 items-start gap-2 p-0.5">
-        <label className="flex items-center text-sm font-medium text-brand-700">Afdelinger:</label>
-        <div className="flex flex-col gap-0.5 py-0.5">
-          {departmentsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
-          {!departmentsLoading && departmentsError && <span className="text-sm text-red-600">{departmentsError}</span>}
-          {!departmentsLoading && !departmentsError && departments.length === 0 && (
-            <span className="text-sm text-brand-500">—</span>
-          )}
-          {!departmentsLoading &&
-            !departmentsError &&
-            departments.map((department) =>
-              selectable ? (
-                <button
-                  key={department.department_id}
-                  type="button"
-                  aria-pressed={department.department_id === selectedDepartmentId}
-                  onClick={() => setSelectedDepartmentId(department.department_id)}
-                  className={`w-fit rounded px-1 text-left text-sm transition ${
-                    department.department_id === selectedDepartmentId
-                      ? "bg-brand-100 font-semibold text-brand-900"
-                      : "text-brand-800 hover:bg-brand-50"
-                  }`}
-                >
-                  {department.name ?? "—"}
-                </button>
-              ) : (
-                <span key={department.department_id} className="text-sm text-brand-800">
-                  {department.name ?? "—"}
-                </span>
-              ),
-            )}
-        </div>
-      </div>
-    );
-  }
-
-  // Only shown in the "Rediger kunde" edit form (above Opdater kunde/
-  // Fortryd) — department management lives alongside editing the
-  // costumer's own name, not in the plain view.
-  const departmentActions = isAddingDepartment ? (
-    <>
-      {departmentError && <p className="text-sm text-red-600">{departmentError}</p>}
-
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => setPendingAction("create-department")}
-          disabled={!canSubmitDepartment}
-          className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          Opret afdeling
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setNewDepartmentName("");
-            setIsAddingDepartment(false);
-          }}
-          className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
-          Annuller
-        </button>
-      </div>
-    </>
-  ) : (
-    <>
-      {departmentError && <p className="text-sm text-red-600">{departmentError}</p>}
-
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={() => {
-            setNewDepartmentName("");
-            setDepartmentError(null);
-            setIsAddingDepartment(true);
-          }}
-          className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-        >
-          Ny afdeling
-        </button>
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() =>
-              blockDefaultDepartmentDelete
-                ? triggerDepartmentWarning("default-department")
-                : setPendingAction("delete-department")
-            }
-            disabled={!selectedDepartmentId}
-            className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Slet afdeling
-          </button>
-          <InlinePopup
-            visible={departmentWarningKey === "default-department"}
-            message={`"${DEFAULT_DEPARTMENT_NAME}" kan ikke slettes.`}
-            variant="warning"
-            align="right"
-          />
-        </div>
-      </div>
-    </>
-  );
 
   // Only while a SPECIFIC costumer is being fetched by id (:costumerId
   // present, no router state yet) — without this guard, the form would
@@ -681,18 +427,12 @@ export function CostumerDetailsPage() {
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       </div>
-                      {renderDepartmentsRow(true)}
-                      {isAddingDepartment && (
-                        <RequiredFieldRow label="Ny afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
-                      )}
                     </div>
                   </div>
 
                   <p className="text-right text-xs text-brand-500">
                     <span className="text-red-600">*</span> Feltet skal udfyldes
                   </p>
-
-                  {departmentActions}
 
                   {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
@@ -750,7 +490,6 @@ export function CostumerDetailsPage() {
                         <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
                         <span className="text-sm text-brand-800">{costumer.email ?? "—"}</span>
                       </div>
-                      {renderDepartmentsRow(false)}
                     </div>
                   </div>
 
@@ -819,22 +558,28 @@ export function CostumerDetailsPage() {
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => triggerNotImplemented("vehicles")}
+                        onClick={() =>
+                          navigate("/fleet-table", {
+                            state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                          })
+                        }
                         className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                       >
                         Administration af køretøjer
                       </button>
-                      <InlinePopup visible={notImplementedKey === "vehicles"} message="Endnu ikke implementeret" />
                     </div>
                     <div className="relative">
                       <button
                         type="button"
-                        onClick={() => triggerNotImplemented("departments")}
+                        onClick={() =>
+                          navigate("/department-details", {
+                            state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                          })
+                        }
                         className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                       >
                         Administration af afdelinger
                       </button>
-                      <InlinePopup visible={notImplementedKey === "departments"} message="Endnu ikke implementeret" />
                     </div>
                   </div>
                 </>
@@ -971,13 +716,9 @@ export function CostumerDetailsPage() {
                     ? "Er du sikker på, at du vil blokere kundens adgang? Alle brugere under kunden bliver låst ude med det samme."
                     : pendingAction === "reactivate"
                       ? "Er du sikker på, at du vil genetablere kundens adgang? Alle brugere under kunden får adgang igen."
-                      : pendingAction === "create-department"
-                        ? "Er du sikker på, at du vil oprette denne afdeling?"
-                        : pendingAction === "delete-department"
-                          ? "Er du sikker på, at du vil slette denne afdeling?"
-                          : "Er du sikker på, at du vil lukke uden at gemme?"
+                      : "Er du sikker på, at du vil lukke uden at gemme?"
           }
-          error={pendingAction === "create-department" || pendingAction === "delete-department" ? departmentError : submitError}
+          error={submitError}
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void handleConfirm()}
           isPending={isSubmitting}
@@ -986,7 +727,7 @@ export function CostumerDetailsPage() {
             (!costumer?.name?.trim() || purgeConfirmText.trim() !== costumer.name.trim())
           }
           confirmPendingLabel={
-            pendingAction === "delete" || pendingAction === "delete-department"
+            pendingAction === "delete"
               ? "Sletter…"
               : pendingAction === "deactivate"
                 ? "Blokerer…"

@@ -43,8 +43,8 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 /**
  * Vehicle detail view ("/vehicle-details/:vehicleId"): plate, model, fuel
  * level, mileage, status, a read-only Afdeling(er) row (the departments this
- * vehicle belongs to, via vehicle_departments — "Alle køretøjer" always
- * first), and (admin-only) a map showing its last known GPS position (or a
+ * vehicle belongs to, via vehicle_departments), and (admin-only) a map
+ * showing its last known GPS position (or a
  * "no GPS available" overlay if none exists), plus (also admin-only)
  * "Rediger køretøj" (to HandleVehiclePage, where Afdeling(er) is actually
  * editable) and "Slet køretøj" (both moved here from VehiclesPage). Normally
@@ -160,11 +160,7 @@ export function VehicleDetailsPage() {
       const departments = (vehicleDepartmentsResult.data ?? [])
         .filter((row): row is VehicleDepartmentRow & { departments: { name: string } } => row.departments !== null)
         .map((row) => ({ department_id: row.department_id, name: row.departments.name }))
-        .sort((a, b) => {
-          if (a.name === "Alle køretøjer") return -1;
-          if (b.name === "Alle køretøjer") return 1;
-          return a.name.localeCompare(b.name);
-        });
+        .sort((a, b) => a.name.localeCompare(b.name));
       setVehicleDepartments(departments);
 
       const homeDepartmentId = homeResult.data?.department_id ?? null;

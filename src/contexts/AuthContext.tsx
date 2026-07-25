@@ -181,18 +181,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       console.error("[AuthContext] user_departments select failed:", error);
       return [];
     }
-    // "Alle køretøjer" always sorts first (see
-    // supabase/applied/grant_admins_alle_koretojer_access.sql — every admin
-    // is guaranteed a grant for it), ahead of the rest in whatever order
-    // the query returned them.
     return (data ?? [])
       .filter((row) => row.departments !== null)
       .map((row) => ({ department_id: row.department_id, name: row.departments!.name }))
-      .sort((a, b) => {
-        if (a.name === "Alle køretøjer") return -1;
-        if (b.name === "Alle køretøjer") return 1;
-        return 0;
-      });
+      .sort((a, b) => a.name.localeCompare(b.name));
   };
 
   useEffect(() => {

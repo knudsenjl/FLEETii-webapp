@@ -1,31 +1,47 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
 type Vehicle = DisplayVehicle;
 
+/** A department belonging to the costumer this page is scoped to — populates the Afdeling filter and determines which vehicles (by departmentIds membership) are in scope. */
+type DepartmentOption = { department_id: string; name: string };
+
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table"): lists every
- * vehicle in the admin's own department (filtered via vehicle_departments,
- * see afdelingId); clicking a
- * row navigates straight to VehicleDetailsPage (editing/deleting a vehicle
- * both live there too), or create a new one via NewVehiclePage.
+ * vehicle belonging to the target costumer (every vehicle whose
+ * departmentIds intersects that costumer's own departments, not just the
+ * viewer's own active one), filterable down to a single Afdeling. Reached
+ * either from the regular admin flow (no router state — scoped to the
+ * viewer's own costumerId) or from CostumerDetailsPage's "Administration af
+ * køretøjer" button (FLEETii admin — costumerId/costumerName passed via
+ * router state, since a FLEETii admin has no costumerId of their own).
+ * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
+ * a vehicle both live there too), or create a new one via NewVehiclePage.
  */
 export function VehiclesPage() {
-  const { afdelingId } = useAuth();
+  const { afdelingId, costumerId } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
 
+  const state = location.state as { costumerId?: string; costumerName?: string } | null;
+  const targetCostumerId = state?.costumerId ?? costumerId;
+  const targetCostumerName = state?.costumerName ?? null;
+
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -43,17 +59,52 @@ export function VehiclesPage() {
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter(
-    (v) => (!filterPlate || v.plate === filterPlate) && (!filterStatus || v.status === filterStatus),
+    (v) =>
+      (!filterPlate || v.plate === filterPlate) &&
+      (!filterStatus || v.status === filterStatus) &&
+      (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
+  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. */
   useEffect(() => {
+    if (!targetCostumerId) {
+      setDepartmentOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("departments")
+      .select("department_id, name")
+      .eq("costumer_id", targetCostumerId)
+      .order("name")
+      .returns<DepartmentOption[]>()
+      .then(({ data }) => {
+        if (!cancelled) setDepartmentOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [targetCostumerId]);
+
+  useEffect(() => {
+    const costumerDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
     setVehicles(
       twoHireVehicles
-        .filter((v) => afdelingId !== null && v.departmentIds.includes(afdelingId))
+        .filter((v) => v.departmentIds.some((id) => costumerDepartmentIds.has(id)))
         .map(toDisplayVehicle)
         .sort((a, b) => a.plate.localeCompare(b.plate)),
     );
-  }, [twoHireVehicles, afdelingId]);
+  }, [twoHireVehicles, departmentOptions]);
+
+  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. FLEETii admin has no afdelingId, so this simply never fires for them, leaving "Alle" selected. */
+  useEffect(() => {
+    if (!afdelingId) return;
+    if (!departmentOptions.some((d) => d.department_id === afdelingId)) return;
+
+    setFilterDepartment(afdelingId);
+  }, [afdelingId, departmentOptions]);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -74,14 +125,16 @@ export function VehiclesPage() {
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">Administration af køretøjer</h2>
+                <h2 className="text-xl font-semibold text-brand-800">
+                  Administration af køretøjer{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
+                </h2>
                 <div className="relative" ref={filterRef}>
                   <button
                     type="button"
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate || filterStatus
+                      filterPlate || filterStatus || filterDepartment
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -96,6 +149,21 @@ export function VehiclesPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
+                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                          Afdeling
+                          <select
+                            value={filterDepartment}
+                            onChange={(e) => setFilterDepartment(e.target.value)}
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                          >
+                            <option value="">Alle</option>
+                            {departmentOptions.map((department) => (
+                              <option key={department.department_id} value={department.department_id}>
+                                {department.name}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Nummerplade
                           <select
@@ -123,12 +191,13 @@ export function VehiclesPage() {
                             <option value="Offline">Offline</option>
                           </select>
                         </label>
-                        {(filterPlate || filterStatus) && (
+                        {(filterPlate || filterStatus || filterDepartment) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFilterPlate("");
                               setFilterStatus("");
+                              setFilterDepartment("");
                             }}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
                           >
@@ -153,7 +222,11 @@ export function VehiclesPage() {
                     {filteredVehicles.length === 0 && (
                       <tr>
                         <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                          {filterPlate || filterStatus ? "Ingen køretøjer matcher filteret." : "Ingen køretøjer fundet."}
+                          {!targetCostumerId
+                            ? "Ingen kunde valgt."
+                            : filterPlate || filterStatus || filterDepartment
+                              ? "Ingen køretøjer matcher filteret."
+                              : "Ingen køretøjer fundet."}
                         </td>
                       </tr>
                     )}

@@ -234,23 +234,24 @@ export function AllBookingsPage() {
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-                      <th className="w-44 whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Periode</th>
+                      <th className="w-44 whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Periode</th>
+                      <th className="w-56 whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Bruger</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
                           {filterUser || filterVehicle
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
@@ -286,8 +287,14 @@ export function AllBookingsPage() {
                             >
                               {formatVehicleLabel(booking.vehicle, vehicles)}
                             </td>
-                            <td className="whitespace-nowrap px-2 py-0.5 text-right" title={formatBookingPeriod(booking)}>
+                            <td
+                              className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right"
+                              title={formatBookingPeriod(booking)}
+                            >
                               {formatBookingPeriod(booking, true)}
+                            </td>
+                            <td className="truncate px-2 py-0.5" title={booking.userEmail ?? undefined}>
+                              {booking.userEmail ?? "—"}
                             </td>
                           </tr>
                         );
