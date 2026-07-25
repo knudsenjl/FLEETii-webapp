@@ -698,6 +698,7 @@ export function UserDetailsPage() {
                   table="user_settings"
                   scopeColumn="user_id"
                   scopeId={user.user_id}
+                  departmentId={afdelingId}
                   deferSave
                 />
               )}

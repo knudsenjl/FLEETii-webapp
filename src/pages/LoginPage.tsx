@@ -198,14 +198,29 @@ export function LoginPage() {
 
                 <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">
                   Brugernavn / e-mail
-                  <input
-                    type="text"
-                    autoComplete="username"
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    placeholder="dig@virksomhed.dk"
-                    className="rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 text-base text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      autoComplete="username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="dig@virksomhed.dk"
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 pr-9 text-base text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                    />
+                    {username && (
+                      <button
+                        type="button"
+                        onClick={() => setUsername("")}
+                        aria-label="Ryd brugernavn"
+                        className="absolute right-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-brand-400 transition hover:bg-brand-100 hover:text-brand-600"
+                      >
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          <path d="M18 6 6 18" />
+                          <path d="M6 6l12 12" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
                 </label>
 
                 <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">

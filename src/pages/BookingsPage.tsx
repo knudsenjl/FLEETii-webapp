@@ -210,7 +210,11 @@ export function BookingsPage() {
                     )}
                     {!loading && !error && !nextBooking && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Ingen kommende reservation.</td>
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
+                          {canShowNewBookingButton
+                            ? "Ingen kommende reservation."
+                            : "Anmod administratoren om at lave en reservation til dig."}
+                        </td>
                       </tr>
                     )}
                     {!loading &&

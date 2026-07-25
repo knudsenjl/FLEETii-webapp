@@ -2,7 +2,16 @@
   "permissions": {
     "allow": [
       "Bash(npm run *)",
-      "Bash(netstat -ano)"
+      "Bash(netstat -ano)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=34268 or ProcessId=23840\")",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=33540 or ProcessId=24920\")",
+      "PowerShell(Stop-Process -Id 34268,23840 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Id 34268,23840 -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=5484 or ProcessId=19860\")",
+      "PowerShell(Stop-Process -Id 5484,19860 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Id 5484,19860 -ErrorAction SilentlyContinue)",
+      "PowerShell(Stop-Process -Id 10572,23884 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Id 10572,23884 -ErrorAction SilentlyContinue)"
     ]
   }
 }

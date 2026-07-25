@@ -7,11 +7,16 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 
-/** A row from the `costumers` table. */
+/** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address/contact_person/phone/email until its own fetch-by-id fallback kicked in. */
 type Costumer = {
   costumer_id: string;
   name: string | null;
   deactivated_at: string | null;
+  cvr: string | null;
+  address: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 /** FLEETii admin dashboard. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
@@ -29,7 +34,7 @@ export function FleetiiAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("costumers")
-        .select("costumer_id, name, deactivated_at")
+        .select("costumer_id, name, deactivated_at, cvr, address, contact_person, phone, email")
         .order("name", { ascending: true })
         .returns<Costumer[]>();
 

@@ -13,7 +13,7 @@ import { InlinePopup } from "./InlinePopup";
 /** The settings route for a given `user_profiles.role` — "FLEETii admin" gets its own page, everyone else gets "admin" or "user" (any non-"admin" role, including null/undefined, is treated as a regular user, matching formatRoleLabel's convention). */
 function settingsPathForRole(role?: string | null): string {
   if (role === "FLEETii admin") return "/settings-superadmin";
-  return role === "admin" ? "/settings-admin" : "/settings-user";
+  return role === "admin" ? "/settings-department" : "/settings-user";
 }
 
 /** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a role-specific settings link (only when logged in), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */

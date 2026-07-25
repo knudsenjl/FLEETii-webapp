@@ -1,4 +1,4 @@
-// The "admin" settings page ("/settings-admin" — reached via the round
+// The "admin" settings page ("/settings-department" — reached via the round
 // settings button in PageHeader.tsx, for role "admin"; see
 // SettingsSuperadminPage.tsx/SettingsUserPage.tsx for the other two roles'
 // variants). Manages the admin's own department's "Anvendelse" list, standard
@@ -14,7 +14,7 @@ import { RettighederSettings } from "../components/RettighederSettings";
 
 /** Settings page for role "admin". */
 export function SettingsAdminPage() {
-  const { afdelingId } = useAuth();
+  const { afdeling, afdelingId } = useAuth();
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -33,7 +33,7 @@ export function SettingsAdminPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Indstillinger</h2>
+            <h2 className="text-xl font-semibold text-brand-800">Indstillinger for {afdeling ?? "—"}</h2>
             <AnvendelseSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />
             <StandardSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />
             <RettighederSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />

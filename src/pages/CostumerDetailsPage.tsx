@@ -17,6 +17,11 @@ type Costumer = {
   costumer_id: string;
   name: string | null;
   deactivated_at: string | null;
+  cvr: string | null;
+  address: string | null;
+  contact_person: string | null;
+  phone: string | null;
+  email: string | null;
 };
 
 /** A row from the `departments` table, scoped to this costumer. */
@@ -70,15 +75,29 @@ export function CostumerDetailsPage() {
   const { session } = useAuth();
   const location = useLocation();
   const { costumerId } = useParams<{ costumerId: string }>();
-  const state = location.state as { costumer?: Costumer } | null;
+  const state = location.state as { costumer?: Costumer; startEditing?: boolean } | null;
   const stateCostumer = state?.costumer ?? null;
   const [fetchedCostumer, setFetchedCostumer] = useState<Costumer | null>(null);
   const [costumerLoading, setCostumerLoading] = useState(false);
   const costumer = stateCostumer ?? fetchedCostumer;
 
   const [name, setName] = useState("");
-  const [isEditing, setIsEditing] = useState(false);
+  const [cvr, setCvr] = useState("");
+  const [address, setAddress] = useState("");
+  const [contactPerson, setContactPerson] = useState("");
+  const [phone, setPhone] = useState("");
+  const [email, setEmail] = useState("");
+  // Seeded from router state's startEditing flag — handleCreate navigates
+  // here right after "Opret kunde" with that flag set, so the newly created
+  // costumer lands directly in its edit view instead of the plain
+  // Kundedetaljer view.
+  const [isEditing, setIsEditing] = useState(Boolean(state?.startEditing));
   const [editName, setEditName] = useState(costumer?.name ?? "");
+  const [editCvr, setEditCvr] = useState(costumer?.cvr ?? "");
+  const [editAddress, setEditAddress] = useState(costumer?.address ?? "");
+  const [editContactPerson, setEditContactPerson] = useState(costumer?.contact_person ?? "");
+  const [editPhone, setEditPhone] = useState(costumer?.phone ?? "");
+  const [editEmail, setEditEmail] = useState(costumer?.email ?? "");
   const [pendingAction, setPendingAction] = useState<
     | "create"
     | "update"
@@ -111,8 +130,15 @@ export function CostumerDetailsPage() {
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [departmentError, setDepartmentError] = useState<string | null>(null);
   const { activeKey: departmentWarningKey, trigger: triggerDepartmentWarning } = useTimedFlag();
+  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const canSubmit = name.trim().length > 0;
+  const canSubmit =
+    name.trim().length > 0 &&
+    cvr.trim().length > 0 &&
+    address.trim().length > 0 &&
+    contactPerson.trim().length > 0 &&
+    phone.trim().length > 0 &&
+    email.trim().length > 0;
   const canSubmitEdit = editName.trim().length > 0;
   const canSubmitDepartment = newDepartmentName.trim().length > 0;
   // Other (non-default) departments still around — DB-enforced too (see
@@ -160,7 +186,7 @@ export function CostumerDetailsPage() {
     setCostumerLoading(true);
     void supabase
       .from("costumers")
-      .select("costumer_id, name, deactivated_at")
+      .select("costumer_id, name, deactivated_at, cvr, address, contact_person, phone, email")
       .eq("costumer_id", costumerId)
       .maybeSingle<Costumer>()
       .then(({ data }) => {
@@ -183,6 +209,11 @@ export function CostumerDetailsPage() {
     if (!costumer) return;
     setEditName(costumer.name ?? "");
     setDeactivatedAt(costumer.deactivated_at ?? null);
+    setEditCvr(costumer.cvr ?? "");
+    setEditAddress(costumer.address ?? "");
+    setEditContactPerson(costumer.contact_person ?? "");
+    setEditPhone(costumer.phone ?? "");
+    setEditEmail(costumer.email ?? "");
   }, [costumer]);
 
   // Redirects back to the FLEETii-admin costumer list if a SPECIFIC costumer
@@ -208,17 +239,34 @@ export function CostumerDetailsPage() {
     setIsSubmitting(true);
     setSubmitError(null);
 
-    const { error } = await supabase.from("costumers").insert({ name: name.trim() });
+    // .select().single() so the newly created row (including its
+    // costumer_id) comes straight back — needed to navigate onward into
+    // its edit view without a redundant fetch.
+    const { data, error } = await supabase
+      .from("costumers")
+      .insert({
+        name: name.trim(),
+        cvr: cvr.trim() || null,
+        address: address.trim() || null,
+        contact_person: contactPerson.trim() || null,
+        phone: phone.trim() || null,
+        email: email.trim() || null,
+      })
+      .select("costumer_id, name, deactivated_at, cvr, address, contact_person, phone, email")
+      .single<Costumer>();
 
-    if (error) {
-      setSubmitError(error.message);
+    if (error || !data) {
+      setSubmitError(error?.message ?? "Kunne ikke oprette kunden.");
       setIsSubmitting(false);
       return;
     }
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/fleetii-admin");
+    navigate(`/costumer-details/${data.costumer_id}`, {
+      replace: true,
+      state: { costumer: data, startEditing: true },
+    });
   };
 
   const handleUpdate = async () => {
@@ -229,7 +277,14 @@ export function CostumerDetailsPage() {
 
     const { error } = await supabase
       .from("costumers")
-      .update({ name: editName.trim() })
+      .update({
+        name: editName.trim(),
+        cvr: editCvr.trim() || null,
+        address: editAddress.trim() || null,
+        contact_person: editContactPerson.trim() || null,
+        phone: editPhone.trim() || null,
+        email: editEmail.trim() || null,
+      })
       .eq("costumer_id", costumer.costumer_id);
 
     if (error) {
@@ -581,6 +636,51 @@ export function CostumerDetailsPage() {
                   <div className="overflow-hidden rounded-2xl border border-brand-100">
                     <div className="divide-y divide-brand-100 bg-white">
                       <RequiredFieldRow label="Navn:" value={editName} onChange={setEditName} />
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                        <input
+                          type="text"
+                          value={editCvr}
+                          onChange={(e) => setEditCvr(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Adresse:</label>
+                        <input
+                          type="text"
+                          value={editAddress}
+                          onChange={(e) => setEditAddress(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
+                        <input
+                          type="text"
+                          value={editContactPerson}
+                          onChange={(e) => setEditContactPerson(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
+                        <input
+                          type="tel"
+                          value={editPhone}
+                          onChange={(e) => setEditPhone(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
+                        <input
+                          type="email"
+                          value={editEmail}
+                          onChange={(e) => setEditEmail(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
                       {renderDepartmentsRow(true)}
                       {isAddingDepartment && (
                         <RequiredFieldRow label="Ny afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
@@ -609,6 +709,11 @@ export function CostumerDetailsPage() {
                       type="button"
                       onClick={() => {
                         setEditName(costumer.name ?? "");
+                        setEditCvr(costumer.cvr ?? "");
+                        setEditAddress(costumer.address ?? "");
+                        setEditContactPerson(costumer.contact_person ?? "");
+                        setEditPhone(costumer.phone ?? "");
+                        setEditEmail(costumer.email ?? "");
                         setIsEditing(false);
                       }}
                       className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
@@ -624,6 +729,26 @@ export function CostumerDetailsPage() {
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">Navn:</label>
                         <span className="text-sm text-brand-800">{costumer.name ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                        <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Adresse:</label>
+                        <span className="text-sm text-brand-800">{costumer.address ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
+                        <span className="text-sm text-brand-800">{costumer.contact_person ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
+                        <span className="text-sm text-brand-800">{costumer.phone ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
+                        <span className="text-sm text-brand-800">{costumer.email ?? "—"}</span>
                       </div>
                       {renderDepartmentsRow(false)}
                     </div>
@@ -668,6 +793,11 @@ export function CostumerDetailsPage() {
                           type="button"
                           onClick={() => {
                             setEditName(costumer.name ?? "");
+                            setEditCvr(costumer.cvr ?? "");
+                            setEditAddress(costumer.address ?? "");
+                            setEditContactPerson(costumer.contact_person ?? "");
+                            setEditPhone(costumer.phone ?? "");
+                            setEditEmail(costumer.email ?? "");
                             setIsEditing(true);
                           }}
                           className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
@@ -684,6 +814,29 @@ export function CostumerDetailsPage() {
                       </>
                     )}
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => triggerNotImplemented("vehicles")}
+                        className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      >
+                        Administration af køretøjer
+                      </button>
+                      <InlinePopup visible={notImplementedKey === "vehicles"} message="Endnu ikke implementeret" />
+                    </div>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => triggerNotImplemented("departments")}
+                        className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      >
+                        Administration af afdelinger
+                      </button>
+                      <InlinePopup visible={notImplementedKey === "departments"} message="Endnu ikke implementeret" />
+                    </div>
+                  </div>
                 </>
               )
             ) : (
@@ -691,6 +844,71 @@ export function CostumerDetailsPage() {
                 <div className="overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
                     <RequiredFieldRow label="Navn:" value={name} onChange={setName} />
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        CVR. <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={cvr}
+                        onChange={(e) => setCvr(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Adresse: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={address}
+                        onChange={(e) => setAddress(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Kontaktperson: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={contactPerson}
+                        onChange={(e) => setContactPerson(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Tlf: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        aria-required="true"
+                        value={phone}
+                        onChange={(e) => setPhone(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        E-mail: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="email"
+                        required
+                        aria-required="true"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
                   </div>
                 </div>
 

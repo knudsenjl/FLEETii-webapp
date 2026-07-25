@@ -230,7 +230,7 @@ function App() {
             }
           />
           <Route
-            path="/settings-admin"
+            path="/settings-department"
             element={
               <ProtectedRoute requireRole="admin">
                 <SettingsAdminPage />
