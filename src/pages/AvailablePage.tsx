@@ -158,7 +158,7 @@ export function AvailablePage() {
                 )}
               </div>
 
-              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>

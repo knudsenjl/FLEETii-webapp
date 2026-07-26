@@ -18,8 +18,10 @@ import {
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useVehicleLockState } from "../hooks/useVehicleLockState";
+import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 
@@ -84,6 +86,7 @@ export function BookingDetailsPage() {
   const canShowEditButton = isAdmin || userMayEditBooking;
 
   const {
+    locked: vehicleLocked,
     lockEnabled,
     unlockEnabled,
     loading: lockStateLoading,
@@ -94,6 +97,8 @@ export function BookingDetailsPage() {
     booking ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso } : null,
     isAdmin,
   );
+  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful setLock — see the Lås/Lås op buttons below. */
+  const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
 
   useEffect(() => {
     void isSettingTilladt("Tillad_slet_reservation", profile?.user_id, afdelingId).then(setUserMayDeleteBooking);
@@ -222,7 +227,26 @@ export function BookingDetailsPage() {
                     <span className="text-sm text-brand-800">{booking.use}</span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
+                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
+                      Køretøj:
+                      {vehicleLocked && (
+                        <svg
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth={2}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          className="h-4 w-4 text-brand-500"
+                          role="img"
+                          aria-label="Køretøjet er låst"
+                        >
+                          <title>Køretøjet er låst</title>
+                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                        </svg>
+                      )}
+                    </label>
                     <span className="text-sm text-brand-800">{formatVehicleLabel(booking.vehicle, vehicles)}</span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
@@ -298,7 +322,10 @@ export function BookingDetailsPage() {
                 <div className="group relative">
                   <button
                     type="button"
-                    onClick={() => void setLock(false)}
+                    onClick={() => void (async () => {
+                      const success = await setLock(false);
+                      if (success) triggerLockConfirmation("unlocked");
+                    })()}
                     disabled={!unlockEnabled || lockStateLoading}
                     aria-label="Lås op"
                     className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -308,14 +335,31 @@ export function BookingDetailsPage() {
                       <path d="M7 11V7a5 5 0 0 1 9.9-1" />
                     </svg>
                   </button>
-                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                    Du kan først låse op, når din reservation er startet
-                  </div>
+                  {/* Not shown at all once the vehicle is actually unlocked
+                      (vehicleLocked === false): unlockEnabled is false there
+                      too, but for a completely different reason (nothing
+                      left to unlock, not "wait for your reservation"), so
+                      this specific message would be actively misleading
+                      rather than just premature — matters every time you
+                      re-hover after unlocking, not just right after the
+                      click. */}
+                  {!unlockEnabled && vehicleLocked !== false && (
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      Du kan først låse op, når din reservation er startet
+                    </div>
+                  )}
+                  <InlinePopup
+                    visible={lockConfirmationKey === "unlocked"}
+                    message="Køretøjet er nu låst op. God tur"
+                  />
                 </div>
                 <div className="group relative">
                   <button
                     type="button"
-                    onClick={() => void setLock(true)}
+                    onClick={() => void (async () => {
+                      const success = await setLock(true);
+                      if (success) triggerLockConfirmation("locked");
+                    })()}
                     disabled={!lockEnabled || lockStateLoading}
                     aria-label="Lås"
                     className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -325,10 +369,13 @@ export function BookingDetailsPage() {
                       <path d="M7 11V7a5 5 0 0 1 10 0v4" />
                     </svg>
                   </button>
-                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                    Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en
-                    anden
-                  </div>
+                  {!lockEnabled && lockConfirmationKey !== "locked" && (
+                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                      Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en
+                      anden
+                    </div>
+                  )}
+                  <InlinePopup visible={lockConfirmationKey === "locked"} message="Køretøjet er nu låst" />
                 </div>
               </div>
 

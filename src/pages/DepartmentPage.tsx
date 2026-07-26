@@ -114,7 +114,7 @@ export function DepartmentPage() {
                 </p>
               )}
 
-              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
                 {/* A real <table> (not the CSS-grid-per-row layout used elsewhere)
                     so column widths are computed once across the header AND every
                     row together — table-layout:auto sizes each column to fit its

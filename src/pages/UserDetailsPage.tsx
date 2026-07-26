@@ -41,22 +41,22 @@ type DepartmentOption = { department_id: string; name: string };
  *
  * Whenever the LOGGED-IN admin's own role (profile.role, not the role
  * being assigned to whichever user this form is creating/editing) is
- * "admin", "Hjemmeafdeling" becomes a select filtered to just
- * userDepartmentIds (staged locally pre-creation, loaded from
- * user_departments when editing) rather than every department in the
- * costumer, and the Afdelinger checkbox table (mirroring
- * HandleVehiclePage.tsx's Afdeling(er)/vehicle_departments pattern) is
- * shown — for both the "Ny bruger" creation form and editing an existing
- * user — so the admin can grant departments beyond the one home
- * department. (In practice this route already requires role "admin" to
- * reach at all — see App.tsx's ProtectedRoute requireAdmin — so today this
- * is always true; the explicit check exists so this page keeps behaving
- * correctly if that route guard ever changes.) Its own Hjemmeafdeling is
- * self-healed into userDepartmentIds regardless, so create-user.mts's own
- * historical gap (never seeding user_departments at all) gets closed for
- * every new user: on successful creation, whatever's in userDepartmentIds
- * (at least the chosen home department, thanks to that self-heal) is
- * inserted for the new user_id.
+ * "admin" or "FLEETii admin" — i.e. whenever this route's own requireAdmin
+ * guard (see App.tsx's ProtectedRoute) let them in at all — the Afdelinger
+ * checkbox table (mirroring HandleVehiclePage.tsx's Afdeling(er)/
+ * vehicle_departments pattern) is shown, for both the "Ny bruger" creation
+ * form and editing an existing user, so the admin can grant departments
+ * beyond the one home department. "Hjemmeafdeling" (once there's a real
+ * choice — 2+ departments) is a select filtered to just userDepartmentIds
+ * (staged locally pre-creation, loaded from user_departments when editing)
+ * rather than every department in the costumer — you check a department
+ * "Tilladt" in Afdelinger first, then it becomes choosable as Hjemmeafdeling,
+ * same ordering as every other Afdeling(er)/Hjemmeafdeling pair in this
+ * project. Its own Hjemmeafdeling is self-healed into userDepartmentIds
+ * regardless, so create-user.mts's own historical gap (never seeding
+ * user_departments at all) gets closed for every new user: on successful
+ * creation, whatever's in userDepartmentIds (at least the chosen home
+ * department, thanks to that self-heal) is inserted for the new user_id.
  *
  * Reachable at plain "/user-details" (create — no user, matches App.tsx's
  * route with no :userId) or "/user-details/:userId" (edit). Normally reached
@@ -68,7 +68,7 @@ type DepartmentOption = { department_id: string; name: string };
  * meant to be an edit, not silently falling into the create form.
  */
 export function UserDetailsPage() {
-  const { session, profile, costumerId, afdelingId, availableDepartments } = useAuth();
+  const { session, profile, costumerId, afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -537,8 +537,13 @@ export function UserDetailsPage() {
                 {user ? `Opdater bruger oplysninger for ${user.full_name ?? user.email ?? "—"}` : "Opret ny bruger"}
               </h2>
 
-              <div className="overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
+              <div className="rounded-2xl border border-brand-100">
+                {/* rounded-2xl lives here too (not just on the outer border,
+                    with no overflow-hidden at all) so the Afdeling(er)/
+                    Hjemmeafdeling "?" popovers — absolutely positioned
+                    descendants — aren't clipped when they overflow this
+                    box's edge (same fix as RettighederSettings.tsx). */}
+                <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                   <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
                   <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
                   <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />
@@ -558,7 +563,8 @@ export function UserDetailsPage() {
                       <option value="admin">Administrator</option>
                     </select>
                   </div>
-                  {profile?.role === "admin" && (
+                  {(profile?.role === "admin" || profile?.role === "FLEETii admin") &&
+                    departmentOptions.length !== 1 && (
                     <div className="grid grid-cols-2 items-start gap-2 p-0.5">
                       <div className="relative flex items-center justify-between gap-2">
                         <label className="text-sm font-medium text-brand-700">Afdeling(er):</label>
@@ -648,7 +654,11 @@ export function UserDetailsPage() {
                       )}
                       <InlinePopup
                         visible={openInfoPopover === "hjemmeafdeling"}
-                        message="Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
+                        message={
+                          departmentOptions.length === 1
+                            ? "Du er tilknyttet denne afdeling"
+                            : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
+                        }
                         align="right"
                       />
                     </div>
@@ -660,25 +670,6 @@ export function UserDetailsPage() {
                         value={departmentOptions[0].name}
                         className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
                       />
-                    ) : profile?.role === "admin" ? (
-                      <select
-                        required
-                        aria-required="true"
-                        value={department}
-                        onChange={(e) => setDepartment(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      >
-                        <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
-                        {departmentOptions
-                          .filter((option) =>
-                            availableDepartments.some((d) => d.department_id === option.department_id),
-                          )
-                          .map((option) => (
-                            <option key={option.department_id} value={option.name}>
-                              {option.name}
-                            </option>
-                          ))}
-                      </select>
                     ) : (
                       <select
                         required
@@ -688,11 +679,13 @@ export function UserDetailsPage() {
                         className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       >
                         <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
-                        {departmentOptions.map((option) => (
-                          <option key={option.department_id} value={option.name}>
-                            {option.name}
-                          </option>
-                        ))}
+                        {departmentOptions
+                          .filter((option) => userDepartmentIds.has(option.department_id))
+                          .map((option) => (
+                            <option key={option.department_id} value={option.name}>
+                              {option.name}
+                            </option>
+                          ))}
                       </select>
                     )}
                   </div>

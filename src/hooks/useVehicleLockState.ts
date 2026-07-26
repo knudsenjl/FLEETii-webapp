@@ -25,8 +25,8 @@ export type VehicleLockState = {
   lockEnabled: boolean;
   unlockEnabled: boolean;
   loading: boolean;
-  /** Persists a new lock state via set-vehicle-lock, then refreshes all derived state. */
-  setLock: (locked: boolean) => Promise<void>;
+  /** Persists a new lock state via set-vehicle-lock, then refreshes all derived state. Resolves true on success, false on failure (error is also set on the returned state either way) — callers use this to know whether to show a "now locked/unlocked" confirmation. */
+  setLock: (locked: boolean) => Promise<boolean>;
   error: string | null;
 };
 
@@ -115,14 +115,15 @@ export function useVehicleLockState(
         const result = (await response.json()) as { error?: string };
         if (!response.ok) {
           setError(result.error ?? "Kunne ikke opdatere lås-status.");
-          return;
+          return false;
         }
       } catch {
         setError("Kunne ikke kontakte serveren. Prøv igen senere.");
-        return;
+        return false;
       }
 
       await reload();
+      return true;
     },
     [vehicleId, session, reload],
   );

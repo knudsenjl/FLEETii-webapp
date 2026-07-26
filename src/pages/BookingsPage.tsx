@@ -232,7 +232,7 @@ export function BookingsPage() {
                 "other",
                 "Vælg en af disse reservationer for at se detaljer eller aflyse reservationen",
               )}
-              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full table-fixed border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     {bookingTableHeaderRow}
@@ -265,7 +265,7 @@ export function BookingsPage() {
               </div>
 
               {canShowNewBookingButton && (
-                <div className="mt-auto flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                   <button
                     type="button"
                     onClick={() => navigate("/reservation")}

@@ -37,6 +37,8 @@ export function VehiclesPage() {
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
+  /** Which of the listed vehicles are currently locked (vehicle_signals.locked — see useVehicleLockState's own doc comment for why it's virtual, not a real 2hire signal), keyed by vehicleId, for the Lås column below. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
+  const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
@@ -97,6 +99,32 @@ export function VehiclesPage() {
         .sort((a, b) => a.plate.localeCompare(b.plate)),
     );
   }, [twoHireVehicles, departmentOptions]);
+
+  /** Bulk-loads the Lås column's lock state for every listed vehicle in one query, rather than one useVehicleLockState per row. */
+  useEffect(() => {
+    if (vehicles.length === 0) {
+      setLockedByVehicleId({});
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_signals")
+      .select("vehicle_id, locked")
+      .in(
+        "vehicle_id",
+        vehicles.map((v) => v.vehicleId),
+      )
+      .returns<{ vehicle_id: string; locked: boolean }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setLockedByVehicleId(Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.locked])));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicles]);
 
   /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. FLEETii admin has no afdelingId, so this simply never fires for them, leaving "Alle" selected. */
   useEffect(() => {
@@ -210,18 +238,19 @@ export function VehiclesPage() {
                 </div>
               </div>
 
-              <div className="flex min-w-0 min-h-0 flex-1 flex-col overflow-auto rounded-none border border-brand-100">
+              <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Lås</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {filteredVehicles.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
                           {!targetCostumerId
                             ? "Ingen kunde valgt."
                             : filterPlate || filterStatus || filterDepartment
@@ -252,6 +281,25 @@ export function VehiclesPage() {
                           }`}
                         >
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
+                          <td className="border-r border-brand-100 px-2 py-0.5 text-center">
+                            {(lockedByVehicleId[vehicle.vehicleId] ?? true) && (
+                              <svg
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth={2}
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                className="mx-auto h-4 w-4 text-brand-500"
+                                role="img"
+                                aria-label="Køretøjet er låst"
+                              >
+                                <title>Køretøjet er låst</title>
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                              </svg>
+                            )}
+                          </td>
                           <td className="px-2 py-0.5">
                             <span
                               className={`mx-auto block h-2.5 w-2.5 rounded-full ${

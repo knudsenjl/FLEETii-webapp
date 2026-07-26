@@ -29,7 +29,9 @@
 // especially for small fleets or the open-ended booking (which excludes the
 // rest of time for that vehicle) — so each insert retries with a fresh
 // random pick on a 23P01 (exclusion_violation) error rather than treating
-// one collision as fatal.
+// one collision as fatal. Overlapping bookings for DIFFERENT vehicles are
+// fine (and expected, at this booking density) — only the same vehicle can't
+// be double-booked.
 import { createClient } from "@supabase/supabase-js";
 import { randomInt } from "node:crypto";
 import { requireUser } from "./_shared/serverAuth.js";
