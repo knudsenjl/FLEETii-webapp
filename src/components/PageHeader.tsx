@@ -16,14 +16,28 @@ function settingsPathForRole(role?: string | null): string {
   return role === "admin" ? "/settings-department" : "/settings-user";
 }
 
+/** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
+const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
+
 /** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a role-specific settings link (only when logged in), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
 export function PageHeader() {
-  const { signOut, profile, afdeling, afdelingId, costumerName, availableDepartments, switchDepartment, isFullyAuthenticated } =
-    useAuth();
+  const {
+    signOut,
+    profile,
+    afdeling,
+    afdelingId,
+    costumerName,
+    availableDepartments,
+    switchDepartment,
+    isFullyAuthenticated,
+    session,
+  } = useAuth();
   const navigate = useNavigate();
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  const [seedingBookings, setSeedingBookings] = useState(false);
+  const [seedResultMessage, setSeedResultMessage] = useState<string | null>(null);
 
   const otherDepartments = availableDepartments.filter((d) => d.department_id !== afdelingId);
 
@@ -36,11 +50,63 @@ export function PageHeader() {
     }
   };
 
+  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above) to populate every department with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. */
+  const handleSeedTestBookings = async () => {
+    setSeedingBookings(true);
+    try {
+      const response = await fetch("/.netlify/functions/seed-test-bookings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        created?: { department: string; count: number }[];
+        skipped?: { department: string; reason: string }[];
+      };
+      if (!response.ok) {
+        setSeedResultMessage(result.error ?? "Kunne ikke oprette testreservationer.");
+      } else {
+        const total = (result.created ?? []).reduce((sum, d) => sum + d.count, 0);
+        const skippedCount = result.skipped?.length ?? 0;
+        setSeedResultMessage(
+          `${total} testreservationer oprettet i ${result.created?.length ?? 0} afdelinger` +
+            (skippedCount > 0 ? ` (${skippedCount} afdeling(er) sprunget over).` : "."),
+        );
+      }
+    } catch {
+      setSeedResultMessage("Kunne ikke kontakte serveren.");
+    } finally {
+      setSeedingBookings(false);
+      triggerNotImplemented("seed-test-bookings-result");
+    }
+  };
+
   return (
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
         <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
         <div className="flex items-center justify-end gap-3">
+          {isFullyAuthenticated && isTestMode && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => void handleSeedTestBookings()}
+                disabled={seedingBookings}
+                aria-label="Opret testreservationer"
+                title="Opret testreservationer (kun testmiljø)"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
+                  <path d="M9 3h6" />
+                  <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V3" />
+                </svg>
+              </button>
+              <InlinePopup visible={notImplementedKey === "seed-test-bookings-result"} message={seedResultMessage ?? ""} align="right" />
+            </div>
+          )}
           {isFullyAuthenticated && (
             <button
               onClick={() => void signOut()}

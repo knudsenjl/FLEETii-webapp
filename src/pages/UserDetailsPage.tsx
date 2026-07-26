@@ -95,6 +95,8 @@ export function UserDetailsPage() {
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [isLastAdmin, setIsLastAdmin] = useState(false);
   const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
+  /** Which (if either) of the Afdeling(er)/Hjemmeafdeling "?" info popovers is open — plain toggle state, not useTimedFlag, since these should stay open for as long as the admin needs to read them rather than auto-closing after a few seconds. Closes on toggling the same one again, opening the other, or clicking anywhere outside (see the fixed inset-0 overlay rendered alongside each). */
+  const [openInfoPopover, setOpenInfoPopover] = useState<"afdelinger" | "hjemmeafdeling" | null>(null);
 
   /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/user-details/:userId" (no router state) — skipped entirely when stateUser is already present. Excludes archived users (deleted_at) same as DepartmentPage's own list, and is naturally scoped to the admin's own department by user_profiles' SELECT RLS policy — a userId outside it just resolves to null, same as "not found". */
   useEffect(() => {
@@ -558,7 +560,25 @@ export function UserDetailsPage() {
                   </div>
                   {profile?.role === "admin" && (
                     <div className="grid grid-cols-2 items-start gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Afdeling(er):</label>
+                      <div className="relative flex items-center justify-between gap-2">
+                        <label className="text-sm font-medium text-brand-700">Afdeling(er):</label>
+                        <button
+                          type="button"
+                          onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
+                          aria-label="Mere information"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                        >
+                          ?
+                        </button>
+                        {openInfoPopover === "afdelinger" && (
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
+                        )}
+                        <InlinePopup
+                          visible={openInfoPopover === "afdelinger"}
+                          message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
+                          align="right"
+                        />
+                      </div>
                       <div className="py-0.5">
                         {grantsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
                         {!grantsLoading && grantsError && <span className="text-sm text-red-600">{grantsError}</span>}
@@ -611,9 +631,27 @@ export function UserDetailsPage() {
                     </div>
                   )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Hjemmeafdeling: {departmentOptions.length !== 1 && <span className="ml-0.5 text-red-600">*</span>}
-                    </label>
+                    <div className="relative flex items-center justify-between gap-2">
+                      <label className="text-sm font-medium text-brand-700">
+                        Hjemmeafdeling: {departmentOptions.length !== 1 && <span className="ml-0.5 text-red-600">*</span>}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
+                        aria-label="Mere information"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                      >
+                        ?
+                      </button>
+                      {openInfoPopover === "hjemmeafdeling" && (
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
+                      )}
+                      <InlinePopup
+                        visible={openInfoPopover === "hjemmeafdeling"}
+                        message="Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
+                        align="right"
+                      />
+                    </div>
                     {departmentOptions.length === 1 ? (
                       <input
                         type="text"
