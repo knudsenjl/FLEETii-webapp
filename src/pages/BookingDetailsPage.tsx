@@ -290,30 +290,46 @@ export function BookingDetailsPage() {
               )}
 
               <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => void setLock(true)}
-                  disabled={!lockEnabled || lockStateLoading}
-                  aria-label="Lås"
-                  className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void setLock(false)}
-                  disabled={!unlockEnabled || lockStateLoading}
-                  aria-label="Lås op"
-                  className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                  </svg>
-                </button>
+                {/* Self-built hover tooltip (group/group-hover), not the
+                    native `title` attribute — that's unreliable on a
+                    disabled button across browsers. CSS :hover/group-hover
+                    still applies to a disabled button fine, since that's a
+                    style state, not a JS mouse event. */}
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => void setLock(false)}
+                    disabled={!unlockEnabled || lockStateLoading}
+                    aria-label="Lås op"
+                    className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+                    </svg>
+                  </button>
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    Du kan først låse op, når din reservation er startet
+                  </div>
+                </div>
+                <div className="group relative">
+                  <button
+                    type="button"
+                    onClick={() => void setLock(true)}
+                    disabled={!lockEnabled || lockStateLoading}
+                    aria-label="Lås"
+                    className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                    </svg>
+                  </button>
+                  <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+                    Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en
+                    anden
+                  </div>
+                </div>
               </div>
 
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}

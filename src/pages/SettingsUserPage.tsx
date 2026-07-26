@@ -2,17 +2,14 @@
 // settings button in PageHeader.tsx, for role "user"; see
 // SettingsSuperadminPage.tsx/SettingsAdminPage.tsx for the other two roles'
 // variants). Manages the logged-in user's own "Anvendelse" override list
-// (user_settings) via AnvendelseSettings, and lets the user self-manage
-// their own EFFECTIVE Tillad_* permission flags via RettighederSettings —
-// passing departmentId so a flag with no personal override displays (and
-// falls back to) the department's own value instead of always showing
-// unchecked. The user may freely set or unset their own flags — the only
-// constraint is a hard ceiling (can't check one true when the department's
-// own value is false), enforced at the DB layer via a trigger regardless of
-// who's writing (see supabase/applied/user_settings_department_ceiling.sql
-// and RettighederSettings' own doc comment for the full permission model).
-// Also manages the user's own standard duration/interval override via
-// StandardSettings.
+// (user_settings) via AnvendelseSettings, and shows (read-only, via
+// RettighederSettings' readOnly prop) their own EFFECTIVE Tillad_*
+// permission flags — passing departmentId so a flag with no personal
+// override displays the department's own value instead of always showing
+// unchecked. A user can no longer change their own rights here (business
+// decision: only an admin can, via UserDetailsPage) — this view is display-
+// only, so they can still see what applies to them. Also manages the user's
+// own standard duration/interval override via StandardSettings.
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
@@ -22,7 +19,7 @@ import { RettighederSettings } from "../components/RettighederSettings";
 
 /** Settings page for role "user". */
 export function SettingsUserPage() {
-  const { afdeling, profile, afdelingId } = useAuth();
+  const { profile, afdelingId } = useAuth();
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -41,7 +38,9 @@ export function SettingsUserPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Indstillinger for {afdeling ?? "—"}</h2>
+            <h2 className="text-xl font-semibold text-brand-800">
+              Indstillinger for {profile?.full_name ?? profile?.email ?? "—"}
+            </h2>
             <AnvendelseSettings
               table="user_settings"
               scopeColumn="user_id"
@@ -54,6 +53,8 @@ export function SettingsUserPage() {
               scopeColumn="user_id"
               scopeId={profile?.user_id ?? null}
               departmentId={afdelingId}
+              heading="Rettigheder for denne bruger"
+              readOnly
             />
           </section>
         </motion.main>

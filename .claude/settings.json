@@ -11,7 +11,16 @@
       "PowerShell(Stop-Process -Id 5484,19860 -Force -ErrorAction SilentlyContinue)",
       "PowerShell(Get-Process -Id 5484,19860 -ErrorAction SilentlyContinue)",
       "PowerShell(Stop-Process -Id 10572,23884 -Force -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Process -Id 10572,23884 -ErrorAction SilentlyContinue)"
+      "PowerShell(Get-Process -Id 10572,23884 -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.220-win32-x64\\\\resources\\\\native-binary\" -ErrorAction SilentlyContinue | Select-Object FullName)",
+      "PowerShell(\\(Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.220-win32-x64\\\\resources\\\\native-binary\" -ErrorAction SilentlyContinue\\).FullName | Write-Output)",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8888,5173 -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=33496 or ProcessId=28796\")",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "mcp__claude_ai_Supabase__apply_migration",
+      "mcp__claude_ai_Supabase__get_advisors"
     ]
   }
 }

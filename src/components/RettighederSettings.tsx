@@ -21,6 +21,8 @@
 // "User" while "Afd." is unchecked) purely so the admin/user sees why,
 // rather than a round-trip DB error — the trigger is the real enforcement.
 import { forwardRef, useEffect, useImperativeHandle, useState } from "react";
+import { InlinePopup } from "./InlinePopup";
+import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 
 interface RettighederSettingsProps {
@@ -32,6 +34,10 @@ interface RettighederSettingsProps {
   deferSave?: boolean;
   /** Only used when table is "user_settings": the department to fall back to (for display) and to check the ceiling against (for editing) — mirrors lib/settings.ts's isSettingTilladt() precedence. Ignored for table="department_settings" (which has no further fallback level, and is itself the ceiling). */
   departmentId?: string | null;
+  /** The section heading — defaults to "Rettigheder" (SettingsUserPage/UserDetailsPage's usage); SettingsAdminPage overrides this to clarify these apply department-wide, not just to whoever's viewing. */
+  heading?: string;
+  /** True on SettingsUserPage's self-service usage only — a user may no longer change their own Tillad_* rights (business decision: only an admin can, via UserDetailsPage). Makes every Aktiv checkbox inert (no click handling at all, not even the department-ceiling popup, since there's nothing to attempt) and hides "Nulstil". Defaults to false. */
+  readOnly?: boolean;
 }
 
 /** Imperative handle exposed when deferSave is true — the parent calls save() (typically right after its own successful update) to actually persist whatever's been toggled locally. */
@@ -53,7 +59,10 @@ type RettighedRow = { name: string; value_bool: boolean | null };
 
 /** Table + checkbox row per Tillad_* flag — saves immediately on toggle unless deferSave (writes are batched, see the ref-exposed save()). */
 export const RettighederSettings = forwardRef<RettighederSettingsHandle, RettighederSettingsProps>(
-  function RettighederSettings({ table, scopeColumn, scopeId, deferSave = false, departmentId }, ref) {
+  function RettighederSettings(
+    { table, scopeColumn, scopeId, deferSave = false, departmentId, heading = "Rettigheder", readOnly = false },
+    ref,
+  ) {
     /** This scope's own explicit rows — what the "User" checkbox shows/edits. Never pre-filled with a department fallback value, or every save would silently turn every never-touched flag into a permanent per-user override (see effectiveValue below for the fallback-aware DISPLAY value). A key can be explicitly removed (see handleReset) to mean "no longer overridden" — distinct from having never had a row at all, which is why save() also needs originalValues below to tell "was never set" apart from "was set, now cleared". */
     const [values, setValues] = useState<Record<string, boolean>>({});
     /** Snapshot of `values` exactly as loaded from the DB — never mutated after that. save() diffs `values` against this to know which rows to upsert (present in values) vs. DELETE (present here but removed from values by handleReset) vs. leave alone (absent from both). */
@@ -64,6 +73,8 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
     const [loadError, setLoadError] = useState<string | null>(null);
     const [savingName, setSavingName] = useState<string | null>(null);
     const [errorByName, setErrorByName] = useState<Record<string, string>>({});
+    /** Which (if any) flag's "can't assign a right your department doesn't grant" popup is currently open — see the Aktiv checkbox below. */
+    const { activeKey: blockedKey, trigger: triggerBlocked } = useTimedFlag();
 
     useEffect(() => {
       if (!scopeId) {
@@ -219,32 +230,18 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
 
     return (
       <div className="flex flex-col gap-4">
-        <h3 className="text-lg font-semibold text-brand-800">Rettigheder</h3>
+        <h3 className="text-lg font-semibold text-brand-800">{heading}</h3>
 
         {loading && <p className="text-sm text-brand-500">Indlæser rettigheder…</p>}
         {!loading && loadError && <p className="text-sm text-red-600">{loadError}</p>}
 
         {!loading && !loadError && (
-          <div className="overflow-hidden rounded-2xl border border-brand-100">
-            <div className="divide-y divide-brand-100 bg-white">
-              {table === "user_settings" && (
-                <div className="grid grid-cols-[14rem_1fr] items-center gap-2 bg-brand-50 p-0.5">
-                  <span />
-                  <div className="flex items-center gap-2 text-[0.6rem] font-semibold uppercase tracking-wide text-brand-500">
-                    {/* Fixed 1rem tracks + justify-items-center mirror the
-                        checkboxes' own w-4/gap-4 layout below exactly, so each
-                        label centers over its column regardless of text width
-                        (unlike inline-block + text-center, which only centers
-                        within a box no wider than the checkbox itself). */}
-                    <div className="grid grid-cols-[1rem_1rem_1rem] items-center justify-items-center gap-4">
-                      <span title="Denne brugers egen override">User</span>
-                      <span title="Afdelingens standardværdi">Afd.</span>
-                      <span title="Den værdi der faktisk gælder for brugeren lige nu">Aktiv</span>
-                    </div>
-                    <span className="w-12" />
-                  </div>
-                </div>
-              )}
+          <div className="rounded-2xl border border-brand-100">
+            {/* rounded-2xl lives here too (not just overflow-hidden on the
+                parent) so the Aktiv checkbox's popup — an absolutely
+                positioned descendant — isn't clipped by an overflow-hidden
+                ancestor when it overflows this box's edge. */}
+            <div className="divide-y divide-brand-100 rounded-2xl bg-white">
               {RETTIGHEDER.map(({ name, label }) => (
                 <div key={name} className="grid grid-cols-[14rem_1fr] items-center gap-2 p-0.5">
                   <label htmlFor={`rettighed-${name}`} className="flex items-center whitespace-normal break-words text-sm font-medium text-brand-700">
@@ -253,39 +250,37 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                   {table === "user_settings" ? (
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-4">
-                        {/* User — this scope's own explicit row, the only editable column. Toggling this is what handleToggle/save() actually persist; it's unset (falls back to Afd.) until touched. Checking it true is rejected client-side (see blocksAllow) when Afd. is explicitly false — the DB trigger enforces the same rule regardless. */}
-                        <input
-                          id={`rettighed-${name}`}
-                          type="checkbox"
-                          checked={values[name] ?? false}
-                          disabled={savingName === name}
-                          onChange={(e) => void handleToggle(name, e.target.checked)}
-                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                        />
-                        {/* Afd. — the department's own value, for reference only. Never editable from here (SettingsAdminPage's own department_settings-scoped instance of this component is where that gets changed) — visibly muted (gray background) so it can't be mistaken for the editable User checkbox. */}
-                        <input
-                          type="checkbox"
-                          aria-label={`${label} (afdelingens standardværdi)`}
-                          checked={departmentValues[name] ?? false}
-                          disabled
-                          readOnly
-                          className="h-4 w-4 cursor-not-allowed rounded border-brand-200 bg-brand-100 text-brand-400 opacity-70"
-                        />
-                        {/* Aktiv — the computed effective value (User if set, else Afd.), i.e. exactly what isSettingTilladt() would return for this user right now. */}
-                        <input
-                          type="checkbox"
-                          aria-label={`${label} (aktiv værdi)`}
-                          checked={effectiveValue(name)}
-                          disabled
-                          readOnly
-                          className="h-4 w-4 cursor-not-allowed rounded border-brand-200 bg-brand-100 text-brand-400 opacity-70"
-                        />
+                        {/* Aktiv — the computed effective value (this scope's own explicit row if set, else the department's), i.e. exactly what isSettingTilladt() would return for this user right now. When NOT readOnly, freely interactive both ways: unchecking writes an explicit false override via handleToggle (same write path the old Bruger checkbox used); checking is refused (via the popup below) only when the department itself explicitly disallows this flag (blocksAllow) — the actual ceiling rule — not merely because the box happens to be unchecked (an unset-department or department-true case is a perfectly valid true override to write). readOnly (SettingsUserPage) makes it fully inert instead — a user may no longer change their own rights at all. */}
+                        <div className="relative">
+                          <input
+                            type="checkbox"
+                            aria-label={`${label} (aktiv værdi)`}
+                            checked={effectiveValue(name)}
+                            disabled={readOnly || savingName === name}
+                            onChange={(e) => {
+                              if (e.target.checked && blocksAllow(name)) {
+                                triggerBlocked(name);
+                                return;
+                              }
+                              void handleToggle(name, e.target.checked);
+                            }}
+                            className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                          />
+                          <InlinePopup
+                            visible={blockedKey === name}
+                            message="Du kan ikke tildele en bruger en rettighed, som ikke er tilgængelig i denne afdeling"
+                            variant="warning"
+                          />
+                        </div>
                         <div className="w-12">
                           {/* Only shown once this scope has its own explicit
                               value for this flag (freshly toggled, or loaded
                               from an existing row) — clears it back to
-                              "unset" so Afd. wins again. Never restricted. */}
-                          {values[name] !== undefined && (
+                              "unset" so Afd. wins again. Hidden entirely when
+                              readOnly, same reasoning as the Aktiv checkbox
+                              above: a user may no longer change their own
+                              rights at all, including clearing them. */}
+                          {!readOnly && values[name] !== undefined && (
                             <button
                               type="button"
                               onClick={() => void handleReset(name)}

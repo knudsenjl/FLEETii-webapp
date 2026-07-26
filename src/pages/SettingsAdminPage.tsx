@@ -36,7 +36,12 @@ export function SettingsAdminPage() {
             <h2 className="text-xl font-semibold text-brand-800">Indstillinger for {afdeling ?? "—"}</h2>
             <AnvendelseSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />
             <StandardSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />
-            <RettighederSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />
+            <RettighederSettings
+              table="department_settings"
+              scopeColumn="department_id"
+              scopeId={afdelingId}
+              heading="Rettigheder for alle brugere i afdelingen"
+            />
           </section>
         </motion.main>
       </div>

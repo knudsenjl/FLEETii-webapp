@@ -68,7 +68,7 @@ type DepartmentOption = { department_id: string; name: string };
  * meant to be an edit, not silently falling into the create form.
  */
 export function UserDetailsPage() {
-  const { session, profile, costumerId, afdelingId } = useAuth();
+  const { session, profile, costumerId, afdelingId, availableDepartments } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -534,7 +534,7 @@ export function UserDetailsPage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">
-                {user ? "Opdater bruger oplysninger" : "Ny bruger oplysninger"}
+                {user ? `Opdater bruger oplysninger for ${user.full_name ?? user.email ?? "—"}` : "Opret ny bruger"}
               </h2>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
@@ -670,7 +670,9 @@ export function UserDetailsPage() {
                       >
                         <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
                         {departmentOptions
-                          .filter((option) => userDepartmentIds.has(option.department_id))
+                          .filter((option) =>
+                            availableDepartments.some((d) => d.department_id === option.department_id),
+                          )
                           .map((option) => (
                             <option key={option.department_id} value={option.name}>
                               {option.name}
@@ -698,6 +700,11 @@ export function UserDetailsPage() {
               </div>
 
               {emailFormatInvalid && <p className="text-xs text-red-600">Ugyldigt e-mailformat.</p>}
+              {emailExists && (
+                <p className="text-xs text-red-600">
+                  Du kan ikke oprette en ny bruger med samme e-mail som en eksisterende bruger.
+                </p>
+              )}
               {phoneFormatInvalid && <p className="text-xs text-red-600">Ugyldigt telefonnummer.</p>}
 
               <p className="text-right text-xs text-brand-500">
@@ -710,8 +717,26 @@ export function UserDetailsPage() {
                   table="user_settings"
                   scopeColumn="user_id"
                   scopeId={user.user_id}
-                  departmentId={afdelingId}
+                  departmentId={homeDepartmentId ?? null}
                   deferSave
+                  heading="Rettigheder for denne bruger"
+                />
+              )}
+
+              {!user && (profile?.role === "admin" || profile?.role === "FLEETii admin") && (
+                // "Ny bruger": gated on the LOGGED-IN admin's own role
+                // (profile?.role), not the new user's selected role — this
+                // is a department_settings-scoped view (rights for everyone
+                // in the department, not this one new user), so who's
+                // creating the account is what matters. Same live,
+                // immediately-saving component SettingsAdminPage itself
+                // uses, scoped to whichever Hjemmeafdeling this new user is
+                // being assigned to, so it can be set up in the same flow.
+                <RettighederSettings
+                  table="department_settings"
+                  scopeColumn="department_id"
+                  scopeId={homeDepartmentId ?? null}
+                  heading="Rettigheder for den nye bruger"
                 />
               )}
 
