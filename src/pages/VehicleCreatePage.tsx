@@ -84,7 +84,14 @@ export function VehicleCreatePage() {
   const { orderId } = useParams<{ orderId: string }>();
   const stateOrder = (location.state as { order?: CostumerOrder } | null)?.order ?? null;
   const [fetchedOrder, setFetchedOrder] = useState<CostumerOrder | null>(null);
-  const [orderLoading, setOrderLoading] = useState(false);
+  // Lazy-initialized true whenever a fetch-by-id is actually going to happen
+  // (orderId present, no stateOrder yet) — starting this false and only
+  // flipping it inside the fetch effect below raced the redirect effect
+  // further down: both effects run in the same post-mount pass, so the
+  // redirect effect would still see the ORIGINAL (false) value and fire
+  // immediately, bouncing straight back to "/fleetii-admin" before the fetch
+  // ever got a chance to resolve.
+  const [orderLoading, setOrderLoading] = useState(() => Boolean(orderId) && !stateOrder);
   const order = stateOrder ?? fetchedOrder;
 
   /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/vehicle-create/:orderId" (no router state) — skipped entirely when stateOrder is already present. Naturally scoped to the admin's own costumer (or any, for a FLEETii admin) by costumer_orders' SELECT RLS policy — an orderId outside it just resolves to null, same as "not found". */
