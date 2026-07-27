@@ -1,14 +1,16 @@
 // The only deliberately public page ("/about" — reachable both from
 // LoginPage before signing in and from every other page's "i" header
-// button). Static company/product info plus a link to the user manual and
-// contact details; PageHeader itself handles showing/hiding "Log ud" and the
-// role/afdeling row based on whether the visitor is actually logged in.
+// button). Static company/product info plus links to the admin manual and
+// user guide, and contact details; PageHeader itself handles showing/hiding
+// "Log ud" and the role/afdeling row based on whether the visitor is
+// actually logged in.
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 
-/** Static "About FLEETii" page: product description, a Brugermanual link, and contact info. Content is static Danish copy — no data fetching. */
+/** Static "About FLEETii" page: product description, Administratormanual/Brugerguide links, and contact info. Content is static Danish copy — no data fetching. */
 export function AboutPage() {
-  const manualUrl = import.meta.env.VITE_BRUGERMANUAL_URL;
+  const brugerguideUrl = "https://claude.ai/code/artifact/1a30e6f4-0097-4097-b860-8bbeca07f60c";
+  const administratormanualUrl = "https://claude.ai/code/artifact/aa12dd5c-25b8-4da6-afa1-10d4d09ec232";
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -30,16 +32,24 @@ export function AboutPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Om FLEETii</h2>
-                {manualUrl && (
+                <div className="flex shrink-0 flex-col gap-2">
                   <a
-                    href={manualUrl}
+                    href={brugerguideUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Brugermanual
+                    Brugerguide
                   </a>
-                )}
+                  <a
+                    href={administratormanualUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Administratormanual
+                  </a>
+                </div>
               </div>
 
               <p className="text-sm text-brand-700">
