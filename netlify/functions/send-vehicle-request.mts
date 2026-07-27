@@ -73,7 +73,10 @@ function buildHtmlBody(fields: {
     </table>
     
     <p>Du kan oprette køretøjet og registrere det i 2hire og FLEETii gennem flg. link:
-    <a href="https://fleetii-webapp.netlify.app/vehicle-create/${fields.orderId}">https://fleetii-webapp.netlify.app/vehicle-create</a>
+    <a href="https://fleetii-webapp.netlify.app/vehicle-create/${fields.orderId}">https://fleetii-webapp.netlify.app/vehicle-create</a></p>
+
+    <p>For at oprette køretøjet i FLEETii skal du logge ind på FLEETii med en
+    FLEETii admin-bruger.</p>
     `;
 }
 
