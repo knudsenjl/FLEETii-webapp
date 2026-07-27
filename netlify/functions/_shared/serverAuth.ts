@@ -47,8 +47,8 @@ export async function requireUser(req: Request): Promise<UserCheckResult> {
   return { ok: true, userId: userData.user.id, client };
 }
 
-/** Verifies the caller (via requireUser()) and additionally that their profile has the given role and isn't archived (deleted_at is null — see supabase/applied/user_profiles_add_deleted_at.sql) — an archived caller's still-valid JWT shouldn't keep passing this check just because the ban hasn't fully propagated yet. Shared by requireAdmin/requireFleetiiAdmin below rather than duplicating the same query per role. */
-async function requireRole(req: Request, role: string, errorMessage: string): Promise<AdminCheckResult> {
+/** Verifies the caller (via requireUser()) and additionally that their profile has one of the given roles and isn't archived (deleted_at is null — see supabase/applied/user_profiles_add_deleted_at.sql) — an archived caller's still-valid JWT shouldn't keep passing this check just because the ban hasn't fully propagated yet. Shared by requireAdmin/requireFleetiiAdmin below rather than duplicating the same query per role. */
+async function requireRole(req: Request, allowedRoles: string[], errorMessage: string): Promise<AdminCheckResult> {
   const userResult = await requireUser(req);
   if (!userResult.ok) {
     return userResult;
@@ -61,19 +61,19 @@ async function requireRole(req: Request, role: string, errorMessage: string): Pr
     .is("deleted_at", null)
     .maybeSingle<{ role: string }>();
 
-  if (profileError || profile?.role !== role) {
+  if (profileError || !profile || !allowedRoles.includes(profile.role)) {
     return { ok: false, status: 403, error: errorMessage };
   }
 
   return { ok: true, userId: userResult.userId };
 }
 
-/** Verifies the caller has role "admin" (see requireRole). */
+/** Verifies the caller has role "admin" OR "FLEETii admin" (a superset, same as ProtectedRoute.tsx's own client-side requireAdmin — see requireRole). */
 export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
-  return requireRole(req, "admin", "Kun administratorer har adgang til denne handling.");
+  return requireRole(req, ["admin", "FLEETii admin"], "Kun administratorer har adgang til denne handling.");
 }
 
-/** Verifies the caller has role "FLEETii admin" (see requireRole) — used by the costumer lifecycle functions (delete-costumer.mts), which only a FLEETii admin, not a regular department admin, may invoke. */
+/** Verifies the caller has EXACTLY role "FLEETii admin" (no "admin" superset, unlike requireAdmin — see requireRole) — used by the costumer lifecycle functions (delete-costumer.mts), which only a FLEETii admin, not a regular department admin, may invoke. */
 export async function requireFleetiiAdmin(req: Request): Promise<AdminCheckResult> {
-  return requireRole(req, "FLEETii admin", "Kun FLEETii-administratorer har adgang til denne handling.");
+  return requireRole(req, ["FLEETii admin"], "Kun FLEETii-administratorer har adgang til denne handling.");
 }

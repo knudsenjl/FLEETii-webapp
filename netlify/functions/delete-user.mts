@@ -68,7 +68,11 @@ export default async (req: Request) => {
   });
 
   const [{ data: caller }, { data: target }] = await Promise.all([
-    admin.from("user_profiles").select("department_id").eq("user_id", authResult.userId).maybeSingle<{ department_id: string | null }>(),
+    admin
+      .from("user_profiles")
+      .select("department_id, role")
+      .eq("user_id", authResult.userId)
+      .maybeSingle<{ department_id: string | null; role: string }>(),
     admin
       .from("user_profiles")
       .select("department_id, role, deleted_at")
@@ -79,7 +83,10 @@ export default async (req: Request) => {
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
-  if (!caller || caller.department_id !== target.department_id) {
+  // A FLEETii admin isn't scoped to one department — same platform-wide
+  // exception as department_settings/user_departments' own RLS policies
+  // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
+  if (!caller || (caller.role !== "FLEETii admin" && caller.department_id !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
   }
   if (target.deleted_at) {

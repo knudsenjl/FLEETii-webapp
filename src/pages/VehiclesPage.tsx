@@ -243,8 +243,8 @@ export function VehiclesPage() {
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Lås</th>
-                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5"></th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
+                      <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
@@ -281,7 +281,7 @@ export function VehiclesPage() {
                           }`}
                         >
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
-                          <td className="border-r border-brand-100 px-2 py-0.5 text-center">
+                          <td className="w-px whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
                             {(lockedByVehicleId[vehicle.vehicleId] ?? true) && (
                               <svg
                                 viewBox="0 0 24 24"
@@ -300,7 +300,7 @@ export function VehiclesPage() {
                               </svg>
                             )}
                           </td>
-                          <td className="px-2 py-0.5">
+                          <td className="w-px whitespace-nowrap px-1 py-0.5 text-center">
                             <span
                               className={`mx-auto block h-2.5 w-2.5 rounded-full ${
                                 vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"

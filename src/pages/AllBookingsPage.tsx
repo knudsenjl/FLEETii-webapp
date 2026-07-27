@@ -50,6 +50,8 @@ export function AllBookingsPage() {
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
   const [users, setUsers] = useState<{ user_id: string; email: string; department_id: string | null }[]>([]);
+  /** Which of the listed bookings' vehicles are currently locked (vehicle_signals.locked), keyed by vehicleId — same bulk-fetch pattern as VehiclesPage.tsx's own Lås column. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
+  const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -119,6 +121,30 @@ export function AllBookingsPage() {
   useEffect(() => {
     void loadBookings();
   }, []);
+
+  /** Bulk-loads the Lås column's lock state for every distinct vehicle among the loaded bookings in one query, rather than one useVehicleLockState per row — see VehiclesPage.tsx's identical pattern. */
+  useEffect(() => {
+    const vehicleIds = Array.from(new Set(bookings.map((b) => b.vehicle)));
+    if (vehicleIds.length === 0) {
+      setLockedByVehicleId({});
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_signals")
+      .select("vehicle_id, locked")
+      .in("vehicle_id", vehicleIds)
+      .returns<{ vehicle_id: string; locked: boolean }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setLockedByVehicleId(Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.locked])));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookings]);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -227,31 +253,39 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* table-fixed + a fixed Periode width, so Køretøj absorbs
-                    whatever space is left over instead of a hardcoded cap —
-                    see BookingsPage for the same pattern. */}
-                <table className="w-full table-fixed border-collapse text-[0.7rem]">
+                {/* Not table-fixed: Periode/Bruger/Lås/Online are all w-px
+                    (shrink to their actual content, same trick as
+                    VehiclesPage.tsx's own Lås/Online columns — only
+                    meaningful under table-layout:auto, table-fixed ignores
+                    content entirely). Køretøj has none of these — combined
+                    with `truncate` (which exempts it from contributing its
+                    full intrinsic width to the auto-layout algorithm), it
+                    absorbs whatever space the others leave over, same end
+                    result as the old table-fixed approach. */}
+                <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-                      <th className="w-44 whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-center">Periode</th>
-                      <th className="w-56 whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Bruger</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
+                      <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">
                           {filterUser || filterVehicle
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
@@ -263,6 +297,7 @@ export function AllBookingsPage() {
                       filteredBookings.map((booking, index) => {
                         const isAlternate = index % 2 === 1;
                         const goToBooking = () => navigate(`/booking-details/${booking.id}`, { state: { booking } });
+                        const twoHireVehicle = vehicles.find((v) => v.vehicleId === booking.vehicle);
                         return (
                           <tr
                             key={booking.id}
@@ -293,8 +328,35 @@ export function AllBookingsPage() {
                             >
                               {formatBookingPeriod(booking, true)}
                             </td>
-                            <td className="truncate px-2 py-0.5" title={booking.userEmail ?? undefined}>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5" title={booking.userEmail ?? undefined}>
                               {booking.userEmail ?? "—"}
+                            </td>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
+                              {(lockedByVehicleId[booking.vehicle] ?? true) && (
+                                <svg
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="mx-auto h-4 w-4 text-brand-500"
+                                  role="img"
+                                  aria-label="Køretøjet er låst"
+                                >
+                                  <title>Køretøjet er låst</title>
+                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                                </svg>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-1 py-0.5 text-center">
+                              <span
+                                className={`mx-auto block h-2.5 w-2.5 rounded-full ${
+                                  twoHireVehicle?.online === "TRUE" ? "bg-green-500" : "bg-red-500"
+                                }`}
+                                title={twoHireVehicle?.online === "TRUE" ? "Online" : "Offline"}
+                              />
                             </td>
                           </tr>
                         );

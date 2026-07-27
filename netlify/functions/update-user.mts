@@ -89,9 +89,9 @@ export default async (req: Request) => {
     await Promise.all([
       admin
         .from("user_profiles")
-        .select("costumer_id")
+        .select("costumer_id, role")
         .eq("user_id", authResult.userId)
-        .maybeSingle<{ costumer_id: string | null }>(),
+        .maybeSingle<{ costumer_id: string | null; role: string }>(),
       admin
         .from("user_profiles")
         .select("costumer_id, email")
@@ -112,10 +112,18 @@ export default async (req: Request) => {
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
-  if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
-    return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });
-  }
-  if (requestedDepartmentName && requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
+  // A FLEETii admin isn't scoped to one costumer — same platform-wide
+  // exception as department_settings/user_departments' own RLS policies
+  // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
+  const isFleetiiAdmin = caller?.role === "FLEETii admin";
+  if (!isFleetiiAdmin) {
+    if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
+      return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });
+    }
+    if (requestedDepartmentName && requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
+      return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+    }
+  } else if (requestedDepartmentName && !requestedDepartmentRow) {
     return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
   }
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
@@ -143,6 +151,13 @@ export default async (req: Request) => {
       full_name: body.full_name ?? null,
       phone: body.phone ?? null,
       department_id: requestedDepartmentId,
+      // The requested department's own costumer_id is authoritative — for a
+      // regular admin this is always target.costumer_id unchanged (the
+      // check above already enforced that match), but a FLEETii admin can
+      // move a user to a department under a DIFFERENT costumer, which must
+      // update costumer_id to match or it'd go stale relative to
+      // department_id.
+      costumer_id: requestedDepartmentRow?.costumer_id ?? target.costumer_id,
       role,
     })
     .eq("user_id", targetUserId);

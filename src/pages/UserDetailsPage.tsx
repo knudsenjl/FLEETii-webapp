@@ -19,6 +19,8 @@ type ProfileRow = {
   phone: string | null;
   department_name: string | null;
   role: string;
+  /** Set once "Bloker brugers adgang" (delete-user.mts) has been used, cleared by "Genetabler brugers adgang" (unblock-user.mts) — see UserDetailsPage's own doc comment for why blocking is reversible rather than a true delete. */
+  deleted_at: string | null;
 };
 
 /** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the admin's own costumer. */
@@ -88,7 +90,9 @@ export function UserDetailsPage() {
   const [role, setRole] = useState(user?.role ?? "user");
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
-  const [pendingAction, setPendingAction] = useState<"create" | "update" | "close" | "delete" | null>(null);
+  const [pendingAction, setPendingAction] = useState<"create" | "update" | "close" | "delete" | "reactivate" | null>(
+    null,
+  );
   const rettighederRef = useRef<RettighederSettingsHandle>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -98,7 +102,7 @@ export function UserDetailsPage() {
   /** Which (if either) of the Afdeling(er)/Hjemmeafdeling "?" info popovers is open — plain toggle state, not useTimedFlag, since these should stay open for as long as the admin needs to read them rather than auto-closing after a few seconds. Closes on toggling the same one again, opening the other, or clicking anywhere outside (see the fixed inset-0 overlay rendered alongside each). */
   const [openInfoPopover, setOpenInfoPopover] = useState<"afdelinger" | "hjemmeafdeling" | null>(null);
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/user-details/:userId" (no router state) — skipped entirely when stateUser is already present. Excludes archived users (deleted_at) same as DepartmentPage's own list, and is naturally scoped to the admin's own department by user_profiles' SELECT RLS policy — a userId outside it just resolves to null, same as "not found". */
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/user-details/:userId" (no router state) — skipped entirely when stateUser is already present. Includes blocked users (deleted_at set) — unlike DepartmentPage's own list, this page needs to reach them so "Genetabler brugers adgang" is reachable — and is naturally scoped to the admin's own department (or any, for a FLEETii admin) by user_profiles' SELECT RLS policy — a userId outside it just resolves to null, same as "not found". */
   useEffect(() => {
     if (stateUser || !userId) return;
 
@@ -106,15 +110,15 @@ export function UserDetailsPage() {
     setUserLoading(true);
     void supabase
       .from("user_profiles")
-      .select("user_id, email, full_name, phone, role, departments!user_profiles_department_id_fkey(name)")
+      .select("user_id, email, full_name, phone, role, deleted_at, departments!user_profiles_department_id_fkey(name)")
       .eq("user_id", userId)
-      .is("deleted_at", null)
       .maybeSingle<{
         user_id: string;
         email: string | null;
         full_name: string | null;
         phone: string | null;
         role: string;
+        deleted_at: string | null;
         departments: { name: string } | null;
       }>()
       .then(({ data }) => {
@@ -128,6 +132,7 @@ export function UserDetailsPage() {
                 phone: data.phone,
                 department_name: data.departments?.name ?? null,
                 role: data.role,
+                deleted_at: data.deleted_at,
               }
             : null,
         );
@@ -233,6 +238,25 @@ export function UserDetailsPage() {
     };
   }, [user]);
 
+  // When exactly one department is checked "Tilladt" in the Afdeling(er)
+  // table, there's no real Hjemmeafdeling choice left either — auto-select
+  // it and lock the field (see the sole-checked-department rendering
+  // below), same treatment as the "only one department in the whole
+  // costumer" case. Safe to run on load too (not just on a fresh checkbox
+  // click): for an existing user already sitting at exactly one grant,
+  // department already matches it, so this is a no-op. The reverse
+  // direction — clearing department back to "" the moment a SECOND
+  // department gets checked — deliberately isn't handled here as a mirrored
+  // effect; see toggleUserDepartment's own comment for why.
+  useEffect(() => {
+    if (userDepartmentIds.size !== 1) return;
+    const [onlyId] = userDepartmentIds;
+    const onlyDepartment = departmentOptions.find((d) => d.department_id === onlyId);
+    if (onlyDepartment && department !== onlyDepartment.name) {
+      setDepartment(onlyDepartment.name);
+    }
+  }, [userDepartmentIds, departmentOptions, department]);
+
   /** Self-heals the current home department into userDepartmentIds whenever either resolves/changes — a user's home department must always be one of their own grants. Runs for a brand-new user too (not just when editing), so create-user.mts's insert below always has at least the chosen home department to seed. */
   useEffect(() => {
     const homeId = departmentOptions.find((d) => d.name === department)?.department_id;
@@ -300,10 +324,28 @@ export function UserDetailsPage() {
     role.trim().length > 0;
 
   const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
+  /** The one department checked "Tilladt" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
+  const soleCheckedDepartment =
+    userDepartmentIds.size === 1
+      ? departmentOptions.find((d) => d.department_id === [...userDepartmentIds][0])
+      : undefined;
 
   /** Toggles a department's Afdelinger grant — refuses the one matching the current home department (a user can't lose access to their own active home department), guarded here too rather than trusting only the checkbox's disabled attribute below. */
   const toggleUserDepartment = (option: DepartmentOption, checked: boolean) => {
     if (option.department_id === homeDepartmentId) return;
+
+    // Checking a SECOND department while exactly one was already the
+    // (locked) Hjemmeafdeling means there's a real choice again — clear
+    // back to "" so the field returns to its normal, editable, unset
+    // "Vælg afdeling" state instead of silently keeping the old pick.
+    // Reads userDepartmentIds directly (this render's own closure, so it's
+    // exactly the pre-toggle count) rather than reacting to it via a
+    // useEffect — deliberately only fires here, as a direct result of THIS
+    // specific 1→2 transition, not the moment an existing multi-department
+    // user's grants first load (which would also be "size !== 1").
+    if (checked && userDepartmentIds.size === 1) {
+      setDepartment("");
+    }
 
     setUserDepartmentIds((prev) => {
       const next = new Set(prev);
@@ -336,6 +378,40 @@ export function UserDetailsPage() {
       const result = (await response.json()) as { error?: string };
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke slette bruger.");
+        setIsSubmitting(false);
+        return;
+      }
+    } catch {
+      setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    setIsSubmitting(false);
+    setPendingAction(null);
+    navigate("/department");
+  };
+
+  /** Reverses handleDelete via unblock-user.mts — lifts the Auth ban and clears deleted_at, then returns to DepartmentPage. No "last admin" pre-check needed here, unlike handleDelete: restoring access only ever adds admin coverage back, never removes it. */
+  const handleUnblock = async () => {
+    if (!user) return;
+
+    setIsSubmitting(true);
+    setSubmitError(null);
+
+    try {
+      const response = await fetch("/.netlify/functions/unblock-user", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ userId: user.user_id }),
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setSubmitError(result.error ?? "Kunne ikke genetablere brugerens adgang.");
         setIsSubmitting(false);
         return;
       }
@@ -441,6 +517,11 @@ export function UserDetailsPage() {
 
     if (pendingAction === "delete") {
       await handleDelete();
+      return;
+    }
+
+    if (pendingAction === "reactivate") {
+      await handleUnblock();
       return;
     }
 
@@ -563,131 +644,144 @@ export function UserDetailsPage() {
                       <option value="admin">Administrator</option>
                     </select>
                   </div>
-                  {(profile?.role === "admin" || profile?.role === "FLEETii admin") &&
-                    departmentOptions.length !== 1 && (
-                    <div className="grid grid-cols-2 items-start gap-2 p-0.5">
-                      <div className="relative flex items-center justify-between gap-2">
-                        <label className="text-sm font-medium text-brand-700">Afdeling(er):</label>
-                        <button
-                          type="button"
-                          onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
-                          aria-label="Mere information"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                        >
-                          ?
-                        </button>
-                        {openInfoPopover === "afdelinger" && (
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                        )}
-                        <InlinePopup
-                          visible={openInfoPopover === "afdelinger"}
-                          message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
-                          align="right"
-                        />
-                      </div>
-                      <div className="py-0.5">
-                        {grantsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
-                        {!grantsLoading && grantsError && <span className="text-sm text-red-600">{grantsError}</span>}
-                        {!grantsLoading && !grantsError && (
-                          <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
-                            <table className="w-full border-collapse text-[0.7rem]">
-                              <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                                <tr>
-                                  <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
-                                    Afdeling
-                                  </th>
-                                  <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
-                                    Tilladt
-                                  </th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-brand-100 bg-white">
-                                {departmentOptions.length === 0 && (
-                                  <tr>
-                                    <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
-                                      Ingen afdelinger fundet.
-                                    </td>
-                                  </tr>
-                                )}
-                                {departmentOptions.map((option) => {
-                                  const isHome = option.department_id === homeDepartmentId;
-                                  return (
-                                    <tr key={option.department_id}>
-                                      <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
-                                        {option.name}
-                                      </td>
-                                      <td className="px-2 py-0.5 text-center">
-                                        <input
-                                          type="checkbox"
-                                          checked={isHome || userDepartmentIds.has(option.department_id)}
-                                          disabled={isHome}
-                                          title={isHome ? "Kan ikke fjernes fra brugerens hjemmeafdeling" : undefined}
-                                          onChange={(e) => toggleUserDepartment(option, e.target.checked)}
-                                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                                        />
-                                      </td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                            </table>
+                  {/* Afdeling(er) + Hjemmeafdeling share this box (own
+                      border, no overflow-hidden, matching rounded-2xl on the
+                      inner div) rather than being two separate rows in the
+                      outer field list — they're tightly coupled
+                      (Hjemmeafdeling can only ever be one of whichever
+                      departments are checked "Tilladt" here). */}
+                  <div className="rounded-2xl border border-brand-100 bg-brand-50/40">
+                    <div className="rounded-2xl">
+                      {(profile?.role === "admin" || profile?.role === "FLEETii admin") &&
+                        departmentOptions.length !== 1 && (
+                          <div className="grid grid-cols-2 items-start gap-2 p-0.5">
+                            <div className="relative flex items-center justify-between gap-2">
+                              <label className="text-sm font-medium text-brand-700">Afdeling(er):</label>
+                              <button
+                                type="button"
+                                onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
+                                aria-label="Mere information"
+                                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                              >
+                                ?
+                              </button>
+                              {openInfoPopover === "afdelinger" && (
+                                <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
+                              )}
+                              <InlinePopup
+                                visible={openInfoPopover === "afdelinger"}
+                                message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
+                                align="right"
+                              />
+                            </div>
+                            <div className="py-0.5">
+                              {grantsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
+                              {!grantsLoading && grantsError && <span className="text-sm text-red-600">{grantsError}</span>}
+                              {!grantsLoading && !grantsError && (
+                                <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
+                                  <table className="w-full border-collapse text-[0.7rem]">
+                                    <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                                      <tr>
+                                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
+                                          Afdeling
+                                        </th>
+                                        <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
+                                          Tilladt
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-brand-100 bg-white">
+                                      {departmentOptions.length === 0 && (
+                                        <tr>
+                                          <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
+                                            Ingen afdelinger fundet.
+                                          </td>
+                                        </tr>
+                                      )}
+                                      {departmentOptions.map((option) => {
+                                        const isHome = option.department_id === homeDepartmentId;
+                                        return (
+                                          <tr key={option.department_id}>
+                                            <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
+                                              {option.name}
+                                            </td>
+                                            <td className="px-2 py-0.5 text-center">
+                                              <input
+                                                type="checkbox"
+                                                checked={isHome || userDepartmentIds.has(option.department_id)}
+                                                disabled={isHome}
+                                                title={isHome ? "Kan ikke fjernes fra brugerens hjemmeafdeling" : undefined}
+                                                onChange={(e) => toggleUserDepartment(option, e.target.checked)}
+                                                className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                              />
+                                            </td>
+                                          </tr>
+                                        );
+                                      })}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <div className="relative flex items-center justify-between gap-2">
+                          <label className="text-sm font-medium text-brand-700">
+                            Hjemmeafdeling:{" "}
+                            {departmentOptions.length !== 1 && !soleCheckedDepartment && (
+                              <span className="ml-0.5 text-red-600">*</span>
+                            )}
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
+                            aria-label="Mere information"
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                          >
+                            ?
+                          </button>
+                          {openInfoPopover === "hjemmeafdeling" && (
+                            <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
+                          )}
+                          <InlinePopup
+                            visible={openInfoPopover === "hjemmeafdeling"}
+                            message={
+                              departmentOptions.length === 1 || soleCheckedDepartment
+                                ? "Du er tilknyttet denne afdeling"
+                                : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
+                            }
+                            align="right"
+                          />
+                        </div>
+                        {departmentOptions.length === 1 || soleCheckedDepartment ? (
+                          <input
+                            type="text"
+                            readOnly
+                            disabled
+                            value={departmentOptions.length === 1 ? departmentOptions[0].name : (soleCheckedDepartment?.name ?? "")}
+                            className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
+                          />
+                        ) : (
+                          <select
+                            required
+                            aria-required="true"
+                            value={department}
+                            onChange={(e) => setDepartment(e.target.value)}
+                            className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          >
+                            <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
+                            {departmentOptions
+                              .filter((option) => userDepartmentIds.has(option.department_id))
+                              .map((option) => (
+                                <option key={option.department_id} value={option.name}>
+                                  {option.name}
+                                </option>
+                              ))}
+                          </select>
+                        )}
                       </div>
                     </div>
-                  )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <div className="relative flex items-center justify-between gap-2">
-                      <label className="text-sm font-medium text-brand-700">
-                        Hjemmeafdeling: {departmentOptions.length !== 1 && <span className="ml-0.5 text-red-600">*</span>}
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
-                        aria-label="Mere information"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                      >
-                        ?
-                      </button>
-                      {openInfoPopover === "hjemmeafdeling" && (
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                      )}
-                      <InlinePopup
-                        visible={openInfoPopover === "hjemmeafdeling"}
-                        message={
-                          departmentOptions.length === 1
-                            ? "Du er tilknyttet denne afdeling"
-                            : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
-                        }
-                        align="right"
-                      />
-                    </div>
-                    {departmentOptions.length === 1 ? (
-                      <input
-                        type="text"
-                        readOnly
-                        disabled
-                        value={departmentOptions[0].name}
-                        className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
-                      />
-                    ) : (
-                      <select
-                        required
-                        aria-required="true"
-                        value={department}
-                        onChange={(e) => setDepartment(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      >
-                        <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
-                        {departmentOptions
-                          .filter((option) => userDepartmentIds.has(option.department_id))
-                          .map((option) => (
-                            <option key={option.department_id} value={option.name}>
-                              {option.name}
-                            </option>
-                          ))}
-                      </select>
-                    )}
                   </div>
                 </div>
               </div>
@@ -736,48 +830,52 @@ export function UserDetailsPage() {
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
               {user ? (
-                <div className="flex flex-col gap-3">
-                  <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSubmitError(null);
+                      setPendingAction("update");
+                    }}
+                    disabled={!canSubmit}
+                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Opdater bruger
+                  </button>
+                  {user.deleted_at ? (
                     <button
                       type="button"
                       onClick={() => {
                         setSubmitError(null);
-                        setPendingAction("update");
+                        setPendingAction("reactivate");
                       }}
-                      disabled={!canSubmit}
-                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Opdater bruger
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setPendingAction("close")}
                       className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                     >
-                      Fortryd
+                      Genetabler brugers adgang
                     </button>
-                  </div>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isLastAdmin) {
-                          triggerWarning("last-admin");
-                          return;
-                        }
-                        setSubmitError(null);
-                        setPendingAction("delete");
-                      }}
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                    >
-                      Arkiver bruger
-                    </button>
-                    <InlinePopup
-                      visible={warningKey === "last-admin"}
-                      message="Kan ikke arkivere den sidste administrator i afdelingen."
-                      variant="warning"
-                    />
-                  </div>
+                  ) : (
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (isLastAdmin) {
+                            triggerWarning("last-admin");
+                            return;
+                          }
+                          setSubmitError(null);
+                          setPendingAction("delete");
+                        }}
+                        className="w-full rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      >
+                        Bloker brugers adgang
+                      </button>
+                      <InlinePopup
+                        visible={warningKey === "last-admin"}
+                        message="Kan ikke arkivere den sidste administrator i afdelingen."
+                        variant="warning"
+                      />
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
@@ -814,14 +912,18 @@ export function UserDetailsPage() {
               : pendingAction === "update"
                 ? "Er du sikker på, at du vil opdatere denne bruger?"
                 : pendingAction === "delete"
-                  ? "Er du sikker på, at du vil arkivere denne bruger? Brugeren kan ikke længere logge ind, men brugerens historik (fx bookinger) bevares."
-                  : "Er du sikker på, at du vil lukke uden at gemme?"
+                  ? "Er du sikker på, at du vil blokere denne bruger adgang? Brugeren kan ikke længere logge ind, men brugerens historik (fx bookinger) bevares."
+                  : pendingAction === "reactivate"
+                    ? "Er du sikker på, at du vil genetablere denne brugers adgang?"
+                    : "Er du sikker på, at du vil lukke uden at gemme?"
           }
           error={submitError}
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void handleConfirm()}
           isPending={isSubmitting}
-          confirmPendingLabel={pendingAction === "delete" ? "Arkiverer…" : "Vent…"}
+          confirmPendingLabel={
+            pendingAction === "delete" ? "Blokerer…" : pendingAction === "reactivate" ? "Genetablerer…" : "Vent…"
+          }
         />
       )}
     </div>

@@ -186,9 +186,9 @@ export default async (req: Request) => {
   const [{ data: caller }, { data: requestedDepartmentRow }] = await Promise.all([
     admin
       .from("user_profiles")
-      .select("costumer_id")
+      .select("costumer_id, role")
       .eq("user_id", authResult.userId)
-      .maybeSingle<{ costumer_id: string | null }>(),
+      .maybeSingle<{ costumer_id: string | null; role: string }>(),
     requestedDepartmentName
       ? admin
           .from("departments")
@@ -199,7 +199,16 @@ export default async (req: Request) => {
   ]);
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
 
-  if (!caller?.costumer_id || requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
+  // A FLEETii admin isn't scoped to one costumer — same platform-wide
+  // exception as department_settings/user_departments' own RLS policies
+  // (see supabase/applied/department_settings_allow_fleetii_admin.sql) —
+  // they just need the requested department to actually exist.
+  const isFleetiiAdmin = caller?.role === "FLEETii admin";
+  if (isFleetiiAdmin) {
+    if (!requestedDepartmentRow) {
+      return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+    }
+  } else if (!caller?.costumer_id || requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
     return new Response(JSON.stringify({ error: "Du kan kun oprette brugere hos din egen kunde." }), { status: 403 });
   }
 
@@ -248,7 +257,11 @@ export default async (req: Request) => {
     full_name: body.full_name ?? null,
     phone: body.phone ?? null,
     department_id: requestedDepartmentId,
-    costumer_id: caller.costumer_id,
+    // The requested department's own costumer_id is authoritative (matters
+    // for a FLEETii admin, whose own costumer_id — if they even have one —
+    // may differ from the department they're assigning); falls back to the
+    // caller's own only if somehow no department resolved.
+    costumer_id: requestedDepartmentRow?.costumer_id ?? caller?.costumer_id ?? null,
     role,
   });
 

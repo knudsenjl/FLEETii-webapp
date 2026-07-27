@@ -20,7 +20,13 @@
       "mcp__claude_ai_Supabase__list_tables",
       "mcp__claude_ai_Supabase__execute_sql",
       "mcp__claude_ai_Supabase__apply_migration",
-      "mcp__claude_ai_Supabase__get_advisors"
+      "mcp__claude_ai_Supabase__get_advisors",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=14028 or ProcessId=32740\")",
+      "PowerShell(Stop-Process -Id 14028,32740 -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(Get-Process -Id 14028,32740 -ErrorAction SilentlyContinue)",
+      "PowerShell(Start-Process -FilePath \"netlify\" -ArgumentList \"dev\" -WorkingDirectory \"c:\\\\Users\\\\J�rgenLindskovKnudse\\\\OneDrive - MH3 ApS\\\\Shared folders\\\\Documents-FLEETii\\\\FLEETii webapp\" -WindowStyle Hidden)",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=11560 or ProcessId=21312 or ProcessId=36528\")",
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=9764 or ProcessId=27300 or ProcessId=7612\")"
     ]
   }
 }

@@ -166,6 +166,19 @@ export function HandleVehiclePage() {
     setHomeDepartmentId((prev) => prev ?? onlyDepartmentId);
   }, [departmentOptions]);
 
+  // When exactly one department is checked "Tilladt" in Afdeling(er), same
+  // treatment even with 2+ departments in the costumer overall — auto-select
+  // and lock Hjemmeafdeling to it (see soleSelectedDepartment/the rendering
+  // below). Safe on load too: already-matching is a no-op. The reverse
+  // direction (clearing back to unset the moment a SECOND department gets
+  // checked) deliberately isn't handled here as a mirrored effect — see
+  // toggleDepartment's own comment for why.
+  useEffect(() => {
+    if (selectedDepartmentIds.size !== 1) return;
+    const [onlyId] = selectedDepartmentIds;
+    setHomeDepartmentId((prev) => (prev === onlyId ? prev : onlyId));
+  }, [selectedDepartmentIds]);
+
   if (!vehicle) {
     return null;
   }
@@ -192,7 +205,25 @@ export function HandleVehiclePage() {
     year.trim().length > 0 &&
     Boolean(homeDepartmentId);
 
+  /** The one department checked "Tilladt" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
+  const soleSelectedDepartment =
+    selectedDepartmentIds.size === 1
+      ? departmentOptions.find((d) => d.department_id === [...selectedDepartmentIds][0])
+      : undefined;
+
   const toggleDepartment = (department: DepartmentOption, checked: boolean) => {
+    // Checking a SECOND department while exactly one was already the
+    // (locked) Hjemmeafdeling means there's a real choice again — clear it
+    // back to unset so the field returns to its normal, editable state
+    // instead of silently keeping the old pick. Reads selectedDepartmentIds
+    // directly (this render's own closure, i.e. the pre-toggle count)
+    // rather than reacting to it via a useEffect — deliberately only fires
+    // here, as a direct result of THIS specific 1→2 transition, not the
+    // moment an already-multi-department vehicle's assignments first load.
+    if (checked && selectedDepartmentIds.size === 1) {
+      setHomeDepartmentId(null);
+    }
+
     setSelectedDepartmentIds((prev) => {
       const next = new Set(prev);
       if (checked) {
@@ -403,83 +434,92 @@ export function HandleVehiclePage() {
                         {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </div>
                     </div>
-                    {departmentOptions.length !== 1 && (
-                      <div className="grid grid-cols-[0.4fr_1fr] items-start px-1 py-0.5 text-[0.7rem] text-brand-700">
-                        <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Afdeling(er):</label>
-                        <div className="py-0.5">
-                          {departmentsLoading && <span className="text-brand-500">Indlæser…</span>}
-                          {!departmentsLoading && departmentsError && (
-                            <span className="text-red-600">{departmentsError}</span>
-                          )}
-                          {!departmentsLoading && !departmentsError && (
-                            <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
-                              <table className="w-full border-collapse text-[0.7rem]">
-                                <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                                  <tr>
-                                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
-                                      Afdeling
-                                    </th>
-                                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
-                                      Tilladt
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-brand-100 bg-white">
-                                  {departmentOptions.length === 0 && (
-                                    <tr>
-                                      <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
-                                        Ingen afdelinger fundet.
-                                      </td>
-                                    </tr>
-                                  )}
-                                  {departmentOptions.map((department) => (
-                                    <tr key={department.department_id}>
-                                      <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
-                                        {department.name}
-                                      </td>
-                                      <td className="px-2 py-0.5 text-center">
-                                        <input
-                                          type="checkbox"
-                                          checked={selectedDepartmentIds.has(department.department_id)}
-                                          onChange={(e) => toggleDepartment(department, e.target.checked)}
-                                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                                        />
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
+                    {/* Afdeling(er) + Hjemmeafdeling share this box rather
+                        than being two separate rows in the outer field list
+                        — they're tightly coupled (Hjemmeafdeling can only
+                        ever be one of whichever departments are checked
+                        "Tilladt" here). */}
+                    <div className="rounded-none border border-brand-100 bg-brand-50/40">
+                      <div>
+                        {departmentOptions.length !== 1 && (
+                          <div className="grid grid-cols-[0.4fr_1fr] items-start px-1 py-0.5 text-[0.7rem] text-brand-700">
+                            <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Afdeling(er):</label>
+                            <div className="py-0.5">
+                              {departmentsLoading && <span className="text-brand-500">Indlæser…</span>}
+                              {!departmentsLoading && departmentsError && (
+                                <span className="text-red-600">{departmentsError}</span>
+                              )}
+                              {!departmentsLoading && !departmentsError && (
+                                <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
+                                  <table className="w-full border-collapse text-[0.7rem]">
+                                    <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                                      <tr>
+                                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
+                                          Afdeling
+                                        </th>
+                                        <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
+                                          Tilladt
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-brand-100 bg-white">
+                                      {departmentOptions.length === 0 && (
+                                        <tr>
+                                          <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
+                                            Ingen afdelinger fundet.
+                                          </td>
+                                        </tr>
+                                      )}
+                                      {departmentOptions.map((department) => (
+                                        <tr key={department.department_id}>
+                                          <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
+                                            {department.name}
+                                          </td>
+                                          <td className="px-2 py-0.5 text-center">
+                                            <input
+                                              type="checkbox"
+                                              checked={selectedDepartmentIds.has(department.department_id)}
+                                              onChange={(e) => toggleDepartment(department, e.target.checked)}
+                                              className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                            />
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              )}
                             </div>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                          <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Hjemmeafdeling:</div>
+                          {departmentOptions.length === 1 || soleSelectedDepartment ? (
+                            <input
+                              type="text"
+                              readOnly
+                              disabled
+                              value={departmentOptions.length === 1 ? departmentOptions[0].name : (soleSelectedDepartment?.name ?? "")}
+                              className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-[0.7rem] text-brand-800"
+                            />
+                          ) : (
+                            <select
+                              value={homeDepartmentId ?? ""}
+                              onChange={(e) => setHomeDepartmentId(e.target.value || null)}
+                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            >
+                              <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
+                              {departmentOptions
+                                .filter((department) => selectedDepartmentIds.has(department.department_id))
+                                .map((department) => (
+                                  <option key={department.department_id} value={department.department_id}>
+                                    {department.name}
+                                  </option>
+                                ))}
+                            </select>
                           )}
                         </div>
                       </div>
-                    )}
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
-                      <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Hjemmeafdeling:</div>
-                      {departmentOptions.length === 1 ? (
-                        <input
-                          type="text"
-                          readOnly
-                          disabled
-                          value={departmentOptions[0].name}
-                          className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-[0.7rem] text-brand-800"
-                        />
-                      ) : (
-                        <select
-                          value={homeDepartmentId ?? ""}
-                          onChange={(e) => setHomeDepartmentId(e.target.value || null)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        >
-                          <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
-                          {departmentOptions
-                            .filter((department) => selectedDepartmentIds.has(department.department_id))
-                            .map((department) => (
-                              <option key={department.department_id} value={department.department_id}>
-                                {department.name}
-                              </option>
-                            ))}
-                        </select>
-                      )}
                     </div>
                   </div>
                 </div>

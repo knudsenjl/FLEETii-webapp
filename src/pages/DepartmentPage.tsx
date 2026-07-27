@@ -14,6 +14,8 @@ type ProfileRow = {
   department_id: string | null;
   department_name: string | null;
   role: string;
+  /** Set once "Bloker brugers adgang" has been used — see UserDetailsPage's own doc comment. Blocked users stay listed here (not hidden) so they can be reopened and unblocked. */
+  deleted_at: string | null;
 };
 
 /** Raw shape of the Supabase query before flattening the embedded departments(name) relation into department_name. */
@@ -24,15 +26,22 @@ type ProfileQueryRow = {
   phone: string | null;
   department_id: string | null;
   role: string;
+  deleted_at: string | null;
   departments: { name: string } | null;
 };
 
 /**
  * Admin "user management" page ("/department"): every user in the admin's
- * own department — click a row to open it in UserDetailsPage, which
- * handles editing (via update-user.mts, including that user's Rettigheder
- * overrides) and deleting (via delete-user.mts) from there, plus a link to
- * create a new user.
+ * own department (or, for a FLEETii admin, any department — see
+ * supabase/applied/user_profiles_select_allow_fleetii_admin.sql) — click a
+ * row to open it in UserDetailsPage, which handles editing (via
+ * update-user.mts, including that user's Rettigheder overrides) and
+ * blocking/unblocking access (via delete-user.mts/unblock-user.mts) from
+ * there, plus a link to create a new user. Blocked users stay listed here
+ * rather than disappearing (a red "Blokeret" badge appears next to their
+ * Rolle, same style as FleetiiAdministrationPage's own "Adgang blokeret"
+ * marker for a deactivated costumer), since blocking is reversible and they
+ * need to stay reachable to unblock.
  */
 export function DepartmentPage() {
   const { afdeling, afdelingId } = useAuth();
@@ -56,8 +65,9 @@ export function DepartmentPage() {
       // (PGRST201) and fails outright — this pins it to the direct FK.
       const { data, error: fetchError } = await supabase
         .from("user_profiles")
-        .select("user_id, email, full_name, phone, department_id, role, departments!user_profiles_department_id_fkey(name)")
-        .is("deleted_at", null)
+        .select(
+          "user_id, email, full_name, phone, department_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
+        )
         .order("full_name", { ascending: true })
         .returns<ProfileQueryRow[]>();
 
@@ -170,7 +180,15 @@ export function DepartmentPage() {
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.email ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
-                            <td className="whitespace-nowrap px-2 py-0.5">{user.role}</td>
+                            <td className="whitespace-nowrap px-2 py-0.5">
+                              {user.deleted_at ? (
+                                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                  Blokeret
+                                </span>
+                              ) : (
+                                user.role
+                              )}
+                            </td>
                           </tr>
                         );
                       })}
