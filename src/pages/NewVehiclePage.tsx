@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
+import { InlinePopup } from "../components/InlinePopup";
 import { PHONE_PATTERN } from "../lib/validation";
 
 /**
@@ -19,11 +20,16 @@ export function NewVehiclePage() {
   const [brand, setBrand] = useState("");
   const [maerke, setMaerke] = useState("");
   const [aargang, setAargang] = useState("");
+  /** Whether a NEW FLEETii device needs to be installed — unticked when the vehicle already has one (an existing IoT device moved from elsewhere, or pre-installed), in which case fleetiiDeviceId identifies it instead. */
+  const [needsFleetiiDevice, setNeedsFleetiiDevice] = useState(true);
+  const [fleetiiDeviceId, setFleetiiDeviceId] = useState("");
   const [kontaktperson, setKontaktperson] = useState("");
   const [kontaktnummer, setKontaktnummer] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  /** Which (if either) of the FLEETii-device "?" info popovers is open — mirrors UserDetailsPage.tsx's own Afdeling(er)/Hjemmeafdeling popover pattern. */
+  const [openInfoPopover, setOpenInfoPopover] = useState<"device" | "deviceId" | null>(null);
 
   const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(kontaktnummer.trim());
 
@@ -32,6 +38,7 @@ export function NewVehiclePage() {
     brand.trim().length > 0 &&
     maerke.trim().length > 0 &&
     aargang.trim().length > 0 &&
+    (needsFleetiiDevice || fleetiiDeviceId.trim().length > 0) &&
     kontaktperson.trim().length > 0 &&
     PHONE_PATTERN.test(kontaktnummer.trim()) &&
     !isSending;
@@ -49,7 +56,17 @@ export function NewVehiclePage() {
           "Content-Type": "application/json",
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
-        body: JSON.stringify({ afdeling, nummerplade, brand, maerke, aargang, kontaktperson, kontaktnummer }),
+        body: JSON.stringify({
+          afdeling,
+          nummerplade,
+          brand,
+          maerke,
+          aargang,
+          needsFleetiiDevice,
+          fleetiiDeviceId: needsFleetiiDevice ? null : fleetiiDeviceId,
+          kontaktperson,
+          kontaktnummer,
+        }),
       });
 
       const result = (await response.json()) as { ok?: boolean; error?: string };
@@ -93,8 +110,13 @@ export function NewVehiclePage() {
                 Denne side skal vi have snakket om. Jeg ved ikke, hvilke oplysninger, Robert har brug for, at kunne oprette en ny bil i den pågældende afdeling.
               </p>
 
-              <div className="overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
+              <div className="rounded-2xl border border-brand-100">
+                {/* rounded-2xl lives here too (not just on the outer border,
+                    with no overflow-hidden at all) so the FLEETii-device "?"
+                    popovers below — absolutely positioned descendants —
+                    aren't clipped when they overflow this box's edge (same
+                    fix as RettighederSettings.tsx/UserDetailsPage.tsx). */}
+                <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
                     <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
@@ -103,6 +125,70 @@ export function NewVehiclePage() {
                   <RequiredFieldRow label="Brand:" value={brand} onChange={setBrand} />
                   <RequiredFieldRow label="Mærke:" value={maerke} onChange={setMaerke} />
                   <RequiredFieldRow label="Årgang:" value={aargang} onChange={setAargang} />
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <div className="relative flex items-center justify-between gap-2">
+                      <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
+                        FLEETii device skal installeres:
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
+                        aria-label="Mere information"
+                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                      >
+                        ?
+                      </button>
+                      {openInfoPopover === "device" && (
+                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
+                      )}
+                      <InlinePopup
+                        visible={openInfoPopover === "device"}
+                        message="Hvis der ikke er et FLEETii device installeret i køretøjet, skal du tikke denne af"
+                        align="right"
+                      />
+                    </div>
+                    <input
+                      id="needs-fleetii-device"
+                      type="checkbox"
+                      checked={needsFleetiiDevice}
+                      onChange={(e) => setNeedsFleetiiDevice(e.target.checked)}
+                      className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                    />
+                  </div>
+                  {!needsFleetiiDevice && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <div className="relative flex items-center justify-between gap-2">
+                        <label htmlFor="fleetii-device-id" className="flex-1 text-right text-sm font-medium text-brand-700">
+                          FLEETii device id: <span className="text-red-600">*</span>
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
+                          aria-label="Mere information"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                        >
+                          ?
+                        </button>
+                        {openInfoPopover === "deviceId" && (
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
+                        )}
+                        <InlinePopup
+                          visible={openInfoPopover === "deviceId"}
+                          message="Angiv id-nummeret på det eksisterende IoT device i køretøjet"
+                          align="right"
+                        />
+                      </div>
+                      <input
+                        id="fleetii-device-id"
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={fleetiiDeviceId}
+                        onChange={(e) => setFleetiiDeviceId(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                  )}
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
                   <RequiredFieldRow label="Kontaktnummer:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
                 </div>
@@ -120,7 +206,7 @@ export function NewVehiclePage() {
               <div className="mt-auto flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <p className="text-xs text-brand-700">
                   Hvis du trykker på knappen herunder, sendes der besked til FLEETii, som
-                  herefter vil oprette bilen i FLEETii, og kontakte dig vedr. aftale omkring
+                  herefter vil vi oprette bilen i FLEETii, og kontakte dig vedr. aftale omkring evt.
                   installering af FLEETii device i køretøjet.
                 </p>
                 <p className="text-xs text-brand-700">

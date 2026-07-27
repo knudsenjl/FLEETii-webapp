@@ -29,10 +29,8 @@ type LeafletMapProps = {
   extraMarkers?: { lat: number; lng: number; tooltip?: string; onClick?: () => void }[];
   /** Whether to render a marker at lat/lng at all (false shows just the tiles, e.g. when no GPS fix exists). */
   showMarker?: boolean;
-  /** Whether clicking the primary marker (with no onMarkerClick) should show a "not implemented" popup, vs. doing nothing. */
-  markerClickable?: boolean;
   markerTooltip?: string;
-  /** Called when the primary marker is clicked; if omitted, falls back to the "not implemented" popup when markerClickable is true. */
+  /** Called when the primary marker is clicked; the marker just isn't clickable if omitted. */
   onMarkerClick?: () => void;
   /** Groups extraMarkers (and the primary marker) into a Leaflet marker cluster instead of showing them individually. */
   cluster?: boolean;
@@ -46,7 +44,6 @@ export function LeafletMap({
   className,
   extraMarkers = [],
   showMarker = true,
-  markerClickable = true,
   markerTooltip,
   onMarkerClick,
   cluster = false,
@@ -81,14 +78,6 @@ export function LeafletMap({
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
     }).addTo(map);
-    const bindNotImplementedPopup = (marker: L.Marker) => {
-      marker.bindPopup("Endnu ikke implementeret");
-      marker.on("click", () => {
-        marker.openPopup();
-        setTimeout(() => marker.closePopup(), 3000);
-      });
-    };
-
     const clusterGroup = cluster ? L.markerClusterGroup().addTo(map) : null;
     const addMarkerToMap = (marker: L.Marker) => {
       if (clusterGroup) {
@@ -104,17 +93,7 @@ export function LeafletMap({
       if (markerTooltip) {
         marker.bindTooltip(markerTooltip, { direction: "top", offset: [0, -28] });
       }
-      if (markerClickable) {
-        marker.bindPopup("Endnu ikke implementeret");
-      }
-      marker.on("click", () => {
-        if (onMarkerClickRef.current) {
-          onMarkerClickRef.current();
-        } else if (markerClickable) {
-          marker.openPopup();
-          setTimeout(() => marker.closePopup(), 3000);
-        }
-      });
+      marker.on("click", () => onMarkerClickRef.current?.());
     }
     extraMarkers.forEach((marker) => {
       const extraMarker = L.marker([marker.lat, marker.lng], { icon: fleetiiIcon });
@@ -124,8 +103,6 @@ export function LeafletMap({
       }
       if (marker.onClick) {
         extraMarker.on("click", marker.onClick);
-      } else {
-        bindNotImplementedPopup(extraMarker);
       }
     });
 
@@ -156,7 +133,7 @@ export function LeafletMap({
     // suggestion would be wrong (using the array reference directly would
     // rebuild the whole map on every caller re-render, see the comment above).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, showMarker, markerClickable, markerTooltip, cluster, extraMarkersKey]);
+  }, [lat, lng, zoom, showMarker, markerTooltip, cluster, extraMarkersKey]);
 
   return <div ref={containerRef} className={className} />;
 }

@@ -160,7 +160,7 @@ export function CostumerDetailsPage() {
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
 
-  /** Inserts the new costumer row; the costumers_create_default_department trigger handles seeding its first department. */
+  /** Inserts the new costumer row, then redirects straight into its own edit view (replace, with the fresh row already in router state) so "Administration af afdelinger" is immediately reachable — there's no trigger seeding a first department anymore (costumers_create_default_department was dropped in remove_alle_koretojer.sql), so a brand-new costumer genuinely starts with zero departments until an admin adds one there. */
   const handleCreate = async () => {
     setIsSubmitting(true);
     setSubmitError(null);

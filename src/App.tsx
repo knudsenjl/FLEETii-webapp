@@ -25,6 +25,7 @@ import { UserDetailsPage } from "./pages/UserDetailsPage";
 import { VehiclesPage } from "./pages/VehiclesPage";
 import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
 import { NewVehiclePage } from "./pages/NewVehiclePage";
+import { VehicleCreatePage } from "./pages/VehicleCreatePage";
 import { AboutPage } from "./pages/AboutPage";
 import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
 import { SettingsAdminPage } from "./pages/SettingsAdminPage";
@@ -155,6 +156,22 @@ function App() {
             element={
               <ProtectedRoute requireRole="FLEETii admin">
                 <DepartmentDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicle-create"
+            element={
+              <ProtectedRoute requireAdmin>
+                <VehicleCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicle-create/:orderId"
+            element={
+              <ProtectedRoute requireAdmin>
+                <VehicleCreatePage />
               </ProtectedRoute>
             }
           />

@@ -298,7 +298,6 @@ export function BookingDetailsPage() {
                     lng={position?.lng ?? DENMARK_CENTER.lng}
                     zoom={position ? 17 : 7}
                     showMarker={Boolean(position)}
-                    markerClickable={false}
                     markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
                     onMarkerClick={goToVehicleDetails}
                     className="absolute inset-0"

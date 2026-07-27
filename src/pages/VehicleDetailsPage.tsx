@@ -376,7 +376,6 @@ export function VehicleDetailsPage() {
                     lng={position?.lng ?? DENMARK_CENTER.lng}
                     zoom={position ? 17 : 7}
                     showMarker={Boolean(position)}
-                    markerClickable={false}
                     markerTooltip={vehicle.plate}
                     className="absolute inset-0"
                   />
