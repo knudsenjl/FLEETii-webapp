@@ -9,12 +9,14 @@ import {
   formatBookingPeriod,
   formatVehicleLabel,
   isMapVisible,
+  isoPrefix,
   mapBookingRow,
   nowIsoString,
   resolveVehicleGpsPosition,
   shortSignalTimestamp,
   toDisplayVehicle,
   type BookingRow,
+  type EditingBooking,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -50,9 +52,12 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * of its last known position (only shown from 15 minutes before the
  * booking's start to 15 minutes after its end — see isMapVisible — outside
  * that window it's not rendered at all), a "Slet reservation" cancel flow,
- * and a "Rediger reservation" flow that re-enters ReservationPage/
- * AvailablePage/ConfirmPage pre-filled with this booking's data, updating it
- * on confirm instead of creating a new one. Normally reached with the
+ * an "Afslut reservation" flow (enabled only within the booking's own
+ * period — locks the vehicle and shortens the booking to end now, without
+ * deleting it), and a "Rediger reservation" flow that re-enters
+ * ReservationPage/AvailablePage/ConfirmPage pre-filled with this booking's
+ * data, updating it on confirm instead of creating a new one. Normally
+ * reached with the
  * booking pre-filled via router state (BookingsPage/AllBookingsPage), which
  * skips a round-trip; a direct URL/refresh/bookmark (no router state) falls
  * back to fetching it by the :bookingId route param instead, redirecting to
@@ -71,6 +76,8 @@ export function BookingDetailsPage() {
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [isFinishing, setIsFinishing] = useState(false);
+  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
@@ -155,20 +162,18 @@ export function BookingDetailsPage() {
       }
     : undefined;
 
-  /** Starts the "Rediger reservation" flow: back through ReservationPage -> AvailablePage -> ConfirmPage, pre-filled with this booking's current bruger/anvendelse/start/end, carrying editingBookingId along so ConfirmPage updates this row instead of inserting a new one. */
+  /** Starts the "Rediger reservation" flow: back through ReservationPage -> (optionally) AvailablePage -> ConfirmPage, pre-filled with this booking's current bruger/anvendelse/start/end/vehicle, updating this row (by booking_id) instead of inserting a new one. vehicleId is carried through to AvailablePage so this booking's current vehicle bypasses the department filter there (see AvailablePage's availableVehicles) even outside the editing admin's own department. */
   const goToEditBooking = () => {
-    navigate("/reservation", {
-      state: {
-        editing: {
-          bookingId: booking.id,
-          userId: booking.userId,
-          userLabel: booking.userEmail,
-          anvendelse: booking.use,
-          startIso: booking.startIso,
-          endIso: booking.endIso,
-        },
-      },
-    });
+    const editing: EditingBooking = {
+      bookingId: booking.id,
+      userId: booking.userId,
+      userLabel: booking.userEmail,
+      anvendelse: booking.use,
+      startIso: booking.startIso,
+      endIso: booking.endIso,
+      vehicleId: booking.vehicle,
+    };
+    navigate("/reservation", { state: { editing } });
   };
 
   /** Deletes this booking and returns to the bookings list. */
@@ -182,6 +187,36 @@ export function BookingDetailsPage() {
       setError(deleteError.message);
       setIsCancelling(false);
       setShowCancelConfirm(false);
+      return;
+    }
+
+    navigate("/bookings", { replace: true });
+  };
+
+  /** "Afslut reservation" is enabled only within the booking's own period — from its start until its end (or always, for an open-ended booking), same wall-clock comparison as computeLockButtonState. */
+  const nowPrefix = isoPrefix(nowIsoString());
+  const bookingStarted = nowPrefix >= isoPrefix(booking.startIso);
+  const bookingExpired = booking.endIso !== null && nowPrefix >= isoPrefix(booking.endIso);
+  const canFinishBooking = bookingStarted && !bookingExpired;
+
+  /** Ends this booking early: locks the vehicle, then sets its "end" to now — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. If locking fails, the booking is left untouched (see useVehicleLockState's own error, shown below the Lås/Lås op buttons) rather than shortening a booking whose vehicle didn't actually get secured. */
+  const handleFinishBooking = async () => {
+    setIsFinishing(true);
+    setError(null);
+
+    const lockSuccess = await setLock(true);
+    if (!lockSuccess) {
+      setIsFinishing(false);
+      setShowFinishConfirm(false);
+      return;
+    }
+
+    const { error: updateError } = await supabase.from("bookings").update({ end: nowIsoString() }).eq(BOOKING_ID_COLUMN, booking.id);
+
+    if (updateError) {
+      setError(updateError.message);
+      setIsFinishing(false);
+      setShowFinishConfirm(false);
       return;
     }
 
@@ -378,6 +413,15 @@ export function BookingDetailsPage() {
                 </div>
               </div>
 
+              <button
+                type="button"
+                onClick={() => setShowFinishConfirm(true)}
+                disabled={!canFinishBooking || isFinishing}
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Afslut reservation
+              </button>
+
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
@@ -417,6 +461,16 @@ export function BookingDetailsPage() {
           onConfirm={() => void handleCancelBooking()}
           isPending={isCancelling}
           confirmPendingLabel="Aflyser…"
+        />
+      )}
+
+      {showFinishConfirm && (
+        <ConfirmDialog
+          message="Er du sikker på, at du vil afslutte denne reservation nu? Køretøjet låses, og reservationen sættes til at slutte nu. Du kan således ikke efterfølgende genoptage brugen af køretøjet uden at der foreligger en ny reservation."
+          onCancel={() => setShowFinishConfirm(false)}
+          onConfirm={() => void handleFinishBooking()}
+          isPending={isFinishing}
+          confirmPendingLabel="Afslutter…"
         />
       )}
     </div>

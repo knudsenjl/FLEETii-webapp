@@ -71,6 +71,25 @@ export type MappedBooking = {
   departmentId: string | null;
 };
 
+/**
+ * The booking currently being edited, as passed in via router state from
+ * BookingDetailsPage's "Rediger reservation" button — carried through
+ * ReservationPage/AvailablePage/ConfirmPage so confirming updates this row
+ * (by booking_id) instead of inserting a new one, and so AvailablePage lets
+ * this booking's own current vehicle bypass the department filter (see
+ * AvailablePage's availableVehicles) even if it isn't in the vehicle list
+ * the editing admin would otherwise see. userLabel is display-only.
+ */
+export type EditingBooking = {
+  bookingId: string;
+  userId: string | null;
+  userLabel: string | null;
+  anvendelse: string;
+  startIso: string;
+  endIso: string | null;
+  vehicleId: string;
+};
+
 /** Splits an ISO datetime into a Danish "dd.mm.yyyy" date and an "HH:mm" time. Tolerates a bare date (no "T") or an empty string by falling back to an empty time instead of throwing. */
 export function splitIsoDateTime(iso: string): { date: string; time: string } {
   const [datePart, timePart] = iso.split("T");

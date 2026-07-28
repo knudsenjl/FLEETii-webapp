@@ -2,10 +2,12 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { supabase } from "../lib/supabase";
+import type { EditingBooking } from "../lib/bookings";
 import {
   ANDET_VALUE,
   fetchSettingText,
@@ -14,16 +16,6 @@ import {
   sortAnvendelserWithAndetLast,
 } from "../lib/settings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
-
-/** The existing booking being edited, as passed in via router state from BookingDetailsPage's "Rediger reservation" button — carried forward through AvailablePage/ConfirmPage so confirming updates this row instead of inserting a new one. */
-type EditingBooking = {
-  bookingId: string;
-  userId: string | null;
-  userLabel: string | null;
-  anvendelse: string;
-  startIso: string;
-  endIso: string | null;
-};
 
 /** Hardcoded fallbacks used whenever "Standard varighed"/"Standard interval" (department_settings/user_settings, see StandardSettings.tsx) has no value for the current user/department. */
 const DEFAULT_DURATION_MINUTES = 3 * 60;
@@ -62,14 +54,26 @@ function ceilToQuarterHour(date: Date): Date {
  * for themselves), what it's for, and the start/end date+time. Defaults to
  * "now" through "+Standard varighed" (falling back to +3 hours when unset),
  * with the Start/Slut TimeSelect stepping by "Standard interval" (falling
- * back to 15 minutes) — see StandardSettings.tsx. Continues to AvailablePage (via router state,
- * not a DB write yet) once "Find ledige" is pressed.
+ * back to 15 minutes) — see StandardSettings.tsx. Continues to AvailablePage
+ * (via router state, not a DB write yet) once "Find ledige" is pressed. No
+ * DB write happens on this page itself, whether creating or editing — the
+ * actual insert/update only ever happens on ConfirmPage's "Bekræft".
+ * When editing an existing booking (reached via BookingDetailsPage's
+ * "Rediger reservation"), "Find ledige" is instead three buttons: "Skift
+ * køretøj" (same as "Find ledige" — AvailablePage lets this booking's own
+ * current vehicle bypass the department filter there, see its
+ * availableVehicles, so it's reachable for reselection), "Opdater" (keeps
+ * the same vehicle and goes straight to ConfirmPage), and "Fortryd"
+ * (abandons the edit, no DB changes, back to the booking's detail page).
  */
 export function ReservationPage() {
   const { session, profile, afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const vehicles = use2hireVehicle();
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
+  /** The booking-being-edited's current (unchanged) vehicle, looked up for "Opdater"'s ConfirmPage summary — undefined only if it's somehow no longer in the fleet list. */
+  const editingVehicle = editing ? vehicles.find((v) => v.vehicleId === editing.vehicleId) : undefined;
   // bruger is a user_id (uuid) now, not an email (see
   // supabase/bookings_user_to_user_id.sql) — session.user.id is already
   // exactly that for a non-admin booking for themselves. When editing an
@@ -327,26 +331,35 @@ export function ReservationPage() {
     setEndIgnored(true);
   };
 
-  const handleFindAvailable = () => {
-    // Recomputed fresh here (not read from possibly-stale state) so a delay
-    // between checking "Nu" and pressing "Find ledige" can't submit a start
-    // time that's already slipped into the past.
+  /**
+   * {start, end, brugerLabel} freshly computed from the current form state —
+   * shared by handleFindAvailable/handleUpdateSameVehicle so neither can
+   * submit a stale value. Recomputed fresh on each call (not read from
+   * possibly-stale state) so a delay between checking "Nu" and pressing the
+   * button can't submit a start time that's already slipped into the past.
+   * An ignored End means "no end constraint" — null rather than a malformed
+   * "T:00" string, matching how AvailablePage/bookings.ts already treat a
+   * null start/end as unbounded (see isVehicleAvailable). bruger is a
+   * user_id now — brugerLabel resolves a display-ready email alongside it,
+   * so AvailablePage/ConfirmPage never need a fresh lookup just to show who
+   * the booking is for.
+   */
+  const currentPeriod = () => {
     const current = new Date();
     const start = startIsNow
       ? `${toIsoDate(current)}T${formatTime(current)}:00`
       : `${startDate}T${startTime}:00`;
-    // An ignored End means "no end constraint" — pass null rather than a
-    // malformed "T:00" string, matching how AvailablePage/bookings.ts
-    // already treat a null start/end as unbounded (see isVehicleAvailable).
     const end = endIgnored ? null : `${endDate}T${endTime}:00`;
-    // bruger is a user_id now — resolve a display-ready email to carry
-    // through router state too, so AvailablePage/ConfirmPage never need a
-    // fresh lookup just to show who the booking is for.
     const brugerLabel =
       profile?.role === "admin"
         ? (departmentUsers.find((u) => u.user_id === bruger)?.email ?? editing?.userLabel ?? "")
         : (session?.user.email ?? "");
+    return { start, end, brugerLabel };
+  };
 
+  /** Not editing: the plain "Find ledige" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. */
+  const handleFindAvailable = () => {
+    const { start, end, brugerLabel } = currentPeriod();
     navigate("/available", {
       state: {
         user: bruger,
@@ -355,8 +368,42 @@ export function ReservationPage() {
         start,
         end,
         editingBookingId: editing?.bookingId,
+        editingVehicleId: editing?.vehicleId,
       },
     });
+  };
+
+  /**
+   * "Opdater": keeps the same vehicle (no detour through AvailablePage) and
+   * goes straight to ConfirmPage's summary — same destination shape
+   * AvailablePage's own "Opdater" produces, just skipping the vehicle
+   * re-pick since it isn't changing. Disabled (see the button below) if the
+   * vehicle somehow isn't in the loaded fleet list.
+   */
+  const handleUpdateSameVehicle = () => {
+    if (!editing || !editingVehicle) return;
+    const { start, end, brugerLabel } = currentPeriod();
+    navigate("/confirm", {
+      state: {
+        vehicle: {
+          id: editingVehicle.vehicleId,
+          vehicle: `${editingVehicle.brand} ${editingVehicle.model}`,
+          plate: editingVehicle.plate,
+        },
+        user: bruger,
+        userLabel: brugerLabel,
+        use: anvendelse,
+        start,
+        end,
+        editingBookingId: editing.bookingId,
+      },
+    });
+  };
+
+  /** "Fortryd": abandons the edit with no DB changes (nothing was deleted in this path) and returns to the booking's own detail page. */
+  const handleCancelEdit = () => {
+    if (!editing) return;
+    navigate(`/booking-details/${editing.bookingId}`);
   };
 
   return (
@@ -543,16 +590,46 @@ export function ReservationPage() {
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <button
-                  type="button"
-                  onClick={handleFindAvailable}
-                  disabled={!bruger || !anvendelse.trim()}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Find ledige
-                </button>
-              </div>
+              {editing ? (
+                <div className="flex flex-col gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleFindAvailable}
+                    disabled={!bruger || !anvendelse.trim()}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Skift køretøj
+                  </button>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={handleUpdateSameVehicle}
+                      disabled={!bruger || !anvendelse.trim() || !editingVehicle}
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Opdater
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      Fortryd
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={handleFindAvailable}
+                    disabled={!bruger || !anvendelse.trim()}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Find ledige
+                  </button>
+                </div>
+              )}
             </div>
           </section>
         </motion.main>

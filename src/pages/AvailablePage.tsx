@@ -52,8 +52,11 @@ function isSameDate(a: Date, b: Date): boolean {
  * Step 2 of the booking flow ("/available"): given the department/period
  * chosen on ReservationPage (via router state), lists every department
  * vehicle that's free for that whole period, with its actual free window
- * either side. Selecting one and pressing "Reserver" continues to
- * ConfirmPage — still no DB write at this point.
+ * either side. Selecting one and pressing "Reserver"/"Opdater" continues to
+ * ConfirmPage — still no DB write at this point. When editing (editingBookingId
+ * set), a "Fortryd" button sits alongside "Opdater" — no DB changes, just
+ * back to the booking's own detail page, same as ReservationPage's own
+ * "Fortryd".
  */
 export function AvailablePage() {
   const { afdelingId } = useAuth();
@@ -67,6 +70,7 @@ export function AvailablePage() {
         start?: string;
         end?: string;
         editingBookingId?: string;
+        editingVehicleId?: string;
       }
     | null;
   const bruger = state?.user ?? "";
@@ -105,7 +109,16 @@ export function AvailablePage() {
 
   const twoHireVehicles = use2hireVehicle();
   const availableVehicles: AvailableVehicle[] = twoHireVehicles
-    .filter((v) => afdelingId !== null && v.departmentIds.includes(afdelingId))
+    // The booking being edited's own current vehicle bypasses the
+    // department filter — it needs to stay selectable/visible here even if
+    // it isn't in the editing admin's own department (e.g. the booking was
+    // originally made under a different department context), otherwise
+    // "Rediger reservation" can never keep (or even see) that vehicle. It's
+    // still fully subject to the real availability check right below: if
+    // the (possibly just-edited) period now genuinely conflicts with a
+    // different booking, it correctly won't show, same as any other
+    // vehicle.
+    .filter((v) => (afdelingId !== null && v.departmentIds.includes(afdelingId)) || v.vehicleId === state?.editingVehicleId)
     .filter((v) => isVehicleAvailable(v.vehicleId, bookings, state?.start ?? null, state?.end ?? null))
     .map((v) => {
       const freePeriod = computeFreePeriod(v.vehicleId, bookings, referenceStart, referenceEnd);
@@ -118,7 +131,8 @@ export function AvailablePage() {
       };
     });
 
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  /** Pre-selects the vehicle the booking being edited already had (see ReservationPage's "editing.vehicleId") — that vehicle bypasses the department filter above, and its own booking row is excluded from the conflict check, so it's guaranteed to show up as available here for its original period. Still just a plain initial value: the user can pick a different vehicle same as any other row. */
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(state?.editingVehicleId ?? null);
   const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
 
   return (
@@ -221,7 +235,16 @@ export function AvailablePage() {
                 </table>
               </div>
 
-              <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+              <div className={editingBookingId ? "grid grid-cols-2 gap-3 pt-2" : "flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end"}>
+                {editingBookingId && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/booking-details/${editingBookingId}`)}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Fortryd
+                  </button>
+                )}
                 <button
                   type="button"
                   disabled={!selectedVehicle}

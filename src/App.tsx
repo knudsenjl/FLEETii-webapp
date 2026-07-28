@@ -14,6 +14,7 @@ import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
 import { AllBookingsPage } from "./pages/AllBookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
+import { TwoHireTestPage } from "./pages/TwoHireTestPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { FleetiiAdministrationPage } from "./pages/FleetiiAdministrationPage";
 import { CostumerDetailsPage } from "./pages/CostumerDetailsPage";
@@ -116,6 +117,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <BookingDetailsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/2hire-test"
+            element={
+              <ProtectedRoute requireAdmin>
+                <TwoHireTestPage />
               </ProtectedRoute>
             }
           />

@@ -30,7 +30,10 @@ type ReservationVehicle = {
  * "bookings" table — inserting a new row normally, or updating the existing
  * one when reached via BookingDetailsPage's "Rediger reservation" (carries
  * editingBookingId through router state from ReservationPage/AvailablePage).
- * Redirects to the fleet's/own bookings list on success depending on role.
+ * "Annuller" carries the full incoming state back to AvailablePage unchanged
+ * (rather than dropping it), so editingBookingId/editingVehicleId survive
+ * the round trip instead of stranding the admin mid-edit. Redirects to the
+ * fleet's/own bookings list on success depending on role.
  */
 export function ConfirmPage() {
   const { session, profile, afdelingId } = useAuth();
@@ -210,7 +213,7 @@ export function ConfirmPage() {
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
                 <button
                   type="button"
-                  onClick={() => navigate("/available")}
+                  onClick={() => navigate("/available", { state })}
                   disabled={isSubmitting}
                   className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
