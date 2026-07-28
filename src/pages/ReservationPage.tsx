@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
@@ -59,21 +58,20 @@ function ceilToQuarterHour(date: Date): Date {
  * DB write happens on this page itself, whether creating or editing — the
  * actual insert/update only ever happens on ConfirmPage's "Bekræft".
  * When editing an existing booking (reached via BookingDetailsPage's
- * "Rediger reservation"), "Find ledige" is instead three buttons: "Skift
- * køretøj" (same as "Find ledige" — AvailablePage lets this booking's own
- * current vehicle bypass the department filter there, see its
- * availableVehicles, so it's reachable for reselection), "Opdater" (keeps
- * the same vehicle and goes straight to ConfirmPage), and "Fortryd"
- * (abandons the edit, no DB changes, back to the booking's detail page).
+ * "Rediger reservation"), "Find ledige" is instead two buttons: "Bekræft/
+ * skift køretøj" (same action as "Find ledige" — always goes through AvailablePage,
+ * even to just keep the same vehicle, so the current period's actual
+ * availability is checked and shown rather than only discovered as an error
+ * on ConfirmPage; AvailablePage lets this booking's own current vehicle
+ * bypass the department filter there, see its availableVehicles, so it's
+ * reachable for reselection) and "Fortryd" (abandons the edit, no DB
+ * changes, back to the booking's detail page).
  */
 export function ReservationPage() {
   const { session, profile, afdelingId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const vehicles = use2hireVehicle();
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
-  /** The booking-being-edited's current (unchanged) vehicle, looked up for "Opdater"'s ConfirmPage summary — undefined only if it's somehow no longer in the fleet list. */
-  const editingVehicle = editing ? vehicles.find((v) => v.vehicleId === editing.vehicleId) : undefined;
   // bruger is a user_id (uuid) now, not an email (see
   // supabase/bookings_user_to_user_id.sql) — session.user.id is already
   // exactly that for a non-admin booking for themselves. When editing an
@@ -373,33 +371,6 @@ export function ReservationPage() {
     });
   };
 
-  /**
-   * "Opdater": keeps the same vehicle (no detour through AvailablePage) and
-   * goes straight to ConfirmPage's summary — same destination shape
-   * AvailablePage's own "Opdater" produces, just skipping the vehicle
-   * re-pick since it isn't changing. Disabled (see the button below) if the
-   * vehicle somehow isn't in the loaded fleet list.
-   */
-  const handleUpdateSameVehicle = () => {
-    if (!editing || !editingVehicle) return;
-    const { start, end, brugerLabel } = currentPeriod();
-    navigate("/confirm", {
-      state: {
-        vehicle: {
-          id: editingVehicle.vehicleId,
-          vehicle: `${editingVehicle.brand} ${editingVehicle.model}`,
-          plate: editingVehicle.plate,
-        },
-        user: bruger,
-        userLabel: brugerLabel,
-        use: anvendelse,
-        start,
-        end,
-        editingBookingId: editing.bookingId,
-      },
-    });
-  };
-
   /** "Fortryd": abandons the edit with no DB changes (nothing was deleted in this path) and returns to the booking's own detail page. */
   const handleCancelEdit = () => {
     if (!editing) return;
@@ -591,32 +562,22 @@ export function ReservationPage() {
               {error && <p className="text-sm text-red-600">{error}</p>}
 
               {editing ? (
-                <div className="flex flex-col gap-3 pt-2">
+                <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim()}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Skift køretøj
+                    Bekræft/skift køretøj
                   </button>
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={handleUpdateSameVehicle}
-                      disabled={!bruger || !anvendelse.trim() || !editingVehicle}
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Opdater
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleCancelEdit}
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Fortryd
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleCancelEdit}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Fortryd
+                  </button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
