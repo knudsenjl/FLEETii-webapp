@@ -91,6 +91,11 @@ export function LoginPage() {
       });
 
       if (signInError) {
+        // Logged so a login failure that ISN'T actually bad credentials
+        // (network/CORS issue, restricted browser environment, etc.) is
+        // distinguishable in devtools — the message shown below is always
+        // the same generic Danish text regardless of the real cause.
+        console.error("[login] signInWithPassword failed:", signInError);
         setError("Forkert brugernavn eller adgangskode.");
         setSubmitting(false);
         return;

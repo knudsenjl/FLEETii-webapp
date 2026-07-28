@@ -26,7 +26,9 @@
       "PowerShell(Get-Process -Id 14028,32740 -ErrorAction SilentlyContinue)",
       "PowerShell(Start-Process -FilePath \"netlify\" -ArgumentList \"dev\" -WorkingDirectory \"c:\\\\Users\\\\J�rgenLindskovKnudse\\\\OneDrive - MH3 ApS\\\\Shared folders\\\\Documents-FLEETii\\\\FLEETii webapp\" -WindowStyle Hidden)",
       "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=11560 or ProcessId=21312 or ProcessId=36528\")",
-      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=9764 or ProcessId=27300 or ProcessId=7612\")"
+      "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=9764 or ProcessId=27300 or ProcessId=7612\")",
+      "PowerShell(Get-NetTCPConnection -LocalPort 8888,5173 -State Listen -ErrorAction SilentlyContinue)",
+      "WebFetch(domain:developer.2hire.io)"
     ]
   }
 }
