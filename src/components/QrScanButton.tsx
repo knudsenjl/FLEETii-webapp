@@ -58,16 +58,12 @@ export function QrScanButton({ onScan }: { onScan: (value: string) => void }) {
         type="button"
         onClick={() => setOpen(true)}
         aria-label="Scan QR-kode"
-        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-brand-600 transition hover:bg-brand-100"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-brand-300 bg-brand-50 text-brand-600 transition hover:bg-brand-100"
       >
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-          <rect x="3" y="3" width="7" height="7" rx="1" />
-          <rect x="14" y="3" width="7" height="7" rx="1" />
-          <rect x="3" y="14" width="7" height="7" rx="1" />
-          <path d="M14 14h3v3h-3z" />
-          <path d="M20 14v3" />
-          <path d="M14 20h3" />
-          <path d="M20 20h.01" />
+        {/* Heroicons "qr-code" outline glyph (fetched verbatim from the heroicons repo) — the three finder-pattern squares + scattered data-dots read as an actual QR code, unlike a hand-drawn approximation. strokeWidth kept at Heroicons' own default 1.5 (lighter than this app's usual 2) since the extra detail here blurs together at icon size otherwise. */}
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" className="h-7 w-7">
+          <path d="M3.75 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 3.75 9.375v-4.5ZM3.75 14.625c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5a1.125 1.125 0 0 1-1.125-1.125v-4.5ZM13.5 4.875c0-.621.504-1.125 1.125-1.125h4.5c.621 0 1.125.504 1.125 1.125v4.5c0 .621-.504 1.125-1.125 1.125h-4.5A1.125 1.125 0 0 1 13.5 9.375v-4.5Z" />
+          <path d="M6.75 6.75h.75v.75h-.75v-.75ZM6.75 16.5h.75v.75h-.75v-.75ZM16.5 6.75h.75v.75h-.75v-.75ZM13.5 13.5h.75v.75h-.75v-.75ZM13.5 19.5h.75v.75h-.75v-.75ZM19.5 13.5h.75v.75h-.75v-.75ZM19.5 19.5h.75v.75h-.75v-.75ZM16.5 16.5h.75v.75h-.75v-.75Z" />
         </svg>
       </button>
 

@@ -406,39 +406,41 @@ export function VehicleCreatePage() {
                 </span>
               ) : (
                 <div className="flex flex-col gap-2 rounded-2xl border border-brand-100 bg-brand-50/40 p-3">
-                  <div className="grid grid-cols-2 items-center gap-2">
-                    <span className="flex items-center justify-between gap-2">
-                      <label className="text-sm font-medium text-brand-700">QR-kode:</label>
-                      <QrScanButton onScan={setQrCode} />
-                    </span>
-                    <input
-                      type="text"
-                      value={qrCode}
-                      onChange={(e) => setQrCode(e.target.value)}
-                      placeholder="fra det fysiske 2hire-device"
-                      className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2">
-                    <label className="text-sm font-medium text-brand-700">2hire-profil:</label>
-                    {profilesLoading ? (
-                      <span className="text-sm text-brand-500">Indlæser…</span>
-                    ) : profilesError ? (
-                      <span className="text-sm text-red-600">{profilesError}</span>
-                    ) : (
-                      <select
-                        value={selectedProfileId}
-                        onChange={(e) => setSelectedProfileId(e.target.value)}
+                  <div className="flex flex-col gap-0.5">
+                    <div className="grid grid-cols-2 items-center gap-2">
+                      <span className="flex items-center justify-between gap-2">
+                        <label className="text-sm font-medium text-brand-700">QR-kode:</label>
+                        <QrScanButton onScan={setQrCode} />
+                      </span>
+                      <input
+                        type="text"
+                        value={qrCode}
+                        onChange={(e) => setQrCode(e.target.value)}
+                        placeholder="fra det fysiske 2hire-device"
                         className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      >
-                        <option value="">Vælg profil…</option>
-                        {profiles.map((profile) => (
-                          <option key={boardProfileId(profile)} value={boardProfileId(profile)}>
-                            {boardProfileLabel(profile)}
-                          </option>
-                        ))}
-                      </select>
-                    )}
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2">
+                      <label className="text-sm font-medium text-brand-700">2hire-profil:</label>
+                      {profilesLoading ? (
+                        <span className="text-sm text-brand-500">Indlæser…</span>
+                      ) : profilesError ? (
+                        <span className="text-sm text-red-600">{profilesError}</span>
+                      ) : (
+                        <select
+                          value={selectedProfileId}
+                          onChange={(e) => setSelectedProfileId(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        >
+                          <option value="">Vælg profil…</option>
+                          {profiles.map((profile) => (
+                            <option key={boardProfileId(profile)} value={boardProfileId(profile)}>
+                              {boardProfileLabel(profile)}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
                   </div>
                   {registerError && <p className="text-sm text-red-600">{registerError}</p>}
                   <button
