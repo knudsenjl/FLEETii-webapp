@@ -6,6 +6,7 @@ import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { QrScanButton } from "../components/QrScanButton";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 
@@ -406,7 +407,10 @@ export function VehicleCreatePage() {
               ) : (
                 <div className="flex flex-col gap-2 rounded-2xl border border-brand-100 bg-brand-50/40 p-3">
                   <div className="grid grid-cols-2 items-center gap-2">
-                    <label className="text-sm font-medium text-brand-700">QR-kode:</label>
+                    <span className="flex items-center justify-between gap-2">
+                      <label className="text-sm font-medium text-brand-700">QR-kode:</label>
+                      <QrScanButton onScan={setQrCode} />
+                    </span>
                     <input
                       type="text"
                       value={qrCode}

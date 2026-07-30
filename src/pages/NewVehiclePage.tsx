@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
@@ -15,7 +15,7 @@ import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
  * vehicle and arrange device installation manually.
  */
 export function NewVehiclePage() {
-  const { afdeling, session } = useAuth();
+  const { afdeling, session, profile } = useAuth();
   const [nummerplade, setNummerplade] = useState("");
   const [brand, setBrand] = useState("");
   const [maerke, setMaerke] = useState("");
@@ -34,6 +34,16 @@ export function NewVehiclePage() {
   const [sent, setSent] = useState(false);
   /** Which (if either) of the FLEETii-device "?" info popovers is open — mirrors UserDetailsPage.tsx's own Afdeling(er)/Hjemmeafdeling popover pattern. */
   const [openInfoPopover, setOpenInfoPopover] = useState<"device" | "deviceId" | null>(null);
+
+  /** Pre-fills Kontaktperson/Kontakt e-mail/Kontakt tlf. from the logged-in user's own profile once it's loaded (profile is null until AuthContext's async fetch resolves) — seeded once via this ref rather than on every profile change, so it doesn't clobber anything the user has already typed/edited (e.g. after a "Skift afdeling" refresh). */
+  const contactSeededRef = useRef(false);
+  useEffect(() => {
+    if (contactSeededRef.current || !profile) return;
+    contactSeededRef.current = true;
+    setKontaktperson(profile.full_name ?? "");
+    setKontaktemail(profile.email ?? "");
+    setKontaktnummer(profile.phone ?? "");
+  }, [profile]);
 
   const emailFormatInvalid = kontaktemail.trim().length > 0 && !EMAIL_PATTERN.test(kontaktemail.trim());
   const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(kontaktnummer.trim());
