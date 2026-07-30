@@ -10,16 +10,39 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
 
-/** The settings route for a given `user_profiles.role` — "FLEETii admin" gets its own page, everyone else gets "admin" or "user" (any non-"admin" role, including null/undefined, is treated as a regular user, matching formatRoleLabel's convention). */
-function settingsPathForRole(role?: string | null): string {
-  if (role === "FLEETii admin") return "/settings-superadmin";
-  return role === "admin" ? "/settings-department" : "/settings-user";
+/** One entry in the settings button's dropdown menu (admin/FLEETii admin only — see settingsMenuItemsForRole). */
+type SettingsMenuItem = { label: string; path: string };
+
+/**
+ * The settings destination(s) for a given `user_profiles.role`. A plain
+ * "user" (any non-"admin"/"FLEETii admin" role, including null/undefined,
+ * matching formatRoleLabel's convention) has only one settings page
+ * (personal), so the settings button navigates straight there — no menu.
+ * "admin"/"FLEETii admin" have TWO: their own personal settings (previously
+ * unreachable at all — "/settings-user" required role==="user" exactly,
+ * see App.tsx) alongside their department/FLEETii-wide settings page —
+ * hence a small menu instead of a single destination.
+ */
+function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
+  if (role === "FLEETii admin") {
+    return [
+      { label: "Brugerindstillinger", path: "/settings-user" },
+      { label: "FLEETii-indstillinger", path: "/settings-superadmin" },
+    ];
+  }
+  if (role === "admin") {
+    return [
+      { label: "Brugerindstillinger", path: "/settings-user" },
+      { label: "Afdelingsindstillinger", path: "/settings-department" },
+    ];
+  }
+  return [];
 }
 
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a role-specific settings link (only when logged in), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
+/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
 export function PageHeader() {
   const {
     signOut,
@@ -38,6 +61,8 @@ export function PageHeader() {
   const [switchError, setSwitchError] = useState<string | null>(null);
   const [seedingBookings, setSeedingBookings] = useState(false);
   const [seedResultMessage, setSeedResultMessage] = useState<string | null>(null);
+  const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
+  const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
   const otherDepartments = availableDepartments.filter((d) => d.department_id !== afdelingId);
 
@@ -157,18 +182,44 @@ export function PageHeader() {
             </div>
           )}
           {isFullyAuthenticated && (
-            <button
-              type="button"
-              onClick={() => navigate(settingsPathForRole(profile?.role))}
-              aria-label="Indstillinger"
-              title="Indstillinger"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
-              </svg>
-            </button>
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() =>
+                  settingsMenuItems.length === 0
+                    ? navigate("/settings-user")
+                    : setSettingsMenuOpen((open) => !open)
+                }
+                aria-label="Indstillinger"
+                title="Indstillinger"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+                </svg>
+              </button>
+              {settingsMenuOpen && settingsMenuItems.length > 0 && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setSettingsMenuOpen(false)} />
+                  <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-brand-200 bg-white py-1 text-sm shadow-lg">
+                    {settingsMenuItems.map((item) => (
+                      <button
+                        key={item.path}
+                        type="button"
+                        onClick={() => {
+                          setSettingsMenuOpen(false);
+                          navigate(item.path);
+                        }}
+                        className="block w-full truncate px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
           )}
           <button
             type="button"

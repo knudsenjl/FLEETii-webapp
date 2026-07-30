@@ -96,15 +96,18 @@ export async function subscribeToGenericSignals(callbackUrl: string): Promise<vo
 /**
  * One of 2hire's own reusable vehicle-configuration profiles (brand/model/
  * setup) for a 2hire-board device — its `id` is what registerVehicle's
- * `profileId` expects. Loosely typed: 2hire's reference page doesn't publish
- * this response's field names in readable form (only via their interactive
- * "Try It" panel), so this is deliberately not asserted beyond "an array of
- * objects" — inspect an actual response before relying on a specific field.
- * Docs: https://developer.2hire.io/reference/getpublicprofilelist
+ * `profileId` expects. CONFIRMED shape (developer.2hire.io/reference/
+ * getpublicprofilelist-1's own example response, clicked directly on the
+ * docs page — id values are UUIDs matching the format a real
+ * registerVehicle() call genuinely returned in this project's own testing,
+ * see register_2hire_test_vehicle.sql): { id, title, description, makerName,
+ * modelName, modelYearRange }. Still typed loosely (Record<string, unknown>)
+ * rather than asserting every field, since only id/title are actually used.
+ * Docs: https://developer.2hire.io/reference/getpublicprofilelist-1
  */
 export type TwoHireBoardProfile = Record<string, unknown>;
 
-/** Lists the 2hire-board vehicle-configuration profiles available to pick a `profileId` from for registerVehicle(). */
+/** Lists the 2hire-board vehicle-configuration profiles available to pick a `profileId` from for registerVehicle(). The confirmed real response shape wraps the array as {profiles: [...]} (see TwoHireBoardProfile's own doc comment) — a bare array is also accepted defensively, though not known to actually occur. */
 export async function getTwoHireBoardProfiles(): Promise<TwoHireBoardProfile[]> {
   const token = await getTwoHireAccessToken();
   const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/connectivity-provider/2hire-board/profile`, {
@@ -115,7 +118,8 @@ export async function getTwoHireBoardProfiles(): Promise<TwoHireBoardProfile[]> 
     throw new Error(`Kunne ikke hente 2hire-profiler (${response.status}): ${await response.text()}`);
   }
 
-  return (await response.json()) as TwoHireBoardProfile[];
+  const body = (await response.json()) as TwoHireBoardProfile[] | { profiles?: TwoHireBoardProfile[] };
+  return Array.isArray(body) ? body : (body.profiles ?? []);
 }
 
 /**
@@ -165,6 +169,33 @@ export async function registerVehicle(params: {
 }
 
 /**
+ * Deregisters a vehicle from 2hire — PUT /api/v1/vehicle/deregister, body
+ * {vehicleId}. Inverse of registerVehicle(); same host/auth pattern and
+ * response.ok-only check (this endpoint doesn't return the {success,cause}
+ * shape sendGenericCommand's does). Called best-effort from
+ * delete-vehicle.mts alongside delete_vehicle() (SQL) — most vehicles were
+ * never actually registered with 2hire in the first place, so a failure
+ * here shouldn't block removing the vehicle from our own DB.
+ *
+ * Docs: https://developer.2hire.io/reference/putderegistervehicle
+ */
+export async function deregisterVehicle(vehicleId: string): Promise<void> {
+  const token = await getTwoHireAccessToken();
+  const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/vehicle/deregister`, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `${token.tokenType} ${token.value}`,
+    },
+    body: JSON.stringify({ vehicleId }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`2hire afregistrering fejlede (${response.status}): ${await response.text()}`);
+  }
+}
+
+/**
  * The e2e/simulation-only host used by createvehicle (POST /devices) and
  * simulateTrip — distinct from getTwoHireBaseUrl()'s test/production switch,
  * since simulating a device or a trip is never something a real, physical
@@ -172,6 +203,61 @@ export async function registerVehicle(params: {
  * fixed to this host regardless of VITE_DATA_SOURCE).
  */
 const TWOHIRE_E2E_BASE_URL = "https://e2e.adapter.2hire.io";
+
+/**
+ * The one fixed profileId that MUST be used when registering a SIMULATED
+ * device (createSimulatedDevice() below) with registerVehicle() — per
+ * 2hire's own "Guide to test..." documentation: "In order to configure
+ * simulators, the profile id 51ba5b28-28da-435a-b42e-a3931288470c need to
+ * be used." This is unrelated to getTwoHireBoardProfiles()'s real
+ * make/model profiles (Fiat 500, etc.) — those are for registering a REAL
+ * physical device (VehicleCreatePage.tsx's flow) and picking one of them
+ * for a simulated device instead causes 2hire to reject later generic
+ * commands with MISSING_CONFIGURATION (confirmed live, migrating CN61538 —
+ * the bulk-migration code originally, mistakenly, best-effort-matched
+ * against the real board-profile list here).
+ */
+export const TWOHIRE_SIMULATOR_PROFILE_ID = "51ba5b28-28da-435a-b42e-a3931288470c";
+
+/**
+ * Creates a simulated 2hire-board device on the e2e host — POST /devices,
+ * connectivityProvider "2HIRE_BOARD" (same variant registerVehicle() uses).
+ * CONFIRMED real response shape (developer.2hire.io/reference/createvehicle's
+ * own example, clicked directly on the docs page): { devices: [{identifier,
+ * qrCode}] } — an array (presumably this endpoint can create more than one
+ * device per call), not a bare object; only the first entry is used here
+ * since exactly one device is requested. Returns the device `identifier`
+ * (what simulateTrip/updateBattery/getDeviceState key on — this becomes
+ * vehicle_profiles.iot_id) and `qrCode` (what registerVehicle() then needs
+ * to actually register this simulated device against test.adapter.2hire.io
+ * and get a real vehicleId). Test/simulation-only — a real physical device
+ * already has both values printed/assigned, there's nothing to "create" for
+ * one.
+ *
+ * Docs: https://developer.2hire.io/reference/createvehicle
+ */
+export async function createSimulatedDevice(): Promise<{ identifier: string; qrCode: string }> {
+  const token = await getTwoHireAccessToken();
+  const response = await fetch(`${TWOHIRE_E2E_BASE_URL}/devices`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `${token.tokenType} ${token.value}`,
+    },
+    body: JSON.stringify({ connectivityProvider: "2HIRE_BOARD" }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`2hire simuleret device-oprettelse fejlede (${response.status}): ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as { devices?: { identifier: string; qrCode: string }[] };
+  const device = body.devices?.[0];
+  if (!device) {
+    throw new Error("2hire simuleret device-oprettelse gav ikke noget device tilbage.");
+  }
+  return device;
+}
 
 /** One GPS fix in a simulated trip — see simulateTrip(). */
 export type SimulatedTripPosition = { latitude: number; longitude: number };
@@ -187,9 +273,9 @@ export type SimulatedTripPosition = { latitude: number; longitude: number };
  * consecutive waypoints roughly every 10s and fires a webhook `position`
  * event per leg of that interpolation; a single-element `positions` array
  * has no leg to interpolate, so it updates the device's internal state
- * instantly (visible via a direct `GET /devices/{identifier}/state` call —
- * not implemented here) but never actually broadcasts a signal, so it never
- * reaches our own vehicle_signals/2hire-webhook.mts at all. Confirmed by
+ * instantly (visible via a direct `getDeviceState()` call) but never
+ * actually broadcasts a signal, so it never reaches our own
+ * vehicle_signals/2hire-webhook.mts at all. Confirmed by
  * testing: a 1-position call produced no webhook event even after 30+
  * seconds; a 2-position call produced one ~10s after the call returned.
  *
@@ -263,4 +349,85 @@ export async function updateBattery(identifier: string, percentage: number): Pro
     const cause = result?.details?.cause ?? result?.code ?? response.status;
     throw new Error(`2hire batteri-opdatering fejlede (${cause}).`);
   }
+}
+
+/** The three generic commands every 2hire-compatible vehicle supports — see sendGenericCommand. */
+export type TwoHireGenericCommand = "start" | "stop" | "locate";
+
+/**
+ * Sends a generic vehicle command — POST
+ * /api/v1/vehicle/{vehicleId}/command/generic/{command} against the real
+ * adapter host (getTwoHireBaseUrl, not the e2e simulation host — this is the
+ * same call a real, in-service vehicle receives). Parameterized by
+ * `command` rather than one function per command so "start"/"stop" (real
+ * lock/unlock — currently deferred, see set-vehicle-lock.mts's doc comment)
+ * can reuse this exact wrapper once wired up, instead of duplicating the
+ * request/response handling for a third command later. `vehicleId` is
+ * 2hire's own real vehicleId (registerVehicle's return value / this fleet's
+ * vehicle_profiles.vehicle_id), not the e2e device identifier.
+ *
+ * Docs: https://developer.2hire.io/reference/commandgeneric
+ */
+export async function sendGenericCommand(vehicleId: string, command: TwoHireGenericCommand): Promise<void> {
+  const token = await getTwoHireAccessToken();
+  const response = await fetch(
+    `${getTwoHireBaseUrl()}/api/v1/vehicle/${encodeURIComponent(vehicleId)}/command/generic/${command}`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `${token.tokenType} ${token.value}`,
+      },
+      body: JSON.stringify({}),
+    },
+  );
+
+  const result = (await response.json().catch(() => null)) as
+    | { success?: boolean; code?: string; details?: { cause?: string } }
+    | null;
+
+  if (!response.ok || !result?.success) {
+    const cause = result?.details?.cause ?? result?.code ?? response.status;
+    throw new Error(`2hire "${command}"-kommando fejlede (${cause}).`);
+  }
+}
+
+/**
+ * A device's current state as reported by 2hire — see getDeviceState().
+ * `status` is the field that matters for lock display: observed values are
+ * "LOCKED", "UNLOCKED", and "MOVING" (set by simulateTrip's first waypoint —
+ * see its own doc comment). The other fields are included since they're
+ * already in 2hire's response and may be useful later (e.g. for
+ * distance_covered/autonomy_percentage, which don't reach our webhook — see
+ * updateBattery's doc comment) — nothing here reads them today.
+ */
+export type TwoHireDeviceState = {
+  status: string;
+  position?: { timestamp: number; data: { latitude: number; longitude: number } };
+  online?: { timestamp: number; data: { online: boolean } };
+  autonomy_percentage?: { timestamp: number; data: { percentage: number } };
+  distance_covered?: { timestamp: number; data: { meters: number } };
+};
+
+/**
+ * Reads a simulated 2hire-board device's current state — GET
+ * /devices/{identifier}/state, e2e host (same reasoning as
+ * simulateTrip/updateBattery: this is a simulation-only endpoint, no
+ * equivalent for a real, in-service vehicle). Used to read back the real
+ * `status` ("LOCKED"/"UNLOCKED") after a sendGenericCommand("start"/"stop")
+ * call, rather than assuming the command did what it asked.
+ *
+ * Docs: https://developer.2hire.io/reference/getdevicestate
+ */
+export async function getDeviceState(identifier: string): Promise<TwoHireDeviceState> {
+  const token = await getTwoHireAccessToken();
+  const response = await fetch(`${TWOHIRE_E2E_BASE_URL}/devices/${encodeURIComponent(identifier)}/state`, {
+    headers: { Authorization: `${token.tokenType} ${token.value}` },
+  });
+
+  if (!response.ok) {
+    throw new Error(`Kunne ikke hente køretøjets 2hire-status (${response.status}): ${await response.text()}`);
+  }
+
+  return (await response.json()) as TwoHireDeviceState;
 }

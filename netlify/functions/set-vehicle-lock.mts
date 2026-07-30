@@ -1,14 +1,16 @@
-// Netlify Function: persists the FLEETii-internal virtual "locked" flag on
-// vehicle_signals (see supabase/vehicle_signals_add_locked.sql for why this
-// is virtual, not a real 2hire signal/command — that's deferred). Reached
-// from useVehicleLockState.ts, used by the Lås/Lås op buttons on
-// BookingDetailsPage.tsx and VehicleDetailsPage.tsx.
+// Netlify Function: sends the real 2hire lock/unlock command
+// (sendGenericCommand "stop"/"start") and, only once that succeeds, persists
+// the result as vehicle_signals.locked — so that flag now reflects the last
+// CONFIRMED real command, not a purely virtual toggle (see
+// supabase/vehicle_signals_add_locked.sql's original "deferred" framing,
+// since superseded by this). Reached from useVehicleLockState.ts, used by
+// the Lås/Lås op buttons on BookingDetailsPage.tsx and VehicleDetailsPage.tsx.
 //
 // requireUser-gated, not admin-only — a regular user needs to toggle the
-// lock on their own reservation. Uses the service-role key, since
-// vehicle_signals deliberately has no client-side INSERT/UPDATE RLS policy
-// (see vehicle_signals_table.sql) — same "service-role writes only" pattern
-// as netlify/functions/2hire-webhook.mts.
+// lock on their own reservation. Uses the service-role key for the
+// vehicle_signals write, since that table deliberately has no client-side
+// INSERT/UPDATE RLS policy (see vehicle_signals_table.sql) — same
+// "service-role writes only" pattern as netlify/functions/2hire-webhook.mts.
 //
 // Does NOT re-validate the three button-activation rules server-side (see
 // src/lib/bookings.ts's computeLockButtonState) — it trusts the calling UI's
@@ -18,6 +20,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireUser } from "./_shared/serverAuth.js";
+import { sendGenericCommand } from "./_shared/twoHireClient.js";
 
 type SetVehicleLockBody = { vehicleId?: string; locked?: boolean };
 
@@ -55,6 +58,20 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "locked skal være true eller false." }), { status: 400 });
   }
   const locked = body.locked;
+
+  // Real 2hire command first — the vehicle_signals write below only happens
+  // if this actually succeeds, so "locked" always reflects a confirmed real
+  // state rather than wishful thinking. Expected to fail for any vehicle
+  // that was never actually registered with 2hire (only WB20499 is today) —
+  // surfaced as a normal error, not swallowed, since a regular user pressing
+  // Lås/Lås op needs to know the vehicle didn't actually respond.
+  try {
+    await sendGenericCommand(vehicleId, locked ? "stop" : "start");
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ukendt fejl.";
+    console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${locked ? "stop" : "start"}) failed:`, message);
+    return new Response(JSON.stringify({ error: message }), { status: 502 });
+  }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },

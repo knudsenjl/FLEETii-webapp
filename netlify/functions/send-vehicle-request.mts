@@ -28,10 +28,14 @@ type SendVehicleRequestBody = {
   brand?: string;
   maerke?: string;
   aargang?: string;
+  /** Optional — not always known (e.g. a genuinely new vehicle), free-text same as the other fields. */
+  fuelLevel?: string | null;
+  mileage?: string | null;
   /** Whether a NEW FLEETii device needs to be installed — false means the vehicle already has one, identified by fleetiiDeviceId instead (see NewVehiclePage.tsx's own doc comment). Defaults true if omitted, matching the client's own default. */
   needsFleetiiDevice?: boolean;
   fleetiiDeviceId?: string | null;
   kontaktperson?: string;
+  kontaktemail?: string;
   kontaktnummer?: string;
 };
 
@@ -44,8 +48,11 @@ function buildHtmlBody(fields: {
   brand: string;
   maerke: string;
   aargang: string;
+  fuelLevel: string;
+  mileage: string;
   fleetiiDevice: string;
   kontaktperson: string;
+  kontaktemail: string;
   kontaktnummer: string;
 }): string {
   const row = (label: string, value: string) => `
@@ -67,9 +74,12 @@ function buildHtmlBody(fields: {
       ${row("Brand", fields.brand)}
       ${row("Mærke", fields.maerke)}
       ${row("Årgang", fields.aargang)}
+      ${row("Kilometerstand", fields.mileage || "—")}
+      ${row("Brændstofniveau", fields.fuelLevel || "—")}
       ${row("FLEETii device", fields.fleetiiDevice)}
       ${row("Kontaktperson", fields.kontaktperson)}
-      ${row("Kontaktnummer", fields.kontaktnummer)}
+      ${row("Kontakt e-mail", fields.kontaktemail)}
+      ${row("Kontakt tlf.", fields.kontaktnummer)}
     </table>
     
     <p>Du kan oprette køretøjet og registrere det i 2hire og FLEETii gennem flg. link:
@@ -81,13 +91,14 @@ function buildHtmlBody(fields: {
 }
 
 /**
- * POST { afdeling?, nummerplade, brand, maerke, aargang, needsFleetiiDevice?,
- * fleetiiDeviceId?, kontaktperson, kontaktnummer } as an authenticated admin
- * (see requireAdmin). Validates every text field is non-empty (plus
- * fleetiiDeviceId when needsFleetiiDevice is false), inserts a matching
- * costumer_orders row (costumer_id/department_id from the caller's own
- * profile), then emails the request to RESEND_MAIL_RECIEVER — via SMTP or
- * Resend, see sendMail.
+ * POST { afdeling?, nummerplade, brand, maerke, aargang, fuelLevel?, mileage?,
+ * needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
+ * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
+ * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false) —
+ * fuelLevel/mileage are optional, not always known at request time. Inserts
+ * a matching costumer_orders row (costumer_id/department_id from the
+ * caller's own profile), then emails the request to RESEND_MAIL_RECIEVER —
+ * via SMTP or Resend, see sendMail.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -124,12 +135,15 @@ export default async (req: Request) => {
   const brand = asTrimmedString(body.brand);
   const maerke = asTrimmedString(body.maerke);
   const aargang = asTrimmedString(body.aargang);
+  const fuelLevel = asTrimmedString(body.fuelLevel);
+  const mileage = asTrimmedString(body.mileage);
   const kontaktperson = asTrimmedString(body.kontaktperson);
+  const kontaktemail = asTrimmedString(body.kontaktemail);
   const kontaktnummer = asTrimmedString(body.kontaktnummer);
-  if (!nummerplade || !brand || !maerke || !aargang || !kontaktperson || !kontaktnummer) {
+  if (!nummerplade || !brand || !maerke || !aargang || !kontaktperson || !kontaktemail || !kontaktnummer) {
     return new Response(
       JSON.stringify({
-        error: "Nummerplade, brand, mærke, årgang, kontaktperson og kontaktnummer er påkrævet.",
+        error: "Nummerplade, brand, mærke, årgang, kontaktperson, kontakt e-mail og kontaktnummer er påkrævet.",
       }),
       { status: 400 },
     );
@@ -174,15 +188,19 @@ export default async (req: Request) => {
   const { data: insertedOrder, error: insertError } = await admin
     .from("costumer_orders")
     .insert({
+      order_type: "Opret",
       costumer_id: caller.costumer_id,
       department_id: caller.department_id,
       number_plate: nummerplade,
       brand,
       model: maerke,
       model_year: aargang,
+      fuel_level: fuelLevel || null,
+      mileage: mileage || null,
       needs_fleetii_device: needsFleetiiDevice,
       fleetii_device_id: needsFleetiiDevice ? null : fleetiiDeviceId,
       contactperson: kontaktperson,
+      contactemail: kontaktemail,
       contactnumber: kontaktnummer,
     })
     .select("order_id")
@@ -211,8 +229,11 @@ export default async (req: Request) => {
       brand,
       maerke,
       aargang,
+      fuelLevel,
+      mileage,
       fleetiiDevice,
       kontaktperson,
+      kontaktemail,
       kontaktnummer,
     }),
   });

@@ -1,11 +1,13 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { shortSignalTimestamp } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
-import { useVehicleLockState } from "../hooks/useVehicleLockState";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { useLocateVehicle } from "../hooks/useLocateVehicle";
 
 /**
  * Dedicated vehicle_profiles.vehicle_id for a copy of WB20418 (see
@@ -15,13 +17,12 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
  * in-service one. This is also the real vehicleId 2hire's TEST adapter
  * assigned once WB20499 was actually registered as a simulated 2hire-board
  * device there (see supabase/applied/register_2hire_test_vehicle.sql) — so
- * a real 2hire webhook/command could address this vehicle by this id. The
- * Lås/Lås op buttons themselves still only write the virtual
- * vehicle_signals.locked flag today (see set-vehicle-lock.mts) — real 2hire
- * lock/unlock commands are still deferred, same as everywhere else in this
- * codebase.
+ * a real 2hire webhook/command addresses this vehicle by this id.
  */
 const TEST_VEHICLE_ID = "6ae6ac0e-b918-4843-b3c4-eae02560c06b";
+
+/** This vehicle's e2e DEVICE identifier (vehicle_profiles.iot_id) — NOT TEST_VEHICLE_ID. getDeviceState/simulateTrip/updateBattery all key on this, not the vehicleId — see twoHireClient.ts's own doc comments on why the two ids are different things. */
+const TEST_DEVICE_IDENTIFIER = "741482310302896";
 
 /** Fallback map center used when the test vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
@@ -29,30 +30,104 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 /**
  * 2hire test page ("/2hire-test", admin-only): a trimmed-down copy of
  * BookingDetailsPage for poking at the 2hire integration (live fuel/mileage/
- * status/position, Lås/Lås op) against a single dedicated test vehicle
- * (TEST_VEHICLE_ID) instead of a real booking's real vehicle — so testing
- * here can't hamper the system as it stands. Unlike BookingDetailsPage,
- * there's no underlying booking at all: no Periode/Anvendelse/Bruger rows,
- * no "Rediger reservation"/"Slet reservation", no map visibility window (the
- * map is just always shown), and the lock buttons use the always-enabled
- * admin rules (see useVehicleLockState) since this route is admin-gated.
+ * status/position, Lås/Lås op, "Blink lygterne") against a single dedicated
+ * test vehicle (TEST_VEHICLE_ID) instead of a real booking's real vehicle —
+ * so testing here can't hamper the system as it stands. Unlike
+ * BookingDetailsPage, there's no underlying booking at all: no Periode/
+ * Anvendelse/Bruger rows, no "Rediger reservation"/"Slet reservation", no map
+ * visibility window (the map is just always shown). Unlike every other
+ * Lås/Lås op button in this codebase, THIS page's buttons issue real 2hire
+ * "start"/"stop" commands (2hire-vehicle-command.mts) and read back the real
+ * resulting status (2hire-vehicle-state.mts) instead of just writing the
+ * virtual vehicle_signals.locked flag (see set-vehicle-lock.mts) — that's
+ * the whole point of this page existing.
  */
 export function TwoHireTestPage() {
+  const { session } = useAuth();
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
   const twoHireVehicle = vehicles.find((v) => v.vehicleId === TEST_VEHICLE_ID);
   const position = gpsPositions.find((p) => p.vehicleId === TEST_VEHICLE_ID);
 
-  const {
-    locked: vehicleLocked,
-    lockEnabled,
-    unlockEnabled,
-    loading: lockStateLoading,
-    setLock,
-    error: lockError,
-  } = useVehicleLockState(TEST_VEHICLE_ID, null, true);
-  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful setLock — see the Lås/Lås op buttons below. */
+  const authHeaders: Record<string, string> = session?.access_token
+    ? { Authorization: `Bearer ${session.access_token}` }
+    : {};
+
+  /** The vehicle's REAL 2hire lock status (null while loading, or if the initial/refresh read fails) — see fetchLockState. */
+  const [locked, setLocked] = useState<boolean | null>(null);
+  const [lockStateLoading, setLockStateLoading] = useState(true);
+  const [isLockActionPending, setIsLockActionPending] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful lock/unlock, and "Lygterne blinker" after a successful "Blink lygterne" — see the buttons below. */
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
+  const { isLocating, locateError, locate } = useLocateVehicle();
+
+  /** Reads the vehicle's real 2hire status via 2hire-vehicle-state.mts and updates `locked`. Called on mount and again after every successful lock/unlock command, so `locked` always reflects what 2hire actually reports rather than what we asked it to do. */
+  const fetchLockState = async () => {
+    setLockStateLoading(true);
+    try {
+      const response = await fetch("/.netlify/functions/2hire-vehicle-state", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ identifier: TEST_DEVICE_IDENTIFIER }),
+      });
+      const result = (await response.json()) as { locked?: boolean; error?: string };
+      if (!response.ok) {
+        setLockError(result.error ?? "Kunne ikke hente lås-status.");
+        setLocked(null);
+        return;
+      }
+      setLocked(result.locked ?? null);
+    } catch {
+      setLockError("Kunne ikke kontakte serveren. Prøv igen senere.");
+      setLocked(null);
+    } finally {
+      setLockStateLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void fetchLockState();
+    // Only on mount — session/authHeaders is stable in practice and
+    // refetching on every render would be pointless; explicit refreshes
+    // happen via handleSetLock after a command instead.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Lås/Lås op: sends 2hire's real generic "stop"/"start" command (see sendGenericCommand's doc comment — "stop" locks, "start" unlocks) via 2hire-vehicle-command.mts, then re-reads the real status rather than assuming the command did what it asked. */
+  const handleSetLock = async (nextLocked: boolean) => {
+    setIsLockActionPending(true);
+    setLockError(null);
+
+    try {
+      const response = await fetch("/.netlify/functions/2hire-vehicle-command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...authHeaders },
+        body: JSON.stringify({ vehicleId: TEST_VEHICLE_ID, command: nextLocked ? "stop" : "start" }),
+      });
+
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) {
+        setLockError(result.error ?? "Kunne ikke opdatere lås-status.");
+        setIsLockActionPending(false);
+        return;
+      }
+    } catch {
+      setLockError("Kunne ikke kontakte serveren. Prøv igen senere.");
+      setIsLockActionPending(false);
+      return;
+    }
+
+    setIsLockActionPending(false);
+    triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
+    await fetchLockState();
+  };
+
+  /** "Blink lygterne": sends 2hire's real generic "locate" command (blinks the headlights) via useLocateVehicle (2hire-vehicle-command.mts). */
+  const handleLocate = async () => {
+    const success = await locate(TEST_VEHICLE_ID);
+    if (success) triggerLockConfirmation("located");
+  };
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -79,7 +154,7 @@ export function TwoHireTestPage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center justify-between text-sm font-medium text-brand-700">
                       Køretøj:
-                      {vehicleLocked && (
+                      {locked && (
                         <svg
                           viewBox="0 0 24 24"
                           fill="none"
@@ -102,12 +177,12 @@ export function TwoHireTestPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.autonomyPercentage ?? "—"}
-                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? (
-                        <span title={twoHireVehicle.autonomyPercentageUpdatedAt}>
-                          {` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`}
+                      {twoHireVehicle?.distanceCovered ?? "—"}
+                      {twoHireVehicle?.distanceCoveredUpdatedAt ? (
+                        <span title={twoHireVehicle.distanceCoveredUpdatedAt}>
+                          {` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`}
                         </span>
                       ) : (
                         ""
@@ -115,12 +190,12 @@ export function TwoHireTestPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
                     <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.distanceCovered ?? "—"}
-                      {twoHireVehicle?.distanceCoveredUpdatedAt ? (
-                        <span title={twoHireVehicle.distanceCoveredUpdatedAt}>
-                          {` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`}
+                      {twoHireVehicle?.autonomyPercentage ?? "—"}
+                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? (
+                        <span title={twoHireVehicle.autonomyPercentageUpdatedAt}>
+                          {` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`}
                         </span>
                       ) : (
                         ""
@@ -165,11 +240,8 @@ export function TwoHireTestPage() {
                 <div className="group relative">
                   <button
                     type="button"
-                    onClick={() => void (async () => {
-                      const success = await setLock(false);
-                      if (success) triggerLockConfirmation("unlocked");
-                    })()}
-                    disabled={!unlockEnabled || lockStateLoading}
+                    onClick={() => void handleSetLock(false)}
+                    disabled={lockStateLoading || isLockActionPending}
                     aria-label="Lås op"
                     className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -186,11 +258,8 @@ export function TwoHireTestPage() {
                 <div className="group relative">
                   <button
                     type="button"
-                    onClick={() => void (async () => {
-                      const success = await setLock(true);
-                      if (success) triggerLockConfirmation("locked");
-                    })()}
-                    disabled={!lockEnabled || lockStateLoading}
+                    onClick={() => void handleSetLock(true)}
+                    disabled={lockStateLoading || isLockActionPending}
                     aria-label="Lås"
                     className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
@@ -203,7 +272,20 @@ export function TwoHireTestPage() {
                 </div>
               </div>
 
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={() => void handleLocate()}
+                  disabled={isLocating}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLocating ? "Blinker…" : "Blink lygterne"}
+                </button>
+                <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
+              </div>
+
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}
+              {locateError && <p className="text-sm text-red-600">{locateError}</p>}
             </div>
           </section>
         </motion.main>

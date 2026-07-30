@@ -38,7 +38,7 @@ type VehicleProfileRow = {
  * manages) — loaded fresh from vehicle_profiles by vehicle_id on mount, then
  * saved back via an UPDATE (see supabase/applied/vehicle_profiles_update_policy.sql
  * for the RLS scoping: admin + vehicle in one of their own departments).
- * Brændstofniveau/Kilometerstand/Status stay read-only since they're live
+ * Kilometerstand/Brændstofniveau/Status stay read-only since they're live
  * telemetry written by the 2hire webhook — editing them wouldn't persist
  * past the next signal update anyway. Afdeling(er) is the first UI anywhere
  * in the app for managing vehicle_departments (previously read-only,
@@ -186,14 +186,14 @@ export function HandleVehiclePage() {
   /** [label, short value (visible), full value (hover tooltip)] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM", full "dd/mm/yyyy HH.MM" available on hover. */
   const readOnlyRows: [string, string, string][] = [
     [
-      "Brændstofniveau:",
-      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`,
-      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}`,
-    ],
-    [
       "Kilometerstand:",
       `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
       `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${vehicle.distanceCoveredUpdatedAt})` : ""}`,
+    ],
+    [
+      "Brændstofniveau:",
+      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`,
+      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}`,
     ],
   ];
 

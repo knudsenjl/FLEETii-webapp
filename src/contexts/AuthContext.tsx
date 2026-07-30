@@ -13,6 +13,16 @@ import {
 } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { isPasswordRecoveryCallback, supabase } from "../lib/supabase";
+import { fetchSettingText } from "../lib/settings";
+
+/** localStorage key for the idle-timeout tracker below — deliberately plain localStorage regardless of "remember me" (lib/supabase.ts's rememberAwareStorage), since it needs to survive a full browser/VS Code restart to catch "closed overnight" — a non-sensitive timestamp, not the session itself. */
+const LAST_ACTIVITY_KEY = "fleetii_last_activity";
+/** Used when neither user_settings nor department_settings has a "Session_timeout" row yet (see StandardSettings.tsx, which is where an admin/user actually sets this) — keep in sync with that component's own defaultValue. */
+const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;
+/** How often the periodic idle check runs while a tab stays open and authenticated — only matters for that "left open" case; the "closed and reopened later" case is caught by an immediate check instead (see the effect below). */
+const IDLE_CHECK_INTERVAL_MS = 30_000;
+/** Caps how often a real user-activity event actually writes to localStorage — mousemove-style events can fire far more often than that's useful for a minutes-scale timeout. */
+const ACTIVITY_WRITE_THROTTLE_MS = 30_000;
 
 /** A row from the `user_profiles` table — the app's own user record, keyed by the Supabase auth.users id. */
 export interface Profile {
@@ -80,6 +90,10 @@ interface AuthContextValue {
   deactivationMessage: string | null;
   /** Clears deactivationMessage — call after LoginPage.tsx has displayed it, so it doesn't reappear on a later, legitimate login. */
   clearDeactivationMessage: () => void;
+  /** Set when the idle-timeout tracker (see the effect below) force-signs-out a session that's had no mouse/keyboard/touch/scroll activity for longer than the effective "Session_timeout" setting (StandardSettings.tsx — user_settings override, else department_settings, else DEFAULT_IDLE_TIMEOUT_MINUTES). Same "sign-out already happened, message left behind for LoginPage.tsx" pattern as deactivationMessage. Danish, user-facing. Null otherwise. */
+  idleTimeoutMessage: string | null;
+  /** Clears idleTimeoutMessage — call after LoginPage.tsx has displayed it, so it doesn't reappear on a later, legitimate login. */
+  clearIdleTimeoutMessage: () => void;
   loading: boolean;
   signOut: () => Promise<void>;
   /** Refreshes the session and applies it to session/profile state directly (awaited), so it's safe to navigate immediately after — see the implementation's comment for why this exists instead of just calling supabase.auth.refreshSession(). */
@@ -128,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // missed) by the time this provider's effect below subscribes to it.
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
   const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
+  const [idleTimeoutMessage, setIdleTimeoutMessage] = useState<string | null>(null);
 
   /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name (and, nested one level further, its costumer's name/deactivated_at) via FKs in the same query (one round-trip instead of separate departments/costumers lookups). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
   const loadProfile = async (
@@ -218,6 +233,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setAvailableDepartments([]);
         setIsFullyAuthenticated(false);
         setDeactivationMessage("Din virksomheds adgang er blokeret. Kontakt FLEETii for detaljer.");
+        // Same reasoning as forceSignOutForIdle's own removeItem (idle-timeout
+        // effect below) — a reactivated costumer's next login shouldn't
+        // inherit a now-stale activity timestamp from before this forced
+        // sign-out.
+        try {
+          localStorage.removeItem(LAST_ACTIVITY_KEY);
+        } catch (_) {
+          /* ignore storage errors */
+        }
         void supabase.auth.signOut();
         return;
       }
@@ -257,9 +281,130 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  /**
+   * Idle-timeout tracker: force-signs-out a session with no mouse/keyboard/
+   * touch/scroll activity for longer than the effective "Session_timeout"
+   * setting (user_settings override, else department_settings, else
+   * DEFAULT_IDLE_TIMEOUT_MINUTES — see StandardSettings.tsx for where an
+   * admin/user actually sets this). Re-runs whenever the effective scope
+   * (user/department) changes, so switching department picks up that
+   * department's own timeout rather than the previous one.
+   *
+   * Two distinct checks, for two distinct scenarios:
+   * - An IMMEDIATE check against the last-activity timestamp already
+   *   persisted in localStorage, the moment this effect runs. This is what
+   *   actually catches "closed the browser/VS Code overnight, reopened it
+   *   the next morning" — nothing was running while it was closed, so a
+   *   live timer alone could never have caught that; only comparing against
+   *   a value that survived the closure can.
+   * - A periodic setInterval check, for a tab that stays open and
+   *   authenticated but genuinely idle (no interaction) for longer than the
+   *   timeout — the immediate check alone wouldn't catch that case, since
+   *   nothing re-triggers this effect while just sitting idle.
+   *
+   * The activity timestamp is deliberately plain localStorage regardless of
+   * "remember me" (see LAST_ACTIVITY_KEY) — it needs to survive a full
+   * restart to make the first check above possible at all.
+   */
+  useEffect(() => {
+    if (!isFullyAuthenticated) return;
+
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    let lastWrite = 0;
+    const activityEvents: (keyof WindowEventMap)[] = ["mousedown", "keydown", "scroll", "touchstart"];
+
+    const readLastActivity = (): number => {
+      try {
+        const raw = localStorage.getItem(LAST_ACTIVITY_KEY);
+        return raw ? Number(raw) : Date.now();
+      } catch (_) {
+        return Date.now();
+      }
+    };
+
+    const recordActivity = () => {
+      const now = Date.now();
+      if (now - lastWrite < ACTIVITY_WRITE_THROTTLE_MS) return;
+      lastWrite = now;
+      try {
+        localStorage.setItem(LAST_ACTIVITY_KEY, String(now));
+      } catch (_) {
+        /* ignore storage errors */
+      }
+    };
+
+    const forceSignOutForIdle = () => {
+      setSession(null);
+      setProfile(null);
+      setAfdeling(null);
+      setCostumerName(null);
+      setAvailableDepartments([]);
+      setIsFullyAuthenticated(false);
+      setIdleTimeoutMessage("Du er blevet logget ud pga. længere tids inaktivitet. Log venligst ind igen.");
+      // Cleared, not just left stale: without this, the very next login
+      // re-runs this effect, readLastActivity() still returns this same
+      // long-past timestamp (nothing else writes to it before this check
+      // runs), and the immediate staleness check below fires again straight
+      // away — signing the freshly-authenticated session back out with the
+      // same message before the user gets a chance to do anything.
+      try {
+        localStorage.removeItem(LAST_ACTIVITY_KEY);
+      } catch (_) {
+        /* ignore storage errors */
+      }
+      void supabase.auth.signOut();
+    };
+
+    void (async () => {
+      const raw = await fetchSettingText("Session_timeout", profile?.user_id, profile?.department_id);
+      if (cancelled) return;
+      const parsedMinutes = raw ? Number.parseInt(raw, 10) : NaN;
+      const timeoutMs =
+        (Number.isFinite(parsedMinutes) && parsedMinutes > 0 ? parsedMinutes : DEFAULT_IDLE_TIMEOUT_MINUTES) * 60_000;
+
+      if (Date.now() - readLastActivity() >= timeoutMs) {
+        forceSignOutForIdle();
+        return;
+      }
+
+      // Becoming authenticated (or this check running at all) counts as
+      // activity — write immediately rather than waiting out the throttle
+      // window, so a freshly-loaded session doesn't look stale on the very
+      // next check.
+      lastWrite = 0;
+      recordActivity();
+
+      activityEvents.forEach((event) => window.addEventListener(event, recordActivity, { passive: true }));
+      intervalId = setInterval(() => {
+        if (Date.now() - readLastActivity() >= timeoutMs) {
+          forceSignOutForIdle();
+        }
+      }, IDLE_CHECK_INTERVAL_MS);
+    })();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+      activityEvents.forEach((event) => window.removeEventListener(event, recordActivity));
+    };
+    // recordActivity/forceSignOutForIdle/etc. are re-created each run
+    // deliberately (they close over profile/afdelingId-derived values) —
+    // only the scope identifiers below should actually restart this effect.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFullyAuthenticated, profile?.user_id, profile?.department_id]);
+
   /** Signs the user out of Supabase and immediately clears local session/profile state (rather than waiting for the onAuthStateChange callback), so the UI reacts instantly. */
   const signOut = async () => {
     await supabase.auth.signOut();
+    // Same reasoning as forceSignOutForIdle's own removeItem: leaving this
+    // stale would make the idle-timeout effect's immediate check misfire on
+    // the very next login.
+    try {
+      localStorage.removeItem(LAST_ACTIVITY_KEY);
+    } catch (_) {
+      /* ignore storage errors */
+    }
     setSession(null);
     setProfile(null);
     setAfdeling(null);
@@ -336,6 +481,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearPasswordRecovery: () => setIsPasswordRecovery(false),
         deactivationMessage,
         clearDeactivationMessage: () => setDeactivationMessage(null),
+        idleTimeoutMessage,
+        clearIdleTimeoutMessage: () => setIdleTimeoutMessage(null),
         loading,
         signOut,
         refreshProfile,

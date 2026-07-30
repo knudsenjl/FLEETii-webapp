@@ -1,53 +1,22 @@
-# Agent Instructions
-You're working inside the **WAT framework** (Workflows, Agents, Tools). This architecture separates concerns so that probabilistic AI handles reasoning while deterministic code handles execution. That separation is what makes this system reliable.
-## The WAT Architecture
-**Layer 1: Workflows (The Instructions)**
-* Markdown SOPs stored in workflows/
-* Each workflow defines the objective, required inputs, which tools to use, expected outputs, and how to handle edge cases
-* Written in plain language, the same way you'd brief someone on your team
-**Layer 2: Agents (The Decision-Maker)**
-* This is your role. You're responsible for intelligent coordination.
-* Read the relevant workflow, run tools in the correct sequence, handle failures gracefully, and ask clarifying questions when needed
-* You connect intent to execution without trying to do everything yourself
-* Example: If you need to pull data from a website, don't attempt it directly. Read workflows/scrape_website.md, figure out the required inputs, then execute tools/scrape_single_site.py
-**Layer 3: Tools (The Execution)**
-* TypeScript modules (Netlify Functions in netlify/functions/, or shared helpers in src/lib/)
-* API calls, data transformations, file operations, database queries
-* Credentials and API keys are stored in .env
-* These scripts are consistent, testable, and fast
-**Why this matters:** When AI tries to handle every step directly, accuracy drops fast. If each step is 90% accurate, you're down to 59% success after just five steps. By offloading execution to deterministic scripts, you stay focused on orchestration and decision-making where you excel.
-## How to Operate
-**1. Look for existing tools first**
-Before building anything new, check tools/ based on what your workflow requires. Only create new scripts when nothing exists for that task.
-**2. Learn and adapt when things fail**
-When you hit an error:
-* Read the full error message and trace
-* Fix the script and retest (if it uses paid API calls or credits, check with me before running again)
-* Document what you learned in the workflow (rate limits, timing quirks, unexpected behavior)
-* Example: You get rate-limited on an API, so you dig into the docs, discover a batch endpoint, refactor the tool to use it, verify it works, then update the workflow so this never happens again
-**3. Keep workflows current**
-Workflows should evolve as you learn. When you find better methods, discover constraints, or encounter recurring issues, update the workflow. That said, don't create or overwrite workflows without asking unless I explicitly tell you to. These are your instructions and need to be preserved and refined, not tossed after one use.
-## The Self-Improvement Loop
-Every failure is a chance to make the system stronger:
-1. Identify what broke
-2. Fix the tool
-3. Verify the fix works
-4. Update the workflow with the new approach
-5. Move on with a more robust system
-This loop is how the framework improves over time.
-## File Structure
-**What goes where:**
-* **Deliverables**: Final outputs go to cloud services (Google Sheets, Slides, etc.) where I can access them directly
-* **Intermediates**: Temporary processing files that can be regenerated
-**Directory layout:**
-```
-.tmp/ # Temporary files (scraped data, intermediate exports). Regenerated as needed.
-tools/ # Python scripts for deterministic execution
-workflows/ # Markdown SOPs defining what to do and how
-.env # API keys and environment variables (NEVER store secrets anywhere else)
-credentials.json, token.json # Google OAuth (gitignore-d)
-```
-**Core principle:** Local files are just for processing. Anything I need to see or use lives in cloud services. Everything in .tmp/ is disposable.
-## Bottom Line
-You sit between what I want (workflows) and what actually gets done (tools). Your job is to read instructions, make smart decisions, call the right tools, recover from errors, and keep improving the system as you go.
-Stay pragmatic. Stay reliable. Keep learning.
+# FLEETii webapp — agent notes
+
+Danish-language fleet/vehicle-reservation admin tool. The domain terms below appear verbatim throughout the UI and code comments — not translated, and not typos.
+
+## Domain glossary
+**Afdeling** department · **Anvendelse** reservation's purpose/usage · **Bruger** user · **Reservation** booking (same thing) · **Slut** end (of a booking) · **Årgang** model year · **Nummerplade** number plate · **Kilometerstand** mileage/odometer · **Brændstofniveau** fuel/battery level · **Ledig** available/free · **Låst / Lås op** locked / unlock · **Fortryd** cancel/undo · **Bekræft** confirm.
+
+## Gotchas — look wrong, aren't
+- **"costumer"/"costumers"** is the actual spelling used throughout the DB schema and code (tables, columns, variable names) — not "customer". Don't "fix" it; a real fix would require a coordinated rename across migrations, RLS policies, and the client.
+- **Naive wall-clock timestamps in `src/lib/bookings.ts`**: reservation start/end are compared as plain string prefixes (`isoPrefix`), never `new Date(iso)`. Supabase round-trips values with a real UTC offset while freshly-typed values don't — parsing both as real `Date`s would silently apply a timezone shift to only one side. If you touch booking time comparisons, follow this convention rather than "cleaning it up" with real `Date` parsing.
+- **`vehicle_profiles.vehicle_id` IS 2hire's own real vehicleId**, not a locally-generated id — 2hire's webhook payloads and lock/unlock commands address a vehicle by this same value. Never regenerate it independently of the vehicle's actual 2hire registration.
+- **"permission denied for table X" right after a rename** — check `role_table_grants`, not just RLS policies. A renamed table keeps its RLS policies but loses its grants.
+- **`netlify dev` has a reliable ENOENT crash** after edits to `create-user.mts` — if it happens, check port 8888 and restart rather than assuming a real bug.
+
+## 2hire integration
+- Three separate hosts — don't confuse them: `test.adapter.2hire.io` (auth, registration, commands, webhook subscription — picked via `VITE_DATA_SOURCE`, see `getTwoHireBaseUrl()`), `e2e.adapter.2hire.io` (device creation + trip simulation, `netlify/functions/_shared/twoHireClient.ts`), and `adapter.2hire.io` (the real production fleet).
+- WB20499 (`vehicle_profiles.vehicle_id` `6ae6ac0e-b918-4843-b3c4-eae02560c06b`) is a dedicated, real 2hire-registered test vehicle with `costumer_id`/`department_id` both NULL — safe to poke at via `/2hire-test` without touching real customer data.
+- The e2e simulator's `distance_covered`/`autonomy_percentage` don't reliably reach our webhook, even though `position` does and even though `GET /state` shows the values genuinely changed — confirmed as an open issue with 2hire support (as of 2026-07-29). Don't assume it's been fixed without checking.
+
+## Working conventions
+- Comment every file, type, and function, and keep comments updated as code changes — this project wants heavier commenting than a typical default.
+- Never do a raw/full read of `.env` or run `netlify env:list` — always use a targeted, redacted lookup for a single key.

@@ -27,6 +27,7 @@ import { VehiclesPage } from "./pages/VehiclesPage";
 import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
 import { NewVehiclePage } from "./pages/NewVehiclePage";
 import { VehicleCreatePage } from "./pages/VehicleCreatePage";
+import { VehicleDeletePage } from "./pages/VehicleDeletePage";
 import { AboutPage } from "./pages/AboutPage";
 import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
 import { SettingsAdminPage } from "./pages/SettingsAdminPage";
@@ -171,7 +172,7 @@ function App() {
           <Route
             path="/vehicle-create"
             element={
-              <ProtectedRoute requireAdmin>
+              <ProtectedRoute requireRole="FLEETii admin">
                 <VehicleCreatePage />
               </ProtectedRoute>
             }
@@ -179,8 +180,24 @@ function App() {
           <Route
             path="/vehicle-create/:orderId"
             element={
-              <ProtectedRoute requireAdmin>
+              <ProtectedRoute requireRole="FLEETii admin">
                 <VehicleCreatePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicle-delete"
+            element={
+              <ProtectedRoute requireRole="FLEETii admin">
+                <VehicleDeletePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vehicle-delete/:orderId"
+            element={
+              <ProtectedRoute requireRole="FLEETii admin">
+                <VehicleDeletePage />
               </ProtectedRoute>
             }
           />
@@ -275,7 +292,7 @@ function App() {
           <Route
             path="/settings-user"
             element={
-              <ProtectedRoute requireRole="user">
+              <ProtectedRoute>
                 <SettingsUserPage />
               </ProtectedRoute>
             }

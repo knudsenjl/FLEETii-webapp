@@ -26,7 +26,7 @@ const stepVariants = {
 /** The login form. Renders unauthenticated at "/" (see RootRoute) and also reachable, unauthenticated, via LoginPage's own "i" about-button linking to /about. */
 export function LoginPage() {
   const navigate = useNavigate();
-  const { deactivationMessage, clearDeactivationMessage } = useAuth();
+  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -60,6 +60,16 @@ export function LoginPage() {
       clearDeactivationMessage();
     }
   }, [deactivationMessage, clearDeactivationMessage]);
+
+  // Same idea as the deactivationMessage effect above, for AuthContext's
+  // idle-timeout tracker — the sign-out already happened by the time this
+  // message is read here.
+  useEffect(() => {
+    if (idleTimeoutMessage) {
+      setError(idleTimeoutMessage);
+      clearIdleTimeoutMessage();
+    }
+  }, [idleTimeoutMessage, clearIdleTimeoutMessage]);
 
   /** Validates the form, remembers the username/session-mode if requested, and signs in via Supabase Auth. Errors are shown inline; a successful sign-in is picked up by AuthContext, not handled here. */
   async function handleCredentialsSubmit(e: FormEvent) {

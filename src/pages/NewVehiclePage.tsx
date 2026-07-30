@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
-import { PHONE_PATTERN } from "../lib/validation";
+import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
 /**
  * Admin "Opret nyt køretøj" page ("/new-vehicle"): rather than creating the
@@ -20,10 +20,14 @@ export function NewVehiclePage() {
   const [brand, setBrand] = useState("");
   const [maerke, setMaerke] = useState("");
   const [aargang, setAargang] = useState("");
+  /** Fuel level/mileage at the time of the request — optional (not always known, e.g. a genuinely new vehicle), free-text same as the other fields here (see costumer_orders_add_fuel_level_and_mileage.sql). */
+  const [fuelLevel, setFuelLevel] = useState("");
+  const [mileage, setMileage] = useState("");
   /** Whether a NEW FLEETii device needs to be installed — unticked when the vehicle already has one (an existing IoT device moved from elsewhere, or pre-installed), in which case fleetiiDeviceId identifies it instead. */
   const [needsFleetiiDevice, setNeedsFleetiiDevice] = useState(true);
   const [fleetiiDeviceId, setFleetiiDeviceId] = useState("");
   const [kontaktperson, setKontaktperson] = useState("");
+  const [kontaktemail, setKontaktemail] = useState("");
   const [kontaktnummer, setKontaktnummer] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
@@ -31,6 +35,7 @@ export function NewVehiclePage() {
   /** Which (if either) of the FLEETii-device "?" info popovers is open — mirrors UserDetailsPage.tsx's own Afdeling(er)/Hjemmeafdeling popover pattern. */
   const [openInfoPopover, setOpenInfoPopover] = useState<"device" | "deviceId" | null>(null);
 
+  const emailFormatInvalid = kontaktemail.trim().length > 0 && !EMAIL_PATTERN.test(kontaktemail.trim());
   const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(kontaktnummer.trim());
 
   const canSend =
@@ -40,6 +45,7 @@ export function NewVehiclePage() {
     aargang.trim().length > 0 &&
     (needsFleetiiDevice || fleetiiDeviceId.trim().length > 0) &&
     kontaktperson.trim().length > 0 &&
+    EMAIL_PATTERN.test(kontaktemail.trim()) &&
     PHONE_PATTERN.test(kontaktnummer.trim()) &&
     !isSending;
 
@@ -62,9 +68,12 @@ export function NewVehiclePage() {
           brand,
           maerke,
           aargang,
+          fuelLevel,
+          mileage,
           needsFleetiiDevice,
           fleetiiDeviceId: needsFleetiiDevice ? null : fleetiiDeviceId,
           kontaktperson,
+          kontaktemail,
           kontaktnummer,
         }),
       });
@@ -125,6 +134,24 @@ export function NewVehiclePage() {
                   <RequiredFieldRow label="Brand:" value={brand} onChange={setBrand} />
                   <RequiredFieldRow label="Mærke:" value={maerke} onChange={setMaerke} />
                   <RequiredFieldRow label="Årgang:" value={aargang} onChange={setAargang} />
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <input
+                      type="text"
+                      value={mileage}
+                      onChange={(e) => setMileage(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <input
+                      type="text"
+                      value={fuelLevel}
+                      onChange={(e) => setFuelLevel(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <div className="relative flex items-center justify-between gap-2">
                       <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
@@ -190,10 +217,12 @@ export function NewVehiclePage() {
                     </div>
                   )}
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
-                  <RequiredFieldRow label="Kontaktnummer:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
+                  <RequiredFieldRow label="Kontakt e-mail:" value={kontaktemail} onChange={setKontaktemail} type="email" />
+                  <RequiredFieldRow label="Kontakt tlf.:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
                 </div>
               </div>
 
+              {emailFormatInvalid && <p className="text-xs text-red-600">Ugyldig e-mailadresse.</p>}
               {phoneFormatInvalid && <p className="text-xs text-red-600">Ugyldigt telefonnummer.</p>}
 
               <p className="text-right text-xs text-brand-500">
@@ -201,7 +230,6 @@ export function NewVehiclePage() {
               </p>
 
               {sendError && <p className="text-sm text-red-600">{sendError}</p>}
-              {sent && <p className="text-sm text-accent-600">Bestillingen er sendt.</p>}
 
               <div className="mt-auto flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <p className="text-xs text-brand-700">
@@ -229,14 +257,20 @@ export function NewVehiclePage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                disabled={!canSend}
-                onClick={() => void handleSend()}
-                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                {isSending ? "Sender…" : "Send bestilling til FLEETii"}
-              </button>
+              {sent ? (
+                <span className="flex w-full items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
+                  Bestillingen er sendt
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canSend}
+                  onClick={() => void handleSend()}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSending ? "Sender…" : "Send bestilling til FLEETii"}
+                </button>
+              )}
             </div>
           </section>
         </motion.main>

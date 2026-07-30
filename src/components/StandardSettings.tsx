@@ -21,7 +21,7 @@ interface StandardSettingsProps {
 /** Raw shape of a value_text row as selected here. */
 type StandardRow = { name: string; value_text: string | null };
 
-/** The two standard-value settings, in the order they're shown. defaultValue is shown (but not persisted) whenever a scope has no saved row yet, matching the "no row = fall back to a sensible default" pattern used elsewhere (e.g. isSettingTilladt). */
+/** The standard-value settings, in the order they're shown. defaultValue is shown (but not persisted) whenever a scope has no saved row yet, matching the "no row = fall back to a sensible default" pattern used elsewhere (e.g. isSettingTilladt). min/max bound "number" inputs — default to 1/59 (a within-the-hour minute value, e.g. Standard_interval) when omitted; Session_timeout overrides this since a timeout in the hours range needs to exceed 59. AuthContext.tsx's own idle-timeout logic has its own hardcoded fallback (DEFAULT_IDLE_TIMEOUT_MINUTES) for when neither scope has a Session_timeout row yet — keep the two in sync if either changes. */
 const STANDARDER: {
   name: string;
   label: string;
@@ -29,9 +29,12 @@ const STANDARDER: {
   inputType: "time" | "number";
   defaultValue: string;
   unit: string;
+  min?: number;
+  max?: number;
 }[] = [
   { name: "Standard_varighed", label: "Standard varighed", placeholder: "hh:mm", inputType: "time", defaultValue: "03:00", unit: "timer" },
   { name: "Standard_interval", label: "Standard interval", placeholder: "mm", inputType: "number", defaultValue: "15", unit: "minutter" },
+  { name: "Session_timeout", label: "Login timeout (inaktivitet)", placeholder: "mm", inputType: "number", defaultValue: "30", unit: "minutter", min: 1, max: 720 },
 ];
 
 /** Table + inline input per standard-value setting — saves on change/blur, mirroring RettighederSettings' immediate-save behaviour. */
@@ -91,14 +94,17 @@ export function StandardSettings({ table, scopeColumn, scopeId }: StandardSettin
   const handleChange = async (name: string, inputType: "time" | "number", raw: string) => {
     if (!scopeId || raw === "") return;
 
-    // The native <input type="number" min={1} max={59}> only affects
-    // spinner/validity styling, not what actually gets typed — a pasted or
-    // spun-past value like "9999" reaches here unclamped, so it's rejected
-    // explicitly rather than saved verbatim.
+    // The native <input type="number" min max> only affects spinner/validity
+    // styling, not what actually gets typed — a pasted or spun-past value
+    // reaches here unclamped, so it's rejected explicitly rather than saved
+    // verbatim.
     if (inputType === "number") {
+      const setting = STANDARDER.find((s) => s.name === name);
+      const min = setting?.min ?? 1;
+      const max = setting?.max ?? 59;
       const parsed = Number(raw);
-      if (!Number.isFinite(parsed) || parsed < 1 || parsed > 59) {
-        setErrorByName((prev) => ({ ...prev, [name]: "Skal være et tal mellem 1 og 59." }));
+      if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
+        setErrorByName((prev) => ({ ...prev, [name]: `Skal være et tal mellem ${min} og ${max}.` }));
         return;
       }
     }
@@ -141,7 +147,7 @@ export function StandardSettings({ table, scopeColumn, scopeId }: StandardSettin
             )}
             {!loading &&
               !loadError &&
-              STANDARDER.map(({ name, label, placeholder, inputType, defaultValue, unit }) => (
+              STANDARDER.map(({ name, label, placeholder, inputType, defaultValue, unit, min, max }) => (
                 <tr key={name}>
                   <td className="w-56 truncate border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
                     {label}:
@@ -152,8 +158,8 @@ export function StandardSettings({ table, scopeColumn, scopeId }: StandardSettin
                         type={inputType}
                         value={values[name] ?? defaultValue}
                         placeholder={placeholder}
-                        min={inputType === "number" ? 1 : undefined}
-                        max={inputType === "number" ? 59 : undefined}
+                        min={inputType === "number" ? (min ?? 1) : undefined}
+                        max={inputType === "number" ? (max ?? 59) : undefined}
                         disabled={savingName === name}
                         onChange={(e) => void handleChange(name, inputType, e.target.value)}
                         style={

@@ -1,7 +1,12 @@
-// The "user" settings page ("/settings-user" — reached via the round
-// settings button in PageHeader.tsx, for role "user"; see
-// SettingsSuperadminPage.tsx/SettingsAdminPage.tsx for the other two roles'
-// variants). Manages the logged-in user's own "Anvendelse" override list
+// The PERSONAL settings page ("/settings-user" — reached via the round
+// settings button in PageHeader.tsx; open to every role, not just "user" —
+// an admin/FLEETii admin has their own personal overrides (e.g. their own
+// "Login timeout") too, and previously had no way to reach this page at all
+// (ProtectedRoute required role==="user" exactly). For role "user" the
+// settings button navigates straight here (their only settings page); for
+// admin/FLEETii admin it opens a small menu offering this page ALONGSIDE
+// their department/FLEETii-wide settings page (SettingsAdminPage.tsx/
+// SettingsSuperadminPage.tsx). Manages the logged-in user's own "Anvendelse" override list
 // (user_settings) via AnvendelseSettings, and shows (read-only, via
 // RettighederSettings' readOnly prop) their own EFFECTIVE Tillad_*
 // permission flags — passing departmentId so a flag with no personal
@@ -17,7 +22,7 @@ import { AnvendelseSettings } from "../components/AnvendelseSettings";
 import { StandardSettings } from "../components/StandardSettings";
 import { RettighederSettings } from "../components/RettighederSettings";
 
-/** Settings page for role "user". */
+/** Personal settings page — every role. */
 export function SettingsUserPage() {
   const { profile, afdelingId } = useAuth();
 

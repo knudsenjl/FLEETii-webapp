@@ -24,6 +24,7 @@ import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useVehicleLockState } from "../hooks/useVehicleLockState";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 
@@ -104,8 +105,9 @@ export function BookingDetailsPage() {
     booking ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso } : null,
     isAdmin,
   );
-  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful setLock — see the Lås/Lås op buttons below. */
+  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink lygterne" buttons below. */
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
+  const { isLocating, locateError, locate } = useLocateVehicle();
 
   useEffect(() => {
     void isSettingTilladt("Tillad_slet_reservation", profile?.user_id, afdelingId).then(setUserMayDeleteBooking);
@@ -199,6 +201,12 @@ export function BookingDetailsPage() {
   const bookingExpired = booking.endIso !== null && nowPrefix >= isoPrefix(booking.endIso);
   const canFinishBooking = bookingStarted && !bookingExpired;
 
+  /** "Blink lygterne": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split). */
+  const handleLocate = async () => {
+    const success = await locate(booking.vehicle);
+    if (success) triggerLockConfirmation("located");
+  };
+
   /** Ends this booking early: locks the vehicle, then sets its "end" to now — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. If locking fails, the booking is left untouched (see useVehicleLockState's own error, shown below the Lås/Lås op buttons) rather than shortening a booking whose vehicle didn't actually get secured. */
   const handleFinishBooking = async () => {
     setIsFinishing(true);
@@ -285,12 +293,12 @@ export function BookingDetailsPage() {
                     <span className="text-sm text-brand-800">{formatVehicleLabel(booking.vehicle, vehicles)}</span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.autonomyPercentage ?? "—"}
-                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? (
-                        <span title={twoHireVehicle.autonomyPercentageUpdatedAt}>
-                          {` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`}
+                      {twoHireVehicle?.distanceCovered ?? "—"}
+                      {twoHireVehicle?.distanceCoveredUpdatedAt ? (
+                        <span title={twoHireVehicle.distanceCoveredUpdatedAt}>
+                          {` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`}
                         </span>
                       ) : (
                         ""
@@ -298,12 +306,12 @@ export function BookingDetailsPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
                     <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.distanceCovered ?? "—"}
-                      {twoHireVehicle?.distanceCoveredUpdatedAt ? (
-                        <span title={twoHireVehicle.distanceCoveredUpdatedAt}>
-                          {` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`}
+                      {twoHireVehicle?.autonomyPercentage ?? "—"}
+                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? (
+                        <span title={twoHireVehicle.autonomyPercentageUpdatedAt}>
+                          {` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`}
                         </span>
                       ) : (
                         ""
@@ -413,6 +421,18 @@ export function BookingDetailsPage() {
                 </div>
               </div>
 
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={() => void handleLocate()}
+                  disabled={isLocating}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLocating ? "Blinker…" : "Blink lygterne"}
+                </button>
+                <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
+              </div>
+
               <button
                 type="button"
                 onClick={() => setShowFinishConfirm(true)}
@@ -423,6 +443,7 @@ export function BookingDetailsPage() {
               </button>
 
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}
+              {locateError && <p className="text-sm text-red-600">{locateError}</p>}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
 

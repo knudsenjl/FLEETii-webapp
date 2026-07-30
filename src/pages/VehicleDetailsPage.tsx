@@ -9,6 +9,7 @@ import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
 import { supabase } from "../lib/supabase";
 
@@ -49,7 +50,10 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * showing its last known GPS position (or a
  * "no GPS available" overlay if none exists), plus (also admin-only)
  * "Rediger køretøj" (to HandleVehiclePage, where Afdeling(er) is actually
- * editable) and "Slet køretøj" (both moved here from VehiclesPage). Normally
+ * editable) and "Slet køretøj" (both moved here from VehiclesPage) — "Slet
+ * køretøj" doesn't delete anything directly, it only sends FLEETii a
+ * deletion request (see send-vehicle-deletion-request.mts/VehicleDeletePage.tsx),
+ * mirroring "Opret køretøj"'s request-based flow in reverse. Normally
  * reached with the vehicle pre-filled via router state (VehiclesPage/
  * FleetManagementPage/BookingDetailsPage), which skips a round-trip; a
  * direct URL/refresh/bookmark (no router state) falls back to looking the
@@ -64,8 +68,12 @@ export function VehicleDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
-  const { profile } = useAuth();
-  const isAdmin = profile?.role === "admin";
+  const { profile, session } = useAuth();
+  // "admin OR FLEETii admin" — same superset convention as ProtectedRoute's
+  // own requireAdmin (App.tsx) and the server-side requireAdmin() helper;
+  // this page has no requireAdmin route gate of its own (see doc comment
+  // above), so it has to make this check itself.
+  const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
   const state = location.state as { vehicle?: Vehicle; booking?: RouterBooking } | null;
   const stateVehicle = state?.vehicle ?? null;
   const booking = state?.booking ?? null;
@@ -85,6 +93,8 @@ export function VehicleDetailsPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  /** Whether a deletion request has been sent this session — hides "Slet køretøj" in favor of a confirmation message, so a duplicate request isn't one click away. Not persisted (mirrors NewVehiclePage.tsx's own `sent` state), since the vehicle itself is untouched until FLEETii fulfils the request. */
+  const [deleteRequestSent, setDeleteRequestSent] = useState(false);
 
   const [vehicleDepartments, setVehicleDepartments] = useState<VehicleDepartment[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
@@ -103,8 +113,9 @@ export function VehicleDetailsPage() {
     setLock,
     error: lockError,
   } = useVehicleLockState(vehicle?.vehicleId ?? "", bookingContext, isAdmin);
-  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful setLock — see the Lås/Lås op buttons below. */
+  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink lygterne" buttons below. */
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
+  const { isLocating, locateError, locate } = useLocateVehicle();
 
   /** Fetch-by-id fallback for a direct URL/refresh/bookmark (no router state) — looks the :vehicleId up in the already-loaded VehicleContext fleet list rather than issuing a new query (see useVehiclesLoading's doc comment for why vehiclesLoading matters here: allVehicles starts empty and this effect would otherwise resolve to "not found" before the context's own fetch has even finished). Skipped entirely when stateVehicle is already present. */
   useEffect(() => {
@@ -196,42 +207,52 @@ export function VehicleDetailsPage() {
   }
 
   /**
-   * Deletes this vehicle's vehicle_signals row (if any) and then its
-   * vehicle_profiles row — in that order, since vehicle_signals.vehicle_id
-   * has a foreign key to vehicle_profiles.vehicle_id, and its on-delete
-   * behavior isn't known here (see supabase/rename_vehicle_id_to_uuid.sql's
-   * header), so the child row is removed explicitly rather than assumed to
-   * cascade. Returns to the fleet table on success, since this page has
-   * nothing left to show.
+   * "Slet køretøj" doesn't delete anything directly — a customer admin can't,
+   * since the physical 2hire board installed in the vehicle has to be
+   * removed and the vehicle deregistered from 2hire, both FLEETii's job (see
+   * send-vehicle-deletion-request.mts). This just records the request and
+   * emails FLEETii; the real deletion happens later, from
+   * VehicleDeletePage.tsx, once staff confirm the device is out. Stays on
+   * this page on success (the vehicle still exists) and shows a persistent
+   * confirmation instead — mirrors NewVehiclePage.tsx's "Bestillingen er
+   * sendt." pattern.
    */
   const handleDeleteVehicle = async () => {
     setIsDeleting(true);
     setDeleteError(null);
 
-    const { error: signalsError } = await supabase
-      .from("vehicle_signals")
-      .delete()
-      .eq("vehicle_id", vehicle.vehicleId);
+    try {
+      const response = await fetch("/.netlify/functions/send-vehicle-deletion-request", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ vehicleId: vehicle.vehicleId }),
+      });
 
-    if (signalsError) {
-      setDeleteError(signalsError.message);
-      setIsDeleting(false);
-      return;
-    }
+      const result = (await response.json()) as { ok?: boolean; error?: string };
 
-    const { error: profileError } = await supabase
-      .from("vehicle_profiles")
-      .delete()
-      .eq("vehicle_id", vehicle.vehicleId);
-
-    if (profileError) {
-      setDeleteError(profileError.message);
+      if (!response.ok) {
+        setDeleteError(result.error ?? "Kunne ikke sende anmodningen.");
+        setIsDeleting(false);
+        return;
+      }
+    } catch {
+      setDeleteError("Kunne ikke kontakte serveren. Prøv igen senere.");
       setIsDeleting(false);
       return;
     }
 
     setIsDeleting(false);
-    navigate("/fleet-table", { replace: true });
+    setShowDeleteConfirm(false);
+    setDeleteRequestSent(true);
+  };
+
+  /** "Blink lygterne": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split), not admin-only. */
+  const handleLocate = async () => {
+    const success = await locate(vehicle.vehicleId);
+    if (success) triggerLockConfirmation("located");
   };
 
   return (
@@ -286,23 +307,6 @@ export function VehicleDetailsPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
-                    <span
-                      className="text-sm text-brand-800"
-                      title={
-                        vehicle.autonomyPercentage && vehicle.autonomyPercentageUpdatedAt
-                          ? `${vehicle.autonomyPercentage} (${vehicle.autonomyPercentageUpdatedAt})`
-                          : undefined
-                      }
-                    >
-                      {vehicle.autonomyPercentage ? (
-                        `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
-                      ) : (
-                        <span className="italic">Ingen information</span>
-                      )}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span
                       className="text-sm text-brand-800"
@@ -314,6 +318,23 @@ export function VehicleDetailsPage() {
                     >
                       {vehicle.distanceCovered ? (
                         `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
+                      ) : (
+                        <span className="italic">Ingen information</span>
+                      )}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <span
+                      className="text-sm text-brand-800"
+                      title={
+                        vehicle.autonomyPercentage && vehicle.autonomyPercentageUpdatedAt
+                          ? `${vehicle.autonomyPercentage} (${vehicle.autonomyPercentageUpdatedAt})`
+                          : undefined
+                      }
+                    >
+                      {vehicle.autonomyPercentage ? (
+                        `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
                       ) : (
                         <span className="italic">Ingen information</span>
                       )}
@@ -456,7 +477,20 @@ export function VehicleDetailsPage() {
                 </div>
               </div>
 
+              <div className="group relative">
+                <button
+                  type="button"
+                  onClick={() => void handleLocate()}
+                  disabled={isLocating}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isLocating ? "Blinker…" : "Blink lygterne"}
+                </button>
+                <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
+              </div>
+
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}
+              {locateError && <p className="text-sm text-red-600">{locateError}</p>}
 
               {isAdmin && (
                 <div className="grid grid-cols-2 gap-3">
@@ -467,13 +501,19 @@ export function VehicleDetailsPage() {
                   >
                     Rediger køretøj
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setShowDeleteConfirm(true)}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Slet køretøj
-                  </button>
+                  {deleteRequestSent ? (
+                    <span className="flex items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
+                      Anmodning om sletning er sendt
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowDeleteConfirm(true)}
+                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Slet køretøj
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -483,12 +523,12 @@ export function VehicleDetailsPage() {
 
       {showDeleteConfirm && (
         <ConfirmDialog
-          message="Er du sikker på, at du vil slette dette køretøj?"
+          message="Er du sikker på, at du vil anmode om sletning af dette køretøj? FLEETii kontakter dig for at aftale afmontering af evt. installeret device."
           error={deleteError}
           onCancel={() => setShowDeleteConfirm(false)}
           onConfirm={() => void handleDeleteVehicle()}
           isPending={isDeleting}
-          confirmPendingLabel="Sletter…"
+          confirmPendingLabel="Sender…"
         />
       )}
     </div>
