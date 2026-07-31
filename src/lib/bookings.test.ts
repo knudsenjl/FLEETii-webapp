@@ -19,6 +19,7 @@ import {
   shortDanishDate,
   shortSignalTimestamp,
   splitIsoDateTime,
+  userAnsatId,
   type BookingNeighbor,
   type BookingRow,
   type BookingWindow,
@@ -45,9 +46,9 @@ describe("DEPARTMENT_COLUMN", () => {
 });
 
 describe("BOOKINGS_SELECT_COLUMNS", () => {
-  it("selects booking_id, vehicle_id, user_id (with embedded user_profiles(email)), and department_id", () => {
+  it("selects booking_id, vehicle_id, user_id (with embedded user_profiles(email, user_ident)), and department_id", () => {
     expect(BOOKINGS_SELECT_COLUMNS).toBe(
-      "booking_id, vehicle_id, start, end, usage, user_id, user_profiles(email), department_id",
+      "booking_id, vehicle_id, start, end, usage, user_id, user_profiles(email, user_ident), department_id",
     );
   });
 });
@@ -89,7 +90,7 @@ describe("mapBookingRow", () => {
     end: "2026-07-09T12:00:00",
     usage: "Kundebesøg",
     user_id: "c2d3e4f5-6789-01bc-defa-2345678901bc",
-    user_profiles: { email: "user@example.com" },
+    user_profiles: { email: "user@example.com", user_ident: null },
     department_id: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
   };
 
@@ -110,14 +111,21 @@ describe("mapBookingRow", () => {
       use: "Kundebesøg",
       userId: "c2d3e4f5-6789-01bc-defa-2345678901bc",
       userEmail: "user@example.com",
+      userIdent: null,
       departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
     });
+  });
+
+  it("maps a set user_ident onto userIdent", () => {
+    const mapped = mapBookingRow({ ...row, user_profiles: { email: "user@example.com", user_ident: "A-1234" } });
+    expect(mapped.userIdent).toBe("A-1234");
   });
 
   it("passes through a null user_id (and its null embedded user_profiles) unchanged", () => {
     const mapped = mapBookingRow({ ...row, user_id: null, user_profiles: null });
     expect(mapped.userId).toBeNull();
     expect(mapped.userEmail).toBeNull();
+    expect(mapped.userIdent).toBeNull();
   });
 
   it("passes through a null department_id unchanged", () => {
@@ -137,8 +145,27 @@ describe("mapBookingRow", () => {
       use: "Kundebesøg",
       userId: "c2d3e4f5-6789-01bc-defa-2345678901bc",
       userEmail: "user@example.com",
+      userIdent: null,
       departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
     });
+  });
+});
+
+describe("userAnsatId", () => {
+  it("prefers userIdent when set", () => {
+    expect(userAnsatId({ userIdent: "A-1234", userEmail: "user@example.com" })).toBe("A-1234");
+  });
+
+  it("falls back to userEmail when userIdent is null", () => {
+    expect(userAnsatId({ userIdent: null, userEmail: "user@example.com" })).toBe("user@example.com");
+  });
+
+  it("falls back to userEmail when userIdent is an empty/whitespace string", () => {
+    expect(userAnsatId({ userIdent: "   ", userEmail: "user@example.com" })).toBe("user@example.com");
+  });
+
+  it("returns null when both are null", () => {
+    expect(userAnsatId({ userIdent: null, userEmail: null })).toBeNull();
   });
 });
 

@@ -9,7 +9,19 @@ import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 
 /** A vehicle_profiles row still on seeded mock data (iot_id like "2H2000...", see seed_vehicle_profiles.sql) — not yet a real 2hire test-adaptor registration. See 2hire-migrate-vehicle.mts. */
-type MockVehicle = { vehicle_id: string; number_plate: string; brand: string; model: string };
+type MockVehicle = {
+  vehicle_id: string;
+  number_plate: string;
+  /** Company-wide "Bil-ID" identifier (see vehicle_profiles_add_vehicle_ident.sql) — takes precedence over number_plate for display; null/empty falls back to it. */
+  vehicle_ident: string | null;
+  brand: string;
+  model: string;
+};
+
+/** "Bil-ID" display value for a vehicle_profiles-backed row — vehicle_ident when set, else number_plate. */
+function vehicleBilId(vehicle: { number_plate: string; vehicle_ident: string | null }): string {
+  return vehicle.vehicle_ident?.trim() ? vehicle.vehicle_ident.trim() : vehicle.number_plate;
+}
 
 /** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address/contact_person/phone/email until its own fetch-by-id fallback kicked in. */
 type Costumer = {
@@ -45,6 +57,8 @@ type CostumerOrder = {
   vehicle_id: string | null;
   costumer_id: string;
   department_id: string | null;
+  /** Company-wide "Bil-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate (see vehicleBilId below). */
+  vehicle_ident: string | null;
   number_plate: string;
   brand: string;
   model: string;
@@ -72,6 +86,7 @@ type CostumerOrderQueryRow = {
   vehicle_id: string | null;
   costumer_id: string;
   department_id: string | null;
+  vehicle_ident: string | null;
   number_plate: string;
   brand: string;
   model: string;
@@ -135,7 +150,7 @@ export function FleetiiAdministrationPage() {
       const { data, error: fetchError } = await supabase
         .from("costumer_orders")
         .select(
-          "order_id, order_type, vehicle_id, costumer_id, department_id, number_plate, brand, model, model_year, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, device_removed, created_at, costumers(name), departments(name)",
+          "order_id, order_type, vehicle_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, device_removed, created_at, costumers(name), departments(name)",
         )
         .order("created_at", { ascending: true })
         .returns<CostumerOrderQueryRow[]>();
@@ -170,7 +185,7 @@ export function FleetiiAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("vehicle_profiles")
-        .select("vehicle_id, number_plate, brand, model")
+        .select("vehicle_id, number_plate, vehicle_ident, brand, model")
         .like("iot_id", "2H2000%")
         .order("number_plate", { ascending: true })
         .returns<MockVehicle[]>();
@@ -200,7 +215,7 @@ export function FleetiiAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("vehicle_profiles")
-        .select("vehicle_id, number_plate, brand, model")
+        .select("vehicle_id, number_plate, vehicle_ident, brand, model")
         .not("iot_id", "like", "2H2000%")
         .order("number_plate", { ascending: true })
         .returns<MockVehicle[]>();
@@ -422,7 +437,7 @@ export function FleetiiAdministrationPage() {
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Type</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Kunde</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
-                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Nummerplade</th>
+                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
@@ -476,7 +491,7 @@ export function FleetiiAdministrationPage() {
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
                             {order.departmentName ?? "—"}
                           </td>
-                          <td className="whitespace-nowrap px-2 py-0.5">{order.number_plate}</td>
+                          <td className="whitespace-nowrap px-2 py-0.5">{vehicleBilId(order)}</td>
                         </tr>
                       );
                     })}
@@ -490,7 +505,7 @@ export function FleetiiAdministrationPage() {
               <table className="w-full border-collapse text-[0.7rem]">
                 <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <tr>
-                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Nummerplade</th>
+                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Mærke</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Status</th>
@@ -523,7 +538,7 @@ export function FleetiiAdministrationPage() {
                       return (
                         <tr key={vehicle.vehicle_id} className={isAlternate ? "bg-brand-50/70" : "bg-white"}>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
-                            {vehicle.number_plate}
+                            {vehicleBilId(vehicle)}
                           </td>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-brand-700">
                             {vehicle.brand}
@@ -572,7 +587,7 @@ export function FleetiiAdministrationPage() {
               <table className="w-full border-collapse text-[0.7rem]">
                 <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <tr>
-                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Nummerplade</th>
+                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Mærke</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Handling</th>
@@ -602,7 +617,7 @@ export function FleetiiAdministrationPage() {
                       return (
                         <tr key={vehicle.vehicle_id} className={isAlternate ? "bg-brand-50/70" : "bg-white"}>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
-                            {vehicle.number_plate}
+                            {vehicleBilId(vehicle)}
                           </td>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-brand-700">
                             {vehicle.brand}
@@ -642,7 +657,7 @@ export function FleetiiAdministrationPage() {
                 <div className="flex max-h-72 flex-col gap-1 overflow-auto text-xs">
                   {migrationLog.map((entry, index) => (
                     <p key={`${entry.vehicle.vehicle_id}-${index}`} className={entry.ok ? "text-accent-700" : "text-red-600"}>
-                      <span className="font-medium">{entry.vehicle.number_plate}:</span> {entry.message}
+                      <span className="font-medium">{vehicleBilId(entry.vehicle)}:</span> {entry.message}
                     </p>
                   ))}
                 </div>

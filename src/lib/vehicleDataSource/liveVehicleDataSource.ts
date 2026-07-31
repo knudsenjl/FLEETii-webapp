@@ -21,6 +21,8 @@ import type { Vehicle2Hire, VehicleDataSource, VehicleGPS2Hire } from "./types";
 type VehicleProfileRow = {
   vehicle_id: string;
   number_plate: string | null;
+  /** Company-wide "Bil-ID" identifier — takes precedence over number_plate for display wherever the app shows a vehicle's identifier (see toVehicle2Hire's plate computation below). Null/empty for most vehicles today; falls back to number_plate. */
+  vehicle_ident: string | null;
   iot_id: string | null;
   brand: string | null;
   model: string | null;
@@ -79,7 +81,10 @@ function toVehicle2Hire(
   departmentIds: string[],
 ): Vehicle2Hire {
   return {
-    plate: profile.number_plate ?? "",
+    // "Bil-ID" wherever this is displayed — vehicle_ident when set,
+    // otherwise number_plate (Nummerplade) as a fallback. See
+    // vehicle_profiles_add_vehicle_ident.sql.
+    plate: profile.vehicle_ident?.trim() ? profile.vehicle_ident.trim() : (profile.number_plate ?? ""),
     vehicleId: profile.vehicle_id,
     connectivityProvider: "",
     iotIdentifier: profile.iot_id ?? "",
@@ -123,7 +128,7 @@ export const liveVehicleDataSource: VehicleDataSource = {
     const [profilesResult, signalsResult, departmentsResult] = await Promise.all([
       supabase
         .from("vehicle_profiles")
-        .select("vehicle_id, number_plate, iot_id, brand, model, model_year")
+        .select("vehicle_id, number_plate, vehicle_ident, iot_id, brand, model, model_year")
         .returns<VehicleProfileRow[]>(),
       supabase
         .from("vehicle_signals")

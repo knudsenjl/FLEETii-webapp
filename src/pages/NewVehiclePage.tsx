@@ -16,6 +16,8 @@ import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
  */
 export function NewVehiclePage() {
   const { afdeling, session, profile } = useAuth();
+  /** Company-wide "Bil-ID" identifier — optional (unlike Nummerplade, not required to send), see costumer_orders_add_vehicle_ident.sql. Carried straight onto the created vehicle_profiles row once FLEETii fulfils the request (2hire-register-vehicle.mts), so it doesn't have to be re-entered later. */
+  const [vehicleIdent, setVehicleIdent] = useState("");
   const [nummerplade, setNummerplade] = useState("");
   const [brand, setBrand] = useState("");
   const [maerke, setMaerke] = useState("");
@@ -74,6 +76,7 @@ export function NewVehiclePage() {
         },
         body: JSON.stringify({
           afdeling,
+          vehicleIdent: vehicleIdent.trim() || null,
           nummerplade,
           brand,
           maerke,
@@ -139,6 +142,16 @@ export function NewVehiclePage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
                     <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Bil-ID:</label>
+                    <input
+                      type="text"
+                      value={vehicleIdent}
+                      onChange={(e) => setVehicleIdent(e.target.value)}
+                      placeholder="valgfri — bruger Nummerplade hvis tom"
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
                   </div>
                   <RequiredFieldRow label="Nummerplade:" value={nummerplade} onChange={setNummerplade} />
                   <RequiredFieldRow label="Brand:" value={brand} onChange={setBrand} />

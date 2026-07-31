@@ -25,6 +25,8 @@ type Vehicle = {
 /** Raw shape of the vehicle_profiles row fetched fresh on mount for the editable fields. */
 type VehicleProfileRow = {
   number_plate: string | null;
+  /** Company-wide "Bil-ID" identifier (see vehicle_profiles_add_vehicle_ident.sql) — optional, shown/edited separately from Nummerplade. */
+  vehicle_ident: string | null;
   brand: string | null;
   model: string | null;
   model_year: string | null;
@@ -33,9 +35,9 @@ type VehicleProfileRow = {
 
 /**
  * Admin "edit vehicle" page ("/edit-vehicle", reached via
- * VehicleDetailsPage's "Rediger køretøj"). Nummerplade/Mærke/Model/Årgang are
- * editable (they're the vehicle_profiles-backed fields an admin actually
- * manages) — loaded fresh from vehicle_profiles by vehicle_id on mount, then
+ * VehicleDetailsPage's "Rediger køretøj"). Bil-ID/Nummerplade/Mærke/Model/
+ * Årgang are editable (they're the vehicle_profiles-backed fields an admin
+ * actually manages) — loaded fresh from vehicle_profiles by vehicle_id on mount, then
  * saved back via an UPDATE (see supabase/applied/vehicle_profiles_update_policy.sql
  * for the RLS scoping: admin + vehicle in one of their own departments).
  * Kilometerstand/Brændstofniveau/Status stay read-only since they're live
@@ -57,6 +59,8 @@ export function HandleVehiclePage() {
   const vehicle = state?.vehicle ?? null;
 
   const [plate, setPlate] = useState("");
+  /** Company-wide "Bil-ID" identifier — optional (unlike plate/make/model/year, not required to save). */
+  const [vehicleIdent, setVehicleIdent] = useState("");
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
@@ -89,7 +93,7 @@ export function HandleVehiclePage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, brand, model, model_year, department_id")
+      .select("number_plate, vehicle_ident, brand, model, model_year, department_id")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfileRow>()
       .then(({ data, error }) => {
@@ -100,6 +104,7 @@ export function HandleVehiclePage() {
           return;
         }
         setPlate(data?.number_plate ?? "");
+        setVehicleIdent(data?.vehicle_ident ?? "");
         setMake(data?.brand ?? "");
         setModel(data?.model ?? "");
         setYear(data?.model_year ?? "");
@@ -265,6 +270,7 @@ export function HandleVehiclePage() {
     setSaveError(null);
 
     const trimmedPlate = plate.trim();
+    const trimmedVehicleIdent = vehicleIdent.trim();
     const trimmedMake = make.trim();
     const trimmedModel = model.trim();
     const trimmedYear = year.trim();
@@ -279,6 +285,7 @@ export function HandleVehiclePage() {
       .from("vehicle_profiles")
       .update({
         number_plate: trimmedPlate,
+        vehicle_ident: trimmedVehicleIdent || null,
         brand: trimmedMake,
         model: trimmedModel,
         model_year: trimmedYear,
@@ -349,7 +356,7 @@ export function HandleVehiclePage() {
         vehicle: {
           ...vehicle,
           vehicle: `${trimmedMake} ${trimmedModel}`,
-          plate: trimmedPlate,
+          plate: trimmedVehicleIdent || trimmedPlate,
           version: trimmedYear,
         },
       },
@@ -382,49 +389,59 @@ export function HandleVehiclePage() {
               {!loading && !loadError && (
                 <div className="overflow-hidden rounded-none border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
+                      <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Bil-ID:</label>
+                      <input
+                        type="text"
+                        value={vehicleIdent}
+                        onChange={(e) => setVehicleIdent(e.target.value)}
+                        placeholder="valgfri — bruger Nummerplade hvis tom"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Nummerplade:</label>
                       <input
                         type="text"
                         value={plate}
                         onChange={(e) => setPlate(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
                     </div>
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Mærke:</label>
                       <input
                         type="text"
                         value={make}
                         onChange={(e) => setMake(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
                     </div>
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Model:</label>
                       <input
                         type="text"
                         value={model}
                         onChange={(e) => setModel(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
                     </div>
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Årgang:</label>
                       <input
                         type="text"
                         value={year}
                         onChange={(e) => setYear(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
                     </div>
                     {readOnlyRows.map(([label, shortValue, fullValue]) => (
-                      <div key={label} className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-[0.7rem] text-brand-700">
+                      <div key={label} className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
                         <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">{label}</div>
                         <div className="whitespace-nowrap px-1" title={fullValue}>{shortValue}</div>
                       </div>
                     ))}
-                    <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-[0.7rem] text-brand-700">
+                    <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
                       <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Status:</div>
                       <div
                         className="whitespace-nowrap px-1"
@@ -442,7 +459,7 @@ export function HandleVehiclePage() {
                     <div className="rounded-none border border-brand-100 bg-brand-50/40">
                       <div>
                         {departmentOptions.length !== 1 && (
-                          <div className="grid grid-cols-[0.4fr_1fr] items-start px-1 py-0.5 text-[0.7rem] text-brand-700">
+                          <div className="grid grid-cols-[0.4fr_1fr] items-start px-1 py-0.5 text-sm text-brand-700">
                             <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Afdeling(er):</label>
                             <div className="py-0.5">
                               {departmentsLoading && <span className="text-brand-500">Indlæser…</span>}
@@ -451,7 +468,7 @@ export function HandleVehiclePage() {
                               )}
                               {!departmentsLoading && !departmentsError && (
                                 <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
-                                  <table className="w-full border-collapse text-[0.7rem]">
+                                  <table className="w-full border-collapse text-sm">
                                     <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                                       <tr>
                                         <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
@@ -492,7 +509,7 @@ export function HandleVehiclePage() {
                             </div>
                           </div>
                         )}
-                        <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-[0.7rem] text-brand-700">
+                        <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                           <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Hjemmeafdeling:</div>
                           {departmentOptions.length === 1 || soleSelectedDepartment ? (
                             <input
@@ -500,13 +517,13 @@ export function HandleVehiclePage() {
                               readOnly
                               disabled
                               value={departmentOptions.length === 1 ? departmentOptions[0].name : (soleSelectedDepartment?.name ?? "")}
-                              className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-[0.7rem] text-brand-800"
+                              className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
                             />
                           ) : (
                             <select
                               value={homeDepartmentId ?? ""}
                               onChange={(e) => setHomeDepartmentId(e.target.value || null)}
-                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-[0.7rem] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                             >
                               <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
                               {departmentOptions

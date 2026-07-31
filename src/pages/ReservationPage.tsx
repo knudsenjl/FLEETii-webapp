@@ -85,13 +85,15 @@ export function ReservationPage() {
   /** The actual "anvendelse" value used downstream — the selected option, or (when ANDET_VALUE is picked) the user's own free-text reason. */
   const anvendelse = anvendelseOption === ANDET_VALUE ? anvendelseCustom : anvendelseOption;
   const [anvendelseOptions, setAnvendelseOptions] = useState<string[]>([]);
-  const [users, setUsers] = useState<{ user_id: string; email: string; department_id: string | null }[]>([]);
+  const [users, setUsers] = useState<
+    { user_id: string; email: string; user_ident: string | null; department_id: string | null }[]
+  >([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     supabase
       .from("user_profiles")
-      .select("user_id, email, department_id")
+      .select("user_id, email, user_ident, department_id")
       .is("deleted_at", null)
       .order("email")
       .then(({ data, error: usersError }) => {
@@ -101,7 +103,8 @@ export function ReservationPage() {
         }
         setUsers(
           (data ?? []).filter(
-            (u): u is { user_id: string; email: string; department_id: string | null } => Boolean(u.email),
+            (u): u is { user_id: string; email: string; user_ident: string | null; department_id: string | null } =>
+              Boolean(u.email),
           ),
         );
       });
@@ -348,10 +351,11 @@ export function ReservationPage() {
       ? `${toIsoDate(current)}T${formatTime(current)}:00`
       : `${startDate}T${startTime}:00`;
     const end = endIgnored ? null : `${endDate}T${endTime}:00`;
+    const selectedUser = departmentUsers.find((u) => u.user_id === bruger);
     const brugerLabel =
       profile?.role === "admin"
-        ? (departmentUsers.find((u) => u.user_id === bruger)?.email ?? editing?.userLabel ?? "")
-        : (session?.user.email ?? "");
+        ? (selectedUser?.user_ident || selectedUser?.email) ?? editing?.userLabel ?? ""
+        : (profile?.user_ident || profile?.email || session?.user.email) ?? "";
     return { start, end, brugerLabel };
   };
 
@@ -403,7 +407,7 @@ export function ReservationPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Bruger {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
+                      Ansat-ID {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
                     {profile?.role === "admin" ? (
                       <select
@@ -414,14 +418,14 @@ export function ReservationPage() {
                         <option value="">Vælg bruger</option>
                         {departmentUsers.map((u) => (
                           <option key={u.user_id} value={u.user_id}>
-                            {u.email}
+                            {u.user_ident || u.email}
                           </option>
                         ))}
                       </select>
                     ) : (
                       <input
                         type="text"
-                        value={session?.user.email ?? ""}
+                        value={profile?.user_ident || profile?.email || session?.user.email || ""}
                         disabled
                         readOnly
                         className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"

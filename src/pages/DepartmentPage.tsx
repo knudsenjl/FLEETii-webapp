@@ -11,6 +11,8 @@ type ProfileRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
+  /** Company-wide "Ansat-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, edited on UserDetailsPage. */
+  user_ident: string | null;
   department_id: string | null;
   department_name: string | null;
   role: string;
@@ -24,6 +26,7 @@ type ProfileQueryRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
+  user_ident: string | null;
   department_id: string | null;
   role: string;
   deleted_at: string | null;
@@ -66,7 +69,7 @@ export function DepartmentPage() {
       const { data, error: fetchError } = await supabase
         .from("user_profiles")
         .select(
-          "user_id, email, full_name, phone, department_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
+          "user_id, email, full_name, phone, user_ident, department_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
         )
         .order("full_name", { ascending: true })
         .returns<ProfileQueryRow[]>();
@@ -134,6 +137,7 @@ export function DepartmentPage() {
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">E-mail</th>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Ansat-ID</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Rolle</th>
                     </tr>
@@ -141,17 +145,17 @@ export function DepartmentPage() {
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && departmentUsers.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Ingen brugere fundet.</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Ingen brugere fundet.</td>
                       </tr>
                     )}
                     {!loading &&
@@ -179,6 +183,7 @@ export function DepartmentPage() {
                           >
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.email ?? "—"}</td>
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.user_ident ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">
                               {user.deleted_at ? (

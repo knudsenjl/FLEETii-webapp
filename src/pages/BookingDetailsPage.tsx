@@ -15,6 +15,7 @@ import {
   resolveVehicleGpsPosition,
   shortSignalTimestamp,
   toDisplayVehicle,
+  userAnsatId,
   type BookingRow,
   type EditingBooking,
 } from "../lib/bookings";
@@ -41,6 +42,7 @@ type BookingDetails = {
   use: string;
   userId: string | null;
   userEmail: string | null;
+  userIdent: string | null;
 };
 
 /** Fallback map center used when the booked vehicle has no GPS fix. */
@@ -169,7 +171,7 @@ export function BookingDetailsPage() {
     const editing: EditingBooking = {
       bookingId: booking.id,
       userId: booking.userId,
-      userLabel: booking.userEmail,
+      userLabel: userAnsatId(booking),
       anvendelse: booking.use,
       startIso: booking.startIso,
       endIso: booking.endIso,
@@ -261,8 +263,8 @@ export function BookingDetailsPage() {
                   </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
-                      <span className="text-sm text-brand-800">{booking.userEmail ?? "—"}</span>
+                      <label className="flex items-center text-sm font-medium text-brand-700">Ansat-ID:</label>
+                      <span className="text-sm text-brand-800">{userAnsatId(booking) ?? "—"}</span>
                     </div>
                   )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">

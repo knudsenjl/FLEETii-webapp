@@ -17,8 +17,8 @@ export const USER_ID_COLUMN = "user_id";
 /** References departments.department_id (uuid) — NOT a department name. See supabase/bookings_department_to_department_id.sql. */
 export const DEPARTMENT_COLUMN = "department_id";
 
-/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email) via the user_id FK (PostgREST resolves it automatically) so callers get a display-ready email alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
-export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email), ${DEPARTMENT_COLUMN}`;
+/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email, user_ident) via the user_id FK (PostgREST resolves it automatically) so callers get display-ready email/Ansat-ID alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
+export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email, user_ident), ${DEPARTMENT_COLUMN}`;
 
 export type DisplayVehicle = Vehicle2Hire & {
   vehicle: string;
@@ -47,7 +47,7 @@ export type BookingRow = {
   /** References user_profiles.user_id — NOT an email (see supabase/bookings_user_to_user_id.sql). */
   user_id: string | null;
   /** The user_id FK's embedded relation (see BOOKINGS_SELECT_COLUMNS) — a single object, not an array, since user_id -> user_profiles is many-to-one. Null if user_id itself is null. */
-  user_profiles: { email: string } | null;
+  user_profiles: { email: string; user_ident: string | null } | null;
   /** References departments.department_id — NOT a department name (see supabase/bookings_department_to_department_id.sql). */
   department_id: string | null;
 };
@@ -65,8 +65,10 @@ export type MappedBooking = {
   use: string;
   /** References user_profiles.user_id — NOT an email. Use userEmail for display. */
   userId: string | null;
-  /** The booking's user's email, resolved via user_id's embedded join — for display (e.g. BookingDetailsPage's "Bruger" row). Null if userId itself is null, or that user has no email. */
+  /** The booking's user's email, resolved via user_id's embedded join — kept as a genuine email (e.g. for a real mailto use later), NOT the display value. For display (e.g. BookingDetailsPage's "Ansat-ID" row), use userIdent first, falling back to this. Null if userId itself is null, or that user has no email. */
   userEmail: string | null;
+  /** The booking's user's "Ansat-ID" (user_profiles.user_ident), resolved via the same embedded join as userEmail — the DISPLAY value wherever the app shows who a booking is for. Null if userId is null or that user has no user_ident set (callers should fall back to userEmail in that case). */
+  userIdent: string | null;
   /** References departments.department_id — NOT a department name. */
   departmentId: string | null;
 };
@@ -137,8 +139,14 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
     use: row.usage,
     userId: row.user_id,
     userEmail: row.user_profiles?.email ?? null,
+    userIdent: row.user_profiles?.user_ident ?? null,
     departmentId: row.department_id,
   };
+}
+
+/** "Ansat-ID" display value for a booking's user (or any user_profiles-backed record) — userIdent when set, else userEmail, else null (e.g. userId itself was null). Single source of truth for this fallback so BookingDetailsPage/AllBookingsPage/ReservationPage don't each reimplement it. */
+export function userAnsatId(user: { userIdent: string | null; userEmail: string | null }): string | null {
+  return user.userIdent?.trim() ? user.userIdent.trim() : user.userEmail;
 }
 
 /** The minimal shape needed to check a booking against a vehicle/time-window — a vehicle's 2hire vehicleId plus its reserved start/end. A null end means the booking is open-ended (see BookingRow). booking_id is optional (omitted by existing callers/tests that never needed it) — when present, it lets a caller exclude one specific booking from the check, e.g. the booking being edited in the "Rediger reservation" flow, so it doesn't conflict with its own existing slot. */

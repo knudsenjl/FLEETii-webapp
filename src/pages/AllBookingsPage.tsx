@@ -13,6 +13,7 @@ import {
   formatVehicleLabel,
   mapBookingRow,
   nowIsoString,
+  userAnsatId,
   type BookingRow,
 } from "../lib/bookings";
 
@@ -27,6 +28,7 @@ type Booking = {
   use: string;
   userId: string | null;
   userEmail: string | null;
+  userIdent: string | null;
 };
 
 /**
@@ -49,7 +51,9 @@ export function AllBookingsPage() {
 
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
-  const [users, setUsers] = useState<{ user_id: string; email: string; department_id: string | null }[]>([]);
+  const [users, setUsers] = useState<
+    { user_id: string; email: string; user_ident: string | null; department_id: string | null }[]
+  >([]);
   /** Which of the listed bookings' vehicles are currently locked (vehicle_signals.locked), keyed by vehicleId — same bulk-fetch pattern as VehiclesPage.tsx's own Lås column. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
   const [filterOpen, setFilterOpen] = useState(false);
@@ -82,13 +86,14 @@ export function AllBookingsPage() {
   useEffect(() => {
     supabase
       .from("user_profiles")
-      .select("user_id, email, department_id")
+      .select("user_id, email, user_ident, department_id")
       .is("deleted_at", null)
       .order("email")
       .then(({ data }) => {
         setUsers(
           (data ?? []).filter(
-            (u): u is { user_id: string; email: string; department_id: string | null } => Boolean(u.email),
+            (u): u is { user_id: string; email: string; user_ident: string | null; department_id: string | null } =>
+              Boolean(u.email),
           ),
         );
       });
@@ -189,7 +194,7 @@ export function AllBookingsPage() {
                         <>
                           <p className="mb-2">Du kan her udvælge reservationer på disse kriterier:</p>
                           <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Bruger
+                            Ansat-ID
                             <select
                               value={filterUser}
                               onChange={(e) => setFilterUser(e.target.value)}
@@ -198,7 +203,7 @@ export function AllBookingsPage() {
                               <option value="">Alle</option>
                               {departmentUsers.map((u) => (
                                 <option key={u.user_id} value={u.user_id}>
-                                  {u.email}
+                                  {u.user_ident || u.email}
                                 </option>
                               ))}
                             </select>
@@ -253,7 +258,7 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Not table-fixed: Periode/Bruger/Lås/Online are all w-px
+                {/* Not table-fixed: Periode/Ansat-ID/Lås/Online are all w-px
                     (shrink to their actual content, same trick as
                     VehiclesPage.tsx's own Lås/Online columns — only
                     meaningful under table-layout:auto, table-fixed ignores
@@ -267,7 +272,7 @@ export function AllBookingsPage() {
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Ansat-ID</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
@@ -328,8 +333,8 @@ export function AllBookingsPage() {
                             >
                               {formatBookingPeriod(booking, true)}
                             </td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5" title={booking.userEmail ?? undefined}>
-                              {booking.userEmail ?? "—"}
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5" title={userAnsatId(booking) ?? undefined}>
+                              {userAnsatId(booking) ?? "—"}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
                               {(lockedByVehicleId[booking.vehicle] ?? true) && (

@@ -193,7 +193,7 @@ export function VehiclesPage() {
                           </select>
                         </label>
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Nummerplade
+                          Bil-ID
                           <select
                             value={filterPlate}
                             onChange={(e) => setFilterPlate(e.target.value)}
@@ -242,6 +242,7 @@ export function VehiclesPage() {
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
@@ -250,7 +251,7 @@ export function VehiclesPage() {
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {filteredVehicles.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
                           {!targetCostumerId
                             ? "Ingen kunde valgt."
                             : filterPlate || filterStatus || filterDepartment
@@ -280,7 +281,8 @@ export function VehiclesPage() {
                               : "bg-white text-brand-700 hover:bg-brand-50"
                           }`}
                         >
-                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{`${vehicle.plate}: ${vehicle.vehicle}`}</td>
+                          <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{vehicle.plate}</td>
+                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{vehicle.vehicle}</td>
                           <td className="w-px whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
                             {(lockedByVehicleId[vehicle.vehicleId] ?? true) && (
                               <svg

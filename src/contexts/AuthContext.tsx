@@ -28,6 +28,8 @@ const ACTIVITY_WRITE_THROTTLE_MS = 30_000;
 export interface Profile {
   user_id: string;
   email: string | null;
+  /** Company-wide "Ansat-ID" identifier (see user_profiles_add_user_ident.sql) — takes precedence over email for display wherever the app shows a user's identifier; null/empty falls back to email. */
+  user_ident: string | null;
   full_name: string | null;
   phone: string | null;
   /** References departments.department_id (uuid) — NOT a department name (see supabase/applied/user_profiles_department_to_department_id.sql). Use afdeling (context value, below) for the display name. */
@@ -41,6 +43,7 @@ export interface Profile {
 type ProfileRow = {
   user_id: string;
   email: string | null;
+  user_ident: string | null;
   full_name: string | null;
   phone: string | null;
   department_id: string | null;
@@ -161,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // user_departments, so a bare "departments(...)" is now ambiguous
       // (PGRST201) and fails outright — this pins it to the direct FK.
       .select(
-        "user_id, email, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
+        "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
       )
       .eq("user_id", userId)
       .maybeSingle<ProfileRow>();

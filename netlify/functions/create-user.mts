@@ -28,6 +28,8 @@ type CreateUserBody = {
   email?: string;
   full_name?: string | null;
   phone?: string | null;
+  /** Company-wide "Ansat-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional. */
+  user_ident?: string | null;
   department?: string | null;
   role?: string;
 };
@@ -256,6 +258,7 @@ export default async (req: Request) => {
     email,
     full_name: body.full_name ?? null,
     phone: body.phone ?? null,
+    user_ident: asTrimmedString(body.user_ident) || null,
     department_id: requestedDepartmentId,
     // The requested department's own costumer_id is authoritative (matters
     // for a FLEETii admin, whose own costumer_id — if they even have one —

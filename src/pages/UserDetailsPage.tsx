@@ -17,6 +17,8 @@ type ProfileRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
+  /** Company-wide "Ansat-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, shown/edited separately from E-mail. */
+  user_ident: string | null;
   department_name: string | null;
   role: string;
   /** Set once "Bloker brugers adgang" (delete-user.mts) has been used, cleared by "Genetabler brugers adgang" (unblock-user.mts) — see UserDetailsPage's own doc comment for why blocking is reversible rather than a true delete. */
@@ -82,6 +84,8 @@ export function UserDetailsPage() {
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
+  /** Company-wide "Ansat-ID" identifier — optional (unlike name/email/phone, not required to save). */
+  const [userIdent, setUserIdent] = useState(user?.user_ident ?? "");
   // No default department when there's a real choice to make (2+ options) —
   // the admin must explicitly pick one from the dropdown. Auto-filled (and
   // locked, see the departmentOptions effect below) only when their costumer
@@ -110,13 +114,16 @@ export function UserDetailsPage() {
     setUserLoading(true);
     void supabase
       .from("user_profiles")
-      .select("user_id, email, full_name, phone, role, deleted_at, departments!user_profiles_department_id_fkey(name)")
+      .select(
+        "user_id, email, full_name, phone, user_ident, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
+      )
       .eq("user_id", userId)
       .maybeSingle<{
         user_id: string;
         email: string | null;
         full_name: string | null;
         phone: string | null;
+        user_ident: string | null;
         role: string;
         deleted_at: string | null;
         departments: { name: string } | null;
@@ -130,6 +137,7 @@ export function UserDetailsPage() {
                 email: data.email,
                 full_name: data.full_name,
                 phone: data.phone,
+                user_ident: data.user_ident,
                 department_name: data.departments?.name ?? null,
                 role: data.role,
                 deleted_at: data.deleted_at,
@@ -155,6 +163,7 @@ export function UserDetailsPage() {
     setFullName(user.full_name ?? "");
     setEmail(user.email ?? "");
     setPhone(user.phone ?? "");
+    setUserIdent(user.user_ident ?? "");
     setDepartment(user.department_name ?? "");
     setRole(user.role ?? "user");
   }, [user]);
@@ -445,6 +454,7 @@ export function UserDetailsPage() {
           email: email.trim(),
           full_name: fullName || null,
           phone: phone || null,
+          user_ident: userIdent.trim() || null,
           department: department || null,
           role: role || "user",
         }),
@@ -544,6 +554,7 @@ export function UserDetailsPage() {
           email: email.trim(),
           full_name: fullName || null,
           phone: phone || null,
+          user_ident: userIdent.trim() || null,
           department: department || null,
           role: role || "user",
         }),
@@ -615,7 +626,9 @@ export function UserDetailsPage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">
-                {user ? `Opdater bruger oplysninger for ${user.full_name ?? user.email ?? "—"}` : "Opret ny bruger"}
+                {user
+                  ? `Opdater bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
+                  : "Opret ny bruger"}
               </h2>
 
               <div className="rounded-2xl border border-brand-100">
@@ -625,6 +638,16 @@ export function UserDetailsPage() {
                     descendants — aren't clipped when they overflow this
                     box's edge (same fix as RettighederSettings.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="text-sm font-medium text-brand-700">Ansat-ID:</label>
+                    <input
+                      type="text"
+                      value={userIdent}
+                      onChange={(e) => setUserIdent(e.target.value)}
+                      placeholder="valgfri — bruger E-mail hvis tom"
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
                   <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
                   <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
                   <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />

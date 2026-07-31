@@ -24,6 +24,8 @@ import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
+  /** Company-wide "Bil-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
+  vehicleIdent?: string | null;
   nummerplade?: string;
   brand?: string;
   maerke?: string;
@@ -44,6 +46,7 @@ function buildHtmlBody(fields: {
   orderId: string;
   customerName: string;
   afdeling: string;
+  vehicleIdent: string;
   nummerplade: string;
   brand: string;
   maerke: string;
@@ -70,6 +73,7 @@ function buildHtmlBody(fields: {
     <table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">
       ${row("Kunde", fields.customerName)}
       ${row("Afdeling", fields.afdeling)}
+      ${row("Bil-ID", fields.vehicleIdent || "—")}
       ${row("Nummerplade", fields.nummerplade)}
       ${row("Brand", fields.brand)}
       ${row("Mærke", fields.maerke)}
@@ -91,7 +95,7 @@ function buildHtmlBody(fields: {
 }
 
 /**
- * POST { afdeling?, nummerplade, brand, maerke, aargang, fuelLevel?, mileage?,
+ * POST { afdeling?, vehicleIdent?, nummerplade, brand, maerke, aargang, fuelLevel?, mileage?,
  * needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
  * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false) —
@@ -131,6 +135,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
   }
 
+  const vehicleIdent = asTrimmedString(body.vehicleIdent);
   const nummerplade = asTrimmedString(body.nummerplade);
   const brand = asTrimmedString(body.brand);
   const maerke = asTrimmedString(body.maerke);
@@ -191,6 +196,7 @@ export default async (req: Request) => {
       order_type: "Opret",
       costumer_id: caller.costumer_id,
       department_id: caller.department_id,
+      vehicle_ident: vehicleIdent || null,
       number_plate: nummerplade,
       brand,
       model: maerke,
@@ -225,6 +231,7 @@ export default async (req: Request) => {
       orderId: insertedOrder.order_id,
       customerName,
       afdeling,
+      vehicleIdent: vehicleIdent ?? "",
       nummerplade,
       brand,
       maerke,

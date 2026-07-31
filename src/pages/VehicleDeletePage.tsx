@@ -220,7 +220,7 @@ export function VehicleDeletePage() {
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
-    ["Nummerplade:", order.number_plate],
+    ["Bil-ID:", order.number_plate],
     ["Brand:", order.brand],
     ["Mærke:", order.model],
     ["Årgang:", order.model_year],

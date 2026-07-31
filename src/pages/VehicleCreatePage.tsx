@@ -15,6 +15,8 @@ type CostumerOrder = {
   order_id: string;
   costumer_id: string;
   department_id: string | null;
+  /** Company-wide "Bil-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate wherever this is displayed (same convention as VehicleDetailsPage.tsx/HandleVehiclePage.tsx). */
+  vehicle_ident: string | null;
   number_plate: string;
   brand: string;
   model: string;
@@ -38,6 +40,7 @@ type CostumerOrderQueryRow = {
   order_id: string;
   costumer_id: string;
   department_id: string | null;
+  vehicle_ident: string | null;
   number_plate: string;
   brand: string;
   model: string;
@@ -133,7 +136,7 @@ export function VehicleCreatePage() {
     void supabase
       .from("costumer_orders")
       .select(
-        "order_id, costumer_id, department_id, number_plate, brand, model, model_year, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, vehicle_id, costumers(name), departments(name)",
+        "order_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, vehicle_id, costumers(name), departments(name)",
       )
       .eq("order_id", orderId)
       .maybeSingle<CostumerOrderQueryRow>()
@@ -145,6 +148,7 @@ export function VehicleCreatePage() {
                 order_id: data.order_id,
                 costumer_id: data.costumer_id,
                 department_id: data.department_id,
+                vehicle_ident: data.vehicle_ident,
                 number_plate: data.number_plate,
                 brand: data.brand,
                 model: data.model,
@@ -355,6 +359,7 @@ export function VehicleCreatePage() {
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
+    ["Bil-ID:", order.vehicle_ident || order.number_plate],
     ["Nummerplade:", order.number_plate],
     ["Brand:", order.brand],
     ["Mærke:", order.model],

@@ -5,10 +5,10 @@
 // vehicle-configuration profile — see 2hire-board-profiles.mts) as a new
 // vehicle in 2hire, then inserts the resulting vehicle into our own DB:
 //   1. registerVehicle({qrCode, profileId}) -> real 2hire vehicleId
-//   2. vehicle_profiles insert (number_plate/brand/model/model_year/
-//      costumer_id/department_id snapshotted from the order — iot_id left
-//      null, since nothing outside TwoHireTestPage.tsx's e2e-simulator-only
-//      calls ever reads it for a real vehicle)
+//   2. vehicle_profiles insert (vehicle_ident/number_plate/brand/model/
+//      model_year/costumer_id/department_id snapshotted from the order —
+//      iot_id left null, since nothing outside TwoHireTestPage.tsx's
+//      e2e-simulator-only calls ever reads it for a real vehicle)
 //   3. vehicle_departments insert (if the order has a department_id)
 //   4. costumer_orders update: vehicle_id + vehicle_registered +
 //      iot_device_associated all set together — 2hire's actual API has no
@@ -67,12 +67,13 @@ export default async (req: Request) => {
 
   const { data: order } = await admin
     .from("costumer_orders")
-    .select("order_type, costumer_id, department_id, number_plate, brand, model, model_year")
+    .select("order_type, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year")
     .eq("order_id", orderId)
     .maybeSingle<{
       order_type: string;
       costumer_id: string;
       department_id: string | null;
+      vehicle_ident: string | null;
       number_plate: string;
       brand: string;
       model: string;
@@ -97,6 +98,7 @@ export default async (req: Request) => {
 
   const { error: profileError } = await admin.from("vehicle_profiles").upsert({
     vehicle_id: vehicleId,
+    vehicle_ident: order.vehicle_ident,
     number_plate: order.number_plate,
     brand: order.brand,
     model: order.model,
