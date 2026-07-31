@@ -194,7 +194,7 @@ export function ConfirmPage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">
-                {editingBookingId ? "Rediger reservation" : "Ny reservation"}
+                {editingBookingId ? "Rediger reservation" : "Opret reservation"}
               </h2>
 
               <div className="overflow-hidden rounded-none border border-brand-100">

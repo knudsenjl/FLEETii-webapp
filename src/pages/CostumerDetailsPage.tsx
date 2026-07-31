@@ -7,7 +7,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
-/** The costumer row, as passed in via router state from FleetiiAdministrationPage. Absent when reached via "Ny kunde" — see the KNOWN LIMITATION below. */
+/** The costumer row, as passed in via router state from FleetiiAdministrationPage. Absent when reached via "Opret kunde" — see the KNOWN LIMITATION below. */
 type Costumer = {
   costumer_id: string;
   name: string | null;
@@ -31,7 +31,7 @@ type Costumer = {
  * if it can't be found. "Rediger kunde" switches it into an editable form in
  * place (in-place rather than a separate page like VehicleDetailsPage/
  * HandleVehiclePage, since costumers only have one editable field). Reached
- * without a costumer (its "Ny kunde" button, or the plain "/costumer-details"
+ * without a costumer (its "Opret kunde" button, or the plain "/costumer-details"
  * route), shows a create form instead — inserting a new costumers row
  * auto-creates its first department (see
  * supabase/applied/departments_default_name_alle_koretojer.sql). Department
@@ -342,7 +342,7 @@ export function CostumerDetailsPage() {
 
   // Only while a SPECIFIC costumer is being fetched by id (:costumerId
   // present, no router state yet) — without this guard, the form would
-  // flash as "Ny kunde" (create mode) for a moment before the fetch resolves
+  // flash as "Opret kunde" (create mode) for a moment before the fetch resolves
   // and `costumer` becomes non-null.
   if (costumerId && !costumer && costumerLoading) {
     return (
@@ -373,7 +373,7 @@ export function CostumerDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">
-              {costumer ? (isEditing ? "Rediger kunde" : "Kundedetaljer") : "Ny kunde"}
+              {costumer ? (isEditing ? "Rediger kunde" : "Kundedetaljer") : "Opret kunde"}
             </h2>
 
             {costumer ? (

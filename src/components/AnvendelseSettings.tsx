@@ -316,7 +316,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
             }}
             className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
           >
-            Ny anvendelse
+            Opret anvendelse
           </button>
           <button
             type="button"

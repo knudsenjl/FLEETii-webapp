@@ -1,15 +1,42 @@
 // The admin home page ("/admin" — where RootRoute sends an admin after
-// login). Pure navigation hub: no data fetching, just links to every other
-// admin-only section of the app.
+// login). Pure navigation hub: no data fetching (except the one on-demand
+// departments fetch below), just links to every other admin-only section of
+// the app.
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
+import { supabase } from "../lib/supabase";
 
-/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so an extra "FLEETii platform administration" button (visible only to that role) links onward to "/fleetii-admin". */
+/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so an extra "FLEETii platform administration" button (visible only to that role) links onward to "/fleetii-admin". Conversely, "Administration af afdelinger" (visible only to a regular "admin") fetches that admin's own costumer's departments and jumps straight to EditDepartmentsPage.tsx — a FLEETii admin already has a fuller path to the same page via CostumerDetailsPage/DepartmentDetailsPage. */
 export function AdminFrontpage() {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile, costumerId, costumerName } = useAuth();
+  const [departmentsLoading, setDepartmentsLoading] = useState(false);
+  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
+
+  /** Fetches this admin's own costumer's departments (RLS already scopes departments' SELECT to any authenticated user, see departments_select_policy.sql — the costumer_id filter here is just "which ones", not a permission check) and hands them to EditDepartmentsPage.tsx via router state, same shape DepartmentDetailsPage.tsx passes. */
+  const handleOpenDepartments = async () => {
+    if (!costumerId) return;
+
+    setDepartmentsLoading(true);
+    setDepartmentsError(null);
+
+    const { data, error } = await supabase
+      .from("departments")
+      .select("department_id, name")
+      .eq("costumer_id", costumerId)
+      .order("name", { ascending: true });
+
+    setDepartmentsLoading(false);
+    if (error) {
+      setDepartmentsError(error.message);
+      return;
+    }
+
+    navigate("/edit-departments", { state: { costumerId, costumerName, departments: data ?? [] } });
+  };
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -47,7 +74,7 @@ export function AdminFrontpage() {
                   onClick={() => navigate("/reservation")}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
-                  Ny reservation
+                  Opret reservation
                 </button>
                 <button
                   type="button"
@@ -77,6 +104,17 @@ export function AdminFrontpage() {
                 >
                   Administration af brugere
                 </button>
+                {profile?.role === "admin" && (
+                  <button
+                    type="button"
+                    disabled={departmentsLoading}
+                    onClick={() => void handleOpenDepartments()}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {departmentsLoading ? "Indlæser…" : "Administration af afdelinger"}
+                  </button>
+                )}
+                {departmentsError && <p className="text-sm text-red-600">{departmentsError}</p>}
               </div>
             </div>
           </section>

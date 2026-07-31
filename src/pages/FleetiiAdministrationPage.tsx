@@ -304,88 +304,21 @@ export function FleetiiAdministrationPage() {
       const result = (await response.json()) as {
         ok?: boolean;
         warning?: string | null;
-        deviceState?: unknown;
         error?: string;
       };
 
       if (!response.ok) {
         logEntry = { ok: false, message: result.error ?? "Kunne ikke gensynkronisere køretøjet." };
       } else {
-        const base = result.warning ? `Gensynkroniseret (advarsel: ${result.warning})` : "Gensynkroniseret.";
-        logEntry = { ok: true, message: `${base} 2hire state: ${JSON.stringify(result.deviceState)}` };
+        logEntry = {
+          ok: true,
+          message: result.warning ? `Gensynkroniseret (advarsel: ${result.warning})` : "Gensynkroniseret.",
+        };
       }
     } catch {
       logEntry = { ok: false, message: "Kunne ikke kontakte serveren. Prøv igen senere." };
     } finally {
       setResyncingVehicleId(null);
-    }
-
-    setMigrationLog((prev) => [{ vehicle, ...logEntry }, ...prev]);
-  };
-
-  /** Which already-migrated vehicle (if any) is currently mid-test-trip — disables that row's own button while in flight. */
-  const [testTripVehicleId, setTestTripVehicleId] = useState<string | null>(null);
-
-  /** ONE-OFF diagnostic (see 2hire-test-trip.mts) — runs the Milano->Aarhus multi-waypoint test trip on a vehicle, to test 2hire's documented "moving -> unlocked at trip end" behaviour. Not a permanent feature. */
-  const runTestTrip = async (vehicle: MockVehicle) => {
-    setTestTripVehicleId(vehicle.vehicle_id);
-    let logEntry: { ok: boolean; message: string };
-
-    try {
-      const response = await fetch("/.netlify/functions/2hire-test-trip", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ vehicleId: vehicle.vehicle_id }),
-      });
-
-      const result = (await response.json()) as { ok?: boolean; deviceState?: unknown; error?: string };
-
-      if (!response.ok) {
-        logEntry = { ok: false, message: result.error ?? "Kunne ikke starte testturen." };
-      } else {
-        logEntry = { ok: true, message: `Testtur startet. 2hire state: ${JSON.stringify(result.deviceState)}` };
-      }
-    } catch {
-      logEntry = { ok: false, message: "Kunne ikke kontakte serveren. Prøv igen senere." };
-    } finally {
-      setTestTripVehicleId(null);
-    }
-
-    setMigrationLog((prev) => [{ vehicle, ...logEntry }, ...prev]);
-  };
-
-  /** Which already-migrated vehicle (if any) is currently mid-status-check — disables that row's own button while in flight. */
-  const [checkingStateVehicleId, setCheckingStateVehicleId] = useState<string | null>(null);
-
-  /** ONE-OFF diagnostic (see 2hire-check-vehicle-state.mts) — reads 2hire's current device state WITHOUT sending any command, safe to use while a trip (e.g. runTestTrip's) is still in progress. Not a permanent feature. */
-  const checkVehicleState = async (vehicle: MockVehicle) => {
-    setCheckingStateVehicleId(vehicle.vehicle_id);
-    let logEntry: { ok: boolean; message: string };
-
-    try {
-      const response = await fetch("/.netlify/functions/2hire-check-vehicle-state", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ vehicleId: vehicle.vehicle_id }),
-      });
-
-      const result = (await response.json()) as { ok?: boolean; deviceState?: unknown; error?: string };
-
-      if (!response.ok) {
-        logEntry = { ok: false, message: result.error ?? "Kunne ikke hente status." };
-      } else {
-        logEntry = { ok: true, message: `2hire state: ${JSON.stringify(result.deviceState)}` };
-      }
-    } catch {
-      logEntry = { ok: false, message: "Kunne ikke kontakte serveren. Prøv igen senere." };
-    } finally {
-      setCheckingStateVehicleId(null);
     }
 
     setMigrationLog((prev) => [{ vehicle, ...logEntry }, ...prev]);
@@ -477,7 +410,7 @@ export function FleetiiAdministrationPage() {
               onClick={() => navigate("/costumer-details")}
               className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
-              Ny kunde
+              Opret kunde
             </button>
 
             <h2 className="text-xl font-semibold text-brand-800">Administration af installationer</h2>
@@ -666,8 +599,6 @@ export function FleetiiAdministrationPage() {
                     migratedVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;
                       const isResyncingThis = resyncingVehicleId === vehicle.vehicle_id;
-                      const isTestTrippingThis = testTripVehicleId === vehicle.vehicle_id;
-                      const isCheckingStateThis = checkingStateVehicleId === vehicle.vehicle_id;
                       return (
                         <tr key={vehicle.vehicle_id} className={isAlternate ? "bg-brand-50/70" : "bg-white"}>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
@@ -680,34 +611,14 @@ export function FleetiiAdministrationPage() {
                             {vehicle.model}
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5">
-                            <div className="flex gap-1">
-                              <button
-                                type="button"
-                                disabled={isResyncingThis}
-                                onClick={() => void resyncVehicle(vehicle)}
-                                className="rounded-lg bg-brand-600 px-2 py-0.5 text-[0.68rem] font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                {isResyncingThis ? "Gensynkroniserer…" : "Gensynkronisér"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isTestTrippingThis}
-                                onClick={() => void runTestTrip(vehicle)}
-                                title="Diagnostisk testtur: Milano → München → Frankfurt → Hamburg → Aarhus"
-                                className="rounded-lg border border-brand-300 px-2 py-0.5 text-[0.68rem] font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                {isTestTrippingThis ? "Kører testtur…" : "Testtur"}
-                              </button>
-                              <button
-                                type="button"
-                                disabled={isCheckingStateThis}
-                                onClick={() => void checkVehicleState(vehicle)}
-                                title="Læser 2hires nuværende status uden at sende nogen kommando"
-                                className="rounded-lg border border-brand-300 px-2 py-0.5 text-[0.68rem] font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                              >
-                                {isCheckingStateThis ? "Tjekker…" : "Tjek status"}
-                              </button>
-                            </div>
+                            <button
+                              type="button"
+                              disabled={isResyncingThis}
+                              onClick={() => void resyncVehicle(vehicle)}
+                              className="rounded-lg bg-brand-600 px-2 py-0.5 text-[0.68rem] font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                              {isResyncingThis ? "Gensynkroniserer…" : "Gensynkronisér"}
+                            </button>
                           </td>
                         </tr>
                       );

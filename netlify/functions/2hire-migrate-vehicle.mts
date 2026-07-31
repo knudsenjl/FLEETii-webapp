@@ -13,7 +13,7 @@
 //      2hire's own default initial state for every simulated device
 //      overwrites lat/lng/autonomy_percentage via webhook, and reading that
 //      back out on a later retry just pushes the corrupted default right
-//      back to 2hire). locked IS still read live — 2hire never writes it.
+//      back to 2hire).
 //   2. createSimulatedDevice() (e2e host) -> {identifier, qrCode} — a real
 //      physical device already has both, but these 40 vehicles don't have
 //      one, so a simulated device stands in for it, same as WB20499's own
@@ -97,15 +97,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Køretøjet er allerede migreret." }), { status: 409 });
   }
 
-  // locked is read live (never written by 2hire — no lock/door-state signal
-  // exists in their API at all — so it can't have been corrupted the way
-  // position/battery can, see originalVehicleTelemetry.ts's own doc comment
-  // for why THOSE two are sourced from the frozen snapshot instead).
-  const { data: signals } = await admin
-    .from("vehicle_signals")
-    .select("locked")
-    .eq("vehicle_id", oldVehicleId)
-    .maybeSingle<{ locked: boolean | null }>();
   const original = ORIGINAL_VEHICLE_TELEMETRY[vehicle.number_plate];
 
   let identifier: string;
@@ -150,7 +141,6 @@ export default async (req: Request) => {
     lat: original?.lat ?? null,
     lng: original?.lng ?? null,
     autonomy_percentage: original?.autonomyPercentage ?? null,
-    locked: signals?.locked ?? null,
   });
 
   return new Response(JSON.stringify({ ok: true, oldVehicleId, newVehicleId, telemetryWarning }), {

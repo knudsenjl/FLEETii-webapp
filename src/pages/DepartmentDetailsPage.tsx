@@ -186,7 +186,7 @@ export function DepartmentDetailsPage() {
             {isAddingDepartment && (
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  <RequiredFieldRow label="Ny afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
+                  <RequiredFieldRow label="Opret afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
                 </div>
               </div>
             )}
@@ -219,6 +219,14 @@ export function DepartmentDetailsPage() {
                 <>
                   <button
                     type="button"
+                    disabled={departments.length === 0}
+                    onClick={() => navigate("/edit-departments", { state: { costumerId, costumerName, departments } })}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Rediger afdelinger
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => {
                       setNewDepartmentName("");
                       setDepartmentError(null);
@@ -226,19 +234,22 @@ export function DepartmentDetailsPage() {
                     }}
                     className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Ny afdeling
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("delete-department")}
-                    disabled={!selectedDepartmentId}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    Slet afdeling
+                    Opret afdeling
                   </button>
                 </>
               )}
             </div>
+
+            {!isAddingDepartment && (
+              <button
+                type="button"
+                onClick={() => setPendingAction("delete-department")}
+                disabled={!selectedDepartmentId}
+                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Slet afdeling
+              </button>
+            )}
           </section>
         </motion.main>
       </div>

@@ -1,6 +1,6 @@
 // Netlify Function: retries/backfills the dynamic-data push (position,
-// battery, lock-state sync — see _shared/vehicleTelemetrySync.ts) for a
-// vehicle that's ALREADY been migrated to 2hire (see
+// battery — see _shared/vehicleTelemetrySync.ts) for a vehicle that's
+// ALREADY been migrated to 2hire (see
 // 2hire-migrate-vehicle.mts). That function's own push can partially fail
 // (VEHICLE_LOCKED, MISSING_CONFIGURATION, ...) without blocking the
 // migration itself, since the DB swap (the part that actually matters) has
@@ -18,7 +18,6 @@
 import { createClient } from "@supabase/supabase-js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { pushDynamicDataToTwoHire } from "./_shared/vehicleTelemetrySync.js";
-import { getDeviceState } from "./_shared/twoHireClient.js";
 import { ORIGINAL_VEHICLE_TELEMETRY } from "./_shared/originalVehicleTelemetry.js";
 
 type ResyncVehicleBody = { vehicleId?: string };
@@ -71,44 +70,20 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Køretøjet har intet 2hire-device tilknyttet." }), { status: 400 });
   }
 
-  // locked is read live (2hire never writes it); lat/lng/autonomy_percentage
-  // come from the frozen ORIGINAL_VEHICLE_TELEMETRY snapshot instead of the
-  // live vehicle_signals row — see that file's own doc comment for why the
-  // live row can't be trusted here (2hire's own default-state webhook can
-  // have already overwritten it with a value that has nothing to do with
-  // this vehicle's real original position/battery).
-  const { data: signals } = await admin
-    .from("vehicle_signals")
-    .select("locked")
-    .eq("vehicle_id", vehicleId)
-    .maybeSingle<{ locked: boolean | null }>();
+  // lat/lng/autonomy_percentage come from the frozen ORIGINAL_VEHICLE_TELEMETRY
+  // snapshot instead of the live vehicle_signals row — see that file's own
+  // doc comment for why the live row can't be trusted here (2hire's own
+  // default-state webhook can have already overwritten it with a value that
+  // has nothing to do with this vehicle's real original position/battery).
   const original = ORIGINAL_VEHICLE_TELEMETRY[vehicle.number_plate];
 
   const warning = await pushDynamicDataToTwoHire(vehicleId, vehicle.iot_id, {
     lat: original?.lat ?? null,
     lng: original?.lng ?? null,
     autonomy_percentage: original?.autonomyPercentage ?? null,
-    locked: signals?.locked ?? null,
   });
 
-  // Diagnostic only (temporary): reads 2hire's OWN internal record of the
-  // device's state right after the push above, via the same e2e-only
-  // introspection TwoHireTestPage.tsx uses — this tells us whether 2hire's
-  // own state already reflects what we just pushed (meaning a webhook-
-  // delivery problem is the remaining issue) or still shows something else
-  // entirely (meaning the push itself isn't taking effect on 2hire's side),
-  // decoupled from whatever vehicle_signals ends up showing once/if a
-  // webhook signal lands. Added while investigating unexplained coordinates
-  // (41.91, 12.50 — nowhere near what was pushed) showing up for more than
-  // one migrated vehicle.
-  let deviceState: unknown = null;
-  try {
-    deviceState = await getDeviceState(vehicle.iot_id);
-  } catch (error) {
-    deviceState = { error: error instanceof Error ? error.message : "Ukendt fejl." };
-  }
-
-  return new Response(JSON.stringify({ ok: true, warning, deviceState }), {
+  return new Response(JSON.stringify({ ok: true, warning }), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
