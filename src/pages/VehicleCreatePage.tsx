@@ -7,6 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { QrScanButton } from "../components/QrScanButton";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 
@@ -15,7 +16,7 @@ type CostumerOrder = {
   order_id: string;
   costumer_id: string;
   department_id: string | null;
-  /** Company-wide "Bil-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate wherever this is displayed (same convention as VehicleDetailsPage.tsx/HandleVehiclePage.tsx). */
+  /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate wherever this is displayed (same convention as VehicleDetailsPage.tsx/HandleVehiclePage.tsx). */
   vehicle_ident: string | null;
   number_plate: string;
   brand: string;
@@ -126,6 +127,8 @@ export function VehicleCreatePage() {
   // ever got a chance to resolve.
   const [orderLoading, setOrderLoading] = useState(() => Boolean(orderId) && !stateOrder);
   const order = stateOrder ?? fetchedOrder;
+  /** Whether this order's own department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useVehicleIdent } = useIdentSettings(order?.department_id ?? null);
 
   /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/vehicle-create/:orderId" (no router state) — skipped entirely when stateOrder is already present. Naturally scoped to a FLEETii admin (any costumer) by costumer_orders' SELECT RLS policy — an orderId outside it just resolves to null, same as "not found". */
   useEffect(() => {
@@ -359,7 +362,7 @@ export function VehicleCreatePage() {
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
-    ["Bil-ID:", order.vehicle_ident || order.number_plate],
+    ...(useVehicleIdent ? ([["Køretøj-ID:", order.vehicle_ident || order.number_plate]] as [string, string][]) : []),
     ["Nummerplade:", order.number_plate],
     ["Brand:", order.brand],
     ["Mærke:", order.model],

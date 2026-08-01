@@ -24,6 +24,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useVehicleLockState } from "../hooks/useVehicleLockState";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { supabase } from "../lib/supabase";
@@ -71,6 +72,8 @@ export function BookingDetailsPage() {
   const location = useLocation();
   const { bookingId } = useParams<{ bookingId: string }>();
   const { profile, afdelingId } = useAuth();
+  /** Whether afdelingId's department shows "Ansat-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx — who a booking belongs to is core information, not an optional extra. */
+  const { useUserIdent } = useIdentSettings(afdelingId);
   const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
   const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -171,7 +174,7 @@ export function BookingDetailsPage() {
     const editing: EditingBooking = {
       bookingId: booking.id,
       userId: booking.userId,
-      userLabel: userAnsatId(booking),
+      userLabel: useUserIdent ? userAnsatId(booking) : booking.userEmail,
       anvendelse: booking.use,
       startIso: booking.startIso,
       endIso: booking.endIso,
@@ -263,8 +266,8 @@ export function BookingDetailsPage() {
                   </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Ansat-ID:</label>
-                      <span className="text-sm text-brand-800">{userAnsatId(booking) ?? "—"}</span>
+                      <label className="flex items-center text-sm font-medium text-brand-700">{useUserIdent ? "Ansat-ID" : "Bruger"}:</label>
+                      <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
                     </div>
                   )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">

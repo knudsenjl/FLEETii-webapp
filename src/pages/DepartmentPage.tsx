@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `user_profiles` table, as listed/selected on this page. department_name is resolved via the department_id FK's embedded join (see loadUsers) — used both for display in the table and passed through via router state to UserDetailsPage's create-user form. */
@@ -51,6 +52,10 @@ export function DepartmentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
+  /** Whether afdelingId's department shows the "Ansat-ID" column below at all — see useIdentSettings' own doc comment. */
+  const { useUserIdent } = useIdentSettings(afdelingId);
+  /** Column count for this table right now — 5 with the Ansat-ID column shown, 4 without. Drives every colSpan below so the loading/error/empty rows still span the table's full width either way. */
+  const columnCount = useUserIdent ? 5 : 4;
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -137,7 +142,9 @@ export function DepartmentPage() {
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">E-mail</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Ansat-ID</th>
+                      {useUserIdent && (
+                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Ansat-ID</th>
+                      )}
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Rolle</th>
                     </tr>
@@ -145,17 +152,17 @@ export function DepartmentPage() {
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
+                        <td colSpan={columnCount} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={columnCount} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && departmentUsers.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Ingen brugere fundet.</td>
+                        <td colSpan={columnCount} className="px-2 py-3 text-center text-brand-500">Ingen brugere fundet.</td>
                       </tr>
                     )}
                     {!loading &&
@@ -183,7 +190,9 @@ export function DepartmentPage() {
                           >
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.email ?? "—"}</td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.user_ident ?? "—"}</td>
+                            {useUserIdent && (
+                              <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.user_ident ?? "—"}</td>
+                            )}
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">
                               {user.deleted_at ? (

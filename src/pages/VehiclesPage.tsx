@@ -193,7 +193,7 @@ export function VehiclesPage() {
                           </select>
                         </label>
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Bil-ID
+                          Køretøj-ID
                           <select
                             value={filterPlate}
                             onChange={(e) => setFilterPlate(e.target.value)}
@@ -242,7 +242,7 @@ export function VehiclesPage() {
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj-ID</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>

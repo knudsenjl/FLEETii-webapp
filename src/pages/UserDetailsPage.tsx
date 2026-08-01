@@ -7,6 +7,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
@@ -73,6 +74,8 @@ type DepartmentOption = { department_id: string; name: string };
  */
 export function UserDetailsPage() {
   const { session, profile, costumerId, afdelingId } = useAuth();
+  /** Whether afdelingId's department shows the "Ansat-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -638,16 +641,18 @@ export function UserDetailsPage() {
                     descendants — aren't clipped when they overflow this
                     box's edge (same fix as RettighederSettings.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="text-sm font-medium text-brand-700">Ansat-ID:</label>
-                    <input
-                      type="text"
-                      value={userIdent}
-                      onChange={(e) => setUserIdent(e.target.value)}
-                      placeholder="valgfri — bruger E-mail hvis tom"
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
+                  {useUserIdent && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="text-sm font-medium text-brand-700">Ansat-ID:</label>
+                      <input
+                        type="text"
+                        value={userIdent}
+                        onChange={(e) => setUserIdent(e.target.value)}
+                        placeholder="valgfri — bruger E-mail hvis tom"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                  )}
                   <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
                   <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
                   <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />

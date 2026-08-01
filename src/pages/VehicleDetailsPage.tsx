@@ -8,6 +8,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
@@ -40,8 +41,8 @@ type VehicleDepartmentRow = { department_id: string; departments: { name: string
 /** Raw shape of the vehicle_profiles row fetched here for its home department — just the scalar department_id, resolved to a name via a separate departments lookup (see the fetch effect below for why this isn't a single embedded query). */
 type VehicleProfileHomeRow = { department_id: string | null };
 
-/** Raw shape of the vehicle_profiles row fetched here for the genuine Nummerplade — see the numberPlate fetch effect below for why this can't just reuse vehicle.plate. */
-type VehicleProfilePlateRow = { number_plate: string | null };
+/** Raw shape of the vehicle_profiles row fetched here for the genuine Nummerplade PLUS this vehicle's own department_id (for the useIdentSettings gate below) — see the numberPlate fetch effect below for why the plate part can't just reuse vehicle.plate. Piggybacks department_id onto this same query rather than a third round-trip, since both are needed together and neither is admin-gated (unlike the vehicleDepartments/homeDepartmentName effect above, which skips entirely for a non-admin viewer). */
+type VehicleProfilePlateRow = { number_plate: string | null; department_id: string | null };
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
@@ -104,9 +105,13 @@ export function VehicleDetailsPage() {
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
   /** vehicle_profiles.department_id's own name (see supabase/applied/add_vehicle_profiles_costumer_and_department_fk.sql) — null if not yet set for this vehicle. Replaces the old vestigial DisplayVehicle.department field (toDisplayVehicle hardcodes that to "—" always). */
   const [homeDepartmentName, setHomeDepartmentName] = useState<string | null>(null);
-  /** The genuine Nummerplade (vehicle_profiles.number_plate) — fetched separately since vehicle.plate (see the Vehicle type above) is Bil-ID-or-Nummerplade-fallback (see liveVehicleDataSource.ts's toVehicle2Hire), so once a vehicle has a vehicle_ident set, the actual plate is otherwise nowhere on this page at all. */
+  /** The genuine Nummerplade (vehicle_profiles.number_plate) — fetched separately since vehicle.plate (see the Vehicle type above) is Køretøj-ID-or-Nummerplade-fallback (see liveVehicleDataSource.ts's toVehicle2Hire), so once a vehicle has a vehicle_ident set, the actual plate is otherwise nowhere on this page at all. */
   const [numberPlate, setNumberPlate] = useState<string | null>(null);
   const [numberPlateLoading, setNumberPlateLoading] = useState(true);
+  /** This vehicle's own home department_id — fetched alongside numberPlate below (see VehicleProfilePlateRow), independent of the admin-only vehicleDepartments/homeDepartmentName effect above so a non-admin viewer still resolves this for the useIdentSettings gate. */
+  const [identDepartmentId, setIdentDepartmentId] = useState<string | null>(null);
+  /** Whether this vehicle's own home department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 
   const bookingContext: VehicleLockBookingContext | null = booking
     ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso }
@@ -215,12 +220,13 @@ export function VehicleDetailsPage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate")
+      .select("number_plate, department_id")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfilePlateRow>()
       .then(({ data }) => {
         if (cancelled) return;
         setNumberPlate(data?.number_plate ?? null);
+        setIdentDepartmentId(data?.department_id ?? null);
         setNumberPlateLoading(false);
       });
 
@@ -306,9 +312,20 @@ export function VehicleDetailsPage() {
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
+                  {useVehicleIdent && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Køretøj-ID:</label>
+                      <span className="text-sm text-brand-800">{vehicle.plate}</span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    {/* The "er låst" indicator lives here (Nummerplade), not
+                        on Køretøj-ID above — Nummerplade always renders
+                        regardless of useVehicleIdent, so this is the one row
+                        guaranteed to always be visible for the lock status
+                        to attach to. */}
                     <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                      Bil-ID:
+                      Nummerplade:
                       {vehicleLocked && (
                         <svg
                           viewBox="0 0 24 24"
@@ -327,10 +344,6 @@ export function VehicleDetailsPage() {
                         </svg>
                       )}
                     </label>
-                    <span className="text-sm text-brand-800">{vehicle.plate}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Nummerplade:</label>
                     <span className="text-sm text-brand-800">
                       {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (numberPlate ?? "—")}
                     </span>

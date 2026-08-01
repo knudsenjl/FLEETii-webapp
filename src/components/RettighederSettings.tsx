@@ -46,12 +46,32 @@ export interface RettighederSettingsHandle {
   save: () => Promise<{ error: string | null }>;
 }
 
-/** The permission flags, in the order they're shown — label text is this app's own phrasing, not a literal transform of the setting name. */
-const RETTIGHEDER: { name: string; label: string }[] = [
-  { name: "Tillad_ny_reservation", label: "Tillad ny reservation" },
-  { name: "Tillad_slet_reservation", label: "Tillad slet reservation" },
-  { name: "Tillad_rediger_reservation", label: "Tillad rediger reservation" },
-  { name: "Tillad_reservation_uden_sluttidspunkt", label: "Tillad reservationer uden sluttid" },
+/** The permission flags, in the order they're shown — label text is this app's own phrasing, not a literal transform of the setting name. info is the "?" popover text shown right-aligned next to the label (see openInfoName below), for table="department_settings" (SettingsAdminPage). infoUser overrides it for table="user_settings" (SettingsUserPage/UserDetailsPage — both about one specific user, so "denne bruger" rather than "brugere i afdelingen"); falls back to info when absent. */
+export const RETTIGHEDER: { name: string; label: string; info: string; infoUser?: string }[] = [
+  {
+    name: "Tillad_ny_reservation",
+    label: "Tillad ny reservation",
+    info: "Tillad brugere i afdelingen selv at oprette nye reservationer",
+    infoUser: "Tillad denne bruger at oprette nye reservationer",
+  },
+  {
+    name: "Tillad_slet_reservation",
+    label: "Tillad slet reservation",
+    info: "Tillad brugere i afdelingen selv at slette egne reservationer",
+    infoUser: "Tillad denne bruger at slette egne reservationer",
+  },
+  {
+    name: "Tillad_rediger_reservation",
+    label: "Tillad rediger reservation",
+    info: "Tillad brugere i afdelingen selv at ændre i deres reservationer",
+    infoUser: "Tillad denne bruger at ændre i deres reservationer",
+  },
+  {
+    name: "Tillad_reservation_uden_sluttidspunkt",
+    label: "Tillad reservationer uden sluttid",
+    info: "Tillad brugere i afdelingen at oprette reservationer uden sluttid",
+    infoUser: "Tillad denne bruger at oprette reservationer uden sluttid",
+  },
 ];
 
 /** Raw shape of a value_bool row as selected here. */
@@ -75,6 +95,8 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
     const [errorByName, setErrorByName] = useState<Record<string, string>>({});
     /** Which (if any) flag's "can't assign a right your department doesn't grant" popup is currently open — see the Aktiv checkbox below. */
     const { activeKey: blockedKey, trigger: triggerBlocked } = useTimedFlag();
+    /** Which (if any) row's "?" info popover is open — plain toggle state, not useTimedFlag, so it stays open for as long as the admin/user needs to read it rather than auto-closing after a few seconds (same pattern as UserDetailsPage's Afdeling(er)/Hjemmeafdeling popovers, and StandardSettings.tsx's own openInfoName). Closes on toggling the same one again, opening a different row's, or clicking anywhere outside. */
+    const [openInfoName, setOpenInfoName] = useState<string | null>(null);
 
     useEffect(() => {
       if (!scopeId) {
@@ -242,11 +264,25 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                 positioned descendant — isn't clipped by an overflow-hidden
                 ancestor when it overflows this box's edge. */}
             <div className="divide-y divide-brand-100 rounded-2xl bg-white">
-              {RETTIGHEDER.map(({ name, label }) => (
+              {RETTIGHEDER.map(({ name, label, info, infoUser }) => (
                 <div key={name} className="grid grid-cols-[14rem_1fr] items-center gap-2 p-0.5">
-                  <label htmlFor={`rettighed-${name}`} className="flex items-center whitespace-normal break-words text-sm font-medium text-brand-700">
-                    {label}:
-                  </label>
+                  <div className="relative flex items-center justify-between gap-1">
+                    <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
+                      {label}:
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => setOpenInfoName((prev) => (prev === name ? null : name))}
+                      aria-label="Mere information"
+                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                    >
+                      ?
+                    </button>
+                    {openInfoName === name && (
+                      <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
+                    )}
+                    <InlinePopup visible={openInfoName === name} message={table === "user_settings" ? (infoUser ?? info) : info} />
+                  </div>
                   {table === "user_settings" ? (
                     <div className="flex items-center gap-2">
                       <div className="flex items-center gap-4">

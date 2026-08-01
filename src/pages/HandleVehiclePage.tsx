@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { shortSignalTimestamp } from "../lib/bookings";
 
@@ -25,7 +26,7 @@ type Vehicle = {
 /** Raw shape of the vehicle_profiles row fetched fresh on mount for the editable fields. */
 type VehicleProfileRow = {
   number_plate: string | null;
-  /** Company-wide "Bil-ID" identifier (see vehicle_profiles_add_vehicle_ident.sql) — optional, shown/edited separately from Nummerplade. */
+  /** Company-wide "Køretøj-ID" identifier (see vehicle_profiles_add_vehicle_ident.sql) — optional, shown/edited separately from Nummerplade. */
   vehicle_ident: string | null;
   brand: string | null;
   model: string | null;
@@ -35,7 +36,7 @@ type VehicleProfileRow = {
 
 /**
  * Admin "edit vehicle" page ("/edit-vehicle", reached via
- * VehicleDetailsPage's "Rediger køretøj"). Bil-ID/Nummerplade/Mærke/Model/
+ * VehicleDetailsPage's "Rediger køretøj"). Køretøj-ID/Nummerplade/Mærke/Model/
  * Årgang are editable (they're the vehicle_profiles-backed fields an admin
  * actually manages) — loaded fresh from vehicle_profiles by vehicle_id on mount, then
  * saved back via an UPDATE (see supabase/applied/vehicle_profiles_update_policy.sql
@@ -59,7 +60,7 @@ export function HandleVehiclePage() {
   const vehicle = state?.vehicle ?? null;
 
   const [plate, setPlate] = useState("");
-  /** Company-wide "Bil-ID" identifier — optional (unlike plate/make/model/year, not required to save). */
+  /** Company-wide "Køretøj-ID" identifier — optional (unlike plate/make/model/year, not required to save). */
   const [vehicleIdent, setVehicleIdent] = useState("");
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
@@ -71,6 +72,8 @@ export function HandleVehiclePage() {
 
   /** The vehicle's own "home" department (vehicle_profiles.department_id — see supabase/applied/add_vehicle_profiles_costumer_and_department_fk.sql), selectable via a <select> filtered to departmentOptions the vehicle is actually assigned to (selectedDepartmentIds) below. Null while still loading. */
   const [homeDepartmentId, setHomeDepartmentId] = useState<string | null>(null);
+  /** Whether this vehicle's own home department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useVehicleIdent } = useIdentSettings(homeDepartmentId);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState<Set<string>>(new Set());
   /** The DB's own current vehicle_departments rows for this vehicle, at load time — diffed against selectedDepartmentIds on save to know which rows to insert/delete, rather than replacing the whole set blindly. */
@@ -389,16 +392,18 @@ export function HandleVehiclePage() {
               {!loading && !loadError && (
                 <div className="overflow-hidden rounded-none border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
-                      <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Bil-ID:</label>
-                      <input
-                        type="text"
-                        value={vehicleIdent}
-                        onChange={(e) => setVehicleIdent(e.target.value)}
-                        placeholder="valgfri — bruger Nummerplade hvis tom"
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
+                    {useVehicleIdent && (
+                      <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
+                        <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Køretøj-ID:</label>
+                        <input
+                          type="text"
+                          value={vehicleIdent}
+                          onChange={(e) => setVehicleIdent(e.target.value)}
+                          placeholder="valgfri — bruger Nummerplade hvis tom"
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                    )}
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Nummerplade:</label>
                       <input

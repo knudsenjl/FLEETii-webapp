@@ -17,18 +17,16 @@
 // department is guaranteed to have this, see
 // supabase/applied/backfill_and_seed_default_anvendelse.sql) are shown but
 // can't be edited/deleted from here, since they aren't this user's own data
-// to manage. Rediger/Slet stay clickable on a protected row (not disabled,
-// per this app's usual guard-button convention) but show a warning instead
-// of proceeding. On SettingsAdminPage (table="department_settings"),
-// ANDET_VALUE is the only protected entry — department items ARE the
-// admin's own data, all editable except that one guaranteed default.
+// to manage — "Rediger anvendelse"/"Slet anvendelse" are both disabled
+// outright on a protected row (see isProtected below), rather than staying
+// clickable with a warning. On SettingsAdminPage (table="department_settings"),
+// ANDET_VALUE is the only protected entry — department items ARE the admin's own data,
+// all editable except that one guaranteed default.
 import { useEffect, useState } from "react";
 import { RequiredFieldRow } from "./RequiredFieldRow";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { InlinePopup } from "./InlinePopup";
 import { supabase } from "../lib/supabase";
 import { ANDET_VALUE, sortAnvendelserWithAndetLast } from "../lib/settings";
-import { useTimedFlag } from "../hooks/useTimedFlag";
 
 const SETTING_NAME = "Anvendelse";
 
@@ -60,9 +58,6 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
   const [pendingAction, setPendingAction] = useState<"create" | "update" | "delete" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
-  const { activeKey: guardKey, trigger: triggerGuard } = useTimedFlag();
-  /** The message shown by the InlinePopup below Rediger/Slet while guardKey is active — kept separate from guardKey itself so the text survives the 3s fade-out (guardKey clears to null; the popup's `visible` just becomes false while `message` still holds its last value). */
-  const [guardMessage, setGuardMessage] = useState("");
 
   const canSubmitField = fieldValue.trim().length > 0;
 
@@ -80,16 +75,6 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
     value === ANDET_VALUE || (table === "user_settings" && departmentAnvendelser.includes(value));
 
   const selectedValue = selectedIndex !== null ? (displayList[selectedIndex] ?? null) : null;
-
-  /** Shows the 3s InlinePopup warning for a protected `value` (see isProtected) — shared by both Rediger and Slet's guard checks. */
-  const triggerProtectedGuard = (value: string) => {
-    setGuardMessage(
-      value === ANDET_VALUE
-        ? `"${ANDET_VALUE}" kan hverken redigeres eller slettes.`
-        : `"${value}" er en fælles indstilling for din afdeling og kan ikke ændres her.`,
-    );
-    triggerGuard("protected");
-  };
 
   useEffect(() => {
     if (!scopeId) {
@@ -213,12 +198,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
   return (
     <div className="flex flex-col gap-4">
       <div className="max-h-64 overflow-auto rounded-none border border-brand-100">
-        <table className="w-full border-collapse text-[0.7rem]">
-          <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-            <tr>
-              <th className="w-56 whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Anvendelser</th>
-            </tr>
-          </thead>
+        <table className="w-full border-collapse text-sm">
           <tbody className="divide-y divide-brand-100 bg-white">
             {loading && (
               <tr>
@@ -269,7 +249,10 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                           : "bg-white text-brand-700 hover:bg-brand-50"
                     }`}
                   >
-                    <td className="whitespace-nowrap px-2 py-0.5 text-center font-medium">{anvendelse}</td>
+                    <td className="whitespace-nowrap px-2 py-0.5 text-left font-medium">
+                      {anvendelse}
+                      {isProtected(anvendelse) && <span className="text-red-600"> *</span>}
+                    </td>
                   </tr>
                 );
               })}
@@ -288,52 +271,48 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
       {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
       {mode === "view" && (
-        <div className="relative grid grid-cols-3 gap-3">
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedValue === null) return;
-              if (isProtected(selectedValue)) {
-                triggerProtectedGuard(selectedValue);
-                return;
-              }
-              setEditingOriginalValue(selectedValue);
-              setFieldValue(selectedValue);
-              setSubmitError(null);
-              setMode("edit");
-            }}
-            disabled={selectedIndex === null}
-            className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Rediger anvendelse
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFieldValue("");
-              setSubmitError(null);
-              setMode("add");
-            }}
-            className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            Opret anvendelse
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (selectedValue === null) return;
-              if (isProtected(selectedValue)) {
-                triggerProtectedGuard(selectedValue);
-                return;
-              }
-              setPendingAction("delete");
-            }}
-            disabled={selectedIndex === null}
-            className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Slet anvendelse
-          </button>
-          <InlinePopup visible={guardKey === "protected"} message={guardMessage} variant="warning" />
+        <div className="flex flex-col gap-3">
+          <p className="text-right text-xs text-brand-500">
+            <span className="text-red-600">*</span> Kan ikke ændres eller slettes
+          </p>
+          <div className="grid grid-cols-3 gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedValue === null) return;
+                setEditingOriginalValue(selectedValue);
+                setFieldValue(selectedValue);
+                setSubmitError(null);
+                setMode("edit");
+              }}
+              disabled={selectedValue === null || isProtected(selectedValue)}
+              className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Rediger anvendelse
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setFieldValue("");
+                setSubmitError(null);
+                setMode("add");
+              }}
+              className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+            >
+              Tilføj anvendelse
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (selectedValue === null) return;
+                setPendingAction("delete");
+              }}
+              disabled={selectedValue === null || isProtected(selectedValue)}
+              className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Slet anvendelse
+            </button>
+          </div>
         </div>
       )}
 
@@ -345,7 +324,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
             disabled={!canSubmitField}
             className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {mode === "add" ? "Opret anvendelse" : "Opdater anvendelse"}
+            {mode === "add" ? "Tilføj anvendelse" : "Opdater anvendelse"}
           </button>
           <button
             type="button"

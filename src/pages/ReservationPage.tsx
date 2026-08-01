@@ -14,6 +14,7 @@ import {
   isSettingTilladt,
   sortAnvendelserWithAndetLast,
 } from "../lib/settings";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
 /** Hardcoded fallbacks used whenever "Standard varighed"/"Standard interval" (department_settings/user_settings, see StandardSettings.tsx) has no value for the current user/department. */
@@ -69,6 +70,8 @@ function ceilToQuarterHour(date: Date): Date {
  */
 export function ReservationPage() {
   const { session, profile, afdelingId } = useAuth();
+  /** Whether afdelingId's department shows "Ansat-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx/BookingDetailsPage.tsx — this is the actual required field for picking who a booking is for, not an optional extra. */
+  const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
@@ -354,8 +357,8 @@ export function ReservationPage() {
     const selectedUser = departmentUsers.find((u) => u.user_id === bruger);
     const brugerLabel =
       profile?.role === "admin"
-        ? (selectedUser?.user_ident || selectedUser?.email) ?? editing?.userLabel ?? ""
-        : (profile?.user_ident || profile?.email || session?.user.email) ?? "";
+        ? ((useUserIdent ? selectedUser?.user_ident : undefined) || selectedUser?.email) ?? editing?.userLabel ?? ""
+        : ((useUserIdent && profile?.user_ident) || profile?.email || session?.user.email) ?? "";
     return { start, end, brugerLabel };
   };
 
@@ -407,7 +410,7 @@ export function ReservationPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Ansat-ID {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
+                      {useUserIdent ? "Ansat-ID" : "Bruger"} {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
                     {profile?.role === "admin" ? (
                       <select
@@ -418,14 +421,14 @@ export function ReservationPage() {
                         <option value="">Vælg bruger</option>
                         {departmentUsers.map((u) => (
                           <option key={u.user_id} value={u.user_id}>
-                            {u.user_ident || u.email}
+                            {useUserIdent ? u.user_ident || u.email : u.email}
                           </option>
                         ))}
                       </select>
                     ) : (
                       <input
                         type="text"
-                        value={profile?.user_ident || profile?.email || session?.user.email || ""}
+                        value={(useUserIdent && profile?.user_ident) || profile?.email || session?.user.email || ""}
                         disabled
                         readOnly
                         className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"

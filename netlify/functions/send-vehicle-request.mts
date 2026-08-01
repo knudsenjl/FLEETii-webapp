@@ -24,7 +24,7 @@ import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
-  /** Company-wide "Bil-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
+  /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
   vehicleIdent?: string | null;
   nummerplade?: string;
   brand?: string;
@@ -73,7 +73,7 @@ function buildHtmlBody(fields: {
     <table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">
       ${row("Kunde", fields.customerName)}
       ${row("Afdeling", fields.afdeling)}
-      ${row("Bil-ID", fields.vehicleIdent || "—")}
+      ${row("Køretøj-ID", fields.vehicleIdent || "—")}
       ${row("Nummerplade", fields.nummerplade)}
       ${row("Brand", fields.brand)}
       ${row("Mærke", fields.maerke)}

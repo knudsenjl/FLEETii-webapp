@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 
 /** A pending "Nedlæg" (deletion) costumer_orders row — mirrors VehicleCreatePage.tsx's own CostumerOrder shape/reasoning, for the reverse flow (see costumer_orders_merge_deletion_requests.sql: both order types share this one table now, distinguished by order_type). Normally arrives pre-filled via router state (FleetiiAdministrationPage's "Administration af installationer" table row click), but also fetchable by id alone so "/vehicle-delete/:orderId" works as a direct link (the email's own link). */
@@ -79,6 +80,10 @@ export function VehicleDeletePage() {
   // handles Nedlæg — same as costumer_orders' SELECT RLS scoping an orderId
   // outside the caller's reach down to "not found" too.
   const order = rawOrder && rawOrder.order_type === "Nedlæg" ? rawOrder : null;
+  /** Whether this order's own department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useVehicleIdent } = useIdentSettings(order?.department_id ?? null);
+  /** The real vehicle_profiles.vehicle_ident for order.vehicle_id (always set for a resolved "Nedlæg" order — see send-vehicle-deletion-request.mts, which never populates costumer_orders.vehicle_ident itself for a deletion request, unlike NewVehiclePage.tsx's creation flow) — fetched fresh from the actual vehicle rather than trusting the order snapshot. Falls back to order.number_plate, same convention as everywhere else. */
+  const [vehicleIdent, setVehicleIdent] = useState<string | null>(null);
 
   const [deviceRemoved, setDeviceRemoved] = useState(order?.device_removed ?? false);
   const [deviceRemovedPending, setDeviceRemovedPending] = useState(false);
@@ -153,6 +158,29 @@ export function VehicleDeletePage() {
     setDeviceRemoved(order.device_removed);
   }, [order]);
 
+  /** Fetches the real vehicle_ident for order.vehicle_id — see vehicleIdent's own doc comment above. */
+  useEffect(() => {
+    if (!order?.vehicle_id) {
+      setVehicleIdent(null);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_ident")
+      .eq("vehicle_id", order.vehicle_id)
+      .maybeSingle<{ vehicle_ident: string | null }>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setVehicleIdent(data?.vehicle_ident ?? null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [order?.vehicle_id]);
+
   if (orderId && !order && orderLoading) {
     return (
       <div className="flex h-dvh items-center justify-center bg-brand-50 text-brand-600">Indlæser anmodning…</div>
@@ -220,7 +248,8 @@ export function VehicleDeletePage() {
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
-    ["Bil-ID:", order.number_plate],
+    ...(useVehicleIdent ? ([["Køretøj-ID:", vehicleIdent || order.number_plate]] as [string, string][]) : []),
+    ["Nummerplade:", order.number_plate],
     ["Brand:", order.brand],
     ["Mærke:", order.model],
     ["Årgang:", order.model_year],

@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import {
@@ -44,6 +45,8 @@ type Booking = {
 export function AllBookingsPage() {
   const { afdelingId } = useAuth();
   const navigate = useNavigate();
+  /** Whether afdelingId's department shows "Ansat-ID" (vs. plain "Bruger"/E-mail) in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, this one never fully disappears when off: a booking's user is core information, not an optional extra, so it reverts to the pre-feature "Bruger"/E-mail display instead (see the label/value swaps below). */
+  const { useUserIdent } = useIdentSettings(afdelingId);
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -194,7 +197,7 @@ export function AllBookingsPage() {
                         <>
                           <p className="mb-2">Du kan her udvælge reservationer på disse kriterier:</p>
                           <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Ansat-ID
+                            {useUserIdent ? "Ansat-ID" : "Bruger"}
                             <select
                               value={filterUser}
                               onChange={(e) => setFilterUser(e.target.value)}
@@ -203,7 +206,7 @@ export function AllBookingsPage() {
                               <option value="">Alle</option>
                               {departmentUsers.map((u) => (
                                 <option key={u.user_id} value={u.user_id}>
-                                  {u.user_ident || u.email}
+                                  {useUserIdent ? u.user_ident || u.email : u.email}
                                 </option>
                               ))}
                             </select>
@@ -258,7 +261,7 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Not table-fixed: Periode/Ansat-ID/Lås/Online are all w-px
+                {/* Not table-fixed: Periode/Ansat-ID (or Bruger)/Lås/Online are all w-px
                     (shrink to their actual content, same trick as
                     VehiclesPage.tsx's own Lås/Online columns — only
                     meaningful under table-layout:auto, table-fixed ignores
@@ -272,7 +275,7 @@ export function AllBookingsPage() {
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Ansat-ID</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">{useUserIdent ? "Ansat-ID" : "Bruger"}</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
@@ -333,8 +336,11 @@ export function AllBookingsPage() {
                             >
                               {formatBookingPeriod(booking, true)}
                             </td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5" title={userAnsatId(booking) ?? undefined}>
-                              {userAnsatId(booking) ?? "—"}
+                            <td
+                              className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5"
+                              title={(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? undefined}
+                            >
+                              {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
                               {(lockedByVehicleId[booking.vehicle] ?? true) && (

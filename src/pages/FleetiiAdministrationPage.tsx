@@ -12,13 +12,13 @@ import { supabase } from "../lib/supabase";
 type MockVehicle = {
   vehicle_id: string;
   number_plate: string;
-  /** Company-wide "Bil-ID" identifier (see vehicle_profiles_add_vehicle_ident.sql) — takes precedence over number_plate for display; null/empty falls back to it. */
+  /** Company-wide "Køretøj-ID" identifier (see vehicle_profiles_add_vehicle_ident.sql) — takes precedence over number_plate for display; null/empty falls back to it. */
   vehicle_ident: string | null;
   brand: string;
   model: string;
 };
 
-/** "Bil-ID" display value for a vehicle_profiles-backed row — vehicle_ident when set, else number_plate. */
+/** "Køretøj-ID" display value for a vehicle_profiles-backed row — vehicle_ident when set, else number_plate. */
 function vehicleBilId(vehicle: { number_plate: string; vehicle_ident: string | null }): string {
   return vehicle.vehicle_ident?.trim() ? vehicle.vehicle_ident.trim() : vehicle.number_plate;
 }
@@ -57,7 +57,7 @@ type CostumerOrder = {
   vehicle_id: string | null;
   costumer_id: string;
   department_id: string | null;
-  /** Company-wide "Bil-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate (see vehicleBilId below). */
+  /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate (see vehicleBilId below). */
   vehicle_ident: string | null;
   number_plate: string;
   brand: string;
@@ -437,7 +437,7 @@ export function FleetiiAdministrationPage() {
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Type</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Kunde</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
-                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
+                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Køretøj-ID</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
@@ -505,7 +505,7 @@ export function FleetiiAdministrationPage() {
               <table className="w-full border-collapse text-[0.7rem]">
                 <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <tr>
-                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
+                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj-ID</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Mærke</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Status</th>
@@ -587,7 +587,7 @@ export function FleetiiAdministrationPage() {
               <table className="w-full border-collapse text-[0.7rem]">
                 <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                   <tr>
-                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bil-ID</th>
+                    <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj-ID</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Mærke</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Handling</th>

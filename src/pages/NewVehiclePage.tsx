@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
 /**
@@ -15,8 +16,10 @@ import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
  * vehicle and arrange device installation manually.
  */
 export function NewVehiclePage() {
-  const { afdeling, session, profile } = useAuth();
-  /** Company-wide "Bil-ID" identifier — optional (unlike Nummerplade, not required to send), see costumer_orders_add_vehicle_ident.sql. Carried straight onto the created vehicle_profiles row once FLEETii fulfils the request (2hire-register-vehicle.mts), so it doesn't have to be re-entered later. */
+  const { afdeling, afdelingId, session, profile } = useAuth();
+  /** Whether afdelingId's department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useVehicleIdent } = useIdentSettings(afdelingId);
+  /** Company-wide "Køretøj-ID" identifier — optional (unlike Nummerplade, not required to send), see costumer_orders_add_vehicle_ident.sql. Carried straight onto the created vehicle_profiles row once FLEETii fulfils the request (2hire-register-vehicle.mts), so it doesn't have to be re-entered later. */
   const [vehicleIdent, setVehicleIdent] = useState("");
   const [nummerplade, setNummerplade] = useState("");
   const [brand, setBrand] = useState("");
@@ -143,16 +146,18 @@ export function NewVehiclePage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
                     <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
                   </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Bil-ID:</label>
-                    <input
-                      type="text"
-                      value={vehicleIdent}
-                      onChange={(e) => setVehicleIdent(e.target.value)}
-                      placeholder="valgfri — bruger Nummerplade hvis tom"
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
+                  {useVehicleIdent && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Køretøj-ID:</label>
+                      <input
+                        type="text"
+                        value={vehicleIdent}
+                        onChange={(e) => setVehicleIdent(e.target.value)}
+                        placeholder="valgfri — bruger Nummerplade hvis tom"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                  )}
                   <RequiredFieldRow label="Nummerplade:" value={nummerplade} onChange={setNummerplade} />
                   <RequiredFieldRow label="Brand:" value={brand} onChange={setBrand} />
                   <RequiredFieldRow label="Mærke:" value={maerke} onChange={setMaerke} />
