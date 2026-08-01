@@ -194,8 +194,8 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
     // verbatim.
     if (inputType === "number") {
       const setting = settings.find((s) => s.name === name);
-      const min = (setting?.inputType === "number" && setting.min) ?? 1;
-      const max = (setting?.inputType === "number" && setting.max) ?? 59;
+      const min = setting?.inputType === "number" ? (setting.min ?? 1) : 1;
+      const max = setting?.inputType === "number" ? (setting.max ?? 59) : 59;
       const parsed = Number(raw);
       if (!Number.isFinite(parsed) || parsed < min || parsed > max) {
         setErrorByName((prev) => ({ ...prev, [name]: `Skal være et tal mellem ${min} og ${max}.` }));
