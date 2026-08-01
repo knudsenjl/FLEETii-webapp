@@ -17,7 +17,7 @@ export const USER_ID_COLUMN = "user_id";
 /** References departments.department_id (uuid) — NOT a department name. See supabase/bookings_department_to_department_id.sql. */
 export const DEPARTMENT_COLUMN = "department_id";
 
-/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email, user_ident) via the user_id FK (PostgREST resolves it automatically) so callers get display-ready email/Ansat-ID alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
+/** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email, user_ident) via the user_id FK (PostgREST resolves it automatically) so callers get display-ready email/Bruger-ID alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
 export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email, user_ident), ${DEPARTMENT_COLUMN}`;
 
 export type DisplayVehicle = Vehicle2Hire & {
@@ -65,9 +65,9 @@ export type MappedBooking = {
   use: string;
   /** References user_profiles.user_id — NOT an email. Use userEmail for display. */
   userId: string | null;
-  /** The booking's user's email, resolved via user_id's embedded join — kept as a genuine email (e.g. for a real mailto use later), NOT the display value. For display (e.g. BookingDetailsPage's "Ansat-ID" row), use userIdent first, falling back to this. Null if userId itself is null, or that user has no email. */
+  /** The booking's user's email, resolved via user_id's embedded join — kept as a genuine email (e.g. for a real mailto use later), NOT the display value. For display (e.g. BookingDetailsPage's "Bruger-ID" row), use userIdent first, falling back to this. Null if userId itself is null, or that user has no email. */
   userEmail: string | null;
-  /** The booking's user's "Ansat-ID" (user_profiles.user_ident), resolved via the same embedded join as userEmail — the DISPLAY value wherever the app shows who a booking is for. Null if userId is null or that user has no user_ident set (callers should fall back to userEmail in that case). */
+  /** The booking's user's "Bruger-ID" (user_profiles.user_ident), resolved via the same embedded join as userEmail — the DISPLAY value wherever the app shows who a booking is for. Null if userId is null or that user has no user_ident set (callers should fall back to userEmail in that case). */
   userIdent: string | null;
   /** References departments.department_id — NOT a department name. */
   departmentId: string | null;
@@ -144,7 +144,7 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
   };
 }
 
-/** "Ansat-ID" display value for a booking's user (or any user_profiles-backed record) — userIdent when set, else userEmail, else null (e.g. userId itself was null). Single source of truth for this fallback so BookingDetailsPage/AllBookingsPage/ReservationPage don't each reimplement it. */
+/** "Bruger-ID" display value for a booking's user (or any user_profiles-backed record) — userIdent when set, else userEmail, else null (e.g. userId itself was null). Single source of truth for this fallback so BookingDetailsPage/AllBookingsPage/ReservationPage don't each reimplement it. */
 export function userAnsatId(user: { userIdent: string | null; userEmail: string | null }): string | null {
   return user.userIdent?.trim() ? user.userIdent.trim() : user.userEmail;
 }

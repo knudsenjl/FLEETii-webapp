@@ -28,7 +28,7 @@ const ACTIVITY_WRITE_THROTTLE_MS = 30_000;
 export interface Profile {
   user_id: string;
   email: string | null;
-  /** Company-wide "Ansat-ID" identifier (see user_profiles_add_user_ident.sql) — takes precedence over email for display wherever the app shows a user's identifier; null/empty falls back to email. */
+  /** Company-wide "Bruger-ID" identifier (see user_profiles_add_user_ident.sql) — takes precedence over email for display wherever the app shows a user's identifier; null/empty falls back to email. */
   user_ident: string | null;
   full_name: string | null;
   phone: string | null;

@@ -21,12 +21,12 @@ import { RETTIGHEDER } from "../components/RettighederSettings";
 export function SettingsAdminPage() {
   const { afdeling, afdelingId } = useAuth();
 
-  /** STANDARDER, plus the two "Opsætning af ID'er" checkboxes, plus the 4 Tillad_* permission checkboxes (reusing RettighederSettings.tsx's own RETTIGHEDER label/info text — that component still owns the canonical copy, since UserDetailsPage still uses it directly for its own editable Aktiv/Nulstil/ceiling-check widget), plus a last "Anvendelser" row embedding AnvendelseSettings itself (see StandardSettings.tsx's "custom" inputType). Memoized (not module-scope, unlike the earlier static-only version) since the last row's render() closes over afdelingId — StandardSettings' load effect depends on this array by reference, so an unmemoized inline array would re-trigger a refetch every render. use_user_ident/use_vehicle_ident are seeded (value_bool = false) for every department by supabase/applied/backfill_and_seed_default_ident_settings.sql; the Tillad_* rows rely on "missing row = false" like they always have. Note: use_user_ident/use_vehicle_ident are settings/toggles only for now — nothing in the app yet reads them to actually gate whether Ansat-ID/Køretøj-ID is shown as the primary identifier. */
+  /** STANDARDER, plus the two "Opsætning af ID'er" checkboxes, plus the 4 Tillad_* permission checkboxes (reusing RettighederSettings.tsx's own RETTIGHEDER label/info text — that component still owns the canonical copy, since UserDetailsPage still uses it directly for its own editable Aktiv/Nulstil/ceiling-check widget), plus a last "Anvendelser" row embedding AnvendelseSettings itself (see StandardSettings.tsx's "custom" inputType). Memoized (not module-scope, unlike the earlier static-only version) since the last row's render() closes over afdelingId — StandardSettings' load effect depends on this array by reference, so an unmemoized inline array would re-trigger a refetch every render. use_user_ident/use_vehicle_ident are seeded (value_bool = false) for every department by supabase/applied/backfill_and_seed_default_ident_settings.sql; the Tillad_* rows rely on "missing row = false" like they always have. Note: use_user_ident/use_vehicle_ident are settings/toggles only for now — nothing in the app yet reads them to actually gate whether Bruger-ID/Køretøj-ID is shown as the primary identifier. */
   const departmentStandarder = useMemo<StandardSetting[]>(
     () => [
       {
         name: "use_user_ident",
-        label: "Anvender Ansat-ID",
+        label: "Anvender Bruger-ID",
         inputType: "checkbox",
         defaultValue: "false",
         info: "Brugere kan identificeres med jeres medarbejder nummer eller lign. efter jeres eget valg. Ellers anvendes E-mail som identifikation",

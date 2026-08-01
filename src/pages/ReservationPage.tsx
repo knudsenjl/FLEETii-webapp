@@ -70,7 +70,7 @@ function ceilToQuarterHour(date: Date): Date {
  */
 export function ReservationPage() {
   const { session, profile, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows "Ansat-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx/BookingDetailsPage.tsx — this is the actual required field for picking who a booking is for, not an optional extra. */
+  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx/BookingDetailsPage.tsx — this is the actual required field for picking who a booking is for, not an optional extra. */
   const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
@@ -410,7 +410,7 @@ export function ReservationPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      {useUserIdent ? "Ansat-ID" : "Bruger"} {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
+                      {useUserIdent ? "Bruger-ID" : "Bruger"} {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
                     {profile?.role === "admin" ? (
                       <select

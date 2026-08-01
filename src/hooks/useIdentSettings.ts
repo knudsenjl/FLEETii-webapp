@@ -1,4 +1,4 @@
-// Shared "does this department show Ansat-ID/Køretøj-ID" fetch for every
+// Shared "does this department show Bruger-ID/Køretøj-ID" fetch for every
 // page that displays those identifiers (see
 // supabase/applied/backfill_and_seed_default_ident_settings.sql for the two
 // department_settings flags this reads: use_user_ident/use_vehicle_ident).
@@ -9,7 +9,7 @@ import { supabase } from "../lib/supabase";
 type IdentSettingRow = { name: "use_user_ident" | "use_vehicle_ident"; value_bool: boolean | null };
 
 export type UseIdentSettingsResult = {
-  /** Whether departmentId's department_settings has use_user_ident = true — gates every "Ansat-ID" row/column. Starts (and stays, if departmentId is null or the row is absent/false) false — fail-closed, same convention as lib/settings.ts's isSettingTilladt, so callers never need to separately check a loading flag to avoid a flash of gated content before the real value is known. */
+  /** Whether departmentId's department_settings has use_user_ident = true — gates every "Bruger-ID" row/column. Starts (and stays, if departmentId is null or the row is absent/false) false — fail-closed, same convention as lib/settings.ts's isSettingTilladt, so callers never need to separately check a loading flag to avoid a flash of gated content before the real value is known. */
   useUserIdent: boolean;
   /** Whether departmentId's department_settings has use_vehicle_ident = true — gates every "Køretøj-ID" row/column. Same fail-closed behavior as useUserIdent. */
   useVehicleIdent: boolean;

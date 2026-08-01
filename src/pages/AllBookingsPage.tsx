@@ -45,7 +45,7 @@ type Booking = {
 export function AllBookingsPage() {
   const { afdelingId } = useAuth();
   const navigate = useNavigate();
-  /** Whether afdelingId's department shows "Ansat-ID" (vs. plain "Bruger"/E-mail) in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, this one never fully disappears when off: a booking's user is core information, not an optional extra, so it reverts to the pre-feature "Bruger"/E-mail display instead (see the label/value swaps below). */
+  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, this one never fully disappears when off: a booking's user is core information, not an optional extra, so it reverts to the pre-feature "Bruger"/E-mail display instead (see the label/value swaps below). */
   const { useUserIdent } = useIdentSettings(afdelingId);
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -197,7 +197,7 @@ export function AllBookingsPage() {
                         <>
                           <p className="mb-2">Du kan her udvælge reservationer på disse kriterier:</p>
                           <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            {useUserIdent ? "Ansat-ID" : "Bruger"}
+                            {useUserIdent ? "Bruger-ID" : "Bruger"}
                             <select
                               value={filterUser}
                               onChange={(e) => setFilterUser(e.target.value)}
@@ -261,7 +261,7 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Not table-fixed: Periode/Ansat-ID (or Bruger)/Lås/Online are all w-px
+                {/* Not table-fixed: Periode/Bruger-ID (or Bruger)/Lås/Online are all w-px
                     (shrink to their actual content, same trick as
                     VehiclesPage.tsx's own Lås/Online columns — only
                     meaningful under table-layout:auto, table-fixed ignores
@@ -275,7 +275,7 @@ export function AllBookingsPage() {
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">{useUserIdent ? "Ansat-ID" : "Bruger"}</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">{useUserIdent ? "Bruger-ID" : "Bruger"}</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>

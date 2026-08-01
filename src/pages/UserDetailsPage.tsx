@@ -18,7 +18,7 @@ type ProfileRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
-  /** Company-wide "Ansat-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, shown/edited separately from E-mail. */
+  /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, shown/edited separately from E-mail. */
   user_ident: string | null;
   department_name: string | null;
   role: string;
@@ -74,7 +74,7 @@ type DepartmentOption = { department_id: string; name: string };
  */
 export function UserDetailsPage() {
   const { session, profile, costumerId, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows the "Ansat-ID:" row below at all — see useIdentSettings' own doc comment. */
+  /** Whether afdelingId's department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
@@ -87,7 +87,7 @@ export function UserDetailsPage() {
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  /** Company-wide "Ansat-ID" identifier — optional (unlike name/email/phone, not required to save). */
+  /** Company-wide "Bruger-ID" identifier — optional (unlike name/email/phone, not required to save). */
   const [userIdent, setUserIdent] = useState(user?.user_ident ?? "");
   // No default department when there's a real choice to make (2+ options) —
   // the admin must explicitly pick one from the dropdown. Auto-filled (and
@@ -643,7 +643,7 @@ export function UserDetailsPage() {
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                   {useUserIdent && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="text-sm font-medium text-brand-700">Ansat-ID:</label>
+                      <label className="text-sm font-medium text-brand-700">Bruger-ID:</label>
                       <input
                         type="text"
                         value={userIdent}

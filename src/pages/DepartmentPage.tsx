@@ -12,7 +12,7 @@ type ProfileRow = {
   email: string | null;
   full_name: string | null;
   phone: string | null;
-  /** Company-wide "Ansat-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, edited on UserDetailsPage. */
+  /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, edited on UserDetailsPage. */
   user_ident: string | null;
   department_id: string | null;
   department_name: string | null;
@@ -52,9 +52,9 @@ export function DepartmentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
-  /** Whether afdelingId's department shows the "Ansat-ID" column below at all — see useIdentSettings' own doc comment. */
+  /** Whether afdelingId's department shows the "Bruger-ID" column below at all — see useIdentSettings' own doc comment. */
   const { useUserIdent } = useIdentSettings(afdelingId);
-  /** Column count for this table right now — 5 with the Ansat-ID column shown, 4 without. Drives every colSpan below so the loading/error/empty rows still span the table's full width either way. */
+  /** Column count for this table right now — 5 with the Bruger-ID column shown, 4 without. Drives every colSpan below so the loading/error/empty rows still span the table's full width either way. */
   const columnCount = useUserIdent ? 5 : 4;
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
@@ -143,7 +143,7 @@ export function DepartmentPage() {
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">E-mail</th>
                       {useUserIdent && (
-                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Ansat-ID</th>
+                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger-ID</th>
                       )}
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Rolle</th>

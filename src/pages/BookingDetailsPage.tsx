@@ -72,7 +72,7 @@ export function BookingDetailsPage() {
   const location = useLocation();
   const { bookingId } = useParams<{ bookingId: string }>();
   const { profile, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows "Ansat-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx — who a booking belongs to is core information, not an optional extra. */
+  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx — who a booking belongs to is core information, not an optional extra. */
   const { useUserIdent } = useIdentSettings(afdelingId);
   const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
   const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
@@ -266,7 +266,7 @@ export function BookingDetailsPage() {
                   </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">{useUserIdent ? "Ansat-ID" : "Bruger"}:</label>
+                      <label className="flex items-center text-sm font-medium text-brand-700">{useUserIdent ? "Bruger-ID" : "Bruger"}:</label>
                       <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
                     </div>
                   )}
