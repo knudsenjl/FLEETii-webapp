@@ -74,8 +74,6 @@ type DepartmentOption = { department_id: string; name: string };
  */
 export function UserDetailsPage() {
   const { session, profile, costumerId, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. */
-  const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -336,6 +334,8 @@ export function UserDetailsPage() {
     role.trim().length > 0;
 
   const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
+  /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a FLEETii admin editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
+  const { useUserIdent } = useIdentSettings(homeDepartmentId ?? null);
   /** The one department checked "Tilladt" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
   const soleCheckedDepartment =
     userDepartmentIds.size === 1

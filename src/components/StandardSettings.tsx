@@ -286,7 +286,7 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
                       )}
                     </div>
                   </td>
-                  <td className="px-2 py-0.5">
+                  <td className={`px-2 py-0.5 ${setting.inputType === "custom" ? "align-top" : ""}`}>
                     {setting.inputType === "custom" ? (
                       setting.render()
                     ) : setting.inputType === "checkbox" ? (
