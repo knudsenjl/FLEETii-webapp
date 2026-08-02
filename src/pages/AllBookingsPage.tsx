@@ -45,8 +45,8 @@ type Booking = {
 export function AllBookingsPage() {
   const { afdelingId } = useAuth();
   const navigate = useNavigate();
-  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, this one never fully disappears when off: a booking's user is core information, not an optional extra, so it reverts to the pre-feature "Bruger"/E-mail display instead (see the label/value swaps below). */
-  const { useUserIdent } = useIdentSettings(afdelingId);
+  /** Whether afdelingId's department shows "Bruger-ID"/"Køretøj-ID" (vs. plain "Bruger"/E-mail or "Reg.nr") in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, these never fully disappear when off: a booking's user/vehicle is core information, not an optional extra, so they revert to the pre-feature display instead (see the label/value swaps below). */
+  const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -59,6 +59,10 @@ export function AllBookingsPage() {
   >([]);
   /** Which of the listed bookings' vehicles are currently locked (vehicle_signals.locked), keyed by vehicleId — same bulk-fetch pattern as VehiclesPage.tsx's own Lås column. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
+  /** The genuine Køretøj-ID/Reg.nr (number_plate) pair per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the new first column below must respect useVehicleIdent. Same bulk-fetch pattern as lockedByVehicleId. */
+  const [identByVehicleId, setIdentByVehicleId] = useState<
+    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
+  >({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -86,6 +90,13 @@ export function AllBookingsPage() {
   );
   const departmentUsers = users.filter((u) => u.department_id === afdelingId);
 
+  // Re-fetches whenever the active department changes (via PageHeader's
+  // "Skift afdeling") — user_profiles' SELECT RLS
+  // (user_profiles_select_admin_own_department) scopes rows to the admin's
+  // CURRENT department, so an empty dependency array left this list (and
+  // the filter popover's "Bruger" dropdown built from it below) stuck
+  // showing whichever department was active on mount — see
+  // DepartmentPage.tsx's identical fix.
   useEffect(() => {
     supabase
       .from("user_profiles")
@@ -100,7 +111,7 @@ export function AllBookingsPage() {
           ),
         );
       });
-  }, []);
+  }, [afdelingId]);
 
   /** Fetches every not-yet-ended booking (across all departments — filtered client-side to the admin's own department below) and replaces `bookings`. Called on mount. */
   const loadBookings = async () => {
@@ -147,6 +158,34 @@ export function AllBookingsPage() {
       .then(({ data }) => {
         if (cancelled) return;
         setLockedByVehicleId(Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.locked])));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bookings]);
+
+  /** Bulk-loads the new first column's Køretøj-ID/Reg.nr pair for every distinct vehicle among the loaded bookings in one query — same pattern as the lockedByVehicleId effect above. */
+  useEffect(() => {
+    const vehicleIds = Array.from(new Set(bookings.map((b) => b.vehicle)));
+    if (vehicleIds.length === 0) {
+      setIdentByVehicleId({});
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id, vehicle_ident, number_plate")
+      .in("vehicle_id", vehicleIds)
+      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setIdentByVehicleId(
+          Object.fromEntries(
+            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
+          ),
+        );
       });
 
     return () => {
@@ -261,11 +300,11 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Not table-fixed: Periode/Bruger-ID (or Bruger)/Lås/Online are all w-px
-                    (shrink to their actual content, same trick as
+                {/* Not table-fixed: Bruger/Køretøj (or Reg.nr)/Periode/Lås/Online
+                    are all w-px (shrink to their actual content, same trick as
                     VehiclesPage.tsx's own Lås/Online columns — only
                     meaningful under table-layout:auto, table-fixed ignores
-                    content entirely). Køretøj has none of these — combined
+                    content entirely). Model has none of these — combined
                     with `truncate` (which exempts it from contributing its
                     full intrinsic width to the auto-layout algorithm), it
                     absorbs whatever space the others leave over, same end
@@ -273,9 +312,10 @@ export function AllBookingsPage() {
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">{useVehicleIdent ? "Køretøj" : "Reg.nr"}</th>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">{useUserIdent ? "Bruger-ID" : "Bruger"}</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
@@ -283,17 +323,17 @@ export function AllBookingsPage() {
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={6} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={6} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={6} className="px-2 py-3 text-center text-brand-500">
                           {filterUser || filterVehicle
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
@@ -325,22 +365,29 @@ export function AllBookingsPage() {
                             }`}
                           >
                             <td
-                              className="truncate border-r border-brand-100 px-2 py-0.5 font-medium"
-                              title={formatVehicleLabel(booking.vehicle, vehicles)}
+                              className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5"
+                              title={(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? undefined}
                             >
-                              {formatVehicleLabel(booking.vehicle, vehicles)}
+                              {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
+                            </td>
+                            <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
+                              {useVehicleIdent
+                                ? identByVehicleId[booking.vehicle]?.vehicleIdent ||
+                                  identByVehicleId[booking.vehicle]?.numberPlate ||
+                                  "—"
+                                : identByVehicleId[booking.vehicle]?.numberPlate || "—"}
+                            </td>
+                            <td
+                              className="truncate border-r border-brand-100 px-2 py-0.5 font-medium"
+                              title={twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle}
+                            >
+                              {twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle}
                             </td>
                             <td
                               className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right"
                               title={formatBookingPeriod(booking)}
                             >
                               {formatBookingPeriod(booking, true)}
-                            </td>
-                            <td
-                              className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5"
-                              title={(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? undefined}
-                            >
-                              {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
                               {(lockedByVehicleId[booking.vehicle] ?? true) && (

@@ -52,10 +52,10 @@ export function DepartmentPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
-  /** Whether afdelingId's department shows the "Bruger-ID" column below at all — see useIdentSettings' own doc comment. */
+  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — see useIdentSettings' own doc comment. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears (a user's identity is core information), only its value source swaps. */
   const { useUserIdent } = useIdentSettings(afdelingId);
-  /** Column count for this table right now — 5 with the Bruger-ID column shown, 4 without. Drives every colSpan below so the loading/error/empty rows still span the table's full width either way. */
-  const columnCount = useUserIdent ? 5 : 4;
+  /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
+  const columnCount = 4;
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,11 +140,8 @@ export function DepartmentPage() {
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">E-mail</th>
-                      {useUserIdent && (
-                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger-ID</th>
-                      )}
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Rolle</th>
                     </tr>
@@ -188,11 +185,10 @@ export function DepartmentPage() {
                                 : "bg-white text-brand-700 hover:bg-brand-50"
                             }`}
                           >
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
+                              {(useUserIdent ? user.user_ident || user.email : user.email) ?? "—"}
+                            </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.email ?? "—"}</td>
-                            {useUserIdent && (
-                              <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.user_ident ?? "—"}</td>
-                            )}
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">
                               {user.deleted_at ? (

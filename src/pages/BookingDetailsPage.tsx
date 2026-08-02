@@ -72,8 +72,8 @@ export function BookingDetailsPage() {
   const location = useLocation();
   const { bookingId } = useParams<{ bookingId: string }>();
   const { profile, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx — who a booking belongs to is core information, not an optional extra. */
-  const { useUserIdent } = useIdentSettings(afdelingId);
+  /** Whether afdelingId's department shows the Bruger-ID value (vs. plain E-mail) in the "Bruger:" row below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/DepartmentPage.tsx: the label is always "Bruger", only the value source swaps — who a booking belongs to is core information, not an optional extra. */
+  const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
   const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -89,6 +89,36 @@ export function BookingDetailsPage() {
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin";
+
+  /** The genuine Køretøj-ID/Nummerplade pair for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. */
+  const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{ vehicleIdent: string | null; numberPlate: string | null } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (!booking) return;
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_ident, number_plate")
+      .eq("vehicle_id", booking.vehicle)
+      .maybeSingle<{ vehicle_ident: string | null; number_plate: string | null }>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setVehicleIdentInfo(data ? { vehicleIdent: data.vehicle_ident, numberPlate: data.number_plate } : null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [booking?.vehicle]);
+  /** "Køretøj:" row's identifying text — Køretøj-ID when useVehicleIdent (falling back to Nummerplade if empty), else Nummerplade directly. Falls back to formatVehicleLabel's own plate (which is itself ident-or-plate, ungated) while vehicle_profiles hasn't loaded yet, so the row doesn't flash blank. */
+  const vehicleLabel =
+    booking && vehicleIdentInfo && twoHireVehicle
+      ? `${(useVehicleIdent ? vehicleIdentInfo.vehicleIdent : null) || vehicleIdentInfo.numberPlate || "—"}: ${twoHireVehicle.brand} ${twoHireVehicle.model}`
+      : booking
+        ? formatVehicleLabel(booking.vehicle, vehicles)
+        : "";
 
   /** "Slet reservation" is always shown for role=admin; for role=user, only when Tillad_slet_reservation is true for this department. */
   const [userMayDeleteBooking, setUserMayDeleteBooking] = useState(false);
@@ -266,8 +296,18 @@ export function BookingDetailsPage() {
                   </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">{useUserIdent ? "Bruger-ID" : "Bruger"}:</label>
-                      <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
+                      <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
+                      {booking.userId ? (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/user-details/${booking.userId}`)}
+                          className="text-left text-sm text-accent-600 hover:underline"
+                        >
+                          {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
+                      )}
                     </div>
                   )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
@@ -295,7 +335,17 @@ export function BookingDetailsPage() {
                         </svg>
                       )}
                     </label>
-                    <span className="text-sm text-brand-800">{formatVehicleLabel(booking.vehicle, vehicles)}</span>
+                    {goToVehicleDetails && twoHireVehicle ? (
+                      <button
+                        type="button"
+                        onClick={goToVehicleDetails}
+                        className="text-left text-sm text-accent-600 hover:underline"
+                      >
+                        {vehicleLabel}
+                      </button>
+                    ) : (
+                      <span className="text-sm text-brand-800">{vehicleLabel}</span>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>

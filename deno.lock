@@ -25,6 +25,7 @@
         "npm:leaflet@^1.9.4",
         "npm:nodemailer@^9.0.3",
         "npm:oxlint@^1.71.0",
+        "npm:qr-scanner@^1.4.2",
         "npm:react-dom@^19.2.7",
         "npm:react-router-dom@^7.18.1",
         "npm:react@^19.2.7",

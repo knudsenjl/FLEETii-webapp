@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
@@ -11,7 +12,6 @@ import {
   BOOKINGS_SELECT_COLUMNS,
   USER_ID_COLUMN,
   formatBookingPeriod,
-  formatVehicleLabel,
   mapBookingRow,
   nowIsoString,
   type BookingRow,
@@ -52,6 +52,44 @@ export function BookingsPage() {
   const isAdmin = profile?.role === "admin";
   const departmentBookings = activeBookings.filter((b) => b.departmentId === afdelingId);
   const [nextBooking, ...remainingBookings] = departmentBookings;
+
+  /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in the new first column below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/FleetManagementPage.tsx. */
+  const { useVehicleIdent } = useIdentSettings(afdelingId);
+  /** The genuine Køretøj-ID/Reg.nr pair per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback. Same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. */
+  const [identByVehicleId, setIdentByVehicleId] = useState<
+    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
+  >({});
+
+  useEffect(() => {
+    const vehicleIds = Array.from(new Set(departmentBookings.map((b) => b.vehicle)));
+    if (vehicleIds.length === 0) {
+      setIdentByVehicleId({});
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id, vehicle_ident, number_plate")
+      .in("vehicle_id", vehicleIds)
+      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setIdentByVehicleId(
+          Object.fromEntries(
+            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
+          ),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // departmentBookings itself is intentionally omitted (fresh array every
+    // render) — its content-based vehicleId set (joined below) is what
+    // actually determines whether a re-fetch is needed.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [departmentBookings.map((b) => b.vehicle).join("|")]);
 
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
@@ -103,47 +141,60 @@ export function BookingsPage() {
 
   /**
    * Shared column-header row for both the "next" and "other" booking tables
-   * below. Periode gets a fixed width (sized for its longest possible
-   * content, the short "dd/mm" two-different-days case) — paired with
-   * `table-fixed` on the <table>, this makes Køretøj absorb whatever space
-   * is left over instead of a hardcoded cap, so it truncates dynamically
-   * depending on how much room Periode's actual content needs.
+   * below. Not table-fixed: Køretøj-ID/Reg.nr and Periode are both w-px
+   * (shrink to their actual content, only meaningful under
+   * table-layout:auto — same trick as AllBookingsPage.tsx's own table).
+   * Model has neither — combined with `truncate` on its cells (which
+   * exempts it from contributing its full intrinsic width to the
+   * auto-layout algorithm), it absorbs whatever space the other two leave
+   * over.
    */
   const bookingTableHeaderRow = (
     <tr>
-      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-      <th className="w-44 whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Periode</th>
+      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
+        {useVehicleIdent ? "Køretøj" : "Reg.nr"}
+      </th>
+      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
+      <th className="w-px whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Periode</th>
     </tr>
   );
 
   /** Renders one booking row that navigates to BookingDetailsPage on click (or Enter/Space) — used for both the "next" booking and the "other" bookings list. */
-  const renderBookingRow = (booking: Booking, isAlternate: boolean, onClick: () => void) => (
-    <tr
-      key={booking.id}
-      role="button"
-      tabIndex={0}
-      onClick={onClick}
-      onKeyDown={(e) => {
-        if (e.key === "Enter" || e.key === " ") {
-          e.preventDefault();
-          onClick();
-        }
-      }}
-      className={`cursor-pointer transition ${
-        isAlternate ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100" : "bg-white text-brand-700 hover:bg-brand-50"
-      }`}
-    >
-      <td
-        className="truncate border-r border-brand-100 px-2 py-0.5 font-medium"
-        title={formatVehicleLabel(booking.vehicle, vehicles)}
+  const renderBookingRow = (booking: Booking, isAlternate: boolean, onClick: () => void) => {
+    const twoHireVehicle = vehicles.find((v) => v.vehicleId === booking.vehicle);
+    const modelLabel = twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle;
+    return (
+      <tr
+        key={booking.id}
+        role="button"
+        tabIndex={0}
+        onClick={onClick}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onClick();
+          }
+        }}
+        className={`cursor-pointer transition ${
+          isAlternate ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100" : "bg-white text-brand-700 hover:bg-brand-50"
+        }`}
       >
-        {formatVehicleLabel(booking.vehicle, vehicles)}
-      </td>
-      <td className="whitespace-nowrap px-2 py-0.5 text-right" title={formatBookingPeriod(booking)}>
-        {formatBookingPeriod(booking, true)}
-      </td>
-    </tr>
-  );
+        <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
+          {useVehicleIdent
+            ? identByVehicleId[booking.vehicle]?.vehicleIdent ||
+              identByVehicleId[booking.vehicle]?.numberPlate ||
+              "—"
+            : identByVehicleId[booking.vehicle]?.numberPlate || "—"}
+        </td>
+        <td className="truncate border-r border-brand-100 px-2 py-0.5 font-medium" title={modelLabel}>
+          {modelLabel}
+        </td>
+        <td className="whitespace-nowrap px-2 py-0.5 text-right" title={formatBookingPeriod(booking)}>
+          {formatBookingPeriod(booking, true)}
+        </td>
+      </tr>
+    );
+  };
 
   /** A section title with an inline info "?" button that shows `message` via useTimedFlag, keyed so the "next" and "other" sections' popups don't interfere with each other. */
   const renderSubheader = (title: string, key: "next" | "other", message: string) => (
@@ -193,24 +244,24 @@ export function BookingsPage() {
                 "Vælg denne reservation for at se detaljer eller aflyse reservationen",
               )}
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
-                <table className="w-full table-fixed border-collapse text-[0.7rem]">
+                <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     {bookingTableHeaderRow}
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && !nextBooking && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
                           {canShowNewBookingButton
                             ? "Ingen kommende reservation."
                             : "Anmod administratoren om at lave en reservation til dig."}
@@ -233,24 +284,24 @@ export function BookingsPage() {
                 "Vælg en af disse reservationer for at se detaljer eller aflyse reservationen",
               )}
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
-                <table className="w-full table-fixed border-collapse text-[0.7rem]">
+                <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     {bookingTableHeaderRow}
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && remainingBookings.length === 0 && (
                       <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">Ingen øvrige reservationer.</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Ingen øvrige reservationer.</td>
                       </tr>
                     )}
                     {!loading &&

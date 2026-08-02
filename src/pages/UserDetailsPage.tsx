@@ -79,7 +79,8 @@ export function UserDetailsPage() {
   const { userId } = useParams<{ userId: string }>();
   const stateUser = (location.state as { user?: ProfileRow } | null)?.user ?? null;
   const [fetchedUser, setFetchedUser] = useState<ProfileRow | null>(null);
-  const [userLoading, setUserLoading] = useState(false);
+  /** Starts true whenever a fetch-by-id will actually run (userId present, no stateUser) — NOT just false-by-default. The redirect-on-missing-user effect below and this page's own fetch effect both run in the SAME passive-effects pass on mount; if this started false, the redirect effect would see the pre-fetch "not loading, no user" state and bounce to /department before the fetch's setUserLoading(true) had any chance to take effect for that pass. Every existing caller (DepartmentPage) masked this by always passing router state, so `user` was already truthy and the redirect's `!user` check short-circuited — this only surfaces for a caller that navigates here by id alone (e.g. BookingDetailsPage's "Bruger" link, or a raw bookmark/refresh). */
+  const [userLoading, setUserLoading] = useState(() => Boolean(userId) && !stateUser);
   const user = stateUser ?? fetchedUser;
 
   const [fullName, setFullName] = useState(user?.full_name ?? "");

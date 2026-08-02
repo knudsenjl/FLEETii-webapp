@@ -70,7 +70,7 @@ function ceilToQuarterHour(date: Date): Date {
  */
 export function ReservationPage() {
   const { session, profile, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) below — see useIdentSettings' own doc comment. Same "revert, don't hide" treatment as AllBookingsPage.tsx/BookingDetailsPage.tsx — this is the actual required field for picking who a booking is for, not an optional extra. */
+  /** Whether afdelingId's department shows the Bruger-ID value (vs. plain E-mail) below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/BookingDetailsPage.tsx: the label is always "Bruger", only the value source swaps — this is the actual required field for picking who a booking is for, not an optional extra. */
   const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
@@ -93,6 +93,12 @@ export function ReservationPage() {
   >([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Re-fetches whenever the active department changes (via PageHeader's
+  // "Skift afdeling") — user_profiles' SELECT RLS
+  // (user_profiles_select_admin_own_department) scopes rows to the admin's
+  // CURRENT department, so an empty dependency array left this list (and
+  // the "bruger" dropdown built from it below) stuck showing whichever
+  // department was active on mount — see DepartmentPage.tsx's identical fix.
   useEffect(() => {
     supabase
       .from("user_profiles")
@@ -111,7 +117,7 @@ export function ReservationPage() {
           ),
         );
       });
-  }, []);
+  }, [afdelingId]);
 
   /** Loads the "Anvendelse" dropdown's options as the union of the user's own department's list (department_settings) and their personal extra options (user_settings) — see fetchSettingUnion. ANDET_VALUE is always sorted to the end, regardless of where it sits in the stored array. */
   useEffect(() => {
@@ -410,7 +416,7 @@ export function ReservationPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      {useUserIdent ? "Bruger-ID" : "Bruger"} {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
+                      Bruger {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
                     {profile?.role === "admin" ? (
                       <select

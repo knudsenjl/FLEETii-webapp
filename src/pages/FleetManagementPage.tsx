@@ -5,6 +5,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { LeafletMap } from "../components/LeafletMap";
+import { useIdentSettings } from "../hooks/useIdentSettings";
+import { supabase } from "../lib/supabase";
 import { toDisplayVehicle } from "../lib/bookings";
 
 /** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
@@ -26,6 +28,51 @@ export function FleetManagementPage() {
   );
   const [primary, ...rest] = departmentGpsPositions;
   const center = primary ?? DENMARK_CENTER;
+
+  /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in each marker's tooltip below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx: vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire) is an UNGATED vehicle_ident-or-number_plate fallback, so it can't be reused directly here — the genuine pair is fetched straight from vehicle_profiles instead. */
+  const { useVehicleIdent } = useIdentSettings(afdelingId);
+  /** The genuine Køretøj-ID/Reg.nr pair per department vehicle, keyed by vehicleId — same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. */
+  const [identByVehicleId, setIdentByVehicleId] = useState<
+    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
+  >({});
+
+  useEffect(() => {
+    const vehicleIds = Array.from(new Set(departmentGpsPositions.map((g) => g.vehicleId)));
+    if (vehicleIds.length === 0) {
+      setIdentByVehicleId({});
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id, vehicle_ident, number_plate")
+      .in("vehicle_id", vehicleIds)
+      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setIdentByVehicleId(
+          Object.fromEntries(
+            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
+          ),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // departmentGpsPositions itself is intentionally omitted from the
+    // dependency array (it's a fresh array/object every render) — its
+    // content-based vehicleId set is what actually determines whether a
+    // re-fetch is needed, same reasoning as LeafletMap.tsx's extraMarkersKey.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [departmentGpsPositions.map((g) => g.vehicleId).join("|")]);
+
+  /** Køretøj-ID/Reg.nr tooltip text for one vehicle — falls back to "—" only if vehicle_profiles hasn't loaded yet for it. */
+  const vehicleTooltip = (vehicleId: string): string =>
+    (useVehicleIdent
+      ? identByVehicleId[vehicleId]?.vehicleIdent || identByVehicleId[vehicleId]?.numberPlate
+      : identByVehicleId[vehicleId]?.numberPlate) || "—";
 
   // Shows immediately when the department has no vehicles, then auto-hides
   // after 3s (rather than staying up indefinitely).
@@ -74,12 +121,12 @@ export function FleetManagementPage() {
                   lng={center.lng}
                   zoom={primary ? 13 : 7}
                   showMarker={Boolean(primary)}
-                  markerTooltip={primary ? twoHireVehicles.find((v) => v.vehicleId === primary.vehicleId)?.plate : undefined}
+                  markerTooltip={primary ? vehicleTooltip(primary.vehicleId) : undefined}
                   onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}
                   extraMarkers={rest.map((g) => ({
                     lat: g.lat,
                     lng: g.lng,
-                    tooltip: twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.plate,
+                    tooltip: vehicleTooltip(g.vehicleId),
                     onClick: () => goToVehicleDetails(g.vehicleId),
                   }))}
                   cluster
