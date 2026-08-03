@@ -15,6 +15,8 @@ type ProfileRow = {
   /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, edited on UserDetailsPage. */
   user_ident: string | null;
   department_id: string | null;
+  /** Fed through to UserDetailsPage via router state so its own targetCostumerId can resolve to this user's OWN costumer (not the viewing admin's) when editing — needed for a FLEETii admin editing a user outside their (former) home costumer. */
+  costumer_id: string | null;
   department_name: string | null;
   role: string;
   /** Set once "Bloker brugers adgang" has been used — see UserDetailsPage's own doc comment. Blocked users stay listed here (not hidden) so they can be reopened and unblocked. */
@@ -29,6 +31,7 @@ type ProfileQueryRow = {
   phone: string | null;
   user_ident: string | null;
   department_id: string | null;
+  costumer_id: string | null;
   role: string;
   deleted_at: string | null;
   departments: { name: string } | null;
@@ -48,7 +51,7 @@ type ProfileQueryRow = {
  * need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { afdeling, afdelingId } = useAuth();
+  const { afdeling, afdelingId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
@@ -74,7 +77,7 @@ export function DepartmentPage() {
       const { data, error: fetchError } = await supabase
         .from("user_profiles")
         .select(
-          "user_id, email, full_name, phone, user_ident, department_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
+          "user_id, email, full_name, phone, user_ident, department_id, costumer_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
         )
         .order("full_name", { ascending: true })
         .returns<ProfileQueryRow[]>();
@@ -102,7 +105,12 @@ export function DepartmentPage() {
     // refresh.
   }, [afdelingId]);
 
-  const departmentUsers = users.filter((u) => u.department_id === afdelingId);
+  // A FLEETii admin sees every user platform-wide (loadUsers' own SELECT
+  // already returns them all, per user_profiles_select_allow_fleetii_admin.sql)
+  // rather than being filtered down to a single department they may no
+  // longer even have — matching this page's own doc comment above.
+  const departmentUsers =
+    profile?.role === "FLEETii admin" ? users : users.filter((u) => u.department_id === afdelingId);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">

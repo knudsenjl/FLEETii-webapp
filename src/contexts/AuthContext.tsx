@@ -52,16 +52,24 @@ type ProfileRow = {
   departments: { name: string; costumers: { name: string; deactivated_at: string | null } | null } | null;
 };
 
-/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). */
+/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). For a FLEETii admin, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName is only ever populated on that branch, letting PageHeader.tsx disambiguate same-named departments across different costumers. */
 export interface DepartmentOption {
   department_id: string;
   name: string;
+  costumerName?: string | null;
 }
 
 /** Raw shape of a user_departments row as selected by loadAvailableDepartments, with the department's name embedded via FK. */
 type UserDepartmentRow = {
   department_id: string;
   departments: { name: string } | null;
+};
+
+/** Raw shape of a departments row as selected by loadAvailableDepartments' FLEETii-admin branch, with its costumer's name embedded via FK. */
+type AllDepartmentsRow = {
+  department_id: string;
+  name: string;
+  costumers: { name: string } | null;
 };
 
 /** Shape of the value exposed by useAuth(). */
@@ -79,8 +87,8 @@ interface AuthContextValue {
   costumerId: string | null;
   /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by "Skift afdeling" (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
   availableDepartments: DepartmentOption[];
-  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. */
-  switchDepartment: (departmentId: string) => Promise<string | null>;
+  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A FLEETii admin may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (PageHeader.tsx never offers an "Alle" entry to switch to for them). */
+  switchDepartment: (departmentId: string | null) => Promise<string | null>;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
   /** True if this account was created with the shared default password and hasn't set a real one yet (see create-user.mts/SetPasswordPage.tsx). ProtectedRoute forces such a session to /set-password before anything else. */
@@ -188,8 +196,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   };
 
-  /** Fetches the departments the given user is allowed to switch into (user_departments, joined with departments for the display name). Returns [] (and logs) on any Supabase error, same degrade-gracefully approach as loadProfile. */
-  const loadAvailableDepartments = async (userId: string): Promise<DepartmentOption[]> => {
+  /** Fetches the departments the given user is allowed to switch into. A FLEETii admin has no personal user_departments grants (platform-wide role, intentionally cleared — see the "let FLEETii admin operate unscoped" work) — for them alone, this returns EVERY department platform-wide instead, each carrying its own costumer's name (PageHeader.tsx shows "Kunde / Afdeling" for these, disambiguating same-named departments across costumers); switching into one of these goes through switch-department.mts rather than the direct update every other role uses (see switchDepartment below), since the column-scoped GRANT backing that direct update can never touch costumer_id. Returns [] (and logs) on any Supabase error, same degrade-gracefully approach as loadProfile. */
+  const loadAvailableDepartments = async (userId: string, role: string | null): Promise<DepartmentOption[]> => {
+    if (role === "FLEETii admin") {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("department_id, name, costumers(name)")
+        .order("name", { ascending: true })
+        .returns<AllDepartmentsRow[]>();
+      if (error) {
+        console.error("[AuthContext] departments select failed:", error);
+        return [];
+      }
+      return (data ?? []).map((row) => ({
+        department_id: row.department_id,
+        name: row.name,
+        costumerName: row.costumers?.name ?? null,
+      }));
+    }
+
     const { data, error } = await supabase
       .from("user_departments")
       .select("department_id, departments(name)")
@@ -248,7 +273,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void supabase.auth.signOut();
         return;
       }
-      const departments = newSession ? await loadAvailableDepartments(newSession.user.id) : [];
+      const departments = newSession ? await loadAvailableDepartments(newSession.user.id, next.profile?.role ?? null) : [];
       if (!mounted || requestId !== latestRequestId) return;
       setSession(newSession);
       setProfile(next.profile);
@@ -435,7 +460,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const next = data.session
       ? await loadProfile(data.session.user.id)
       : { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
-    const departments = data.session ? await loadAvailableDepartments(data.session.user.id) : [];
+    const departments = data.session ? await loadAvailableDepartments(data.session.user.id, next.profile?.role ?? null) : [];
     setSession(data.session);
     setProfile(next.profile);
     setAfdeling(next.afdeling);
@@ -445,21 +470,55 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Switches the user's active department by updating user_profiles.department_id
-   * directly (RLS restricts this to the department_id column and to a value
-   * present in the user's own user_departments grants — see
-   * user_profiles_update_own_department.sql — so an already-revoked or
-   * foreign department_id is rejected server-side, not just skipped
-   * client-side). Re-loads profile/afdeling/costumerName on success so
+   * Switches the user's active department. A FLEETii admin goes through
+   * switch-department.mts (a service-role-backed Netlify Function) instead
+   * of the direct update below — that function also updates costumer_id to
+   * match the target department's own, which a FLEETii admin genuinely
+   * needs (they may switch into a department under a completely different
+   * costumer) but the direct path below structurally cannot do (its GRANT
+   * only ever covers the department_id column — see
+   * user_profiles_update_own_department.sql) and which no user_departments
+   * grant exists for anyway (a FLEETii admin's grants are intentionally
+   * empty — see the "let FLEETii admin operate unscoped" work). A FLEETii
+   * admin may also pass departmentId as null — "Alle" (PageHeader.tsx's own
+   * pseudo-entry) — which the function treats as "clear back to unscoped"
+   * rather than a specific department; every other role keeps updating
+   * user_profiles.department_id directly (RLS restricts this to the
+   * department_id column and to a value present in the user's own
+   * user_departments grants — see user_profiles_update_own_department.sql
+   * — so an already-revoked or foreign department_id is rejected
+   * server-side, not just skipped client-side; null is never passed on this
+   * path since PageHeader never offers "Alle" to a non-FLEETii-admin).
+   * Re-loads profile/afdeling/costumerName on success either way, so
    * PageHeader and every afdelingId comparison update immediately.
    */
-  const switchDepartment = async (departmentId: string): Promise<string | null> => {
+  const switchDepartment = async (departmentId: string | null): Promise<string | null> => {
     if (!session) return "Ikke logget ind.";
-    const { error: updateError } = await supabase
-      .from("user_profiles")
-      .update({ department_id: departmentId })
-      .eq("user_id", session.user.id);
-    if (updateError) return updateError.message;
+
+    if (profile?.role === "FLEETii admin") {
+      try {
+        const response = await fetch("/.netlify/functions/switch-department", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ departmentId }),
+        });
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok) return result.error ?? "Kunne ikke skifte afdeling.";
+      } catch {
+        return "Kunne ikke kontakte serveren. Prøv igen senere.";
+      }
+    } else {
+      if (!departmentId) return "Ugyldig afdeling.";
+      const { error: updateError } = await supabase
+        .from("user_profiles")
+        .update({ department_id: departmentId })
+        .eq("user_id", session.user.id);
+      if (updateError) return updateError.message;
+    }
+
     const next = await loadProfile(session.user.id);
     setProfile(next.profile);
     setAfdeling(next.afdeling);

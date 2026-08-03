@@ -149,13 +149,20 @@ export function VehiclesPage() {
     };
   }, [vehicles]);
 
-  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. FLEETii admin has no afdelingId, so this simply never fires for them, leaving "Alle" selected. */
+  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. A regular admin's afdelingId is always set and always present in departmentOptions (their own single costumer), so this always fires for them. A FLEETii admin's afdelingId becomes null the moment they switch back to "Alle" (PageHeader's own pseudo-entry) — the else branch resets filterDepartment to "" (Alle) to follow that back down, rather than leaving a stale department pick from before the switch. */
   useEffect(() => {
-    if (!afdelingId) return;
-    if (!departmentOptions.some((d) => d.department_id === afdelingId)) return;
+    if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
+      setFilterDepartment(afdelingId);
+    } else if (isFleetiiAdmin) {
+      setFilterDepartment("");
+    }
+  }, [afdelingId, departmentOptions, isFleetiiAdmin]);
 
-    setFilterDepartment(afdelingId);
-  }, [afdelingId, departmentOptions]);
+  /** FLEETii-admin-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Only depends on costumerId (not filterCostumerId itself), so a manual in-page Kunde pick is left alone until the active costumer itself actually changes via "Skift afdeling" — costumerId never changes any other way. Includes the "Alle" case: switching back to it sets costumerId to null, which resets filterCostumerId to "" here too. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+    setFilterCostumerId(costumerId ?? "");
+  }, [isFleetiiAdmin, costumerId]);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">

@@ -67,22 +67,45 @@ function ceilToQuarterHour(date: Date): Date {
  * bypass the department filter there, see its availableVehicles, so it's
  * reachable for reselection) and "Fortryd" (abandons the edit, no DB
  * changes, back to the booking's detail page).
+ *
+ * For a FLEETii admin (no department of their own — see isFleetiiAdmin), an
+ * extra required "Kunde/afdeling" row comes first, letting them pick which
+ * department platform-wide this booking belongs to — every department,
+ * shown as "Kunde / Afdeling" (departmentOptions), same convention as
+ * PageHeader's own "Skift afdeling". That pick is what actually scopes
+ * AvailablePage's vehicle list (not afdelingId, which is null for them) and
+ * is what ConfirmPage eventually writes as the booking's department_id.
+ * Pre-filled to the booking's own current department when editing (via
+ * EditingBooking's departmentId), unset when creating a brand-new one —
+ * "Find ledige"/"Bekræft/skift køretøj" both stay disabled until it's
+ * chosen. The "Bruger" picker is gated on it too: disabled and scoped to
+ * ONLY that department's own users (departmentUsers) rather than every user
+ * platform-wide, and cleared back to unset the moment "Kunde/afdeling"
+ * itself changes (the old pick may not even belong to the new department).
+ * Every other role never sees the "Kunde/afdeling" row at all; their own
+ * afdelingId is used unchanged, exactly as before.
  */
 export function ReservationPage() {
-  const { session, profile, afdelingId } = useAuth();
+  const { session, profile, afdelingId, afdeling, costumerName } = useAuth();
   /** Whether afdelingId's department shows the Bruger-ID value (vs. plain E-mail) below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/BookingDetailsPage.tsx: the label is always "Bruger", only the value source swaps — this is the actual required field for picking who a booking is for, not an optional extra. */
   const { useUserIdent } = useIdentSettings(afdelingId);
   const navigate = useNavigate();
   const location = useLocation();
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
+  const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
+  /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  /** Pre-fills to the booking being edited's own current department (see EditingBooking's departmentId) — otherwise unset, requiring an explicit pick, same as bruger's own editing?.userId prefill just below. */
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(editing?.departmentId ?? "");
+  const [departmentOptions, setDepartmentOptions] = useState<
+    { department_id: string; name: string; costumerName: string | null }[]
+  >([]);
   // bruger is a user_id (uuid) now, not an email (see
   // supabase/bookings_user_to_user_id.sql) — session.user.id is already
   // exactly that for a non-admin booking for themselves. When editing an
   // existing booking, editing.userId (whoever it was originally for) wins
   // over both defaults.
-  const [bruger, setBruger] = useState(
-    editing?.userId ?? (profile?.role === "admin" ? "" : session?.user.id ?? ""),
-  );
+  const [bruger, setBruger] = useState(editing?.userId ?? (isAdmin ? "" : session?.user.id ?? ""));
   const [anvendelseOption, setAnvendelseOption] = useState("");
   const [anvendelseCustom, setAnvendelseCustom] = useState("");
   /** The actual "anvendelse" value used downstream — the selected option, or (when ANDET_VALUE is picked) the user's own free-text reason. */
@@ -119,14 +142,40 @@ export function ReservationPage() {
       });
   }, [afdelingId]);
 
-  /** Loads the "Anvendelse" dropdown's options as the union of the user's own department's list (department_settings) and their personal extra options (user_settings) — see fetchSettingUnion. ANDET_VALUE is always sorted to the end, regardless of where it sits in the stored array. */
+  /** Loads EVERY department platform-wide, each carrying its own costumer's name, for the "Kunde/afdeling" row's select — FLEETii-admin only, same query/shape as AuthContext's loadAvailableDepartments/ConfirmPage's own former version of this effect (departments' and costumers' SELECT RLS are both unrestricted for any authenticated user). */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+
+    let cancelled = false;
+    void supabase
+      .from("departments")
+      .select("department_id, name, costumers(name)")
+      .order("name", { ascending: true })
+      .returns<{ department_id: string; name: string; costumers: { name: string } | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setDepartmentOptions(
+          (data ?? []).map((row) => ({
+            department_id: row.department_id,
+            name: row.name,
+            costumerName: row.costumers?.name ?? null,
+          })),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin]);
+
+  /** Loads the "Anvendelse" dropdown's options as the union of the user's own department's list (department_settings) and their personal extra options (user_settings) — see fetchSettingUnion. ANDET_VALUE is guaranteed present here even if it's missing from BOTH fetched rows (a department created before backfill_and_seed_default_anvendelse.sql, or afdelingId === null — a FLEETii admin sitting on "Alle", see the "let FLEETii admin operate unscoped" work — never resolves a department_settings row to seed it from at all) — the option to type a free-text reason must always exist, not just whenever the DB happens to have been seeded. Always sorted to the end, regardless of where it sits (or whether it was just appended). */
   useEffect(() => {
     void fetchSettingUnion("Anvendelse", profile?.user_id, afdelingId)
+      .then((values) => (values.includes(ANDET_VALUE) ? values : [...values, ANDET_VALUE]))
       .then(sortAnvendelserWithAndetLast)
       .then(setAnvendelseOptions);
   }, [profile?.user_id, afdelingId]);
 
-  const isAdmin = profile?.role === "admin";
   /** Whether a non-admin user may create an open-ended ("Ingen slutdato") reservation, per Tillad_reservation_uden_sluttidspunkt. Admins can always do so regardless — see handleEndIgnoreToggle. */
   const [userMayIgnoreEnd, setUserMayIgnoreEnd] = useState(false);
   const canIgnoreEnd = isAdmin || userMayIgnoreEnd;
@@ -168,7 +217,14 @@ export function ReservationPage() {
     }
   }, [editing, anvendelseOptions]);
 
-  const departmentUsers = users.filter((u) => u.department_id === afdelingId);
+  // A FLEETii admin has no department of their own, so "Bruger" is scoped to
+  // whichever department they picked in "Kunde/afdeling" instead of
+  // afdelingId — empty (and the Bruger select disabled, see above) until
+  // one is chosen, never "every user platform-wide": picking a department
+  // first is what makes the Bruger list meaningful at all.
+  const departmentUsers = isFleetiiAdmin
+    ? users.filter((u) => u.department_id === selectedDepartmentId)
+    : users.filter((u) => u.department_id === afdelingId);
 
   const now = ceilToQuarterHour(new Date());
   const end = new Date(now.getTime() + effectiveDurationMinutes * 60 * 1000);
@@ -362,13 +418,23 @@ export function ReservationPage() {
     const end = endIgnored ? null : `${endDate}T${endTime}:00`;
     const selectedUser = departmentUsers.find((u) => u.user_id === bruger);
     const brugerLabel =
-      profile?.role === "admin"
+      isAdmin
         ? ((useUserIdent ? selectedUser?.user_ident : undefined) || selectedUser?.email) ?? editing?.userLabel ?? ""
         : ((useUserIdent && profile?.user_ident) || profile?.email || session?.user.email) ?? "";
     return { start, end, brugerLabel };
   };
 
-  /** Not editing: the plain "Find ledige" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. */
+  /** Display-ready "Kunde/afdeling" label matching the resolved departmentId below — the picked department's own "Kunde / Afdeling" for a FLEETii admin, or the viewer's own afdeling (with costumerName, when set) for every other role. Same "Kunde / Afdeling" (space-slash-space) format as PageHeader's "Skift afdeling" dropdown and this page's own Kunde/afdeling select just below — not PageHeader's OTHER, no-space "Afdeling:" summary line convention. Resolved here (not re-fetched on ConfirmPage) same as brugerLabel above — passed through router state all the way to ConfirmPage, which shows it as a final, read-only "security check" row before the booking is actually written. */
+  const departmentLabel = isFleetiiAdmin
+    ? (() => {
+        const selected = departmentOptions.find((d) => d.department_id === selectedDepartmentId);
+        return selected ? (selected.costumerName ? `${selected.costumerName} / ${selected.name}` : selected.name) : "";
+      })()
+    : costumerName
+      ? `${costumerName} / ${afdeling ?? ""}`
+      : (afdeling ?? "");
+
+  /** Not editing: the plain "Find ledige" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. departmentId is the RESOLVED target department — the "Kunde/afdeling" pick for a FLEETii admin (validated below, required), or just afdelingId unchanged for every other role — carried all the way through AvailablePage (which scopes its own vehicle list to it) to ConfirmPage (which writes it as the booking's department_id). departmentLabel is its display-ready counterpart, for ConfirmPage's read-only summary row. */
   const handleFindAvailable = () => {
     const { start, end, brugerLabel } = currentPeriod();
     navigate("/available", {
@@ -380,6 +446,8 @@ export function ReservationPage() {
         end,
         editingBookingId: editing?.bookingId,
         editingVehicleId: editing?.vehicleId,
+        departmentId: isFleetiiAdmin ? selectedDepartmentId || null : afdelingId,
+        departmentLabel,
       },
     });
   };
@@ -414,17 +482,50 @@ export function ReservationPage() {
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
+                  {isFleetiiAdmin && (
+                    // FLEETii-admin-only — a FLEETii admin has no department
+                    // of their own, so this booking's target department must
+                    // be picked explicitly before AvailablePage can even show
+                    // a scoped vehicle list.
+                    <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Kunde/afdeling <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <select
+                        value={selectedDepartmentId}
+                        onChange={(e) => {
+                          // Clears the Bruger pick too — the previously
+                          // selected user may not belong to the newly
+                          // chosen department at all (departmentUsers below
+                          // is scoped to it), so keeping the old value would
+                          // silently book on behalf of someone outside the
+                          // department this booking is now being made for.
+                          setSelectedDepartmentId(e.target.value);
+                          setBruger("");
+                        }}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="">Vælg kunde/afdeling</option>
+                        {departmentOptions.map((department) => (
+                          <option key={department.department_id} value={department.department_id}>
+                            {department.costumerName ? `${department.costumerName} / ${department.name}` : department.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Bruger {profile?.role === "admin" && <span className="ml-0.5 text-red-600">*</span>}
+                      Bruger {isAdmin && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
-                    {profile?.role === "admin" ? (
+                    {isAdmin ? (
                       <select
                         value={bruger}
                         onChange={(e) => setBruger(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        disabled={isFleetiiAdmin && !selectedDepartmentId}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:bg-brand-100"
                       >
-                        <option value="">Vælg bruger</option>
+                        <option value="">{isFleetiiAdmin && !selectedDepartmentId ? "Vælg kunde/afdeling først" : "Vælg bruger"}</option>
                         {departmentUsers.map((u) => (
                           <option key={u.user_id} value={u.user_id}>
                             {useUserIdent ? u.user_ident || u.email : u.email}
@@ -579,7 +680,7 @@ export function ReservationPage() {
                   <button
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={!bruger || !anvendelse.trim()}
+                    disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Bekræft/skift køretøj
@@ -597,7 +698,7 @@ export function ReservationPage() {
                   <button
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={!bruger || !anvendelse.trim()}
+                    disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Find ledige

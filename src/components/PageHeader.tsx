@@ -42,7 +42,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
+/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (only when NOT already on it, i.e. afdelingId !== null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
 export function PageHeader() {
   const {
     signOut,
@@ -65,8 +65,11 @@ export function PageHeader() {
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
   const otherDepartments = availableDepartments.filter((d) => d.department_id !== afdelingId);
+  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a FLEETii admin, and only when they're NOT already on it (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. */
+  const canSwitchToAll = profile?.role === "FLEETii admin" && afdelingId !== null;
 
-  const handleSwitch = async (departmentId: string) => {
+  /** departmentId null means "Alle" (see canSwitchToAll/AuthContext's switchDepartment) — the FLEETii admin's own default, unscoped state. */
+  const handleSwitch = async (departmentId: string | null) => {
     setSwitcherOpen(false);
     const error = await switchDepartment(departmentId);
     if (error) {
@@ -145,7 +148,7 @@ export function PageHeader() {
               <button
                 type="button"
                 onClick={() =>
-                  otherDepartments.length === 0
+                  otherDepartments.length === 0 && !canSwitchToAll
                     ? triggerNotImplemented("no-other-departments")
                     : setSwitcherOpen((open) => !open)
                 }
@@ -166,6 +169,15 @@ export function PageHeader() {
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />
                   <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-brand-200 bg-white py-1 text-sm shadow-lg">
+                    {canSwitchToAll && (
+                      <button
+                        type="button"
+                        onClick={() => void handleSwitch(null)}
+                        className="block w-full truncate px-3 py-2 text-left font-medium text-brand-700 transition hover:bg-brand-50"
+                      >
+                        Alle
+                      </button>
+                    )}
                     {otherDepartments.map((department) => (
                       <button
                         key={department.department_id}
@@ -173,7 +185,7 @@ export function PageHeader() {
                         onClick={() => void handleSwitch(department.department_id)}
                         className="block w-full truncate px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
                       >
-                        {department.name}
+                        {department.costumerName ? `${department.costumerName} / ${department.name}` : department.name}
                       </button>
                     ))}
                   </div>
@@ -237,7 +249,8 @@ export function PageHeader() {
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
             Afdeling: {costumerName ? `${costumerName}/` : ""}
-            {afdeling ?? "—"}
+            {/* afdeling is only ever null for a FLEETii admin sitting on "Alle" (see PageHeader's own "Skift afdeling" pseudo-entry) — every other role always has a real department, so "—" (missing data) never actually applies to them. */}
+            {afdeling ?? (profile?.role === "FLEETii admin" ? "Alle" : "—")}
           </p>
         </div>
       )}

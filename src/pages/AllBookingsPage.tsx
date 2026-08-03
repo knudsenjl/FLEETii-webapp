@@ -41,9 +41,18 @@ type Booking = {
  * own bookings, or an admin's own "next booking" home view) — the two share
  * most of their fetch/render logic but haven't been consolidated into one
  * component.
+ *
+ * A FLEETii admin (no department of their own) sees every booking
+ * platform-wide by default, and gets two extra filter fields — Kunde and
+ * Afdeling — to narrow that down, same "Alle" (blank = no scoping)
+ * convention as VehiclesPage.tsx's own Kunde/Afdeling filters. A regular
+ * admin never sees these two fields at all — they're always scoped to
+ * their own single department already.
  */
 export function AllBookingsPage() {
-  const { afdelingId } = useAuth();
+  const { afdelingId, costumerId, profile } = useAuth();
+  /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the Kunde/Afdeling filters below (not just the existing Bruger/Køretøj ones) actually narrow the list down, since departmentBookings otherwise shows every booking platform-wide. */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
   const navigate = useNavigate();
   /** Whether afdelingId's department shows "Bruger-ID"/"Køretøj-ID" (vs. plain "Bruger"/E-mail or "Reg.nr") in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, these never fully disappear when off: a booking's user/vehicle is core information, not an optional extra, so they revert to the pre-feature display instead (see the label/value swaps below). */
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
@@ -66,6 +75,11 @@ export function AllBookingsPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
+  /** FLEETii-admin-only "Kunde"/"Afdeling" filters — a regular admin is always scoped to their own single department already (see departmentBookings below), so these only exist for a FLEETii admin narrowing down the platform-wide list. Same "Alle" (blank = no scoping) convention as VehiclesPage.tsx's own Kunde filter; a FLEETii admin has no costumerId of their own to seed a default from (see the "let FLEETii admin operate unscoped" work), so both simply default to "". */
+  const [filterCostumerId, setFilterCostumerId] = useState("");
+  const [filterDepartment, setFilterDepartment] = useState("");
+  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  const [departmentOptions, setDepartmentOptions] = useState<{ department_id: string; name: string }[]>([]);
   const filterRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,14 +95,87 @@ export function AllBookingsPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterOpen]);
 
-  const departmentBookings = bookings.filter(
-    (b) => afdelingId !== null && vehicles.find((v) => v.vehicleId === b.vehicle)?.departmentIds.includes(afdelingId),
-  );
+  /** Loads every costumer for the FLEETii-admin-only Kunde filter — mirrors VehiclesPage.tsx's own costumerOptions effect. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+
+    let cancelled = false;
+    void supabase
+      .from("costumers")
+      .select("costumer_id, name")
+      .order("name", { ascending: true })
+      .returns<{ costumer_id: string; name: string }[]>()
+      .then(({ data }) => {
+        if (!cancelled) setCostumerOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin]);
+
+  /** Loads the Afdeling filter's own options — every department belonging to filterCostumerId, or (when "Alle" is selected) every department platform-wide, same "Alle: no scoping" meaning as VehiclesPage.tsx's identical effect. FLEETii-admin only; a regular admin never has more than their own single department to begin with. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) {
+      setDepartmentOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const query = supabase.from("departments").select("department_id, name").order("name", { ascending: true });
+    void (filterCostumerId ? query.eq("costumer_id", filterCostumerId) : query)
+      .returns<{ department_id: string; name: string }[]>()
+      .then(({ data }) => {
+        if (!cancelled) setDepartmentOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin, filterCostumerId]);
+
+  /** Syncs the Afdeling filter to the viewer's own active department — every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so this page's own filter follows along, same pattern as VehiclesPage.tsx's identical effect. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual in-page pick is left alone until the active department itself changes again. The else branch resets back to "" ("Alle") the moment afdelingId becomes null — switching back to "Alle" via PageHeader. */
+  useEffect(() => {
+    if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
+      setFilterDepartment(afdelingId);
+    } else if (isFleetiiAdmin) {
+      setFilterDepartment("");
+    }
+  }, [afdelingId, departmentOptions, isFleetiiAdmin]);
+
+  /** Syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, one level up. Only depends on costumerId (not filterCostumerId itself), so a manual in-page Kunde pick is left alone until the active costumer itself actually changes — costumerId never changes any other way. Resets to "" ("Alle") when costumerId goes back to null too. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+    setFilterCostumerId(costumerId ?? "");
+  }, [isFleetiiAdmin, costumerId]);
+
+  // A FLEETii admin sees every booking/user platform-wide by default (they
+  // have no department of their own to scope to) — the underlying
+  // bookings/vehicles/users fetches are already cross-department (SELECT RLS
+  // is unrestricted for bookings/vehicle_profiles, and
+  // user_profiles_select_allow_fleetii_admin.sql already covers users) — but
+  // narrows down to whichever Kunde/Afdeling was picked in the filter below,
+  // same as VehiclesPage.tsx's own Kunde/Afdeling filters. A specific
+  // Afdeling pick always wins over a Kunde pick alone (a department belongs
+  // to exactly one costumer, so it's already the more specific choice);
+  // Kunde alone scopes to every one of that costumer's departments
+  // (departmentOptions is already loaded pre-scoped to it, see the effect
+  // above).
+  const scopedDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
+  const departmentBookings = bookings.filter((b) => {
+    const bookingDepartmentIds = vehicles.find((v) => v.vehicleId === b.vehicle)?.departmentIds ?? [];
+    if (isFleetiiAdmin) {
+      if (filterDepartment) return bookingDepartmentIds.includes(filterDepartment);
+      if (filterCostumerId) return bookingDepartmentIds.some((id) => scopedDepartmentIds.has(id));
+      return true;
+    }
+    return afdelingId !== null && bookingDepartmentIds.includes(afdelingId);
+  });
   const vehicleOptions = Array.from(new Set(departmentBookings.map((b) => b.vehicle))).sort();
   const filteredBookings = departmentBookings.filter(
     (b) => (!filterUser || b.userId === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
-  const departmentUsers = users.filter((u) => u.department_id === afdelingId);
+  const departmentUsers = isFleetiiAdmin ? users : users.filter((u) => u.department_id === afdelingId);
 
   // Re-fetches whenever the active department changes (via PageHeader's
   // "Skift afdeling") — user_profiles' SELECT RLS
@@ -220,7 +307,7 @@ export function AllBookingsPage() {
                       onClick={() => setFilterOpen((prev) => !prev)}
                       aria-label="Filtrer"
                       className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                        filterUser || filterVehicle
+                        filterUser || filterVehicle || filterCostumerId || filterDepartment
                           ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                           : "border-brand-300 text-brand-600 hover:bg-brand-50"
                       }`}
@@ -235,6 +322,43 @@ export function AllBookingsPage() {
                       message={
                         <>
                           <p className="mb-2">Du kan her udvælge reservationer på disse kriterier:</p>
+                          {isFleetiiAdmin && (
+                            <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                              Kunde
+                              <select
+                                value={filterCostumerId}
+                                onChange={(e) => {
+                                  setFilterCostumerId(e.target.value);
+                                  setFilterDepartment("");
+                                }}
+                                className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                              >
+                                <option value="">Alle</option>
+                                {costumerOptions.map((costumer) => (
+                                  <option key={costumer.costumer_id} value={costumer.costumer_id}>
+                                    {costumer.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
+                          {isFleetiiAdmin && (
+                            <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                              Afdeling
+                              <select
+                                value={filterDepartment}
+                                onChange={(e) => setFilterDepartment(e.target.value)}
+                                className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                              >
+                                <option value="">Alle</option>
+                                {departmentOptions.map((department) => (
+                                  <option key={department.department_id} value={department.department_id}>
+                                    {department.name}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          )}
                           <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                             {useUserIdent ? "Bruger-ID" : "Bruger"}
                             <select
@@ -265,12 +389,14 @@ export function AllBookingsPage() {
                               ))}
                             </select>
                           </label>
-                          {(filterUser || filterVehicle) && (
+                          {(filterUser || filterVehicle || filterCostumerId || filterDepartment) && (
                             <button
                               type="button"
                               onClick={() => {
                                 setFilterUser("");
                                 setFilterVehicle("");
+                                setFilterCostumerId("");
+                                setFilterDepartment("");
                               }}
                               className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
                             >
@@ -334,7 +460,7 @@ export function AllBookingsPage() {
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
                         <td colSpan={6} className="px-2 py-3 text-center text-brand-500">
-                          {filterUser || filterVehicle
+                          {filterUser || filterVehicle || filterCostumerId || filterDepartment
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
                         </td>

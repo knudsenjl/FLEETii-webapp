@@ -50,9 +50,15 @@ function isSameDate(a: Date, b: Date): boolean {
  * set), a "Fortryd" button sits alongside "Opdater" — no DB changes, just
  * back to the booking's own detail page, same as ReservationPage's own
  * "Fortryd".
+ *
+ * targetDepartmentId is what actually scopes availableVehicles — afdelingId
+ * directly for a regular admin, or state.departmentId (ReservationPage's own
+ * "Kunde/afdeling" pick) for a FLEETii admin, who has no afdelingId of their
+ * own. Carried through to ConfirmPage unchanged, which writes it as the
+ * booking's department_id.
  */
 export function AvailablePage() {
-  const { afdelingId } = useAuth();
+  const { afdelingId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -64,6 +70,10 @@ export function AvailablePage() {
         end?: string;
         editingBookingId?: string;
         editingVehicleId?: string;
+        /** The RESOLVED target department from ReservationPage — the FLEETii-admin-only "Kunde/afdeling" pick, or just afdelingId unchanged for every other role (see ReservationPage's own doc comment). Scopes availableVehicles below, and is carried through unchanged to ConfirmPage, which writes it as the booking's department_id. */
+        departmentId?: string | null;
+        /** Display-ready counterpart to departmentId — ConfirmPage's read-only "Kunde/afdeling" summary row. Purely pass-through here, same as userLabel. */
+        departmentLabel?: string;
       }
     | null;
   const bruger = state?.user ?? "";
@@ -72,6 +82,8 @@ export function AvailablePage() {
   const editingBookingId = state?.editingBookingId;
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
+  /** For a FLEETii admin, state.departmentId (ReservationPage's own "Kunde/afdeling" pick) is authoritative — they have no afdelingId of their own. Every other role keeps using afdelingId directly, unchanged. */
+  const targetDepartmentId = profile?.role === "FLEETii admin" ? (state?.departmentId ?? null) : afdelingId;
 
   const [bookings, setBookings] = useState<BookingWindow[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
@@ -111,7 +123,11 @@ export function AvailablePage() {
     // the (possibly just-edited) period now genuinely conflicts with a
     // different booking, it correctly won't show, same as any other
     // vehicle.
-    .filter((v) => (afdelingId !== null && v.departmentIds.includes(afdelingId)) || v.vehicleId === state?.editingVehicleId)
+    .filter(
+      (v) =>
+        (targetDepartmentId !== null && v.departmentIds.includes(targetDepartmentId)) ||
+        v.vehicleId === state?.editingVehicleId,
+    )
     .filter((v) => isVehicleAvailable(v.vehicleId, bookings, state?.start ?? null, state?.end ?? null))
     .map((v) => {
       const freePeriod = computeFreePeriod(v.vehicleId, bookings, referenceStart, referenceEnd);
@@ -290,6 +306,8 @@ export function AvailablePage() {
                         start: state?.start,
                         end: state?.end,
                         editingBookingId,
+                        departmentId: targetDepartmentId,
+                        departmentLabel: state?.departmentLabel,
                       },
                     })
                   }

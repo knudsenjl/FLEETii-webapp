@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
-import { useAuth } from "../contexts/AuthContext";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { shortSignalTimestamp } from "../lib/bookings";
 
-/** A department the vehicle could be assigned to — scoped to the admin's own costumer (see the departments-loading effect below). */
+/** A department the vehicle could be assigned to — scoped to the vehicle's OWN costumer, fetched fresh alongside the vehicle's other fields (see vehicleCostumerId / the departments-loading effect below), not the viewer's — a FLEETii admin has no costumer of their own and must still be able to reassign a vehicle belonging to any costumer. */
 type DepartmentOption = { department_id: string; name: string };
 
 /** The DisplayVehicle shape, as passed in via router state from VehicleDetailsPage's "Rediger køretøj" button. Only vehicleId is actually used here — the editable fields (plate/brand/model/year) are fetched fresh from vehicle_profiles on mount instead of trusted from router state, since VehicleDetailsPage's own Vehicle type only carries an already-combined "brand model" display string, not the separate fields this form edits/saves. */
@@ -32,6 +31,7 @@ type VehicleProfileRow = {
   model: string | null;
   model_year: string | null;
   department_id: string | null;
+  costumer_id: string | null;
 };
 
 /**
@@ -40,7 +40,9 @@ type VehicleProfileRow = {
  * Årgang are editable (they're the vehicle_profiles-backed fields an admin
  * actually manages) — loaded fresh from vehicle_profiles by vehicle_id on mount, then
  * saved back via an UPDATE (see supabase/applied/vehicle_profiles_update_policy.sql
- * for the RLS scoping: admin + vehicle in one of their own departments).
+ * and vehicle_profiles_update_allow_fleetii_admin.sql for the RLS scoping:
+ * admin + vehicle in one of their own departments, or FLEETii admin +
+ * any vehicle).
  * Kilometerstand/Brændstofniveau/Status stay read-only since they're live
  * telemetry written by the 2hire webhook — editing them wouldn't persist
  * past the next signal update anyway. Afdeling(er) is the first UI anywhere
@@ -52,7 +54,6 @@ type VehicleProfileRow = {
  * needs). "Fortryd" navigates back to VehicleDetailsPage without saving.
  */
 export function HandleVehiclePage() {
-  const { costumerId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const refreshVehicles = useRefreshVehicles();
@@ -72,6 +73,8 @@ export function HandleVehiclePage() {
 
   /** The vehicle's own "home" department (vehicle_profiles.department_id — see supabase/applied/add_vehicle_profiles_costumer_and_department_fk.sql), selectable via a <select> filtered to departmentOptions the vehicle is actually assigned to (selectedDepartmentIds) below. Null while still loading. */
   const [homeDepartmentId, setHomeDepartmentId] = useState<string | null>(null);
+  /** The vehicle's own current costumer_id (vehicle_profiles.costumer_id), fetched alongside its other fields — the departments-loading effect and handleSave's own update both key off this, NOT the viewer's own costumer, so a FLEETii admin (no costumer of their own) can still edit a vehicle belonging to any costumer without silently reassigning it. Null while still loading. */
+  const [vehicleCostumerId, setVehicleCostumerId] = useState<string | null>(null);
   /** Whether this vehicle's own home department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(homeDepartmentId);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
@@ -96,7 +99,7 @@ export function HandleVehiclePage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, brand, model, model_year, department_id")
+      .select("number_plate, vehicle_ident, brand, model, model_year, department_id, costumer_id")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfileRow>()
       .then(({ data, error }) => {
@@ -112,6 +115,7 @@ export function HandleVehiclePage() {
         setModel(data?.model ?? "");
         setYear(data?.model_year ?? "");
         setHomeDepartmentId(data?.department_id ?? null);
+        setVehicleCostumerId(data?.costumer_id ?? null);
         setLoading(false);
       });
 
@@ -120,9 +124,9 @@ export function HandleVehiclePage() {
     };
   }, [vehicle]);
 
-  /** Loads the admin's own costumer's departments (the assignable options — scoped the same way UserDetailsPage.tsx's own department picker is) and this vehicle's current vehicle_departments rows. */
+  /** Loads the vehicle's OWN costumer's departments (the assignable options — scoped the same way UserDetailsPage.tsx's own department picker is, but keyed off vehicleCostumerId rather than the viewer's costumer) and this vehicle's current vehicle_departments rows. Waits for vehicleCostumerId to have loaded (the fetch effect above) before running. */
   useEffect(() => {
-    if (!vehicle || !costumerId) return;
+    if (!vehicle || !vehicleCostumerId) return;
 
     let cancelled = false;
     setDepartmentsLoading(true);
@@ -132,7 +136,7 @@ export function HandleVehiclePage() {
       supabase
         .from("departments")
         .select("department_id, name")
-        .eq("costumer_id", costumerId)
+        .eq("costumer_id", vehicleCostumerId)
         .order("name", { ascending: true })
         .returns<DepartmentOption[]>(),
       supabase.from("vehicle_departments").select("department_id").eq("vehicle_id", vehicle.vehicleId).returns<
@@ -160,7 +164,7 @@ export function HandleVehiclePage() {
     return () => {
       cancelled = true;
     };
-  }, [vehicle, costumerId]);
+  }, [vehicle, vehicleCostumerId]);
 
   // A costumer with only one department has no real choice to make for
   // either Afdeling(er) or Hjemmeafdeling — self-heal that sole department
@@ -291,7 +295,7 @@ export function HandleVehiclePage() {
         model: trimmedModel,
         model_year: trimmedYear,
         department_id: homeDepartmentId,
-        costumer_id: costumerId,
+        costumer_id: vehicleCostumerId,
       })
       .eq("vehicle_id", vehicle.vehicleId)
       .select("vehicle_id");
@@ -445,7 +449,14 @@ export function HandleVehiclePage() {
                       </div>
                     ))}
                     <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
-                      <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Status:</div>
+                      <div className="flex items-center justify-between whitespace-nowrap border-r border-brand-100 pr-1 font-medium">
+                        Status:
+                        {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. */}
+                        <span
+                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"}`}
+                          title={vehicle.status}
+                        />
+                      </div>
                       <div className="whitespace-nowrap px-1">
                         {vehicle.status}
                         {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}

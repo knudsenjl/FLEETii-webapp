@@ -19,12 +19,18 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * markers. Clicking any marker jumps to VehicleDetailsPage for that vehicle.
  */
 export function FleetManagementPage() {
-  const { afdelingId } = useAuth();
+  const { afdelingId, profile } = useAuth();
   const navigate = useNavigate();
   const gpsPositions = use2hireGPS();
   const twoHireVehicles = use2hireVehicle();
+  // A FLEETii admin sees every vehicle platform-wide (they have no
+  // department of their own to scope to) rather than nothing — the
+  // underlying gpsPositions/twoHireVehicles fetches are already
+  // cross-department (SELECT RLS is unrestricted, qual: true).
   const departmentGpsPositions = gpsPositions.filter(
-    (g) => afdelingId !== null && twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.departmentIds.includes(afdelingId),
+    (g) =>
+      profile?.role === "FLEETii admin" ||
+      (afdelingId !== null && twoHireVehicles.find((v) => v.vehicleId === g.vehicleId)?.departmentIds.includes(afdelingId)),
   );
   const [primary, ...rest] = departmentGpsPositions;
   const center = primary ?? DENMARK_CENTER;

@@ -34,9 +34,21 @@ type ReservationVehicle = {
  * (rather than dropping it), so editingBookingId/editingVehicleId survive
  * the round trip instead of stranding the admin mid-edit. Redirects to the
  * fleet's/own bookings list on success depending on role.
+ *
+ * departmentId (state) is the RESOLVED target department, already picked on
+ * ReservationPage and carried through AvailablePage unchanged — for a
+ * regular admin it's just their own afdelingId; for a FLEETii admin (no
+ * afdelingId of their own) it's whatever they chose in ReservationPage's
+ * own "Kunde/afdeling" row. This page has no department picker of its own —
+ * it just writes whatever arrives here as the booking's department_id.
+ * departmentLabel (its display-ready counterpart) is shown as the summary's
+ * very first row, a final read-only "security check" so whoever's
+ * confirming can double-check the department before "Bekræft" actually
+ * writes it — most useful for a FLEETii admin picking among many, but shown
+ * for every role.
  */
 export function ConfirmPage() {
-  const { session, profile, afdelingId } = useAuth();
+  const { session, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -48,6 +60,9 @@ export function ConfirmPage() {
         start?: string;
         end?: string;
         editingBookingId?: string;
+        departmentId?: string | null;
+        /** Display-ready counterpart to departmentId (ReservationPage's own resolved "Kunde/afdeling" label) — shown as the first summary row below, a final read-only "security check" before the booking is actually written. */
+        departmentLabel?: string;
       }
     | null;
   const vehicle = state?.vehicle ?? null;
@@ -121,8 +136,13 @@ export function ConfirmPage() {
       return;
     }
 
-    if (!afdelingId) {
-      setError("Kunne ikke finde din afdeling. Kontakt en administrator.");
+    // Already resolved on ReservationPage (own afdelingId for a regular
+    // admin, the "Kunde/afdeling" pick for a FLEETii admin) and carried
+    // through AvailablePage unchanged — this is just a defensive backstop
+    // for reaching this page some other way (a raw refresh/bookmark, no
+    // router state at all).
+    if (!state?.departmentId) {
+      setError("Kunne ikke finde afdeling. Start reservationen forfra.");
       setIsSubmitting(false);
       return;
     }
@@ -133,7 +153,7 @@ export function ConfirmPage() {
       end: reservationEnd,
       usage: anvendelse,
       [USER_ID_COLUMN]: bruger || session?.user.id || null,
-      [DEPARTMENT_COLUMN]: afdelingId,
+      [DEPARTMENT_COLUMN]: state.departmentId,
     };
 
     const { error: writeError } = editingBookingId
@@ -155,11 +175,12 @@ export function ConfirmPage() {
       return;
     }
 
-    navigate(profile?.role === "admin" ? "/allbookings" : "/bookings", { replace: true });
+    navigate(profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/allbookings" : "/bookings", { replace: true });
   };
 
-  /** [label, value] — Start/Slut show "dd/mm" (dropping the year). */
+  /** [label, value] — Start/Slut show "dd/mm" (dropping the year). Kunde/afdeling comes first — a final, read-only "security check" confirming which department this booking is actually about to be written to, before "Bekræft" is pressed. */
   const rows: [string, string][] = [
+    ["Kunde/afdeling:", state?.departmentLabel ?? ""],
     ["Reserveret til:", brugerLabel],
     ["Anvendelse:", anvendelse],
     ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`],

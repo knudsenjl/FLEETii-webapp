@@ -21,12 +21,15 @@ type ProfileRow = {
   /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, shown/edited separately from E-mail. */
   user_ident: string | null;
   department_name: string | null;
+  /** This user's own home department/costumer (user_profiles.department_id/costumer_id) — used to scope the departments-loading effect and the isLastAdmin pre-check to the EDITED user's own costumer/department rather than the viewing admin's, so a FLEETii admin (no costumer of their own) can still edit a user belonging to any costumer. */
+  department_id: string | null;
+  costumer_id: string | null;
   role: string;
   /** Set once "Bloker brugers adgang" (delete-user.mts) has been used, cleared by "Genetabler brugers adgang" (unblock-user.mts) — see UserDetailsPage's own doc comment for why blocking is reversible rather than a true delete. */
   deleted_at: string | null;
 };
 
-/** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the admin's own costumer. */
+/** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the target costumer (see targetCostumerId below: the edited user's own costumer when editing, the Kunde filter when a FLEETii admin is creating a new user, or otherwise the viewing admin's own costumer). */
 type DepartmentOption = { department_id: string; name: string };
 
 /**
@@ -63,6 +66,11 @@ type DepartmentOption = { department_id: string; name: string };
  * creation, whatever's in userDepartmentIds (at least the chosen home
  * department, thanks to that self-heal) is inserted for the new user_id.
  *
+ * A FLEETii admin has no costumerId of their own, so creating a brand-new
+ * user (never editing an existing one — see targetCostumerId) shows an
+ * extra, required "Kunde" picker first; nothing else on the page (the
+ * Afdeling(er)/Hjemmeafdeling options) can load until one's chosen.
+ *
  * Reachable at plain "/user-details" (create — no user, matches App.tsx's
  * route with no :userId) or "/user-details/:userId" (edit). Normally reached
  * with the user pre-filled via router state (DepartmentPage's row click),
@@ -73,7 +81,7 @@ type DepartmentOption = { department_id: string; name: string };
  * meant to be an edit, not silently falling into the create form.
  */
 export function UserDetailsPage() {
-  const { session, profile, costumerId, afdelingId } = useAuth();
+  const { session, profile, costumerId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -117,7 +125,7 @@ export function UserDetailsPage() {
     void supabase
       .from("user_profiles")
       .select(
-        "user_id, email, full_name, phone, user_ident, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
+        "user_id, email, full_name, phone, user_ident, department_id, costumer_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
       )
       .eq("user_id", userId)
       .maybeSingle<{
@@ -126,6 +134,8 @@ export function UserDetailsPage() {
         full_name: string | null;
         phone: string | null;
         user_ident: string | null;
+        department_id: string | null;
+        costumer_id: string | null;
         role: string;
         deleted_at: string | null;
         departments: { name: string } | null;
@@ -141,6 +151,8 @@ export function UserDetailsPage() {
                 phone: data.phone,
                 user_ident: data.user_ident,
                 department_name: data.departments?.name ?? null,
+                department_id: data.department_id,
+                costumer_id: data.costumer_id,
                 role: data.role,
                 deleted_at: data.deleted_at,
               }
@@ -188,24 +200,51 @@ export function UserDetailsPage() {
   const [grantsLoading, setGrantsLoading] = useState(true);
   const [grantsError, setGrantsError] = useState<string | null>(null);
 
-  // Scoped to the admin's own costumer (costumerId) — otherwise this listed
-  // every department across every costumer, letting an admin assign a new
-  // user to a department outside their own company.
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, the Kunde picker below is what actually picks the target costumer instead. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const [filterCostumerId, setFilterCostumerId] = useState("");
+  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), the Kunde filter when a FLEETii admin is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
+  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isFleetiiAdmin ? filterCostumerId || null : costumerId;
+
+  /** Loads every costumer for the "Ny bruger" Kunde picker — FLEETii admin, create mode only. */
   useEffect(() => {
-    if (!costumerId) {
+    if (user || !isFleetiiAdmin) return;
+
+    let cancelled = false;
+    void supabase
+      .from("costumers")
+      .select("costumer_id, name")
+      .order("name", { ascending: true })
+      .returns<{ costumer_id: string; name: string }[]>()
+      .then(({ data }) => {
+        if (!cancelled) setCostumerOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user, isFleetiiAdmin]);
+
+  // Scoped to targetCostumerId, NOT the viewing admin's own costumerId —
+  // otherwise a FLEETii admin editing a user in some other costumer (or
+  // creating one for a costumer picked via the Kunde filter above) would see
+  // either the wrong departments or none at all.
+  useEffect(() => {
+    if (!targetCostumerId) {
       setDepartmentOptions([]);
       return;
     }
     void supabase
       .from("departments")
       .select("department_id, name")
-      .eq("costumer_id", costumerId)
+      .eq("costumer_id", targetCostumerId)
       .order("name", { ascending: true })
       .returns<DepartmentOption[]>()
       .then(({ data }) => {
         setDepartmentOptions(data ?? []);
       });
-  }, [costumerId]);
+  }, [targetCostumerId]);
 
   // A costumer with only one department has no real choice to make — force
   // it and lock the field instead of showing a single-option dropdown.
@@ -275,26 +314,29 @@ export function UserDetailsPage() {
     setUserDepartmentIds((prev) => (prev.has(homeId) ? prev : new Set(prev).add(homeId)));
   }, [department, departmentOptions]);
 
-  // Pre-checks whether this user is the last remaining admin in the
-  // (caller's own) department, so clicking "Arkiver bruger" can show a
-  // warning popup instead of "Er du sikker...?" for an archive delete-user.mts
-  // will reject anyway. Mirrors that function's own guard — this is a UX
-  // pre-check only, not the authorization boundary (the server re-checks it
-  // regardless).
+  // Pre-checks whether this user is the last remaining admin in THEIR OWN
+  // department (user.department_id, not the viewing admin's own afdelingId —
+  // a FLEETii admin viewing/archiving a user outside their own former
+  // department has afdelingId === null, which would otherwise always read
+  // as "not the last admin" regardless of the target's real situation), so
+  // clicking "Arkiver bruger" can show a warning popup instead of "Er du
+  // sikker...?" for an archive delete-user.mts will reject anyway. Mirrors
+  // that function's own guard — this is a UX pre-check only, not the
+  // authorization boundary (the server re-checks it regardless).
   useEffect(() => {
-    if (!user || user.role !== "admin" || !afdelingId) {
+    if (!user || user.role !== "admin" || !user.department_id) {
       setIsLastAdmin(false);
       return;
     }
     void supabase
       .from("user_profiles")
       .select("user_id", { count: "exact", head: true })
-      .eq("department_id", afdelingId)
+      .eq("department_id", user.department_id)
       .eq("role", "admin")
       .is("deleted_at", null)
       .neq("user_id", user.user_id)
       .then(({ count }) => setIsLastAdmin((count ?? 0) === 0));
-  }, [user, afdelingId]);
+  }, [user]);
 
   useEffect(() => {
     const trimmed = email.trim();
@@ -332,7 +374,12 @@ export function UserDetailsPage() {
     emailExists === false &&
     PHONE_PATTERN.test(phone.trim()) &&
     department.trim().length > 0 &&
-    role.trim().length > 0;
+    role.trim().length > 0 &&
+    // A brand-new user needs an explicit Kunde pick when created by a
+    // FLEETii admin — there's no viewer-own costumer to fall back to, and
+    // "no costumer chosen" must block submission rather than silently
+    // creating the user with no departmentOptions at all.
+    (user || !isFleetiiAdmin || Boolean(filterCostumerId));
 
   const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
   /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a FLEETii admin editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
@@ -642,6 +689,33 @@ export function UserDetailsPage() {
                     descendants — aren't clipped when they overflow this
                     box's edge (same fix as RettighederSettings.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
+                  {!user && isFleetiiAdmin && (
+                    // FLEETii-admin-only "Ny bruger" Kunde picker — a
+                    // FLEETii admin has no costumerId of their own, so
+                    // there's no meaningful default here (unlike
+                    // VehiclesPage's "Alle" filter): departmentOptions stays
+                    // empty and canSubmit stays false until a costumer is
+                    // explicitly chosen.
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Kunde: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <select
+                        required
+                        aria-required="true"
+                        value={filterCostumerId}
+                        onChange={(e) => setFilterCostumerId(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="" className="bg-brand-100">Vælg kunde:</option>
+                        {costumerOptions.map((costumer) => (
+                          <option key={costumer.costumer_id} value={costumer.costumer_id}>
+                            {costumer.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   {useUserIdent && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="text-sm font-medium text-brand-700">Bruger-ID:</label>

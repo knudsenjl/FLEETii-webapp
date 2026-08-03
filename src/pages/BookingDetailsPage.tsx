@@ -44,6 +44,8 @@ type BookingDetails = {
   userId: string | null;
   userEmail: string | null;
   userIdent: string | null;
+  /** References departments.department_id — NOT a department name. Threaded into EditingBooking (goToEditBooking below) so ReservationPage's "Kunde/afdeling" picker can pre-fill to this booking's own current department for a FLEETii admin, instead of starting unset. */
+  departmentId: string | null;
 };
 
 /** Fallback map center used when the booked vehicle has no GPS fix. */
@@ -88,7 +90,7 @@ export function BookingDetailsPage() {
   const gpsPositions = use2hireGPS();
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
 
   /** The genuine Køretøj-ID/Nummerplade pair for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. */
   const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{ vehicleIdent: string | null; numberPlate: string | null } | null>(
@@ -209,6 +211,7 @@ export function BookingDetailsPage() {
       startIso: booking.startIso,
       endIso: booking.endIso,
       vehicleId: booking.vehicle,
+      departmentId: booking.departmentId,
     };
     navigate("/reservation", { state: { editing } });
   };
@@ -364,7 +367,16 @@ export function BookingDetailsPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Status:</label>
+                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
+                      Status:
+                      {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. Omitted entirely when twoHireVehicle hasn't loaded (matching the value's own "—" fallback). */}
+                      {twoHireVehicle && (
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${twoHireVehicle.online === "TRUE" ? "bg-green-500" : "bg-red-500"}`}
+                          title={twoHireVehicle.online === "TRUE" ? "Online" : "Offline"}
+                        />
+                      )}
+                    </label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
                       {twoHireVehicle?.onlineUpdatedAt

@@ -81,6 +81,9 @@ export type MappedBooking = {
  * this booking's own current vehicle bypass the department filter (see
  * AvailablePage's availableVehicles) even if it isn't in the vehicle list
  * the editing admin would otherwise see. userLabel is display-only.
+ * departmentId pre-fills ConfirmPage's FLEETii-admin-only "Kunde/afdeling"
+ * picker with this booking's own current department, rather than forcing a
+ * re-pick from the full platform-wide list on every edit.
  */
 export type EditingBooking = {
   bookingId: string;
@@ -90,6 +93,7 @@ export type EditingBooking = {
   startIso: string;
   endIso: string | null;
   vehicleId: string;
+  departmentId: string | null;
 };
 
 /** Splits an ISO datetime into a Danish "dd.mm.yyyy" date and an "HH:mm" time. Tolerates a bare date (no "T") or an empty string by falling back to an empty time instead of throwing. */

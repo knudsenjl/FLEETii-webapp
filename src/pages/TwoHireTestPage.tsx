@@ -195,7 +195,16 @@ export function TwoHireTestPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Status:</label>
+                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
+                      Status:
+                      {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. Omitted entirely when twoHireVehicle hasn't loaded (matching the value's own "—" fallback). */}
+                      {twoHireVehicle && (
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${twoHireVehicle.online === "TRUE" ? "bg-green-500" : "bg-red-500"}`}
+                          title={twoHireVehicle.online === "TRUE" ? "Online" : "Offline"}
+                        />
+                      )}
+                    </label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
                       {twoHireVehicle?.onlineUpdatedAt

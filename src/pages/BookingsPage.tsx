@@ -49,7 +49,7 @@ export function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const isAdmin = profile?.role === "admin";
+  const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
   const departmentBookings = activeBookings.filter((b) => b.departmentId === afdelingId);
   const [nextBooking, ...remainingBookings] = departmentBookings;
 
