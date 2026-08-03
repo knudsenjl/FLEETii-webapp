@@ -7,6 +7,7 @@ import {
   BOOKING_ID_COLUMN,
   BOOKINGS_SELECT_COLUMNS,
   formatBookingPeriod,
+  formatVehicleIdentLabel,
   formatVehicleLabel,
   isMapVisible,
   isoPrefix,
@@ -114,10 +115,10 @@ export function BookingDetailsPage() {
       cancelled = true;
     };
   }, [booking?.vehicle]);
-  /** "Køretøj:" row's identifying text — Køretøj-ID when useVehicleIdent (falling back to Nummerplade if empty), else Nummerplade directly. Falls back to formatVehicleLabel's own plate (which is itself ident-or-plate, ungated) while vehicle_profiles hasn't loaded yet, so the row doesn't flash blank. */
+  /** "Køretøj:" row's identifying text — "{ident} / {plate}: {brand} {model}" (see formatVehicleIdentLabel) when useVehicleIdent and vehicle_ident are both set, else just "{plate}: {brand} {model}". Falls back to formatVehicleLabel's own plate (which is itself ident-or-plate, ungated) while vehicle_profiles hasn't loaded yet, so the row doesn't flash blank. */
   const vehicleLabel =
     booking && vehicleIdentInfo && twoHireVehicle
-      ? `${(useVehicleIdent ? vehicleIdentInfo.vehicleIdent : null) || vehicleIdentInfo.numberPlate || "—"}: ${twoHireVehicle.brand} ${twoHireVehicle.model}`
+      ? `${formatVehicleIdentLabel(vehicleIdentInfo.vehicleIdent, vehicleIdentInfo.numberPlate, useVehicleIdent)}: ${twoHireVehicle.brand} ${twoHireVehicle.model}`
       : booking
         ? formatVehicleLabel(booking.vehicle, vehicles)
         : "";

@@ -12,6 +12,7 @@ import {
   BOOKINGS_SELECT_COLUMNS,
   USER_ID_COLUMN,
   formatBookingPeriod,
+  formatVehicleIdentLabel,
   mapBookingRow,
   nowIsoString,
   type BookingRow,
@@ -151,9 +152,7 @@ export function BookingsPage() {
    */
   const bookingTableHeaderRow = (
     <tr>
-      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
-        {useVehicleIdent ? "Køretøj" : "Reg.nr"}
-      </th>
+      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
       <th className="w-px whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Periode</th>
     </tr>
@@ -180,11 +179,11 @@ export function BookingsPage() {
         }`}
       >
         <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
-          {useVehicleIdent
-            ? identByVehicleId[booking.vehicle]?.vehicleIdent ||
-              identByVehicleId[booking.vehicle]?.numberPlate ||
-              "—"
-            : identByVehicleId[booking.vehicle]?.numberPlate || "—"}
+          {formatVehicleIdentLabel(
+            identByVehicleId[booking.vehicle]?.vehicleIdent,
+            identByVehicleId[booking.vehicle]?.numberPlate,
+            useVehicleIdent,
+          )}
         </td>
         <td className="truncate border-r border-brand-100 px-2 py-0.5 font-medium" title={modelLabel}>
           {modelLabel}

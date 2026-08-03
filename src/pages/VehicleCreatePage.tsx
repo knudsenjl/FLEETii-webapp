@@ -10,6 +10,7 @@ import { QrScanButton } from "../components/QrScanButton";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
+import { formatVehicleIdentLabel } from "../lib/bookings";
 
 /** A pending "send-vehicle-request" submission — mirrors FleetiiAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
 type CostumerOrder = {
@@ -533,8 +534,11 @@ export function VehicleCreatePage() {
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
-    ...(useVehicleIdent ? ([["Køretøj-ID:", order.vehicle_ident || order.number_plate]] as [string, string][]) : []),
-    ["Nummerplade:", order.number_plate],
+    // Single merged row (was two: "Køretøj-ID:" + "Nummerplade:") —
+    // "{vehicle_ident} - {number_plate}" when this order's department shows
+    // vehicle_ident AND it's actually set, else just number_plate — same
+    // design as VehicleDetailsPage.tsx's own merged "Køretøj:" row.
+    ["Køretøj:", formatVehicleIdentLabel(order.vehicle_ident, order.number_plate, useVehicleIdent)],
     ["Brand:", order.brand ?? "—"],
     ["Mærke:", order.model ?? "—"],
     ["Årgang:", order.model_year ?? "—"],

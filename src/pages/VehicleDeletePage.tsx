@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
+import { formatVehicleIdentLabel } from "../lib/bookings";
 
 /** A pending "Nedlæg" (deletion) costumer_orders row — mirrors VehicleCreatePage.tsx's own CostumerOrder shape/reasoning, for the reverse flow (see costumer_orders_merge_deletion_requests.sql: both order types share this one table now, distinguished by order_type). Normally arrives pre-filled via router state (FleetiiAdministrationPage's "Administration af installationer" table row click), but also fetchable by id alone so "/vehicle-delete/:orderId" works as a direct link (the email's own link). */
 type VehicleDeletionOrder = {
@@ -248,8 +249,11 @@ export function VehicleDeletePage() {
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
-    ...(useVehicleIdent ? ([["Køretøj-ID:", vehicleIdent || order.number_plate]] as [string, string][]) : []),
-    ["Nummerplade:", order.number_plate],
+    // Single merged row (was two: "Køretøj-ID:" + "Nummerplade:") —
+    // "{vehicle_ident} - {number_plate}" when this order's department shows
+    // vehicle_ident AND it's actually set, else just number_plate — same
+    // design as VehicleDetailsPage.tsx's own merged "Køretøj:" row.
+    ["Køretøj:", formatVehicleIdentLabel(vehicleIdent, order.number_plate, useVehicleIdent)],
     ["Brand:", order.brand],
     ["Mærke:", order.model],
     ["Årgang:", order.model_year],

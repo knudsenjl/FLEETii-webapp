@@ -7,7 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { LeafletMap } from "../components/LeafletMap";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
-import { toDisplayVehicle } from "../lib/bookings";
+import { formatVehicleIdentLabel, toDisplayVehicle } from "../lib/bookings";
 
 /** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
@@ -74,11 +74,9 @@ export function FleetManagementPage() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [departmentGpsPositions.map((g) => g.vehicleId).join("|")]);
 
-  /** Køretøj-ID/Reg.nr tooltip text for one vehicle — falls back to "—" only if vehicle_profiles hasn't loaded yet for it. */
+  /** Køretøj-ID/Reg.nr tooltip text for one vehicle — "{ident} / {plate}" or just plate, same combined semantics as formatVehicleIdentLabel everywhere else; falls back to "—" only if vehicle_profiles hasn't loaded yet for it. */
   const vehicleTooltip = (vehicleId: string): string =>
-    (useVehicleIdent
-      ? identByVehicleId[vehicleId]?.vehicleIdent || identByVehicleId[vehicleId]?.numberPlate
-      : identByVehicleId[vehicleId]?.numberPlate) || "—";
+    formatVehicleIdentLabel(identByVehicleId[vehicleId]?.vehicleIdent, identByVehicleId[vehicleId]?.numberPlate, useVehicleIdent);
 
   // Shows immediately when the department has no vehicles, then auto-hides
   // after 3s (rather than staying up indefinitely).

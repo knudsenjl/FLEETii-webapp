@@ -335,6 +335,25 @@ export function formatVehicleLabel(vehicleId: string, vehicles: VehicleLookup[])
   return match ? `${match.plate}: ${match.brand} ${match.model}` : vehicleId;
 }
 
+/**
+ * Formats the shared vehicle-identifier display used across every booking/
+ * fleet list page and the "Køretøj:" detail rows — "{vehicle_ident} /
+ * {number_plate}" when useVehicleIdent is true and vehicle_ident is
+ * actually set, else just number_plate (or "—" if even that's missing).
+ * Combines both rather than swapping between them (same design as
+ * VehicleDetailsPage.tsx's own merged "Køretøj:" row) — a plate is always
+ * shown, vehicle_ident only ever adds to it, never replaces it.
+ */
+export function formatVehicleIdentLabel(
+  vehicleIdent: string | null | undefined,
+  numberPlate: string | null | undefined,
+  useVehicleIdent: boolean,
+): string {
+  const plate = numberPlate?.trim() || "—";
+  const ident = vehicleIdent?.trim();
+  return useVehicleIdent && ident ? `${ident} / ${plate}` : plate;
+}
+
 /** A single vehicle's live GPS fix. */
 export type GpsPosition = { vehicleId: string; lat: number; lng: number };
 

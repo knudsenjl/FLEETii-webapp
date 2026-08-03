@@ -11,6 +11,7 @@ import {
   VEHICLE_ID_COLUMN,
   computeFreePeriod,
   formatFreePeriod,
+  formatVehicleIdentLabel,
   isVehicleAvailable,
   nowIsoString,
   type BookingWindow,
@@ -215,9 +216,7 @@ export function AvailablePage() {
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
-                        {useVehicleIdent ? "Køretøj" : "Reg.nr"}
-                      </th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Ledig periode</th>
                     </tr>
@@ -267,11 +266,11 @@ export function AvailablePage() {
                             }`}
                           >
                             <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
-                              {useVehicleIdent
-                                ? identByVehicleId[vehicle.id]?.vehicleIdent ||
-                                  identByVehicleId[vehicle.id]?.numberPlate ||
-                                  "—"
-                                : identByVehicleId[vehicle.id]?.numberPlate || "—"}
+                              {formatVehicleIdentLabel(
+                                identByVehicleId[vehicle.id]?.vehicleIdent,
+                                identByVehicleId[vehicle.id]?.numberPlate,
+                                useVehicleIdent,
+                              )}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{vehicle.vehicle}</td>
                             <td className="whitespace-nowrap px-2 py-0.5 text-center">{vehicle.ledigPeriode}</td>

@@ -11,6 +11,7 @@ import { supabase } from "../lib/supabase";
 import {
   BOOKINGS_SELECT_COLUMNS,
   formatBookingPeriod,
+  formatVehicleIdentLabel,
   formatVehicleLabel,
   mapBookingRow,
   nowIsoString,
@@ -54,7 +55,7 @@ export function AllBookingsPage() {
   /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the Kunde/Afdeling filters below (not just the existing Bruger/Køretøj ones) actually narrow the list down, since departmentBookings otherwise shows every booking platform-wide. */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
   const navigate = useNavigate();
-  /** Whether afdelingId's department shows "Bruger-ID"/"Køretøj-ID" (vs. plain "Bruger"/E-mail or "Reg.nr") in the filter and table below — see useIdentSettings' own doc comment. Unlike every other gated row in the app, these never fully disappear when off: a booking's user/vehicle is core information, not an optional extra, so they revert to the pre-feature display instead (see the label/value swaps below). */
+  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) in the filter, and combines Køretøj-ID into the "Køretøj" column below ("{ident} / {plate}" — see formatVehicleIdentLabel) rather than swapping to it — see useIdentSettings' own doc comment. Unlike every other gated row in the app, these never fully disappear when off: a booking's user/vehicle is core information, not an optional extra, so they revert to the pre-feature display instead (see the label/value swaps below). */
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const vehicles = use2hireVehicle();
   const [bookings, setBookings] = useState<Booking[]>([]);
@@ -439,7 +440,7 @@ export function AllBookingsPage() {
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">{useVehicleIdent ? "Køretøj" : "Reg.nr"}</th>
+                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
@@ -497,11 +498,11 @@ export function AllBookingsPage() {
                               {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
                             </td>
                             <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
-                              {useVehicleIdent
-                                ? identByVehicleId[booking.vehicle]?.vehicleIdent ||
-                                  identByVehicleId[booking.vehicle]?.numberPlate ||
-                                  "—"
-                                : identByVehicleId[booking.vehicle]?.numberPlate || "—"}
+                              {formatVehicleIdentLabel(
+                                identByVehicleId[booking.vehicle]?.vehicleIdent,
+                                identByVehicleId[booking.vehicle]?.numberPlate,
+                                useVehicleIdent,
+                              )}
                             </td>
                             <td
                               className="truncate border-r border-brand-100 px-2 py-0.5 font-medium"

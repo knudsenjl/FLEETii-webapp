@@ -7,11 +7,6 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 
-/** "Køretøj-ID" display value for a vehicle_profiles-backed row — vehicle_ident when set, else number_plate. */
-function vehicleBilId(vehicle: { number_plate: string; vehicle_ident: string | null }): string {
-  return vehicle.vehicle_ident?.trim() ? vehicle.vehicle_ident.trim() : vehicle.number_plate;
-}
-
 /** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address/contact_person/phone/email until its own fetch-by-id fallback kicked in. */
 type Costumer = {
   costumer_id: string;
@@ -46,7 +41,7 @@ type CostumerOrder = {
   vehicle_id: string | null;
   costumer_id: string;
   department_id: string | null;
-  /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate (see vehicleBilId below). */
+  /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Not shown in this page's own table (an order has no confirmed identifier until a real vehicle_profiles row exists — see the "Reg.nr." column below, which always uses number_plate instead); carried through router state so VehicleCreatePage.tsx's own "Køretøj-ID:" row can still show/prefill it. */
   vehicle_ident: string | null;
   number_plate: string;
   /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable later via VehicleCreatePage.tsx's own editable rows. */
@@ -261,7 +256,7 @@ export function FleetiiAdministrationPage() {
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Type</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Kunde</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
-                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Køretøj-ID</th>
+                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Reg.nr.</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
@@ -315,7 +310,7 @@ export function FleetiiAdministrationPage() {
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
                             {order.departmentName ?? "—"}
                           </td>
-                          <td className="whitespace-nowrap px-2 py-0.5">{vehicleBilId(order)}</td>
+                          <td className="whitespace-nowrap px-2 py-0.5">{order.number_plate}</td>
                         </tr>
                       );
                     })}
