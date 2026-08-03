@@ -55,9 +55,6 @@ export function NewVehiclePage() {
 
   const canSend =
     nummerplade.trim().length > 0 &&
-    brand.trim().length > 0 &&
-    maerke.trim().length > 0 &&
-    aargang.trim().length > 0 &&
     (needsFleetiiDevice || fleetiiDeviceId.trim().length > 0) &&
     kontaktperson.trim().length > 0 &&
     EMAIL_PATTERN.test(kontaktemail.trim()) &&
@@ -159,9 +156,33 @@ export function NewVehiclePage() {
                     </div>
                   )}
                   <RequiredFieldRow label="Nummerplade:" value={nummerplade} onChange={setNummerplade} />
-                  <RequiredFieldRow label="Brand:" value={brand} onChange={setBrand} />
-                  <RequiredFieldRow label="Mærke:" value={maerke} onChange={setMaerke} />
-                  <RequiredFieldRow label="Årgang:" value={aargang} onChange={setAargang} />
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Brand:</label>
+                    <input
+                      type="text"
+                      value={brand}
+                      onChange={(e) => setBrand(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Mærke:</label>
+                    <input
+                      type="text"
+                      value={maerke}
+                      onChange={(e) => setMaerke(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Årgang:</label>
+                    <input
+                      type="text"
+                      value={aargang}
+                      onChange={(e) => setAargang(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    />
+                  </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <input

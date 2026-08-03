@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -19,9 +19,10 @@ type CostumerOrder = {
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate wherever this is displayed (same convention as VehicleDetailsPage.tsx/HandleVehiclePage.tsx). */
   vehicle_ident: string | null;
   number_plate: string;
-  brand: string;
-  model: string;
-  model_year: string;
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Brand:"/"Mærke:"/"Årgang:" rows below, incl. the MotorAPI fill button). */
+  brand: string | null;
+  model: string | null;
+  model_year: string | null;
   needs_fleetii_device: boolean;
   fleetii_device_id: string | null;
   contactperson: string;
@@ -43,9 +44,10 @@ type CostumerOrderQueryRow = {
   department_id: string | null;
   vehicle_ident: string | null;
   number_plate: string;
-  brand: string;
-  model: string;
-  model_year: string;
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Brand:"/"Mærke:"/"Årgang:" rows below, incl. the MotorAPI fill button). */
+  brand: string | null;
+  model: string | null;
+  model_year: string | null;
   needs_fleetii_device: boolean;
   fleetii_device_id: string | null;
   contactperson: string;
@@ -62,6 +64,9 @@ type CostumerOrderQueryRow = {
 /** One of 2hire's own vehicle-configuration profiles (see 2hire-board-profiles.mts) — confirmed real shape { id, title, description, makerName, modelName, modelYearRange } (developer.2hire.io/reference/getpublicprofilelist-1's own example response, see twoHireClient.ts's own TwoHireBoardProfile comment); still loosely typed since only id/title are actually used here. */
 type TwoHireBoardProfile = Record<string, unknown>;
 
+/** 2hire's fixed profile id for any simulated device — per 2hire's own "Guide to test..." documentation: "In order to configure simulators, the profile id 51ba5b28-28da-435a-b42e-a3931288470c need to be used." Used below as the automatic fallback selection whenever no real profile is available to pick from. */
+const TWOHIRE_SIMULATOR_PROFILE_ID = "51ba5b28-28da-435a-b42e-a3931288470c";
+
 /** id extraction for a profile — "id" is the confirmed real field; "profileId" kept as a defensive fallback. Falls back to an empty string (which the picker then can't submit, rather than silently using a wrong value) if neither is present. */
 function boardProfileId(profile: TwoHireBoardProfile): string {
   const raw = profile.id ?? profile.profileId;
@@ -74,6 +79,58 @@ function boardProfileLabel(profile: TwoHireBoardProfile): string {
   if (typeof raw === "string" && raw.length > 0) return raw;
   const id = boardProfileId(profile);
   return id || JSON.stringify(profile);
+}
+
+/** Lowercases and strips everything but letters/digits, so "MERCEDES_BENZ" (this app's own brand spelling) and a 2hire makerName like "Mercedes-Benz" compare equal regardless of case/separator style. */
+function normalizeForMatch(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/** Extracts every 4-digit year found in a free-text "Årgang" value (e.g. "2014-2025", "2020", "ca. 2019") and returns [min, max] — null if none found, so callers can treat an unparseable year as "don't filter on year" rather than wrongly excluding every profile. */
+function parseOrderYearRange(value: string): [number, number] | null {
+  const years = [...value.matchAll(/\d{4}/g)].map((m) => Number(m[0]));
+  if (years.length === 0) return null;
+  return [Math.min(...years), Math.max(...years)];
+}
+
+/** Whether a 2hire board profile is a plausible match for this order's own brand/model/model_year — matched leniently in both directions (either string containing the other) since neither this app's free-text brand/model fields nor 2hire's makerName/modelName are guaranteed to be spelled identically. Year matches on range overlap (order.model_year is itself often a range like "2014-2025", not a single year). Missing/unparseable data on either side passes rather than excludes, so a profile is only ever filtered OUT on a genuine mismatch, never on missing info. */
+function profileMatchesOrder(profile: TwoHireBoardProfile, order: { brand: string; model: string; model_year: string }): boolean {
+  const maker = normalizeForMatch(typeof profile.makerName === "string" ? profile.makerName : "");
+  const orderBrand = normalizeForMatch(order.brand);
+  const makerMatches = !maker || !orderBrand || maker.includes(orderBrand) || orderBrand.includes(maker);
+
+  const modelName = normalizeForMatch(typeof profile.modelName === "string" ? profile.modelName : "");
+  const orderModel = normalizeForMatch(order.model);
+  const modelMatches = !modelName || !orderModel || modelName.includes(orderModel) || orderModel.includes(modelName);
+
+  const profileYearRange =
+    Array.isArray(profile.modelYearRange) &&
+    profile.modelYearRange.length === 2 &&
+    typeof profile.modelYearRange[0] === "number" &&
+    typeof profile.modelYearRange[1] === "number"
+      ? (profile.modelYearRange as [number, number])
+      : null;
+  const orderYearRange = parseOrderYearRange(order.model_year);
+  const yearMatches =
+    !profileYearRange || !orderYearRange || (orderYearRange[1] >= profileYearRange[0] && orderYearRange[0] <= profileYearRange[1]);
+
+  return makerMatches && modelMatches && yearMatches;
+}
+
+/** Pulls the first present, non-empty field (in priority order) out of the MotorAPI vehicle lookup's "vehicle" section (see motorapi-vehicle-lookup.mts — the { data } | { error } shape). Field names (make/model/variant/model_year) are confirmed real, not guessed — the "i" button's JSON popup shows the raw response if MotorAPI ever changes shape. */
+function motorApiVehicleField(motorApiResult: unknown, keys: string[]): string | null {
+  if (!motorApiResult || typeof motorApiResult !== "object") return null;
+  const vehicleSection = (motorApiResult as { vehicle?: unknown }).vehicle;
+  if (!vehicleSection || typeof vehicleSection !== "object" || !("data" in vehicleSection)) return null;
+  const data = (vehicleSection as { data?: unknown }).data;
+  if (!data || typeof data !== "object") return null;
+
+  for (const key of keys) {
+    const value = (data as Record<string, unknown>)[key];
+    if (typeof value === "string" && value.trim()) return value.trim();
+    if (typeof value === "number") return String(value);
+  }
+  return null;
 }
 
 /** The one remaining manual-checklist step ("Other 2hire registrations") — see costumer_orders_add_step_flags.sql. "vehicle_registered"/"iot_device_associated" used to be separate manual steps here too, but are now set together by the real 2hire-register-vehicle.mts call below, so they're no longer reactivatable via this generic flip-back-to-false mechanism. */
@@ -192,19 +249,38 @@ export function VehicleCreatePage() {
   const [iotDeviceAssociated, setIotDeviceAssociated] = useState(order?.iot_device_associated ?? false);
   const [other2hireDone, setOther2hireDone] = useState(order?.other_2hire_done ?? false);
   const [registeredVehicleId, setRegisteredVehicleId] = useState(order?.vehicle_id ?? null);
+  /** Editable Brand/Mærke/Årgang — local state rather than reading order.brand/model/model_year directly, since these are now editable inputs (see the "Brand:"/"Mærke:"/"Årgang:" rows below) that persist to costumer_orders on blur (saveOrderField). Only editable while !vehicleRegistered: 2hire-register-vehicle.mts snapshots these onto the new vehicle_profiles row at registration time, so editing them afterward wouldn't retroactively change the already-created vehicle — misleading to allow. */
+  const [brandInput, setBrandInput] = useState(order?.brand ?? "");
+  const [modelInput, setModelInput] = useState(order?.model ?? "");
+  const [modelYearInput, setModelYearInput] = useState(order?.model_year ?? "");
+  const [orderFieldSaveError, setOrderFieldSaveError] = useState<string | null>(null);
 
-  // Populates the step flags/vehicleId once `order` resolves asynchronously
-  // (the fetch-by-id path above) — the useState initializers just above only
-  // run on the very first render, which happens before that fetch can
-  // possibly have completed. Harmless no-op re-set on the (more common)
-  // router-state path, where `order` is already correct on the first render.
+  // Populates the step flags/vehicleId/editable fields once `order` resolves
+  // asynchronously (the fetch-by-id path above) — the useState initializers
+  // just above only run on the very first render, which happens before that
+  // fetch can possibly have completed. Harmless no-op re-set on the (more
+  // common) router-state path, where `order` is already correct on the first
+  // render.
   useEffect(() => {
     if (!order) return;
     setVehicleRegistered(order.vehicle_registered);
     setIotDeviceAssociated(order.iot_device_associated);
     setOther2hireDone(order.other_2hire_done);
     setRegisteredVehicleId(order.vehicle_id);
+    setBrandInput(order.brand ?? "");
+    setModelInput(order.model ?? "");
+    setModelYearInput(order.model_year ?? "");
   }, [order]);
+
+  /** Persists a single edited Brand/Mærke/Årgang field to costumer_orders on blur — same direct-update pattern as markOtherStepDone/reactivateOtherStep below. Only called with a genuinely changed, non-empty trimmed value (see the input's onBlur handlers). */
+  const saveOrderField = async (field: "brand" | "model" | "model_year", value: string) => {
+    if (!order) return;
+    setOrderFieldSaveError(null);
+    const { error } = await supabase.from("costumer_orders").update({ [field]: value }).eq("order_id", order.order_id);
+    if (error) {
+      setOrderFieldSaveError(error.message);
+    }
+  };
 
   /** "Registrér køretøj i 2hire" form state — only relevant while !vehicleRegistered. */
   const [qrCode, setQrCode] = useState("");
@@ -214,6 +290,101 @@ export function VehicleCreatePage() {
   const [profilesError, setProfilesError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  /** Whether the "2hire-profil" picker below is narrowed to profiles matching this order's own brand/model/model_year (see profileMatchesOrder) — off by default: today's only environment (2hire's test/simulator adaptor) has exactly one profile, which never matches a real vehicle's brand/model, so defaulting to filtered would hide the only usable option on every single registration right now. Toggle it on once real production credentials expose an actual make/model catalog worth narrowing. */
+  const [filterProfilesByOrder, setFilterProfilesByOrder] = useState(false);
+  const visibleProfiles =
+    filterProfilesByOrder && order
+      ? profiles.filter((profile) =>
+          profileMatchesOrder(profile, { brand: brandInput, model: modelInput, model_year: modelYearInput }),
+        )
+      : profiles;
+  /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile (e.g. TWOHIRE_SIMULATOR_PROFILE_ID auto-selected below when the real API response happens not to include it). */
+  const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
+
+  /** Auto-selects a profile whenever there's exactly one (or zero) to pick from, so the admin isn't left clicking a single-option dropdown or an empty one: zero visible profiles falls back to the fixed simulator profile (see TWOHIRE_SIMULATOR_PROFILE_ID's own doc comment — otherwise every registration under today's test/simulator 2hire environment would require manually toggling the filter off and picking the one simulator entry by hand); exactly one visible profile (filtered down to a single match, or the catalog itself only has one) is selected outright; two or more leaves selection blank for the admin to actually choose. Only fires once profiles have actually loaded (not while loading/erroring), and only reacts to the *count* changing (not every re-render — visibleProfiles is a fresh array each render), so a real manual selection among 2+ options is left alone as long as the visible list's size doesn't change. */
+  useEffect(() => {
+    if (profilesLoading || profilesError) return;
+    if (visibleProfiles.length === 0) {
+      setSelectedProfileId(TWOHIRE_SIMULATOR_PROFILE_ID);
+    } else if (visibleProfiles.length === 1) {
+      setSelectedProfileId(boardProfileId(visibleProfiles[0]));
+    } else {
+      setSelectedProfileId("");
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleProfiles.length, profilesLoading, profilesError]);
+
+  /** Whether the "i" popup showing the selected profile's raw JSON (next to the filter button) is open — a plain click-to-toggle, not a timed notice, since this is content meant to be read/copied. */
+  const [showProfileJson, setShowProfileJson] = useState(false);
+  const profileJsonRef = useRef<HTMLDivElement>(null);
+
+  /** Closes the profile-JSON popup on an outside click — same pattern as AllBookingsPage.tsx's own filter popover. */
+  useEffect(() => {
+    if (!showProfileJson) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (profileJsonRef.current && !profileJsonRef.current.contains(event.target as Node)) {
+        setShowProfileJson(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showProfileJson]);
+
+  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the "i" button on the Nummerplade row below — fetched lazily on first open rather than on mount, since MotorAPI usage counts against a daily quota. Combined { vehicle, environment, equipment } response, each independently either { data } or { error } (a used/older vehicle may simply have no environment/equipment data). */
+  const [motorApiResult, setMotorApiResult] = useState<unknown>(null);
+  const [motorApiLoading, setMotorApiLoading] = useState(false);
+  const [motorApiError, setMotorApiError] = useState<string | null>(null);
+  const [showMotorApiPopup, setShowMotorApiPopup] = useState(false);
+  const motorApiRef = useRef<HTMLDivElement>(null);
+
+  /** Closes the MotorAPI popup on an outside click — same pattern as the profile-JSON popup above. */
+  useEffect(() => {
+    if (!showMotorApiPopup) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (motorApiRef.current && !motorApiRef.current.contains(event.target as Node)) {
+        setShowMotorApiPopup(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMotorApiPopup]);
+
+  /** Fetches the MotorAPI lookup exactly once and caches it in motorApiResult — every caller (the "i" popup below, and the Brand/Mærke/Årgang "↓↙" fill buttons) goes through this single guarded entry point, so no combination of clicks ever triggers a second network call once a result (or an in-flight request) already exists. MotorAPI usage counts against a daily quota, so this matters beyond just avoiding redundant work. */
+  const ensureMotorApiDataLoaded = () => {
+    if (motorApiResult !== null || motorApiLoading || !order) return;
+
+    setMotorApiLoading(true);
+    setMotorApiError(null);
+    void fetch(`/.netlify/functions/motorapi-vehicle-lookup?regNo=${encodeURIComponent(order.number_plate)}`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as unknown;
+        if (!response.ok) {
+          const message = (result as { error?: string } | null)?.error ?? "Kunne ikke hente data fra MotorAPI.";
+          setMotorApiError(message);
+          setMotorApiLoading(false);
+          return;
+        }
+        setMotorApiResult(result);
+        setMotorApiLoading(false);
+      })
+      .catch(() => {
+        setMotorApiError("Kunne ikke kontakte serveren. Prøv igen senere.");
+        setMotorApiLoading(false);
+      });
+  };
+
+  /** Opens the MotorAPI popup, loading its data (via ensureMotorApiDataLoaded) only on the transition into "open" — a re-click just toggles visibility of what's already loaded/cached. */
+  const handleOpenMotorApiPopup = () => {
+    const opening = !showMotorApiPopup;
+    setShowMotorApiPopup(opening);
+    if (opening) ensureMotorApiDataLoaded();
+  };
 
   /** Loads 2hire's own board profiles for the picker above — skipped once the vehicle is already registered (no longer needed). */
   useEffect(() => {
@@ -364,9 +535,9 @@ export function VehicleCreatePage() {
     ["Afdeling:", order.departmentName ?? "—"],
     ...(useVehicleIdent ? ([["Køretøj-ID:", order.vehicle_ident || order.number_plate]] as [string, string][]) : []),
     ["Nummerplade:", order.number_plate],
-    ["Brand:", order.brand],
-    ["Mærke:", order.model],
-    ["Årgang:", order.model_year],
+    ["Brand:", order.brand ?? "—"],
+    ["Mærke:", order.model ?? "—"],
+    ["Årgang:", order.model_year ?? "—"],
     [
       "FLEETii device:",
       order.needs_fleetii_device ? "Nyt device skal installeres" : `Eksisterende device (id: ${order.fleetii_device_id})`,
@@ -398,14 +569,118 @@ export function VehicleCreatePage() {
 
             <div className="rounded-2xl border border-brand-100">
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">
-                {rows.map(([label, value]) => (
-                  <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
-                    <span className="text-sm text-brand-800">{value}</span>
-                  </div>
-                ))}
+                {rows.map(([label, value]) => {
+                  /** Brand/Mærke/Årgang are editable (see saveOrderField) while the vehicle isn't registered yet — 2hire-register-vehicle.mts snapshots them onto vehicle_profiles at registration time, so editing afterward wouldn't change anything real and reverts to plain text (using `value`, which the sync effect keeps equal to order.brand/model/model_year regardless). getMotorApiValue is the confirmed-real MotorAPI field(s) the corner-down-left button below pulls from (see motorApiVehicleField) — Mærke combines "model" and "variant" into one string, matching how this app's own single Mærke field conflates model+variant. */
+                  const editableField =
+                    label === "Brand:"
+                      ? {
+                          value: brandInput,
+                          setValue: setBrandInput,
+                          field: "brand" as const,
+                          original: order.brand,
+                          getMotorApiValue: () => motorApiVehicleField(motorApiResult, ["make"]),
+                        }
+                      : label === "Mærke:"
+                        ? {
+                            value: modelInput,
+                            setValue: setModelInput,
+                            field: "model" as const,
+                            original: order.model,
+                            getMotorApiValue: () =>
+                              [motorApiVehicleField(motorApiResult, ["model"]), motorApiVehicleField(motorApiResult, ["variant"])]
+                                .filter(Boolean)
+                                .join(" ") || null,
+                          }
+                        : label === "Årgang:"
+                          ? {
+                              value: modelYearInput,
+                              setValue: setModelYearInput,
+                              field: "model_year" as const,
+                              original: order.model_year,
+                              getMotorApiValue: () => motorApiVehicleField(motorApiResult, ["model_year"]),
+                            }
+                          : null;
+
+                  if (editableField && !vehicleRegistered) {
+                    const motorApiValue = editableField.getMotorApiValue();
+                    return (
+                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                        <div className="flex items-center gap-1">
+                          <input
+                            type="text"
+                            value={editableField.value}
+                            onChange={(e) => editableField.setValue(e.target.value)}
+                            onBlur={() => {
+                              const trimmed = editableField.value.trim();
+                              if (trimmed && trimmed !== editableField.original) {
+                                void saveOrderField(editableField.field, trimmed);
+                              }
+                            }}
+                            className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          />
+                          <button
+                            type="button"
+                            disabled={!motorApiValue}
+                            onClick={() => {
+                              if (!motorApiValue) return;
+                              editableField.setValue(motorApiValue);
+                              if (motorApiValue !== editableField.original) {
+                                void saveOrderField(editableField.field, motorApiValue);
+                              }
+                            }}
+                            aria-label={`Udfyld ${label} fra MotorAPI`}
+                            title={motorApiValue ? `Udfyld fra MotorAPI: ${motorApiValue}` : "Ingen værdi fundet i MotorAPI endnu"}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                              <polyline points="9 10 4 15 9 20" />
+                              <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  return label === "Nummerplade:" ? (
+                    <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <div className="relative flex items-center justify-between gap-2" ref={motorApiRef}>
+                        <label className="text-sm font-medium text-brand-700">{label}</label>
+                        <button
+                          type="button"
+                          onClick={handleOpenMotorApiPopup}
+                          aria-label="Slå køretøj op i MotorAPI"
+                          className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
+                        >
+                          i
+                        </button>
+                        <InlinePopup
+                          visible={showMotorApiPopup}
+                          align="right"
+                          message={
+                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                              {motorApiLoading
+                                ? "Henter fra MotorAPI…"
+                                : motorApiError
+                                  ? motorApiError
+                                  : JSON.stringify(motorApiResult, null, 2)}
+                            </pre>
+                          }
+                        />
+                      </div>
+                      <span className="text-sm text-brand-800">{value}</span>
+                    </div>
+                  ) : (
+                    <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <span className="text-sm text-brand-800">{value}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
+            {orderFieldSaveError && <p className="text-sm text-red-600">{orderFieldSaveError}</p>}
 
             <div className="flex flex-col gap-3">
               {vehicleRegistered ? (
@@ -429,11 +704,66 @@ export function VehicleCreatePage() {
                       />
                     </div>
                     <div className="grid grid-cols-2 items-center gap-2">
-                      <label className="text-sm font-medium text-brand-700">2hire-profil:</label>
+                      <div className="flex items-center justify-between gap-2">
+                        <label className="text-sm font-medium text-brand-700">2hire-profil:</label>
+                        <div className="flex items-center gap-1">
+                          <div className="relative" ref={profileJsonRef}>
+                            <button
+                              type="button"
+                              onClick={() => setShowProfileJson((prev) => !prev)}
+                              aria-label="Vis valgt profil som JSON"
+                              className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
+                            >
+                              i
+                            </button>
+                            <InlinePopup
+                              visible={showProfileJson}
+                              align="right"
+                              message={
+                                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                                  {selectedProfile
+                                    ? JSON.stringify(selectedProfile, null, 2)
+                                    : selectedProfileId
+                                      ? `Ingen profildata fundet for id: ${selectedProfileId}`
+                                      : "Ingen profil valgt."}
+                                </pre>
+                              }
+                            />
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFilterProfilesByOrder((prev) => !prev);
+                              setSelectedProfileId("");
+                            }}
+                            aria-label={filterProfilesByOrder ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
+                            title={filterProfilesByOrder ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
+                            className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
+                              filterProfilesByOrder
+                                ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                                : "border-brand-300 text-brand-600 hover:bg-brand-50"
+                            }`}
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                              <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
                       {profilesLoading ? (
                         <span className="text-sm text-brand-500">Indlæser…</span>
                       ) : profilesError ? (
                         <span className="text-sm text-red-600">{profilesError}</span>
+                      ) : visibleProfiles.length === 0 ? (
+                        <select
+                          value={selectedProfileId}
+                          onChange={(e) => setSelectedProfileId(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        >
+                          <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>
+                            Testprofil (2hboard simulator) — ingen profil matcher køretøjet
+                          </option>
+                        </select>
                       ) : (
                         <select
                           value={selectedProfileId}
@@ -441,7 +771,7 @@ export function VehicleCreatePage() {
                           className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         >
                           <option value="">Vælg profil…</option>
-                          {profiles.map((profile) => (
+                          {visibleProfiles.map((profile) => (
                             <option key={boardProfileId(profile)} value={boardProfileId(profile)}>
                               {boardProfileLabel(profile)}
                             </option>

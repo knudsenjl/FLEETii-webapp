@@ -383,10 +383,7 @@ export function AllBookingsPage() {
                             >
                               {twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle}
                             </td>
-                            <td
-                              className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right"
-                              title={formatBookingPeriod(booking)}
-                            >
+                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right">
                               {formatBookingPeriod(booking, true)}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">

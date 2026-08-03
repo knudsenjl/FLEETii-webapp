@@ -356,14 +356,7 @@ export function VehicleDetailsPage() {
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
-                    <span
-                      className="text-sm text-brand-800"
-                      title={
-                        vehicle.distanceCovered && vehicle.distanceCoveredUpdatedAt
-                          ? `${vehicle.distanceCovered} (${vehicle.distanceCoveredUpdatedAt})`
-                          : undefined
-                      }
-                    >
+                    <span className="text-sm text-brand-800">
                       {vehicle.distanceCovered ? (
                         `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
                       ) : (
@@ -373,14 +366,7 @@ export function VehicleDetailsPage() {
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
-                    <span
-                      className="text-sm text-brand-800"
-                      title={
-                        vehicle.autonomyPercentage && vehicle.autonomyPercentageUpdatedAt
-                          ? `${vehicle.autonomyPercentage} (${vehicle.autonomyPercentageUpdatedAt})`
-                          : undefined
-                      }
-                    >
+                    <span className="text-sm text-brand-800">
                       {vehicle.autonomyPercentage ? (
                         `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
                       ) : (
@@ -390,10 +376,7 @@ export function VehicleDetailsPage() {
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Status:</label>
-                    <span
-                      className="text-sm text-brand-800"
-                      title={vehicle.onlineUpdatedAt ? `${vehicle.status} (opdateret ${vehicle.onlineUpdatedAt})` : undefined}
-                    >
+                    <span className="text-sm text-brand-800">
                       {vehicle.status}
                       {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                     </span>

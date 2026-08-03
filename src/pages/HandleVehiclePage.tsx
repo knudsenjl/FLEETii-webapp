@@ -191,17 +191,15 @@ export function HandleVehiclePage() {
     return null;
   }
 
-  /** [label, short value (visible), full value (hover tooltip)] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM", full "dd/mm/yyyy HH.MM" available on hover. */
-  const readOnlyRows: [string, string, string][] = [
+  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM" (dropping the year). */
+  const readOnlyRows: [string, string][] = [
     [
       "Kilometerstand:",
       `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
-      `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${vehicle.distanceCoveredUpdatedAt})` : ""}`,
     ],
     [
       "Brændstofniveau:",
       `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`,
-      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${vehicle.autonomyPercentageUpdatedAt})` : ""}`,
     ],
   ];
 
@@ -440,18 +438,15 @@ export function HandleVehiclePage() {
                         className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
                     </div>
-                    {readOnlyRows.map(([label, shortValue, fullValue]) => (
+                    {readOnlyRows.map(([label, value]) => (
                       <div key={label} className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
                         <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">{label}</div>
-                        <div className="whitespace-nowrap px-1" title={fullValue}>{shortValue}</div>
+                        <div className="whitespace-nowrap px-1">{value}</div>
                       </div>
                     ))}
                     <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
                       <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Status:</div>
-                      <div
-                        className="whitespace-nowrap px-1"
-                        title={vehicle.onlineUpdatedAt ? `${vehicle.status} (opdateret ${vehicle.onlineUpdatedAt})` : undefined}
-                      >
+                      <div className="whitespace-nowrap px-1">
                         {vehicle.status}
                         {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </div>

@@ -290,9 +290,7 @@ export function BookingDetailsPage() {
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
-                    <span className="text-sm text-brand-800" title={formatBookingPeriod(booking)}>
-                      {formatBookingPeriod(booking, true)}
-                    </span>
+                    <span className="text-sm text-brand-800">{formatBookingPeriod(booking, true)}</span>
                   </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
@@ -351,39 +349,27 @@ export function BookingDetailsPage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle?.distanceCovered ?? "—"}
-                      {twoHireVehicle?.distanceCoveredUpdatedAt ? (
-                        <span title={twoHireVehicle.distanceCoveredUpdatedAt}>
-                          {` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`}
-                        </span>
-                      ) : (
-                        ""
-                      )}
+                      {twoHireVehicle?.distanceCoveredUpdatedAt
+                        ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
+                        : ""}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle?.autonomyPercentage ?? "—"}
-                      {twoHireVehicle?.autonomyPercentageUpdatedAt ? (
-                        <span title={twoHireVehicle.autonomyPercentageUpdatedAt}>
-                          {` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`}
-                        </span>
-                      ) : (
-                        ""
-                      )}
+                      {twoHireVehicle?.autonomyPercentageUpdatedAt
+                        ? ` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`
+                        : ""}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Status:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
-                      {twoHireVehicle?.onlineUpdatedAt ? (
-                        <span title={twoHireVehicle.onlineUpdatedAt}>
-                          {` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`}
-                        </span>
-                      ) : (
-                        ""
-                      )}
+                      {twoHireVehicle?.onlineUpdatedAt
+                        ? ` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
+                        : ""}
                     </span>
                   </div>
                 </div>

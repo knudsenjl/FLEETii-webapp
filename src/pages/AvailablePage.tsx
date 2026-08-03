@@ -16,13 +16,12 @@ import {
   type BookingWindow,
 } from "../lib/bookings";
 
-/** A vehicle available for the requested period, plus a human-readable description of its free window (short "dd/mm" dates for display, full "dd.mm.yyyy" dates for the hover tooltip). */
+/** A vehicle available for the requested period, plus a human-readable description of its free window (short "dd/mm" dates). */
 type AvailableVehicle = {
   id: string;
   vehicle: string;
   plate: string;
   ledigPeriode: string;
-  ledigPeriodeFull: string;
 };
 
 function formatDanishTime(date: Date): string {
@@ -31,13 +30,6 @@ function formatDanishTime(date: Date): string {
   return `${hours}:${minutes}`;
 }
 
-function formatDanishDateTime(date: Date): string {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}.${month}.${date.getFullYear()} ${formatDanishTime(date)}`;
-}
-
-/** Same as formatDanishDateTime, but "dd/mm" instead of "dd.mm.yyyy" — pairs with the full version as a hover tooltip. */
 function formatDanishDateTimeShort(date: Date): string {
   const day = String(date.getDate()).padStart(2, "0");
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -128,7 +120,6 @@ export function AvailablePage() {
         vehicle: `${v.brand} ${v.model}`,
         plate: v.plate,
         ledigPeriode: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod, true),
-        ledigPeriodeFull: freePeriod === null ? "Ingen bookinger" : formatFreePeriod(freePeriod),
       };
     });
 
@@ -195,14 +186,7 @@ export function AvailablePage() {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Ledige køretøjer</h2>
                 {reservationStart && reservationEnd && (
-                  <span
-                    className="text-[0.7rem] text-brand-600"
-                    title={`${formatDanishDateTime(reservationStart)} - ${
-                      isSameDate(reservationStart, reservationEnd)
-                        ? formatDanishTime(reservationEnd)
-                        : formatDanishDateTime(reservationEnd)
-                    }`}
-                  >
+                  <span className="text-[0.7rem] text-brand-600">
                     Periode: {formatDanishDateTimeShort(reservationStart)} -{" "}
                     {isSameDate(reservationStart, reservationEnd)
                       ? formatDanishTime(reservationEnd)
@@ -274,9 +258,7 @@ export function AvailablePage() {
                                 : identByVehicleId[vehicle.id]?.numberPlate || "—"}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{vehicle.vehicle}</td>
-                            <td className="whitespace-nowrap px-2 py-0.5 text-center" title={vehicle.ledigPeriodeFull}>
-                              {vehicle.ledigPeriode}
-                            </td>
+                            <td className="whitespace-nowrap px-2 py-0.5 text-center">{vehicle.ledigPeriode}</td>
                           </tr>
                         );
                       })}

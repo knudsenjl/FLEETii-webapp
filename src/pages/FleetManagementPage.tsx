@@ -130,6 +130,8 @@ export function FleetManagementPage() {
                     onClick: () => goToVehicleDetails(g.vehicleId),
                   }))}
                   cluster
+                  permanentTooltips
+                  showMarkerIcon={false}
                   className="absolute inset-0"
                 />
                 {showEmptyNotice && (

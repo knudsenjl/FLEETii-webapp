@@ -204,61 +204,6 @@ export async function deregisterVehicle(vehicleId: string): Promise<void> {
  */
 const TWOHIRE_E2E_BASE_URL = "https://e2e.adapter.2hire.io";
 
-/**
- * The one fixed profileId that MUST be used when registering a SIMULATED
- * device (createSimulatedDevice() below) with registerVehicle() — per
- * 2hire's own "Guide to test..." documentation: "In order to configure
- * simulators, the profile id 51ba5b28-28da-435a-b42e-a3931288470c need to
- * be used." This is unrelated to getTwoHireBoardProfiles()'s real
- * make/model profiles (Fiat 500, etc.) — those are for registering a REAL
- * physical device (VehicleCreatePage.tsx's flow) and picking one of them
- * for a simulated device instead causes 2hire to reject later generic
- * commands with MISSING_CONFIGURATION (confirmed live, migrating CN61538 —
- * the bulk-migration code originally, mistakenly, best-effort-matched
- * against the real board-profile list here).
- */
-export const TWOHIRE_SIMULATOR_PROFILE_ID = "51ba5b28-28da-435a-b42e-a3931288470c";
-
-/**
- * Creates a simulated 2hire-board device on the e2e host — POST /devices,
- * connectivityProvider "2HIRE_BOARD" (same variant registerVehicle() uses).
- * CONFIRMED real response shape (developer.2hire.io/reference/createvehicle's
- * own example, clicked directly on the docs page): { devices: [{identifier,
- * qrCode}] } — an array (presumably this endpoint can create more than one
- * device per call), not a bare object; only the first entry is used here
- * since exactly one device is requested. Returns the device `identifier`
- * (what simulateTrip/updateBattery/getDeviceState key on — this becomes
- * vehicle_profiles.iot_id) and `qrCode` (what registerVehicle() then needs
- * to actually register this simulated device against test.adapter.2hire.io
- * and get a real vehicleId). Test/simulation-only — a real physical device
- * already has both values printed/assigned, there's nothing to "create" for
- * one.
- *
- * Docs: https://developer.2hire.io/reference/createvehicle
- */
-export async function createSimulatedDevice(): Promise<{ identifier: string; qrCode: string }> {
-  const token = await getTwoHireAccessToken();
-  const response = await fetch(`${TWOHIRE_E2E_BASE_URL}/devices`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `${token.tokenType} ${token.value}`,
-    },
-    body: JSON.stringify({ connectivityProvider: "2HIRE_BOARD" }),
-  });
-
-  if (!response.ok) {
-    throw new Error(`2hire simuleret device-oprettelse fejlede (${response.status}): ${await response.text()}`);
-  }
-
-  const body = (await response.json()) as { devices?: { identifier: string; qrCode: string }[] };
-  const device = body.devices?.[0];
-  if (!device) {
-    throw new Error("2hire simuleret device-oprettelse gav ikke noget device tilbage.");
-  }
-  return device;
-}
-
 /** One GPS fix in a simulated trip — see simulateTrip(). */
 export type SimulatedTripPosition = { latitude: number; longitude: number };
 

@@ -19,6 +19,15 @@ const fleetiiIcon = L.icon({
   popupAnchor: [0, -30],
 });
 
+/** A small downward-pointing triangle in FLEETii navy (--color-brand-600) — used instead of the full FLEETii pin when showMarkerIcon is false (e.g. FleetManagementPage, whose permanent tooltip pills already carry the identifying text, so the full pin graphic is redundant clutter). The triangle's tip is the anchor, same convention as fleetiiIcon's own bottom-center anchor, so it still marks the exact lat/lng and a permanent tooltip's [0, -28] offset still lands in the same spot. The white drop-shadow keeps it visible against dark map tiles. */
+const positionMarkerIcon = L.divIcon({
+  className: "",
+  html: '<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #18385b;filter:drop-shadow(0 0 1px white)"></div>',
+  iconSize: [12, 9],
+  iconAnchor: [6, 9],
+  popupAnchor: [0, -9],
+});
+
 type LeafletMapProps = {
   /** Center coordinate (also the primary marker's position when showMarker is true). */
   lat: number;
@@ -34,6 +43,10 @@ type LeafletMapProps = {
   onMarkerClick?: () => void;
   /** Groups extraMarkers (and the primary marker) into a Leaflet marker cluster instead of showing them individually. */
   cluster?: boolean;
+  /** Shows every marker's tooltip permanently above it instead of only on hover — hover has no equivalent on a touchscreen (iPhone/iPad), so a map relying on hover-only tooltips leaves those labels completely unreachable there. Off by default since a permanent label isn't always wanted (e.g. a single "you are here" marker doesn't need one). */
+  permanentTooltips?: boolean;
+  /** False renders every marker as a small FLEETii-blue position triangle instead of the full FLEETii pin — still clickable/tooltip-bearing, just a smaller position indicator. On by default. */
+  showMarkerIcon?: boolean;
 };
 
 /** Renders an OpenStreetMap tile map with a primary marker and optional extra markers/clustering. See LeafletMapProps for what each prop controls. */
@@ -47,6 +60,8 @@ export function LeafletMap({
   markerTooltip,
   onMarkerClick,
   cluster = false,
+  permanentTooltips = false,
+  showMarkerIcon = true,
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -87,19 +102,25 @@ export function LeafletMap({
       }
     };
 
+    const icon = showMarkerIcon ? fleetiiIcon : positionMarkerIcon;
+    // The -28 offset was tuned for fleetiiIcon's 30px height; positionMarkerIcon
+    // is only 9px tall, so the same offset would leave a large gap between the
+    // triangle and its tooltip.
+    const tooltipOffset: [number, number] = showMarkerIcon ? [0, -28] : [0, -6];
+
     if (showMarker) {
-      const marker = L.marker([lat, lng], { icon: fleetiiIcon });
+      const marker = L.marker([lat, lng], { icon });
       addMarkerToMap(marker);
       if (markerTooltip) {
-        marker.bindTooltip(markerTooltip, { direction: "top", offset: [0, -28] });
+        marker.bindTooltip(markerTooltip, { direction: "top", offset: tooltipOffset, permanent: permanentTooltips });
       }
       marker.on("click", () => onMarkerClickRef.current?.());
     }
     extraMarkers.forEach((marker) => {
-      const extraMarker = L.marker([marker.lat, marker.lng], { icon: fleetiiIcon });
+      const extraMarker = L.marker([marker.lat, marker.lng], { icon });
       addMarkerToMap(extraMarker);
       if (marker.tooltip) {
-        extraMarker.bindTooltip(marker.tooltip, { direction: "top", offset: [0, -28] });
+        extraMarker.bindTooltip(marker.tooltip, { direction: "top", offset: tooltipOffset, permanent: permanentTooltips });
       }
       if (marker.onClick) {
         extraMarker.on("click", marker.onClick);
@@ -133,7 +154,7 @@ export function LeafletMap({
     // suggestion would be wrong (using the array reference directly would
     // rebuild the whole map on every caller re-render, see the comment above).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, showMarker, markerTooltip, cluster, extraMarkersKey]);
+  }, [lat, lng, zoom, showMarker, markerTooltip, cluster, permanentTooltips, showMarkerIcon, extraMarkersKey]);
 
   return <div ref={containerRef} className={className} />;
 }

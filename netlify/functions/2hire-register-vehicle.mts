@@ -75,9 +75,10 @@ export default async (req: Request) => {
       department_id: string | null;
       vehicle_ident: string | null;
       number_plate: string;
-      brand: string;
-      model: string;
-      model_year: string;
+      /** Optional as of costumer_orders_brand_model_year_nullable.sql — Brand/Mærke/Årgang are no longer required on NewVehiclePage.tsx's "Ny bestilling" form, so a vehicle can be registered before they're ever filled in (VehicleCreatePage.tsx's own editable Brand/Mærke/Årgang rows, with the MotorAPI fill button). vehicle_profiles.brand/model/model_year are nullable too, so passing null straight through below is fine. */
+      brand: string | null;
+      model: string | null;
+      model_year: string | null;
     }>();
 
   if (!order) {

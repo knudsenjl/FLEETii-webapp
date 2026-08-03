@@ -189,9 +189,7 @@ export function BookingsPage() {
         <td className="truncate border-r border-brand-100 px-2 py-0.5 font-medium" title={modelLabel}>
           {modelLabel}
         </td>
-        <td className="whitespace-nowrap px-2 py-0.5 text-right" title={formatBookingPeriod(booking)}>
-          {formatBookingPeriod(booking, true)}
-        </td>
+        <td className="whitespace-nowrap px-2 py-0.5 text-right">{formatBookingPeriod(booking, true)}</td>
       </tr>
     );
   };

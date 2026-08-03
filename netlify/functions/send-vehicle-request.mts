@@ -27,9 +27,10 @@ type SendVehicleRequestBody = {
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
   vehicleIdent?: string | null;
   nummerplade?: string;
-  brand?: string;
-  maerke?: string;
-  aargang?: string;
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx, fillable later on VehicleCreatePage.tsx (incl. its MotorAPI fill button). */
+  brand?: string | null;
+  maerke?: string | null;
+  aargang?: string | null;
   /** Optional — not always known (e.g. a genuinely new vehicle), free-text same as the other fields. */
   fuelLevel?: string | null;
   mileage?: string | null;
@@ -75,9 +76,9 @@ function buildHtmlBody(fields: {
       ${row("Afdeling", fields.afdeling)}
       ${row("Køretøj-ID", fields.vehicleIdent || "—")}
       ${row("Nummerplade", fields.nummerplade)}
-      ${row("Brand", fields.brand)}
-      ${row("Mærke", fields.maerke)}
-      ${row("Årgang", fields.aargang)}
+      ${row("Brand", fields.brand || "—")}
+      ${row("Mærke", fields.maerke || "—")}
+      ${row("Årgang", fields.aargang || "—")}
       ${row("Kilometerstand", fields.mileage || "—")}
       ${row("Brændstofniveau", fields.fuelLevel || "—")}
       ${row("FLEETii device", fields.fleetiiDevice)}
@@ -95,12 +96,14 @@ function buildHtmlBody(fields: {
 }
 
 /**
- * POST { afdeling?, vehicleIdent?, nummerplade, brand, maerke, aargang, fuelLevel?, mileage?,
+ * POST { afdeling?, vehicleIdent?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
  * needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
  * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false) —
- * fuelLevel/mileage are optional, not always known at request time. Inserts
- * a matching costumer_orders row (costumer_id/department_id from the
+ * brand/maerke/aargang/fuelLevel/mileage are all optional, not always known
+ * at request time (brand/model/model_year can be filled in later on
+ * VehicleCreatePage.tsx, see costumer_orders_brand_model_year_nullable.sql).
+ * Inserts a matching costumer_orders row (costumer_id/department_id from the
  * caller's own profile), then emails the request to RESEND_MAIL_RECIEVER —
  * via SMTP or Resend, see sendMail.
  */
@@ -145,10 +148,10 @@ export default async (req: Request) => {
   const kontaktperson = asTrimmedString(body.kontaktperson);
   const kontaktemail = asTrimmedString(body.kontaktemail);
   const kontaktnummer = asTrimmedString(body.kontaktnummer);
-  if (!nummerplade || !brand || !maerke || !aargang || !kontaktperson || !kontaktemail || !kontaktnummer) {
+  if (!nummerplade || !kontaktperson || !kontaktemail || !kontaktnummer) {
     return new Response(
       JSON.stringify({
-        error: "Nummerplade, brand, mærke, årgang, kontaktperson, kontakt e-mail og kontaktnummer er påkrævet.",
+        error: "Nummerplade, kontaktperson, kontakt e-mail og kontaktnummer er påkrævet.",
       }),
       { status: 400 },
     );
@@ -198,9 +201,9 @@ export default async (req: Request) => {
       department_id: caller.department_id,
       vehicle_ident: vehicleIdent || null,
       number_plate: nummerplade,
-      brand,
-      model: maerke,
-      model_year: aargang,
+      brand: brand || null,
+      model: maerke || null,
+      model_year: aargang || null,
       fuel_level: fuelLevel || null,
       mileage: mileage || null,
       needs_fleetii_device: needsFleetiiDevice,
@@ -233,9 +236,9 @@ export default async (req: Request) => {
       afdeling,
       vehicleIdent: vehicleIdent ?? "",
       nummerplade,
-      brand,
-      maerke,
-      aargang,
+      brand: brand ?? "",
+      maerke: maerke ?? "",
+      aargang: aargang ?? "",
       fuelLevel: fuelLevel ?? "",
       mileage: mileage ?? "",
       fleetiiDevice,

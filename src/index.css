@@ -114,3 +114,27 @@
     height: 100%;
   }
 }
+
+/* FleetManagementPage's permanent vehicle-label tooltips (see
+   LeafletMap.tsx's permanentTooltips prop — added so the label is reachable
+   without hover, which doesn't exist on iPhone/iPad). Shrinks Leaflet's
+   default tooltip box down to a small semi-transparent pill instead of its
+   normal opaque, full-size popup, and drops the little direction arrow
+   (doesn't suit a permanently-visible label). Deliberately kept OUTSIDE
+   @layer base: Leaflet's own leaflet.css is unlayered, and per the CSS
+   Cascade Layers spec, unlayered rules always beat layered ones regardless
+   of specificity — an override inside @layer base would silently lose to
+   Leaflet's defaults. The two-class selector (rather than
+   .leaflet-tooltip-permanent alone) guarantees this wins on specificity too,
+   regardless of the two stylesheets' actual import order. Only ever
+   targets PERMANENT tooltips — the hover-only tooltips used elsewhere
+   (BookingDetailsPage/VehicleDetailsPage's single marker) are untouched. */
+.leaflet-tooltip.leaflet-tooltip-permanent {
+  /* padding-block is already 0 — the remaining vertical bulk was the
+     inherited ~1.5 line-height leaving empty space above/below the glyphs
+     inside the line box; leading-none (line-height:1) closes that gap. */
+  @apply rounded-md border-none bg-white/75 px-1.5 py-0 text-[0.65rem] font-semibold leading-none text-brand-800 shadow-none;
+}
+.leaflet-tooltip.leaflet-tooltip-permanent::before {
+  display: none;
+}

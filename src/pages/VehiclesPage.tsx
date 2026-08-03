@@ -26,14 +26,40 @@ type DepartmentOption = { department_id: string; name: string };
  * a vehicle both live there too), or create a new one via NewVehiclePage.
  */
 export function VehiclesPage() {
-  const { afdelingId, costumerId } = useAuth();
+  const { afdelingId, costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them alone, the Kunde filter below is what actually picks targetCostumerId, rather than requiring every visit to arrive via CostumerDetailsPage's router state. */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
 
   const state = location.state as { costumerId?: string; costumerName?: string } | null;
-  const targetCostumerId = state?.costumerId ?? costumerId;
-  const targetCostumerName = state?.costumerName ?? null;
+  /** FLEETii-admin-only "Kunde" filter — seeded from router state (CostumerDetailsPage's own "Administration af køretøjer" button) first, then the admin's own costumerId if their account happens to carry one (some FLEETii admin accounts do, for internal test purposes — see user_profiles_select_allow_fleetii_admin.sql's own comment), otherwise "" ("Alle" — every costumer). Lets a FLEETii admin pick a different costumer directly from this page instead of needing to go through CostumerDetailsPage every time, while still defaulting to something meaningful rather than blank when possible. */
+  const [filterCostumerId, setFilterCostumerId] = useState(state?.costumerId ?? costumerId ?? "");
+  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  const targetCostumerId = isFleetiiAdmin ? filterCostumerId || null : (state?.costumerId ?? costumerId);
+  const targetCostumerName = isFleetiiAdmin
+    ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? state?.costumerName ?? null)
+    : null;
+
+  /** Loads every costumer for the Kunde filter dropdown — FLEETii admin only, since a regular admin is always scoped to their own single costumer. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+
+    let cancelled = false;
+    void supabase
+      .from("costumers")
+      .select("costumer_id, name")
+      .order("name")
+      .returns<{ costumer_id: string; name: string }[]>()
+      .then(({ data }) => {
+        if (!cancelled) setCostumerOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin]);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
@@ -67,19 +93,16 @@ export function VehiclesPage() {
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
-  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. */
+  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. For a FLEETii admin with "Alle" selected (targetCostumerId null), loads EVERY department across every costumer instead of none — "Alle" means "all vehicles in all departments in all costumers", the same "no scoping at all" meaning "Alle" already has on the other filters (departments' own SELECT RLS is unrestricted — departments_select_authenticated: qual = true — so this is a real cross-costumer query, not blocked by RLS). For a regular admin, targetCostumerId is always their own costumerId in practice, so the null branch below never actually applies to them. */
   useEffect(() => {
-    if (!targetCostumerId) {
+    if (!targetCostumerId && !isFleetiiAdmin) {
       setDepartmentOptions([]);
       return;
     }
 
     let cancelled = false;
-    void supabase
-      .from("departments")
-      .select("department_id, name")
-      .eq("costumer_id", targetCostumerId)
-      .order("name")
+    const query = supabase.from("departments").select("department_id, name").order("name");
+    void (targetCostumerId ? query.eq("costumer_id", targetCostumerId) : query)
       .returns<DepartmentOption[]>()
       .then(({ data }) => {
         if (!cancelled) setDepartmentOptions(data ?? []);
@@ -88,7 +111,7 @@ export function VehiclesPage() {
     return () => {
       cancelled = true;
     };
-  }, [targetCostumerId]);
+  }, [targetCostumerId, isFleetiiAdmin]);
 
   useEffect(() => {
     const costumerDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
@@ -162,7 +185,7 @@ export function VehiclesPage() {
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate || filterStatus || filterDepartment
+                      filterPlate || filterStatus || filterDepartment || filterCostumerId
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -177,6 +200,26 @@ export function VehiclesPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
+                        {isFleetiiAdmin && (
+                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                            Kunde
+                            <select
+                              value={filterCostumerId}
+                              onChange={(e) => {
+                                setFilterCostumerId(e.target.value);
+                                setFilterDepartment("");
+                              }}
+                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            >
+                              <option value="">Alle</option>
+                              {costumerOptions.map((costumer) => (
+                                <option key={costumer.costumer_id} value={costumer.costumer_id}>
+                                  {costumer.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Afdeling
                           <select
@@ -193,7 +236,7 @@ export function VehiclesPage() {
                           </select>
                         </label>
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Køretøj-ID
+                          Køretøj
                           <select
                             value={filterPlate}
                             onChange={(e) => setFilterPlate(e.target.value)}
@@ -219,13 +262,14 @@ export function VehiclesPage() {
                             <option value="Offline">Offline</option>
                           </select>
                         </label>
-                        {(filterPlate || filterStatus || filterDepartment) && (
+                        {(filterPlate || filterStatus || filterDepartment || filterCostumerId) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFilterPlate("");
                               setFilterStatus("");
                               setFilterDepartment("");
+                              setFilterCostumerId("");
                             }}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
                           >
@@ -252,9 +296,9 @@ export function VehiclesPage() {
                     {filteredVehicles.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {!targetCostumerId
+                          {!targetCostumerId && !isFleetiiAdmin
                             ? "Ingen kunde valgt."
-                            : filterPlate || filterStatus || filterDepartment
+                            : filterPlate || filterStatus || filterDepartment || filterCostumerId
                               ? "Ingen køretøjer matcher filteret."
                               : "Ingen køretøjer fundet."}
                         </td>
