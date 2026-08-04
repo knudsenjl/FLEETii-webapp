@@ -6,6 +6,7 @@
 
 /** Default row/input styling — matches the tight two-column admin tables (NewVehiclePage, UserDetailsPage). Override via className/inputClassName for a different layout (e.g. ReservationPage's roomier form rows). */
 const DEFAULT_ROW_CLASSNAME = "grid grid-cols-2 items-center gap-2 p-0.5";
+const DEFAULT_LABEL_CLASSNAME = "flex items-center text-sm font-medium text-brand-700";
 const DEFAULT_INPUT_CLASSNAME =
   "rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20";
 
@@ -18,6 +19,8 @@ interface RequiredFieldRowProps {
   type?: string;
   /** Overrides the row wrapper's classes (default: tight two-column grid). */
   className?: string;
+  /** Overrides the <label>'s classes (default: left-aligned, matches the tight admin-table style). */
+  labelClassName?: string;
   /** Overrides the <input>'s classes (default: matches the tight admin-table style). */
   inputClassName?: string;
 }
@@ -30,11 +33,12 @@ export function RequiredFieldRow({
   placeholder,
   type = "text",
   className = DEFAULT_ROW_CLASSNAME,
+  labelClassName = DEFAULT_LABEL_CLASSNAME,
   inputClassName = DEFAULT_INPUT_CLASSNAME,
 }: RequiredFieldRowProps) {
   return (
     <div className={className}>
-      <label className="flex items-center text-sm font-medium text-brand-700">
+      <label className={labelClassName}>
         {label} <span className="ml-0.5 text-red-600">*</span>
       </label>
       <input

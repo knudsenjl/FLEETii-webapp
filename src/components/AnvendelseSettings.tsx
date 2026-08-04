@@ -196,8 +196,8 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="max-h-64 overflow-auto rounded-none border border-brand-100">
+    <div className="rounded-none border border-brand-100">
+      <div className="max-h-64 overflow-auto">
         <table className="w-full border-collapse text-sm">
           <tbody className="divide-y divide-brand-100 bg-white">
             {loading && (
@@ -260,85 +260,88 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
         </table>
       </div>
 
-      {mode !== "view" && (
-        <div className="overflow-hidden rounded-2xl border border-brand-100">
-          <div className="divide-y divide-brand-100 bg-white">
-            <RequiredFieldRow label="Anvendelse:" value={fieldValue} onChange={setFieldValue} />
-          </div>
-        </div>
-      )}
+      <div className="flex flex-col gap-3 border-t border-brand-100 bg-white p-2">
+        {mode !== "view" && (
+          <RequiredFieldRow
+            label="Ny anvendelse:"
+            labelClassName="flex items-center justify-end text-sm font-medium text-brand-700"
+            value={fieldValue}
+            onChange={setFieldValue}
+          />
+        )}
 
-      {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-      {mode === "view" && (
-        <div className="flex flex-col gap-3">
-          <p className="text-right text-xs text-brand-500">
-            <span className="text-red-600">*</span> Kan ikke ændres eller slettes
-          </p>
-          <div className="grid grid-cols-3 gap-3">
+        {mode === "view" && (
+          <>
+            <p className="text-right text-xs text-brand-500">
+              <span className="text-red-600">*</span> Kan ikke ændres eller slettes
+            </p>
+            <div className="grid grid-cols-3 gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedValue === null) return;
+                  setEditingOriginalValue(selectedValue);
+                  setFieldValue(selectedValue);
+                  setSubmitError(null);
+                  setMode("edit");
+                }}
+                disabled={selectedValue === null || isProtected(selectedValue)}
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Rediger anvendelse
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFieldValue("");
+                  setSubmitError(null);
+                  setMode("add");
+                }}
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                Tilføj anvendelse
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (selectedValue === null) return;
+                  setPendingAction("delete");
+                }}
+                disabled={selectedValue === null || isProtected(selectedValue)}
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                Slet anvendelse
+              </button>
+            </div>
+          </>
+        )}
+
+        {mode !== "view" && (
+          <div className="grid grid-cols-2 gap-3">
             <button
               type="button"
-              onClick={() => {
-                if (selectedValue === null) return;
-                setEditingOriginalValue(selectedValue);
-                setFieldValue(selectedValue);
-                setSubmitError(null);
-                setMode("edit");
-              }}
-              disabled={selectedValue === null || isProtected(selectedValue)}
+              onClick={() => setPendingAction(mode === "add" ? "create" : "update")}
+              disabled={!canSubmitField}
               className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Rediger anvendelse
+              {mode === "add" ? "Tilføj anvendelse" : "Opdater anvendelse"}
             </button>
             <button
               type="button"
               onClick={() => {
                 setFieldValue("");
-                setSubmitError(null);
-                setMode("add");
+                setEditingOriginalValue(null);
+                setMode("view");
               }}
               className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
-              Tilføj anvendelse
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                if (selectedValue === null) return;
-                setPendingAction("delete");
-              }}
-              disabled={selectedValue === null || isProtected(selectedValue)}
-              className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              Slet anvendelse
+              Fortryd
             </button>
           </div>
-        </div>
-      )}
-
-      {mode !== "view" && (
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setPendingAction(mode === "add" ? "create" : "update")}
-            disabled={!canSubmitField}
-            className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {mode === "add" ? "Tilføj anvendelse" : "Opdater anvendelse"}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setFieldValue("");
-              setEditingOriginalValue(null);
-              setMode("view");
-            }}
-            className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-          >
-            Fortryd
-          </button>
-        </div>
-      )}
+        )}
+      </div>
 
       {pendingAction && (
         <ConfirmDialog
