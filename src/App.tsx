@@ -3,7 +3,8 @@
 // unauthenticated users to "/" and shows a "forbidden" notice to non-admins
 // on admin-only routes. "/about" is the one deliberately public route (it
 // must be reachable from LoginPage before a user has signed in).
-import { Navigate, Route, Routes } from "react-router-dom";
+import { useEffect } from "react";
+import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VehicleProvider } from "./contexts/VehicleContext";
 import { ProtectedRoute } from "./components/ProtectedRoute";
@@ -67,11 +68,29 @@ function RootRoute() {
   return <LoginPage />;
 }
 
+/**
+ * Resets the window's scroll position to the top on every route change.
+ * Plain <BrowserRouter> (main.tsx) does NOT do this on its own — without
+ * it, navigating away from a page the user had scrolled down (e.g.
+ * LoginPage on a small/mobile viewport, where the form can push below the
+ * fold) leaves the NEXT page starting at that same scroll offset too,
+ * hiding its own PageHeader above the fold until the user manually scrolls
+ * up (or zooms out, which removes the need to scroll at all).
+ */
+function ScrollToTop() {
+  const { pathname } = useLocation();
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, [pathname]);
+  return null;
+}
+
 /** Root component: wraps the whole route tree in the two app-wide providers (auth session/profile, and 2hire vehicle/GPS telemetry) and declares every route. */
 function App() {
   return (
     <AuthProvider>
       <VehicleProvider>
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<RootRoute />} />
           <Route
