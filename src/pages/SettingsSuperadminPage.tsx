@@ -24,7 +24,7 @@ export function SettingsSuperadminPage() {
         >
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-3 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Indstillinger</h2>
             <p className="text-sm text-red-600">Denne side er ikke designet endnu.</p>
             <p className="text-sm text-red-600">

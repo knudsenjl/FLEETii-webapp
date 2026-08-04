@@ -75,7 +75,7 @@ export function SettingsAdminPage() {
         >
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Indstillinger for {afdeling ?? "—"}</h2>
             <StandardSettings
               table="department_settings"

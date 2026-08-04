@@ -300,17 +300,17 @@ export function VehicleDetailsPage() {
         aria-hidden="true"
       />
 
-      <div className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6">
+      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex flex-1 flex-col"
+          className="flex min-h-0 flex-1 flex-col"
         >
           <PageHeader />
 
-          <section className="flex flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex flex-1 flex-col gap-4">
+          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
