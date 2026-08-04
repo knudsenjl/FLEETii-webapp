@@ -649,31 +649,41 @@ export function VehicleCreatePage() {
 
                   return label === "Køretøj:" ? (
                     <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <div className="relative flex items-center justify-between gap-2" ref={motorApiRef}>
-                        <label className="text-sm font-medium text-brand-700">{label}</label>
-                        <button
-                          type="button"
-                          onClick={handleOpenMotorApiPopup}
-                          aria-label="Slå køretøj op i MotorAPI"
-                          className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
-                        >
-                          i
-                        </button>
-                        <InlinePopup
-                          visible={showMotorApiPopup}
-                          align="right"
-                          message={
-                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
-                              {motorApiLoading
-                                ? "Henter fra MotorAPI…"
-                                : motorApiError
-                                  ? motorApiError
-                                  : JSON.stringify(motorApiResult, null, 2)}
-                            </pre>
-                          }
+                      <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <div className="flex items-center gap-1">
+                        {/* Styled as a read-only input (same shape as Brand's own editable one below) rather than a plain span, for visual consistency across the rows — it just isn't actually editable here (Køretøj combines vehicle_ident/number_plate, neither is a field of its own to write back to). */}
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={value}
+                          className="w-full min-w-0 cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
                         />
+                        {/* Right-aligned in the input/value column, same placement as the Brand/Mærke/Årgang MotorAPI fill ("arrow") buttons below — not in the label column like before. */}
+                        <div className="relative shrink-0" ref={motorApiRef}>
+                          <button
+                            type="button"
+                            onClick={handleOpenMotorApiPopup}
+                            aria-label="Slå køretøj op i MotorAPI"
+                            className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
+                          >
+                            i
+                          </button>
+                          <InlinePopup
+                            visible={showMotorApiPopup}
+                            align="right"
+                            message={
+                              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                                {motorApiLoading
+                                  ? "Henter fra MotorAPI…"
+                                  : motorApiError
+                                    ? motorApiError
+                                    : JSON.stringify(motorApiResult, null, 2)}
+                              </pre>
+                            }
+                          />
+                        </div>
                       </div>
-                      <span className="text-sm text-brand-800">{value}</span>
                     </div>
                   ) : (
                     <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">

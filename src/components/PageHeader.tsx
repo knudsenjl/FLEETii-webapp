@@ -157,10 +157,14 @@ export function PageHeader() {
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
-                  <path d="M8 3 4 7l4 4" />
-                  <path d="M4 7h11a5 5 0 0 1 5 5v1" />
-                  <path d="m16 21 4-4-4-4" />
-                  <path d="M20 17H9a5 5 0 0 1-5-5v-1" />
+                  {/* Hierarchy/org-chart icon (root -> two child departments) —
+                      replaced the earlier swap-arrows icon, which looked too
+                      similar to the new reload button right next to it. */}
+                  <path d="M9 7h6" />
+                  <path d="M9 7v10h6" />
+                  <rect x="3" y="4" width="6" height="6" rx="1" fill="currentColor" stroke="none" />
+                  <rect x="15" y="4" width="6" height="6" rx="1" />
+                  <rect x="15" y="14" width="6" height="6" rx="1" />
                 </svg>
               </button>
               <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen andre afdelinger tilgængelige" align="right" />
