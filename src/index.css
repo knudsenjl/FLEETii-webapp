@@ -120,12 +120,17 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    /* overscroll-behavior: none was here — deliberately removed (per user
-       request) to let iOS's native pull-to-refresh work again, at the cost
-       of possibly reintroducing rubber-band/bounce artifacts at the edges
-       of the app's internal scroll panels (VehicleDetailsPage etc.) — the
-       likely original reason it was set. Revert this one line if that
-       turns out to be awkward in practice. */
+    /* Confirmed this does NOT block iOS pull-to-refresh — removing it made
+       no observable difference. The real reason that gesture doesn't work
+       here is position:fixed itself, just above: the actual page/document
+       never scrolls (everything scrolls inside internal panels instead),
+       and Safari's pull-to-refresh is tied to the page itself being
+       scrolled-to-top-and-pulled-further, which has no scroll surface to
+       hook onto in this layout. Kept for its original purpose (preventing
+       rubber-band/bounce artifacts at the edges of internal scroll panels)
+       since disabling it bought nothing. See PageHeader.tsx's explicit
+       reload button for the actual fix to "no way to force-refresh". */
+    overscroll-behavior: none;
   }
 
   #root {
