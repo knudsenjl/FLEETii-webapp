@@ -275,14 +275,18 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
 
       {/* Everything below spans both columns — the settings table's w-56
           label column leaves too little room for the add/edit field or the
-          button rows. Inline style (not a Tailwind class) to cancel the
-          outer table's divide-y line on each of these — divide-y's own
-          selector is a sibling combinator with real specificity, and an
-          inline style is the one thing guaranteed to beat it — so the
-          whole group still reads as one "Anvendelser" block, not separate
-          settings. */}
+          button rows. borderTopStyle: "hidden" (not just width: 0) cancels
+          the outer table's divide-y line on each of these — under
+          border-collapse, a conflicting border is resolved by WIDTH first
+          ("wider wins", regardless of cascade specificity or inline vs.
+          stylesheet origin), so a mere border-top-width: 0 here still LOSES
+          to divide-y's 1px line at the shared edge. Per CSS2.1's border
+          conflict resolution, only 'hidden' unconditionally suppresses
+          every competing border at that location — the one value actually
+          guaranteed to win. Keeps the whole group reading as one
+          "Anvendelser" block, not separate settings. */}
       {mode !== "view" && (
-        <tr style={{ borderTopWidth: 0 }}>
+        <tr style={{ borderTopStyle: "hidden" }}>
           <td colSpan={2} className="px-2 py-0.5">
             {/* No red "*" here — that mark already means something else two
                 rows down ("Kan ikke ændres eller slettes"), so reusing it
@@ -304,7 +308,7 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {submitError && (
-        <tr style={{ borderTopWidth: 0 }}>
+        <tr style={{ borderTopStyle: "hidden" }}>
           <td colSpan={2} className="px-2 py-0.5">
             <p className="text-sm text-red-600">{submitError}</p>
           </td>
@@ -312,7 +316,7 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {mode === "view" && displayList.length > 0 && (
-        <tr style={{ borderTopWidth: 0 }}>
+        <tr style={{ borderTopStyle: "hidden" }}>
           <td colSpan={2} className="px-2 py-0.5">
             <p className="text-right text-xs text-brand-500">
               <span className="text-red-600">*</span> Kan ikke ændres eller slettes
@@ -322,7 +326,7 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {mode === "view" && (
-        <tr style={{ borderTopWidth: 0 }}>
+        <tr style={{ borderTopStyle: "hidden" }}>
           <td colSpan={2} className="px-2 py-0.5">
             <div className="grid grid-cols-3 gap-3">
               <button
@@ -367,7 +371,7 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {mode !== "view" && (
-        <tr style={{ borderTopWidth: 0 }}>
+        <tr style={{ borderTopStyle: "hidden" }}>
           <td colSpan={2} className="px-2 py-0.5">
             <div className="grid grid-cols-2 gap-3">
               <button
