@@ -96,7 +96,20 @@
   html {
     font-family: var(--font-sans);
     font-size: 87.5%;
-    height: 100dvh;
+    /* svh (small viewport height), not dvh — on iOS Safari specifically,
+       dvh's value at initial paint can reflect the LARGE viewport (as if
+       the address bar were already collapsed) even though it's still
+       expanded and visually covering that space, and fixed-position
+       descendants (body, right below) don't reliably re-settle once dvh
+       recomputes — the net effect is real content (e.g. PageHeader)
+       rendered UNDER the browser chrome, invisible until the user
+       pinch-zooms out or the chrome happens to collapse. svh is the
+       conservative, CONSTANT "chrome fully expanded" value, so nothing is
+       ever hidden behind it; costs a few px of unused space at the bottom
+       once the chrome auto-hides, a fine tradeoff for "never hidden". Same
+       reasoning applied to every page's own h-dvh -> h-svh (see git log).
+    */
+    height: 100svh;
     overflow: hidden;
   }
 

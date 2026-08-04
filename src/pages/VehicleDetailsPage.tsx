@@ -240,7 +240,7 @@ export function VehicleDetailsPage() {
 
   if (!vehicle) {
     return vehiclesLoading ? (
-      <div className="flex h-dvh items-center justify-center bg-brand-50 text-brand-600">Indlæser køretøj…</div>
+      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser køretøj…</div>
     ) : null;
   }
 
@@ -294,7 +294,7 @@ export function VehicleDetailsPage() {
   };
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
+    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"

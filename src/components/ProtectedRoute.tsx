@@ -60,7 +60,7 @@ export function ProtectedRoute({
 
   if (loading) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-brand-50">
+      <div className="flex min-h-svh flex-col items-center justify-center gap-4 bg-brand-50">
         <FleetiiLogo className="h-12 w-auto animate-pulse-slow" />
       </div>
     );

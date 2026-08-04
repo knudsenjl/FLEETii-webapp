@@ -82,7 +82,7 @@ export function SetPasswordPage() {
   };
 
   return (
-    <div className="flex h-dvh flex-col items-center justify-center overflow-y-auto bg-brand-50 px-5 py-10 sm:px-6">
+    <div className="flex h-svh flex-col items-center justify-center overflow-y-auto bg-brand-50 px-5 py-10 sm:px-6">
       <div
         className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(circle_at_50%_0%,theme(colors.brand.100),transparent_60%)]"
         aria-hidden="true"

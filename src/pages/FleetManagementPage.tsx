@@ -98,7 +98,7 @@ export function FleetManagementPage() {
   };
 
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-brand-50 text-brand-900">
+    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 text-brand-900">
       <div
         className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
         aria-hidden="true"
