@@ -262,8 +262,15 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
               settings.map((setting) => {
                 /** Label text + optional "?" info popover — shared by every row, "custom" included (same label column shape either way). */
                 const labelContent = (
-                  <div className="relative flex items-center justify-between gap-1">
-                    <span className="truncate">{setting.label}:</span>
+                  <div className="relative flex min-w-0 items-center justify-between gap-1">
+                    {/* Word-wraps instead of truncating with "…" — the
+                        longest label ("Tillad reservationer uden
+                        sluttidspunkt") needs two lines in the w-56 column,
+                        not a clipped one. min-w-0 on both this flex
+                        container and the span lets it actually shrink and
+                        wrap instead of overflowing (flex items don't wrap
+                        by default). */}
+                    <span className="min-w-0 break-words">{setting.label}:</span>
                     {setting.info && (
                       <>
                         <button

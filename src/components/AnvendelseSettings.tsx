@@ -275,15 +275,27 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
 
       {/* Everything below spans both columns — the settings table's w-56
           label column leaves too little room for the add/edit field or the
-          button rows. border-t-0! cancels the outer table's divide-y line
-          on each of these so the whole group still reads as one
-          "Anvendelser" block, not separate settings. */}
+          button rows. Inline style (not a Tailwind class) to cancel the
+          outer table's divide-y line on each of these — divide-y's own
+          selector is a sibling combinator with real specificity, and an
+          inline style is the one thing guaranteed to beat it — so the
+          whole group still reads as one "Anvendelser" block, not separate
+          settings. */}
       {mode !== "view" && (
-        <tr className="border-t-0!">
+        <tr style={{ borderTopWidth: 0 }}>
           <td colSpan={2} className="px-2 py-0.5">
+            {/* No red "*" here — that mark already means something else two
+                rows down ("Kan ikke ændres eller slettes"), so reusing it
+                for "required" would read as a contradiction. A grey
+                placeholder hint in the input itself is enough; the submit
+                button below stays disabled until something's typed
+                (canSubmitField), so nothing is actually enforced by the
+                asterisk anyway. */}
             <RequiredFieldRow
               label="Ny anvendelse:"
               labelClassName="flex items-center justify-end text-sm font-medium text-brand-700"
+              placeholder="Angiv årsag"
+              hideAsterisk
               value={fieldValue}
               onChange={setFieldValue}
             />
@@ -292,15 +304,15 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {submitError && (
-        <tr className="border-t-0!">
+        <tr style={{ borderTopWidth: 0 }}>
           <td colSpan={2} className="px-2 py-0.5">
             <p className="text-sm text-red-600">{submitError}</p>
           </td>
         </tr>
       )}
 
-      {mode === "view" && (
-        <tr className="border-t-0!">
+      {mode === "view" && displayList.length > 0 && (
+        <tr style={{ borderTopWidth: 0 }}>
           <td colSpan={2} className="px-2 py-0.5">
             <p className="text-right text-xs text-brand-500">
               <span className="text-red-600">*</span> Kan ikke ændres eller slettes
@@ -310,7 +322,7 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {mode === "view" && (
-        <tr className="border-t-0!">
+        <tr style={{ borderTopWidth: 0 }}>
           <td colSpan={2} className="px-2 py-0.5">
             <div className="grid grid-cols-3 gap-3">
               <button
@@ -355,7 +367,7 @@ export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, dep
       )}
 
       {mode !== "view" && (
-        <tr className="border-t-0!">
+        <tr style={{ borderTopWidth: 0 }}>
           <td colSpan={2} className="px-2 py-0.5">
             <div className="grid grid-cols-2 gap-3">
               <button
