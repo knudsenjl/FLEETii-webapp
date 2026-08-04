@@ -14,7 +14,7 @@
 // rows need special handling). No admin-only write restriction on the
 // writable rows — both pages may edit their own scope's row, same as
 // Anvendelse.
-import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { InlinePopup } from "./InlinePopup";
 import { supabase } from "../lib/supabase";
 
@@ -57,8 +57,8 @@ export type StandardSetting =
       name: string;
       label: string;
       inputType: "custom";
-      /** Renders the row's entire value cell — no DB-backed value at all (not fetched, not written, never appears in loading/error state for this row specifically). Used for embedding an unrelated component (e.g. AnvendelseSettings) as a row here rather than a separate page section — the render function (not a bare ReactNode) so it's only invoked at actual render time, same as everywhere else in this table, and can freely close over the caller's own props/state (scopeId, departmentId, etc). */
-      render: () => ReactNode;
+      /** Renders this row's own <tr> elements directly (not just a value cell) — no DB-backed value at all (not fetched, not written, never appears in loading/error state for this row specifically). Used for embedding an unrelated component (e.g. AnvendelseSettings) as one or more rows here rather than a separate page section. Takes the ready-made label cell (the same "label: + ?" content every ordinary row gets) so the custom row can place it in its own first <tr> and follow with as many additional full-width <tr>s as it needs — AnvendelseSettings' entries list stays beside the label in that first row, while its legend/buttons need the full row width, not the narrow value column. A render *function* (not a bare ReactNode) so it's only invoked at actual render time and can freely close over the caller's own props/state (scopeId, departmentId, etc). */
+      render: (labelCell: ReactNode) => ReactNode;
       /** Optional "?" info popover text shown right-aligned next to the label — see the openInfoName state below. Omit for a row with no explanation needed. */
       info?: string;
     };
@@ -283,15 +283,20 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
                   </div>
                 );
 
+                // "custom" rows own their entire <tr> set (label row +
+                // however many full-width rows they need below it) — see
+                // the render prop's own doc comment on StandardSetting.
+                if (setting.inputType === "custom") {
+                  return <Fragment key={setting.name}>{setting.render(labelContent)}</Fragment>;
+                }
+
                 return (
                   <tr key={setting.name}>
                     <td className="w-56 border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
                       {labelContent}
                     </td>
                     <td className="px-2 py-0.5">
-                      {setting.inputType === "custom" ? (
-                        setting.render()
-                      ) : setting.inputType === "checkbox" ? (
+                      {setting.inputType === "checkbox" ? (
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"

@@ -48,8 +48,9 @@ export function SettingsUserPage() {
         label: "Anvendelser",
         inputType: "custom",
         info: 'Disse anvendelser er tilgængelige, som begrundelse for en reservation. Ved at vælge "Andet" kan du angive en anden begrundese',
-        render: () => (
+        render: (labelCell) => (
           <AnvendelseSettings
+            labelCell={labelCell}
             table="user_settings"
             scopeColumn="user_id"
             scopeId={profile?.user_id ?? null}

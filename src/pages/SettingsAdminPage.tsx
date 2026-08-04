@@ -53,7 +53,14 @@ export function SettingsAdminPage() {
         label: "Anvendelser",
         inputType: "custom",
         info: 'Disse anvendelser er tilgængelige for brugerne, som begrundelse for en reservation. Ved at vælge "Andet" kan de angive en anden begrundese',
-        render: () => <AnvendelseSettings table="department_settings" scopeColumn="department_id" scopeId={afdelingId} />,
+        render: (labelCell) => (
+          <AnvendelseSettings
+            labelCell={labelCell}
+            table="department_settings"
+            scopeColumn="department_id"
+            scopeId={afdelingId}
+          />
+        ),
       },
     ],
     [afdelingId],

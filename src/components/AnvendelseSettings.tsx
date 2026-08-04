@@ -22,7 +22,7 @@
 // clickable with a warning. On SettingsAdminPage (table="department_settings"),
 // ANDET_VALUE is the only protected entry — department items ARE the admin's own data,
 // all editable except that one guaranteed default.
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { RequiredFieldRow } from "./RequiredFieldRow";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { supabase } from "../lib/supabase";
@@ -31,6 +31,8 @@ import { ANDET_VALUE, sortAnvendelserWithAndetLast } from "../lib/settings";
 const SETTING_NAME = "Anvendelse";
 
 interface AnvendelseSettingsProps {
+  /** The ready-made "Anvendelser: ?" label cell content, built by StandardSettings.tsx (same as every ordinary row gets) — placed in this component's own first <tr>, left column, since this component now owns its whole <tr> set rather than just a value cell. */
+  labelCell: ReactNode;
   table: "department_settings" | "user_settings";
   scopeColumn: "department_id" | "user_id";
   /** The admin's department_id or the user's own user_id — null while auth state is still loading, in which case nothing loads yet. */
@@ -43,7 +45,7 @@ interface AnvendelseSettingsProps {
 type SettingRow = { value: string[] };
 
 /** Table + inline add/edit form + Ny/Rediger/Slet buttons for managing one scope's "Anvendelse" list (the Anvendelse dropdown's options on ReservationPage). */
-export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }: AnvendelseSettingsProps) {
+export function AnvendelseSettings({ labelCell, table, scopeColumn, scopeId, departmentId }: AnvendelseSettingsProps) {
   /** This scope's own writable list — the full list for department_settings, or just the user's personal additions for user_settings (see departmentAnvendelser below for the rest of what's displayed). */
   const [anvendelser, setAnvendelser] = useState<string[]>([]);
   /** Read-only reference list, only fetched/relevant for table="user_settings" — the user's department's own Anvendelse row, merged into the display but never written by this component. */
@@ -196,96 +198,121 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
   };
 
   return (
-    <div className="rounded-none border border-brand-100">
-      <div className="max-h-64 overflow-auto">
-        <table className="w-full border-collapse text-sm">
-          <tbody className="divide-y divide-brand-100 bg-white">
-            {loading && (
-              <tr>
-                <td className="px-2 py-3 text-center text-brand-500">Indlæser anvendelser…</td>
-              </tr>
-            )}
-            {!loading && loadError && (
-              <tr>
-                <td className="px-2 py-3 text-center text-red-600">{loadError}</td>
-              </tr>
-            )}
-            {!loading && !loadError && displayList.length === 0 && (
-              <tr>
-                <td className="px-2 py-3 text-center text-brand-500">Ingen anvendelser fundet.</td>
-              </tr>
-            )}
-            {!loading &&
-              !loadError &&
-              displayList.map((anvendelse, index) => {
-                const isAlternate = index % 2 === 1;
-                const isSelected = index === selectedIndex;
-                return (
-                  <tr
-                    // Position-based, not value-based — this component's own
-                    // selection model (selectedIndex, see above) already
-                    // identifies a row by its position in displayList, not
-                    // by its text, so this stays consistent with that AND
-                    // avoids a React key collision if the array ever
-                    // contains a duplicate value (handleCreate/handleUpdate
-                    // guard against creating new ones, but pre-existing data
-                    // could still have one).
-                    key={index}
-                    role="button"
-                    tabIndex={0}
-                    aria-pressed={isSelected}
-                    onClick={() => setSelectedIndex(index)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" || e.key === " ") {
-                        e.preventDefault();
-                        setSelectedIndex(index);
-                      }
-                    }}
-                    className={`cursor-pointer transition ${
-                      isSelected
-                        ? "bg-brand-100 text-brand-800"
-                        : isAlternate
-                          ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                          : "bg-white text-brand-700 hover:bg-brand-50"
-                    }`}
-                  >
-                    <td className="break-words px-2 py-0.5 text-left font-medium">
-                      {anvendelse}
-                      {isProtected(anvendelse) && <span className="text-red-600"> *</span>}
-                    </td>
+    <>
+      {/* Row 1: same shape as every ordinary settings row — label (passed in
+          from StandardSettings.tsx) in the w-56 column, this scope's own
+          Anvendelse list in the value column. align-top on both cells since
+          the list box is usually taller than one line of label text. */}
+      <tr>
+        <td className="w-56 border-r border-brand-100 px-2 py-0.5 align-top font-medium text-brand-700">
+          {labelCell}
+        </td>
+        <td className="px-2 py-0.5 align-top">
+          <div className="max-h-64 overflow-auto rounded-none border border-brand-100">
+            <table className="w-full border-collapse text-sm">
+              <tbody className="divide-y divide-brand-100 bg-white">
+                {loading && (
+                  <tr>
+                    <td className="px-2 py-3 text-center text-brand-500">Indlæser anvendelser…</td>
                   </tr>
-                );
-              })}
-          </tbody>
-        </table>
-      </div>
+                )}
+                {!loading && loadError && (
+                  <tr>
+                    <td className="px-2 py-3 text-center text-red-600">{loadError}</td>
+                  </tr>
+                )}
+                {!loading && !loadError && displayList.length === 0 && (
+                  <tr>
+                    <td className="px-2 py-3 text-center text-brand-500">Ingen anvendelser fundet.</td>
+                  </tr>
+                )}
+                {!loading &&
+                  !loadError &&
+                  displayList.map((anvendelse, index) => {
+                    const isAlternate = index % 2 === 1;
+                    const isSelected = index === selectedIndex;
+                    return (
+                      <tr
+                        // Position-based, not value-based — this component's own
+                        // selection model (selectedIndex, see above) already
+                        // identifies a row by its position in displayList, not
+                        // by its text, so this stays consistent with that AND
+                        // avoids a React key collision if the array ever
+                        // contains a duplicate value (handleCreate/handleUpdate
+                        // guard against creating new ones, but pre-existing data
+                        // could still have one).
+                        key={index}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={isSelected}
+                        onClick={() => setSelectedIndex(index)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            setSelectedIndex(index);
+                          }
+                        }}
+                        className={`cursor-pointer transition ${
+                          isSelected
+                            ? "bg-brand-100 text-brand-800"
+                            : isAlternate
+                              ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                              : "bg-white text-brand-700 hover:bg-brand-50"
+                        }`}
+                      >
+                        <td className="break-words px-2 py-0.5 text-left font-medium">
+                          {anvendelse}
+                          {isProtected(anvendelse) && <span className="text-red-600"> *</span>}
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
+        </td>
+      </tr>
 
-      <div className="flex flex-col gap-3 border-t border-brand-100 bg-white p-2">
-        {mode !== "view" && (
-          <RequiredFieldRow
-            label="Ny anvendelse:"
-            labelClassName="text-right text-sm font-medium text-brand-700"
-            className="flex flex-col gap-1 p-0.5"
-            inputClassName="w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-            value={fieldValue}
-            onChange={setFieldValue}
-          />
-        )}
+      {/* Everything below spans both columns — the settings table's w-56
+          label column leaves too little room for the add/edit field or the
+          button rows. border-t-0! cancels the outer table's divide-y line
+          on each of these so the whole group still reads as one
+          "Anvendelser" block, not separate settings. */}
+      {mode !== "view" && (
+        <tr className="border-t-0!">
+          <td colSpan={2} className="px-2 py-0.5">
+            <RequiredFieldRow
+              label="Ny anvendelse:"
+              labelClassName="flex items-center justify-end text-sm font-medium text-brand-700"
+              value={fieldValue}
+              onChange={setFieldValue}
+            />
+          </td>
+        </tr>
+      )}
 
-        {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+      {submitError && (
+        <tr className="border-t-0!">
+          <td colSpan={2} className="px-2 py-0.5">
+            <p className="text-sm text-red-600">{submitError}</p>
+          </td>
+        </tr>
+      )}
 
-        {mode === "view" && (
-          <>
+      {mode === "view" && (
+        <tr className="border-t-0!">
+          <td colSpan={2} className="px-2 py-0.5">
             <p className="text-right text-xs text-brand-500">
               <span className="text-red-600">*</span> Kan ikke ændres eller slettes
             </p>
-            {/* Stacked, not side-by-side — this column is only ~140px wide
-                (the settings table's remaining width after the w-56 label
-                column), too narrow to fit 3 buttons on one line. Labels
-                drop the redundant "anvendelse" word (context is already
-                the "Anvendelser:" row) so each single button stays on one
-                line too. */}
-            <div className="flex flex-col gap-2">
+          </td>
+        </tr>
+      )}
+
+      {mode === "view" && (
+        <tr className="border-t-0!">
+          <td colSpan={2} className="px-2 py-0.5">
+            <div className="grid grid-cols-3 gap-3">
               <button
                 type="button"
                 onClick={() => {
@@ -298,7 +325,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 disabled={selectedValue === null || isProtected(selectedValue)}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Rediger
+                Rediger anvendelse
               </button>
               <button
                 type="button"
@@ -309,7 +336,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 }}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
-                Tilføj
+                Tilføj anvendelse
               </button>
               <button
                 type="button"
@@ -320,53 +347,61 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 disabled={selectedValue === null || isProtected(selectedValue)}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Slet
+                Slet anvendelse
               </button>
             </div>
-          </>
-        )}
+          </td>
+        </tr>
+      )}
 
-        {mode !== "view" && (
-          <div className="flex flex-col gap-2">
-            <button
-              type="button"
-              onClick={() => setPendingAction(mode === "add" ? "create" : "update")}
-              disabled={!canSubmitField}
-              className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {mode === "add" ? "Tilføj" : "Opdater"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setFieldValue("");
-                setEditingOriginalValue(null);
-                setMode("view");
-              }}
-              className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-            >
-              Fortryd
-            </button>
-          </div>
-        )}
-      </div>
+      {mode !== "view" && (
+        <tr className="border-t-0!">
+          <td colSpan={2} className="px-2 py-0.5">
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setPendingAction(mode === "add" ? "create" : "update")}
+                disabled={!canSubmitField}
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {mode === "add" ? "Tilføj anvendelse" : "Opdater anvendelse"}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setFieldValue("");
+                  setEditingOriginalValue(null);
+                  setMode("view");
+                }}
+                className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+              >
+                Fortryd
+              </button>
+            </div>
+          </td>
+        </tr>
+      )}
 
       {pendingAction && (
-        <ConfirmDialog
-          message={
-            pendingAction === "create"
-              ? "Er du sikker på, at du vil oprette denne anvendelse?"
-              : pendingAction === "update"
-                ? "Er du sikker på, at du vil opdatere denne anvendelse?"
-                : "Er du sikker på, at du vil slette denne anvendelse?"
-          }
-          error={submitError}
-          onCancel={() => setPendingAction(null)}
-          onConfirm={() => void handleConfirm()}
-          isPending={isSubmitting}
-          confirmPendingLabel={pendingAction === "delete" ? "Sletter…" : "Vent…"}
-        />
+        <tr>
+          <td colSpan={2} className="p-0">
+            <ConfirmDialog
+              message={
+                pendingAction === "create"
+                  ? "Er du sikker på, at du vil oprette denne anvendelse?"
+                  : pendingAction === "update"
+                    ? "Er du sikker på, at du vil opdatere denne anvendelse?"
+                    : "Er du sikker på, at du vil slette denne anvendelse?"
+              }
+              error={submitError}
+              onCancel={() => setPendingAction(null)}
+              onConfirm={() => void handleConfirm()}
+              isPending={isSubmitting}
+              confirmPendingLabel={pendingAction === "delete" ? "Sletter…" : "Vent…"}
+            />
+          </td>
+        </tr>
       )}
-    </div>
+    </>
   );
 }
