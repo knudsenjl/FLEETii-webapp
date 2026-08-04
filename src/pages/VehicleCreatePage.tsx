@@ -333,7 +333,7 @@ export function VehicleCreatePage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showProfileJson]);
 
-  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the "i" button on the Nummerplade row below — fetched lazily on first open rather than on mount, since MotorAPI usage counts against a daily quota. Combined { vehicle, environment, equipment } response, each independently either { data } or { error } (a used/older vehicle may simply have no environment/equipment data). */
+  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the "i" button on the merged Køretøj row below — always keyed on order.number_plate (the real registration number), never vehicle_ident (MotorAPI has no notion of a company-internal identifier) — fetched lazily on first open rather than on mount, since MotorAPI usage counts against a daily quota. Combined { vehicle, environment, equipment } response, each independently either { data } or { error } (a used/older vehicle may simply have no environment/equipment data). */
   const [motorApiResult, setMotorApiResult] = useState<unknown>(null);
   const [motorApiLoading, setMotorApiLoading] = useState(false);
   const [motorApiError, setMotorApiError] = useState<string | null>(null);
@@ -647,7 +647,7 @@ export function VehicleCreatePage() {
                     );
                   }
 
-                  return label === "Nummerplade:" ? (
+                  return label === "Køretøj:" ? (
                     <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <div className="relative flex items-center justify-between gap-2" ref={motorApiRef}>
                         <label className="text-sm font-medium text-brand-700">{label}</label>

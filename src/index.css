@@ -120,7 +120,12 @@
     width: 100%;
     height: 100%;
     overflow: hidden;
-    overscroll-behavior: none;
+    /* overscroll-behavior: none was here — deliberately removed (per user
+       request) to let iOS's native pull-to-refresh work again, at the cost
+       of possibly reintroducing rubber-band/bounce artifacts at the edges
+       of the app's internal scroll panels (VehicleDetailsPage etc.) — the
+       likely original reason it was set. Revert this one line if that
+       turns out to be awkward in practice. */
   }
 
   #root {
