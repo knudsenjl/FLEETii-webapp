@@ -14,7 +14,7 @@
 // rows need special handling). No admin-only write restriction on the
 // writable rows — both pages may edit their own scope's row, same as
 // Anvendelse.
-import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { InlinePopup } from "./InlinePopup";
 import { supabase } from "../lib/supabase";
 
@@ -260,57 +260,7 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
             {!loading &&
               !loadError &&
               settings.map((setting) => {
-                if (setting.inputType === "custom") {
-                  // Two rows, shaped like every ordinary setting row below —
-                  // a label row (text in the w-56 label column, "?" in its
-                  // own right-aligned value column, same as every other
-                  // row's shape) immediately followed by a second row
-                  // holding the actual content (AnvendelseSettings' own
-                  // embedded table), full-width via colSpan. border-t-0!
-                  // on the second row cancels the table's divide-y line
-                  // between the two so the pair reads as one "Anvendelser"
-                  // block, not two separate settings.
-                  return (
-                    <Fragment key={setting.name}>
-                      <tr>
-                        <td className="w-56 border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
-                          <span className="truncate">{setting.label}:</span>
-                        </td>
-                        <td className="px-2 py-0.5 text-right">
-                          {setting.info && (
-                            <span className="relative inline-block">
-                              <button
-                                type="button"
-                                onClick={() =>
-                                  setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))
-                                }
-                                aria-label="Mere information"
-                                className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                              >
-                                ?
-                              </button>
-                              {openInfoName === setting.name && (
-                                <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                              )}
-                              <InlinePopup
-                                visible={openInfoName === setting.name}
-                                message={setting.info}
-                                align="right"
-                              />
-                            </span>
-                          )}
-                        </td>
-                      </tr>
-                      <tr className="border-t-0!">
-                        <td colSpan={2} className="px-2 py-0.5">
-                          {setting.render()}
-                        </td>
-                      </tr>
-                    </Fragment>
-                  );
-                }
-
-                /** Label text + optional "?" info popover — shared by every ordinary (non-"custom") row below. */
+                /** Label text + optional "?" info popover — shared by every row, "custom" included (same label column shape either way). */
                 const labelContent = (
                   <div className="relative flex items-center justify-between gap-1">
                     <span className="truncate">{setting.label}:</span>
@@ -339,7 +289,9 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
                       {labelContent}
                     </td>
                     <td className="px-2 py-0.5">
-                      {setting.inputType === "checkbox" ? (
+                      {setting.inputType === "custom" ? (
+                        setting.render()
+                      ) : setting.inputType === "checkbox" ? (
                         <div className="flex items-center gap-2">
                           <input
                             type="checkbox"

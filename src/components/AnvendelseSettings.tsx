@@ -249,7 +249,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                           : "bg-white text-brand-700 hover:bg-brand-50"
                     }`}
                   >
-                    <td className="whitespace-nowrap px-2 py-0.5 text-left font-medium">
+                    <td className="break-words px-2 py-0.5 text-left font-medium">
                       {anvendelse}
                       {isProtected(anvendelse) && <span className="text-red-600"> *</span>}
                     </td>
@@ -264,7 +264,9 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
         {mode !== "view" && (
           <RequiredFieldRow
             label="Ny anvendelse:"
-            labelClassName="flex items-center justify-end text-sm font-medium text-brand-700"
+            labelClassName="text-right text-sm font-medium text-brand-700"
+            className="flex flex-col gap-1 p-0.5"
+            inputClassName="w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
             value={fieldValue}
             onChange={setFieldValue}
           />
@@ -277,7 +279,13 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
             <p className="text-right text-xs text-brand-500">
               <span className="text-red-600">*</span> Kan ikke ændres eller slettes
             </p>
-            <div className="grid grid-cols-3 gap-3">
+            {/* Stacked, not side-by-side — this column is only ~140px wide
+                (the settings table's remaining width after the w-56 label
+                column), too narrow to fit 3 buttons on one line. Labels
+                drop the redundant "anvendelse" word (context is already
+                the "Anvendelser:" row) so each single button stays on one
+                line too. */}
+            <div className="flex flex-col gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -290,7 +298,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 disabled={selectedValue === null || isProtected(selectedValue)}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Rediger anvendelse
+                Rediger
               </button>
               <button
                 type="button"
@@ -301,7 +309,7 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 }}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
               >
-                Tilføj anvendelse
+                Tilføj
               </button>
               <button
                 type="button"
@@ -312,21 +320,21 @@ export function AnvendelseSettings({ table, scopeColumn, scopeId, departmentId }
                 disabled={selectedValue === null || isProtected(selectedValue)}
                 className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                Slet anvendelse
+                Slet
               </button>
             </div>
           </>
         )}
 
         {mode !== "view" && (
-          <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-2">
             <button
               type="button"
               onClick={() => setPendingAction(mode === "add" ? "create" : "update")}
               disabled={!canSubmitField}
               className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              {mode === "add" ? "Tilføj anvendelse" : "Opdater anvendelse"}
+              {mode === "add" ? "Tilføj" : "Opdater"}
             </button>
             <button
               type="button"
