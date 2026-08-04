@@ -83,7 +83,7 @@ export const STANDARDER: StandardSetting[] = [
     placeholder: "mm",
     inputType: "number",
     defaultValue: "15",
-    unit: "minutter",
+    unit: "min.",
     info: "Nye reservationer vil som default have intervaller på denne varighed",
   },
   {
@@ -92,7 +92,7 @@ export const STANDARDER: StandardSetting[] = [
     placeholder: "mm",
     inputType: "number",
     defaultValue: "30",
-    unit: "minutter",
+    unit: "min.",
     min: 1,
     max: 720,
     info: "Hvis du er inaktiv i dette tidsrum, vil du automatisk blive logget af systemet",
@@ -259,78 +259,106 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
             )}
             {!loading &&
               !loadError &&
-              settings.map((setting) => (
-                <tr key={setting.name}>
-                  <td
-                    className={`w-56 border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700 ${
-                      setting.inputType === "custom" ? "align-top" : ""
-                    }`}
-                  >
-                    <div className="relative flex items-center justify-between gap-1">
-                      <span className="truncate">{setting.label}:</span>
-                      {setting.info && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))}
-                            aria-label="Mere information"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                          >
-                            ?
-                          </button>
-                          {openInfoName === setting.name && (
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                          )}
-                          <InlinePopup visible={openInfoName === setting.name} message={setting.info} />
-                        </>
-                      )}
-                    </div>
-                  </td>
-                  <td className={`px-2 py-0.5 ${setting.inputType === "custom" ? "align-top" : ""}`}>
-                    {setting.inputType === "custom" ? (
-                      setting.render()
-                    ) : setting.inputType === "checkbox" ? (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={
-                            setting.readOnly
-                              ? effectiveValue(setting.name, setting.defaultValue)
-                              : (values[setting.name] ?? setting.defaultValue) === "true"
-                          }
-                          disabled={setting.readOnly || savingName === setting.name}
-                          readOnly={setting.readOnly}
-                          onChange={setting.readOnly ? undefined : (e) => void handleToggle(setting.name, e.target.checked)}
-                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                        />
-                        {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <input
-                          type={setting.inputType}
-                          value={values[setting.name] ?? setting.defaultValue}
-                          placeholder={setting.placeholder}
-                          min={setting.inputType === "number" ? (setting.min ?? 1) : undefined}
-                          max={setting.inputType === "number" ? (setting.max ?? 59) : undefined}
-                          disabled={savingName === setting.name}
-                          onChange={(e) => void handleChange(setting.name, setting.inputType, e.target.value)}
-                          style={
-                            setting.inputType === "number"
-                              ? ({ MozAppearance: "number-input" } as unknown as CSSProperties)
-                              : undefined
-                          }
-                          className={`w-28 shrink-0 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed ${
-                            setting.inputType === "number" ? "number-spinner-always" : ""
-                          }`}
-                        />
-                        <span className="text-left text-sm text-brand-600">{setting.unit}</span>
-                        {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
-                      </div>
+              settings.map((setting) => {
+                /** Label text + optional "?" info popover — identical for every row, just positioned differently below (beside a narrow value column for an ordinary row, stacked above a full-width one for "custom"). */
+                const labelContent = (
+                  <div className="relative flex items-center justify-between gap-1">
+                    <span className="truncate">{setting.label}:</span>
+                    {setting.info && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))}
+                          aria-label="Mere information"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                        >
+                          ?
+                        </button>
+                        {openInfoName === setting.name && (
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
+                        )}
+                        <InlinePopup visible={openInfoName === setting.name} message={setting.info} />
+                      </>
                     )}
-                  </td>
-                </tr>
-              ))}
+                  </div>
+                );
+
+                if (setting.inputType === "custom") {
+                  // Full-width row (colSpan=2, single cell) rather than the
+                  // usual w-56-label + narrow-value split — this row's own
+                  // content (AnvendelseSettings' whole list+editor UI) needs
+                  // real horizontal room on a small screen, not squeezed
+                  // into the same width every simple input/checkbox row
+                  // fits fine in. Label sits ABOVE the content in that same
+                  // cell (not beside it in its own bordered column), so
+                  // there's no dividing line between them — only the
+                  // table's own divide-y still separates this whole row
+                  // from the next setting.
+                  return (
+                    <tr key={setting.name}>
+                      <td colSpan={2} className="px-2 py-0.5">
+                        <div className="mb-2 font-medium text-brand-700">{labelContent}</div>
+                        {setting.render()}
+                      </td>
+                    </tr>
+                  );
+                }
+
+                return (
+                  <tr key={setting.name}>
+                    <td className="w-56 border-r border-brand-100 px-2 py-0.5 font-medium text-brand-700">
+                      {labelContent}
+                    </td>
+                    <td className="px-2 py-0.5">
+                      {setting.inputType === "checkbox" ? (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={
+                              setting.readOnly
+                                ? effectiveValue(setting.name, setting.defaultValue)
+                                : (values[setting.name] ?? setting.defaultValue) === "true"
+                            }
+                            disabled={setting.readOnly || savingName === setting.name}
+                            readOnly={setting.readOnly}
+                            onChange={setting.readOnly ? undefined : (e) => void handleToggle(setting.name, e.target.checked)}
+                            className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                          />
+                          {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <input
+                            type={setting.inputType}
+                            value={values[setting.name] ?? setting.defaultValue}
+                            placeholder={setting.placeholder}
+                            min={setting.inputType === "number" ? (setting.min ?? 1) : undefined}
+                            max={setting.inputType === "number" ? (setting.max ?? 59) : undefined}
+                            disabled={savingName === setting.name}
+                            onChange={(e) => void handleChange(setting.name, setting.inputType, e.target.value)}
+                            style={
+                              setting.inputType === "number"
+                                ? ({ MozAppearance: "number-input" } as unknown as CSSProperties)
+                                : undefined
+                            }
+                            className={`shrink-0 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed ${
+                              // "time" needs more room than "nn:nn" alone
+                              // suggests — the browser's own native
+                              // hh:mm picker UI (steppers/clock icon) eats
+                              // into the box too, and clips at w-16 (16
+                              // fits a plain "MM" number input snugly, but
+                              // not this).
+                              setting.inputType === "time" ? "w-24" : "w-16 number-spinner-always"
+                            }`}
+                          />
+                          <span className="text-left text-sm text-brand-600">{setting.unit}</span>
+                          {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
           </tbody>
         </table>
       </div>
