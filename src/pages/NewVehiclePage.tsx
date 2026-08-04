@@ -280,7 +280,7 @@ export function NewVehiclePage() {
 
               {sendError && <p className="text-sm text-red-600">{sendError}</p>}
 
-              <div className="mt-auto flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
+              <div className="flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <p className="text-xs text-brand-700">
                   Hvis du trykker på knappen herunder, sendes der besked til FLEETii, som
                   herefter vil vi oprette bilen i FLEETii, og kontakte dig vedr. aftale omkring evt.
