@@ -14,9 +14,10 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
  * Admin "Flådestyring" page ("/fleet-map"): a single map showing every
- * vehicle in the admin's department, clustered, with the first vehicle as
- * the "primary" marker (used to center the map) and the rest as extra
- * markers. Clicking any marker jumps to VehicleDetailsPage for that vehicle.
+ * vehicle in the admin's department, clustered by default (toggleable via
+ * clusterMarkers below), with the first vehicle as the "primary" marker
+ * (used to center the map) and the rest as extra markers. Clicking any
+ * marker jumps to VehicleDetailsPage for that vehicle.
  */
 export function FleetManagementPage() {
   const { afdelingId, profile } = useAuth();
@@ -78,6 +79,9 @@ export function FleetManagementPage() {
   const vehicleTooltip = (vehicleId: string): string =>
     formatVehicleIdentLabel(identByVehicleId[vehicleId]?.vehicleIdent, identByVehicleId[vehicleId]?.numberPlate, useVehicleIdent);
 
+  /** Whether nearby vehicles group into a single cluster marker (LeafletMap's own `cluster` prop) or each show individually — user-toggleable, defaults to clustered (the previous fixed behavior). */
+  const [clusterMarkers, setClusterMarkers] = useState(true);
+
   // Shows immediately when the department has no vehicles, then auto-hides
   // after 3s (rather than staying up indefinitely).
   const [showEmptyNotice, setShowEmptyNotice] = useState(false);
@@ -115,8 +119,15 @@ export function FleetManagementPage() {
             <PageHeader />
 
             <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-              <div className="space-y-4">
+              <div className="flex items-center justify-between gap-2 space-y-4">
                 <h2 className="text-xl font-semibold text-brand-800">Flådestyring</h2>
+                <button
+                  type="button"
+                  onClick={() => setClusterMarkers((prev) => !prev)}
+                  className="shrink-0 rounded-lg border border-brand-200 bg-white px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-50"
+                >
+                  {clusterMarkers ? "Vis enkeltvis" : "Saml køretøjer"}
+                </button>
               </div>
 
               <div className="relative mt-4 min-h-[16rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
@@ -133,7 +144,7 @@ export function FleetManagementPage() {
                     tooltip: vehicleTooltip(g.vehicleId),
                     onClick: () => goToVehicleDetails(g.vehicleId),
                   }))}
-                  cluster
+                  cluster={clusterMarkers}
                   permanentTooltips
                   showMarkerIcon={false}
                   className="absolute inset-0"
