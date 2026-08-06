@@ -7,13 +7,15 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 
-/** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address/contact_person/phone/email until its own fetch-by-id fallback kicked in. */
+/** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address fields/contact_person/phone/email until its own fetch-by-id fallback kicked in. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
   costumer_id: string;
   name: string | null;
   deactivated_at: string | null;
   cvr: string | null;
-  address: string | null;
+  address_street: string | null;
+  address_postal_city: string | null;
+  address_country: string | null;
   contact_person: string | null;
   phone: string | null;
   email: string | null;
@@ -105,7 +107,7 @@ export function FleetiiAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("costumers")
-        .select("costumer_id, name, deactivated_at, cvr, address, contact_person, phone, email")
+        .select("costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email")
         .order("name", { ascending: true })
         .returns<Costumer[]>();
 

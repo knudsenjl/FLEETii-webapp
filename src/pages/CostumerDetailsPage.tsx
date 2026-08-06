@@ -7,13 +7,15 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
-/** The costumer row, as passed in via router state from FleetiiAdministrationPage. Absent when reached via "Opret kunde" — see the KNOWN LIMITATION below. */
+/** The costumer row, as passed in via router state from FleetiiAdministrationPage. Absent when reached via "Opret kunde" — see the KNOWN LIMITATION below. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
   costumer_id: string;
   name: string | null;
   deactivated_at: string | null;
   cvr: string | null;
-  address: string | null;
+  address_street: string | null;
+  address_postal_city: string | null;
+  address_country: string | null;
   contact_person: string | null;
   phone: string | null;
   email: string | null;
@@ -71,7 +73,9 @@ export function CostumerDetailsPage() {
 
   const [name, setName] = useState("");
   const [cvr, setCvr] = useState("");
-  const [address, setAddress] = useState("");
+  const [street, setStreet] = useState("");
+  const [postalCity, setPostalCity] = useState("");
+  const [country, setCountry] = useState("");
   const [contactPerson, setContactPerson] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
@@ -82,7 +86,9 @@ export function CostumerDetailsPage() {
   const [isEditing, setIsEditing] = useState(Boolean(state?.startEditing));
   const [editName, setEditName] = useState(costumer?.name ?? "");
   const [editCvr, setEditCvr] = useState(costumer?.cvr ?? "");
-  const [editAddress, setEditAddress] = useState(costumer?.address ?? "");
+  const [editStreet, setEditStreet] = useState(costumer?.address_street ?? "");
+  const [editPostalCity, setEditPostalCity] = useState(costumer?.address_postal_city ?? "");
+  const [editCountry, setEditCountry] = useState(costumer?.address_country ?? "");
   const [editContactPerson, setEditContactPerson] = useState(costumer?.contact_person ?? "");
   const [editPhone, setEditPhone] = useState(costumer?.phone ?? "");
   const [editEmail, setEditEmail] = useState(costumer?.email ?? "");
@@ -105,7 +111,9 @@ export function CostumerDetailsPage() {
   const canSubmit =
     name.trim().length > 0 &&
     cvr.trim().length > 0 &&
-    address.trim().length > 0 &&
+    street.trim().length > 0 &&
+    postalCity.trim().length > 0 &&
+    country.trim().length > 0 &&
     contactPerson.trim().length > 0 &&
     phone.trim().length > 0 &&
     email.trim().length > 0;
@@ -119,7 +127,9 @@ export function CostumerDetailsPage() {
     setCostumerLoading(true);
     void supabase
       .from("costumers")
-      .select("costumer_id, name, deactivated_at, cvr, address, contact_person, phone, email")
+      .select(
+        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email",
+      )
       .eq("costumer_id", costumerId)
       .maybeSingle<Costumer>()
       .then(({ data }) => {
@@ -143,7 +153,9 @@ export function CostumerDetailsPage() {
     setEditName(costumer.name ?? "");
     setDeactivatedAt(costumer.deactivated_at ?? null);
     setEditCvr(costumer.cvr ?? "");
-    setEditAddress(costumer.address ?? "");
+    setEditStreet(costumer.address_street ?? "");
+    setEditPostalCity(costumer.address_postal_city ?? "");
+    setEditCountry(costumer.address_country ?? "");
     setEditContactPerson(costumer.contact_person ?? "");
     setEditPhone(costumer.phone ?? "");
     setEditEmail(costumer.email ?? "");
@@ -173,12 +185,16 @@ export function CostumerDetailsPage() {
       .insert({
         name: name.trim(),
         cvr: cvr.trim() || null,
-        address: address.trim() || null,
+        address_street: street.trim() || null,
+        address_postal_city: postalCity.trim() || null,
+        address_country: country.trim() || null,
         contact_person: contactPerson.trim() || null,
         phone: phone.trim() || null,
         email: email.trim() || null,
       })
-      .select("costumer_id, name, deactivated_at, cvr, address, contact_person, phone, email")
+      .select(
+        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email",
+      )
       .single<Costumer>();
 
     if (error || !data) {
@@ -206,7 +222,9 @@ export function CostumerDetailsPage() {
       .update({
         name: editName.trim(),
         cvr: editCvr.trim() || null,
-        address: editAddress.trim() || null,
+        address_street: editStreet.trim() || null,
+        address_postal_city: editPostalCity.trim() || null,
+        address_country: editCountry.trim() || null,
         contact_person: editContactPerson.trim() || null,
         phone: editPhone.trim() || null,
         email: editEmail.trim() || null,
@@ -366,11 +384,6 @@ export function CostumerDetailsPage() {
         >
           <PageHeader />
 
-          <p className="text-sm font-medium text-red-600">
-            Vi skal have diskuteret, hvilke oplysninger der skal opbevares i FLEETii om hver kunde. Disse oplysninger
-            vil KUN være synlige for vores interne brug (bortset fra navnet).
-          </p>
-
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">
               {costumer ? (isEditing ? "Rediger kunde" : "Kundedetaljer") : "Opret kunde"}
@@ -392,11 +405,29 @@ export function CostumerDetailsPage() {
                         />
                       </div>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Adresse:</label>
+                        <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
                         <input
                           type="text"
-                          value={editAddress}
-                          onChange={(e) => setEditAddress(e.target.value)}
+                          value={editStreet}
+                          onChange={(e) => setEditStreet(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
+                        <input
+                          type="text"
+                          value={editPostalCity}
+                          onChange={(e) => setEditPostalCity(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
+                        <input
+                          type="text"
+                          value={editCountry}
+                          onChange={(e) => setEditCountry(e.target.value)}
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       </div>
@@ -450,7 +481,9 @@ export function CostumerDetailsPage() {
                       onClick={() => {
                         setEditName(costumer.name ?? "");
                         setEditCvr(costumer.cvr ?? "");
-                        setEditAddress(costumer.address ?? "");
+                        setEditStreet(costumer.address_street ?? "");
+                        setEditPostalCity(costumer.address_postal_city ?? "");
+                        setEditCountry(costumer.address_country ?? "");
                         setEditContactPerson(costumer.contact_person ?? "");
                         setEditPhone(costumer.phone ?? "");
                         setEditEmail(costumer.email ?? "");
@@ -475,8 +508,16 @@ export function CostumerDetailsPage() {
                         <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
                       </div>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Adresse:</label>
-                        <span className="text-sm text-brand-800">{costumer.address ?? "—"}</span>
+                        <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
+                        <span className="text-sm text-brand-800">{costumer.address_street ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
+                        <span className="text-sm text-brand-800">{costumer.address_postal_city ?? "—"}</span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
+                        <span className="text-sm text-brand-800">{costumer.address_country ?? "—"}</span>
                       </div>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
@@ -533,7 +574,9 @@ export function CostumerDetailsPage() {
                           onClick={() => {
                             setEditName(costumer.name ?? "");
                             setEditCvr(costumer.cvr ?? "");
-                            setEditAddress(costumer.address ?? "");
+                            setEditStreet(costumer.address_street ?? "");
+                            setEditPostalCity(costumer.address_postal_city ?? "");
+                            setEditCountry(costumer.address_country ?? "");
                             setEditContactPerson(costumer.contact_person ?? "");
                             setEditPhone(costumer.phone ?? "");
                             setEditEmail(costumer.email ?? "");
@@ -604,14 +647,40 @@ export function CostumerDetailsPage() {
                     </div>
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">
-                        Adresse: <span className="ml-0.5 text-red-600">*</span>
+                        Vej og husnr.: <span className="ml-0.5 text-red-600">*</span>
                       </label>
                       <input
                         type="text"
                         required
                         aria-required="true"
-                        value={address}
-                        onChange={(e) => setAddress(e.target.value)}
+                        value={street}
+                        onChange={(e) => setStreet(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Postnr. og by: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={postalCity}
+                        onChange={(e) => setPostalCity(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Land: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={country}
+                        onChange={(e) => setCountry(e.target.value)}
                         className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
                     </div>
