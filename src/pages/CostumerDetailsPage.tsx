@@ -67,9 +67,21 @@ export function CostumerDetailsPage() {
   const { costumerId } = useParams<{ costumerId: string }>();
   const state = location.state as { costumer?: Costumer; startEditing?: boolean } | null;
   const stateCostumer = state?.costumer ?? null;
-  const [fetchedCostumer, setFetchedCostumer] = useState<Costumer | null>(null);
+  // undefined = "haven't fetched yet" (so costumer below falls back to
+  // stateCostumer for an instant first paint); null = "fetched, confirmed
+  // gone" (e.g. deleted — must NOT fall back to stale state, or the
+  // redirect-on-missing-data effect below would never fire).
+  const [fetchedCostumer, setFetchedCostumer] = useState<Costumer | null | undefined>(undefined);
   const [costumerLoading, setCostumerLoading] = useState(false);
-  const costumer = stateCostumer ?? fetchedCostumer;
+  // fetchedCostumer wins once it arrives, not stateCostumer — router state
+  // is only an instant-paint fallback for the moment before the fetch
+  // below resolves. It used to be the other way around (state always won),
+  // which looked fine for a normal navigation (state IS fresh then) but
+  // silently showed STALE data after a hard refresh: browsers keep
+  // history.state across a same-URL reload, so location.state can still be
+  // populated with whatever was fetched on a PREVIOUS visit — e.g. from
+  // before a later schema change, missing fields entirely.
+  const costumer = fetchedCostumer !== undefined ? fetchedCostumer : stateCostumer;
 
   const [name, setName] = useState("");
   const [cvr, setCvr] = useState("");
@@ -123,9 +135,9 @@ export function CostumerDetailsPage() {
     email.trim().length > 0;
   const canSubmitEdit = editName.trim().length > 0;
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/costumer-details/:costumerId" (no router state) — skipped entirely when stateCostumer is already present. */
+  /** Always (re)fetches the costumer by id when one is present — even when router state already has one, since that state can be stale (see costumer's own comment above). stateCostumer still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. */
   useEffect(() => {
-    if (stateCostumer || !costumerId) return;
+    if (!costumerId) return;
 
     let cancelled = false;
     setCostumerLoading(true);
@@ -145,7 +157,7 @@ export function CostumerDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [costumerId, stateCostumer]);
+  }, [costumerId]);
 
   // Populates editName/deactivatedAt once `costumer` resolves asynchronously
   // (the fetch-by-id path above) — their useState initializers only run on
