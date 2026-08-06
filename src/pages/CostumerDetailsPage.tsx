@@ -75,7 +75,11 @@ export function CostumerDetailsPage() {
   const [cvr, setCvr] = useState("");
   const [street, setStreet] = useState("");
   const [postalCity, setPostalCity] = useState("");
-  const [country, setCountry] = useState("");
+  // Defaults to "Danmark" rather than empty — almost every costumer is
+  // Danish, matching the DB column's own default (see
+  // costumers_address_country_default_denmark.sql) — still a plain
+  // editable field, just pre-filled.
+  const [country, setCountry] = useState("Danmark");
   const [contactPerson, setContactPerson] = useState("");
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
