@@ -41,8 +41,13 @@ type VehicleDepartmentRow = { department_id: string; departments: { name: string
 /** Raw shape of the vehicle_profiles row fetched here for its home department — just the scalar department_id, resolved to a name via a separate departments lookup (see the fetch effect below for why this isn't a single embedded query). */
 type VehicleProfileHomeRow = { department_id: string | null };
 
-/** Raw shape of the vehicle_profiles row fetched here for the genuine Nummerplade/vehicle_ident PLUS this vehicle's own department_id (for the useIdentSettings gate below) — see the numberPlate fetch effect below for why the plate part can't just reuse vehicle.plate. Piggybacks department_id onto this same query rather than a third round-trip, since both are needed together and neither is admin-gated (unlike the vehicleDepartments/homeDepartmentName effect above, which skips entirely for a non-admin viewer). */
-type VehicleProfilePlateRow = { number_plate: string | null; vehicle_ident: string | null; department_id: string | null };
+/** Raw shape of the vehicle_profiles row fetched here for the genuine Nummerplade/vehicle_ident PLUS this vehicle's own department_id (for the useIdentSettings gate below) — see the numberPlate fetch effect below for why the plate part can't just reuse vehicle.plate. Piggybacks department_id and drivmiddel onto this same query rather than extra round-trips, since none of these are admin-gated (unlike the vehicleDepartments/homeDepartmentName effect above, which skips entirely for a non-admin viewer). */
+type VehicleProfilePlateRow = {
+  number_plate: string | null;
+  vehicle_ident: string | null;
+  department_id: string | null;
+  drivmiddel: string | null;
+};
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
@@ -112,6 +117,8 @@ export function VehicleDetailsPage() {
   const [numberPlateLoading, setNumberPlateLoading] = useState(true);
   /** This vehicle's own home department_id — fetched alongside numberPlate below (see VehicleProfilePlateRow), independent of the admin-only vehicleDepartments/homeDepartmentName effect above so a non-admin viewer still resolves this for the useIdentSettings gate. */
   const [identDepartmentId, setIdentDepartmentId] = useState<string | null>(null);
+  /** vehicle_profiles.drivmiddel — fetched alongside numberPlate below, shown in the "Drivmiddel:" row. */
+  const [drivmiddel, setDrivmiddel] = useState<string | null>(null);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 
@@ -222,7 +229,7 @@ export function VehicleDetailsPage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, department_id")
+      .select("number_plate, vehicle_ident, department_id, drivmiddel")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfilePlateRow>()
       .then(({ data }) => {
@@ -230,6 +237,7 @@ export function VehicleDetailsPage() {
         setNumberPlate(data?.number_plate ?? null);
         setVehicleIdent(data?.vehicle_ident ?? null);
         setIdentDepartmentId(data?.department_id ?? null);
+        setDrivmiddel(data?.drivmiddel ?? null);
         setNumberPlateLoading(false);
       });
 
@@ -358,18 +366,27 @@ export function VehicleDetailsPage() {
                       {vehicle.version ? `${vehicle.vehicle} - årgang: ${vehicle.version}` : vehicle.vehicle}
                     </span>
                   </div>
+                  {/* Kilometerstand and Status are only shown to admin/FLEETii admin — same gating as BookingDetailsPage.tsx's identical rows. */}
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                      <span className="text-sm text-brand-800">
+                        {vehicle.distanceCovered ? (
+                          `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
+                        ) : (
+                          <span className="italic">Ingen information</span>
+                        )}
+                      </span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
                     <span className="text-sm text-brand-800">
-                      {vehicle.distanceCovered ? (
-                        `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
-                      ) : (
-                        <span className="italic">Ingen information</span>
-                      )}
+                      {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (drivmiddel ?? "—")}
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
                     <span className="text-sm text-brand-800">
                       {vehicle.autonomyPercentage ? (
                         `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
@@ -378,20 +395,22 @@ export function VehicleDetailsPage() {
                       )}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                      Status:
-                      {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. */}
-                      <span
-                        className={`h-2.5 w-2.5 rounded-full ${vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"}`}
-                        title={vehicle.status}
-                      />
-                    </label>
-                    <span className="text-sm text-brand-800">
-                      {vehicle.status}
-                      {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
-                    </span>
-                  </div>
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center justify-between text-sm font-medium text-brand-700">
+                        Status:
+                        {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. */}
+                        <span
+                          className={`h-2.5 w-2.5 rounded-full ${vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"}`}
+                          title={vehicle.status}
+                        />
+                      </label>
+                      <span className="text-sm text-brand-800">
+                        {vehicle.status}
+                        {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
+                      </span>
+                    </div>
+                  )}
                   {isAdmin && (
                     <>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">

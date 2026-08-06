@@ -3,7 +3,7 @@
 Danish-language fleet/vehicle-reservation admin tool. The domain terms below appear verbatim throughout the UI and code comments — not translated, and not typos.
 
 ## Domain glossary
-**Afdeling** department · **Anvendelse** reservation's purpose/usage · **Bruger** user · **Reservation** booking (same thing) · **Slut** end (of a booking) · **Årgang** model year · **Nummerplade** number plate · **Kilometerstand** mileage/odometer · **Brændstofniveau** fuel/battery level · **Ledig** available/free · **Låst / Lås op** locked / unlock · **Fortryd** cancel/undo · **Bekræft** confirm.
+**Afdeling** department · **Anvendelse** reservation's purpose/usage · **Bruger** user · **Reservation** booking (same thing) · **Slut** end (of a booking) · **Årgang** model year · **Nummerplade** number plate · **Kilometerstand** mileage/odometer · **Drivmiddel** propellant/fuel type (`vehicle_profiles.drivmiddel`/`costumer_orders.drivmiddel` — one of Benzin/Diesel/El/Hybrid/Brint) · **Drivmiddelniveau** fuel/battery level (0–100%, from 2hire telemetry — a different concept from Drivmiddel, don't conflate them) · **Ledig** available/free · **Låst / Lås op** locked / unlock · **Fortryd** cancel/undo · **Bekræft** confirm.
 
 ## Gotchas — look wrong, aren't
 - **"costumer"/"costumers"** is the actual spelling used throughout the DB schema and code (tables, columns, variable names) — not "customer". Don't "fix" it; a real fix would require a coordinated rename across migrations, RLS policies, and the client.

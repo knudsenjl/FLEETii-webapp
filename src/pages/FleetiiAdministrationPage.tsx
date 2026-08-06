@@ -50,6 +50,8 @@ type CostumerOrder = {
   brand: string | null;
   model: string | null;
   model_year: string | null;
+  /** Only meaningful for order_type "Opret" — see costumer_orders_add_drivmiddel.sql. Carried through router state so VehicleCreatePage.tsx's own "Drivmiddel:" row doesn't need a redundant fetch. */
+  drivmiddel: string;
   needs_fleetii_device: boolean;
   fleetii_device_id: string | null;
   contactperson: string;
@@ -78,6 +80,7 @@ type CostumerOrderQueryRow = {
   brand: string | null;
   model: string | null;
   model_year: string | null;
+  drivmiddel: string;
   needs_fleetii_device: boolean;
   fleetii_device_id: string | null;
   contactperson: string;
@@ -136,7 +139,7 @@ export function FleetiiAdministrationPage() {
       const { data, error: fetchError } = await supabase
         .from("costumer_orders")
         .select(
-          "order_id, order_type, vehicle_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, device_removed, created_at, costumers(name), departments(name)",
+          "order_id, order_type, vehicle_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, device_removed, created_at, costumers(name), departments(name)",
         )
         .order("created_at", { ascending: true })
         .returns<CostumerOrderQueryRow[]>();

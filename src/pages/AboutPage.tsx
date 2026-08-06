@@ -70,7 +70,7 @@ export function AboutPage() {
                 <p className="text-sm text-brand-700">
                   Gennem flådeadministrationen får du overblik over, hvor jeres køretøjer
                   befinder sig geografisk, og du kan som administrator få indblik i væsentlige
-                  faktorer, som eksempelvis brændstofniveau. Herudover kan du foretage bookinger
+                  faktorer, som eksempelvis drivmiddelniveau. Herudover kan du foretage bookinger
                   for dine brugere m.m.
                 </p>
               </div>

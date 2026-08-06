@@ -75,6 +75,8 @@ export function AvailablePage() {
         departmentId?: string | null;
         /** Display-ready counterpart to departmentId — ConfirmPage's read-only "Kunde/afdeling" summary row. Purely pass-through here, same as userLabel. */
         departmentLabel?: string;
+        /** Present only when this page was reached via a browser back-navigation from ConfirmPage — see the "Reserver"/"Opdater" button's own comment below. Restores the row the admin had picked, which a plain useState initializer would otherwise lose on remount. */
+        selectedVehicleId?: string | null;
       }
     | null;
   const bruger = state?.user ?? "";
@@ -178,8 +180,10 @@ export function AvailablePage() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [availableVehicles.map((v) => v.id).join("|")]);
 
-  /** Pre-selects the vehicle the booking being edited already had (see ReservationPage's "editing.vehicleId") — that vehicle bypasses the department filter above, and its own booking row is excluded from the conflict check, so it's guaranteed to show up as available here for its original period. Still just a plain initial value: the user can pick a different vehicle same as any other row. */
-  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(state?.editingVehicleId ?? null);
+  /** Pre-selects the vehicle the booking being edited already had (see ReservationPage's "editing.vehicleId") — that vehicle bypasses the department filter above, and its own booking row is excluded from the conflict check, so it's guaranteed to show up as available here for its original period. state?.selectedVehicleId (present only after a browser back-navigation from ConfirmPage — see the "Reserver"/"Opdater" button below) wins over that, so a real pick the admin already made isn't silently replaced by the editing-default. Still just a plain initial value otherwise: the user can pick a different vehicle same as any other row. */
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(
+    state?.selectedVehicleId ?? state?.editingVehicleId ?? null,
+  );
   const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
 
   return (
@@ -294,8 +298,14 @@ export function AvailablePage() {
                 <button
                   type="button"
                   disabled={!selectedVehicle}
-                  onClick={() =>
-                    selectedVehicle &&
+                  onClick={() => {
+                    if (!selectedVehicle) return;
+                    // Snapshot the picked vehicle onto THIS page's own
+                    // history entry (replace, not push) right before
+                    // navigating away — same fix as ReservationPage's
+                    // formSnapshot, so a browser back-navigation from
+                    // ConfirmPage doesn't lose the selection.
+                    navigate(location.pathname, { replace: true, state: { ...state, selectedVehicleId } });
                     navigate("/confirm", {
                       state: {
                         vehicle: selectedVehicle,
@@ -308,8 +318,8 @@ export function AvailablePage() {
                         departmentId: targetDepartmentId,
                         departmentLabel: state?.departmentLabel,
                       },
-                    })
-                  }
+                    });
+                  }}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {editingBookingId ? "Opdater" : "Reserver"}

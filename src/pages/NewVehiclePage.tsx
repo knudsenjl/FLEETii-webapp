@@ -5,6 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
 /**
@@ -28,6 +29,8 @@ export function NewVehiclePage() {
   /** Fuel level/mileage at the time of the request — optional (not always known, e.g. a genuinely new vehicle), free-text same as the other fields here (see costumer_orders_add_fuel_level_and_mileage.sql). */
   const [fuelLevel, setFuelLevel] = useState("");
   const [mileage, setMileage] = useState("");
+  /** costumer_orders.drivmiddel — always a real value (a <select>, no "not filled in yet" state), defaults to "Benzin" matching the column's own default. */
+  const [drivmiddel, setDrivmiddel] = useState("Benzin");
   /** Whether a NEW FLEETii device needs to be installed — unticked when the vehicle already has one (an existing IoT device moved from elsewhere, or pre-installed), in which case fleetiiDeviceId identifies it instead. */
   const [needsFleetiiDevice, setNeedsFleetiiDevice] = useState(true);
   const [fleetiiDeviceId, setFleetiiDeviceId] = useState("");
@@ -83,6 +86,7 @@ export function NewVehiclePage() {
           aargang,
           fuelLevel,
           mileage,
+          drivmiddel,
           needsFleetiiDevice,
           fleetiiDeviceId: needsFleetiiDevice ? null : fleetiiDeviceId,
           kontaktperson,
@@ -127,10 +131,6 @@ export function NewVehiclePage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">Opret nyt køretøj</h2>
-
-              <p className="text-xs text-red-600">
-                Denne side skal vi have snakket om. Jeg ved ikke, hvilke oplysninger, Robert har brug for, at kunne oprette en ny bil i den pågældende afdeling.
-              </p>
 
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
@@ -193,7 +193,21 @@ export function NewVehiclePage() {
                     />
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                    <select
+                      value={drivmiddel}
+                      onChange={(e) => setDrivmiddel(e.target.value)}
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                    >
+                      {DRIVMIDDEL_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
                     <input
                       type="text"
                       value={fuelLevel}

@@ -34,6 +34,8 @@ type SendVehicleRequestBody = {
   /** Optional — not always known (e.g. a genuinely new vehicle), free-text same as the other fields. */
   fuelLevel?: string | null;
   mileage?: string | null;
+  /** One of vehicle_profiles.drivmiddel's five values (see NewVehiclePage.tsx's <select>) — falls back to the column's own "Benzin" default (see costumer_orders_add_drivmiddel.sql) if somehow missing, same as an omitted insert column would. */
+  drivmiddel?: string | null;
   /** Whether a NEW FLEETii device needs to be installed — false means the vehicle already has one, identified by fleetiiDeviceId instead (see NewVehiclePage.tsx's own doc comment). Defaults true if omitted, matching the client's own default. */
   needsFleetiiDevice?: boolean;
   fleetiiDeviceId?: string | null;
@@ -54,6 +56,7 @@ function buildHtmlBody(fields: {
   aargang: string;
   fuelLevel: string;
   mileage: string;
+  drivmiddel: string;
   fleetiiDevice: string;
   kontaktperson: string;
   kontaktemail: string;
@@ -80,7 +83,8 @@ function buildHtmlBody(fields: {
       ${row("Mærke", fields.maerke || "—")}
       ${row("Årgang", fields.aargang || "—")}
       ${row("Kilometerstand", fields.mileage || "—")}
-      ${row("Brændstofniveau", fields.fuelLevel || "—")}
+      ${row("Drivmiddel", fields.drivmiddel)}
+      ${row("Drivmiddelniveau", fields.fuelLevel || "—")}
       ${row("FLEETii device", fields.fleetiiDevice)}
       ${row("Kontaktperson", fields.kontaktperson)}
       ${row("Kontakt e-mail", fields.kontaktemail)}
@@ -97,7 +101,7 @@ function buildHtmlBody(fields: {
 
 /**
  * POST { afdeling?, vehicleIdent?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
- * needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
+ * drivmiddel?, needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
  * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false) —
  * brand/maerke/aargang/fuelLevel/mileage are all optional, not always known
@@ -145,6 +149,7 @@ export default async (req: Request) => {
   const aargang = asTrimmedString(body.aargang);
   const fuelLevel = asTrimmedString(body.fuelLevel);
   const mileage = asTrimmedString(body.mileage);
+  const drivmiddel = asTrimmedString(body.drivmiddel) || "Benzin";
   const kontaktperson = asTrimmedString(body.kontaktperson);
   const kontaktemail = asTrimmedString(body.kontaktemail);
   const kontaktnummer = asTrimmedString(body.kontaktnummer);
@@ -206,6 +211,7 @@ export default async (req: Request) => {
       model_year: aargang || null,
       fuel_level: fuelLevel || null,
       mileage: mileage || null,
+      drivmiddel,
       needs_fleetii_device: needsFleetiiDevice,
       fleetii_device_id: needsFleetiiDevice ? null : fleetiiDeviceId,
       contactperson: kontaktperson,
@@ -241,6 +247,7 @@ export default async (req: Request) => {
       aargang: aargang ?? "",
       fuelLevel: fuelLevel ?? "",
       mileage: mileage ?? "",
+      drivmiddel,
       fleetiiDevice,
       kontaktperson,
       kontaktemail,

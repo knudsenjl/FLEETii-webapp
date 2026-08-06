@@ -264,6 +264,43 @@ describe("isVehicleAvailable", () => {
     const bookings: BookingWindow[] = [{ vehicle_id: "AB12345", start: "2026-07-09T14:00:00", end: null }];
     expect(isVehicleAvailable("AB12345", bookings, reservationStart, reservationEnd)).toBe(true);
   });
+
+  // "Ingen sluttid" — the REQUEST itself is open-ended (reservationEnd is
+  // null, reservationStart is set). Regression coverage for a real bug: an
+  // earlier version treated ANY null reservationEnd as "no period picked
+  // yet" and short-circuited to available regardless of real conflicts, so
+  // picking "Ingen sluttid" made every vehicle show as available on
+  // AvailablePage even when genuinely booked.
+  it("is unavailable for an open-ended request when an existing booking hasn't ended yet", () => {
+    const bookings: BookingWindow[] = [
+      { vehicle_id: "AB12345", start: "2026-07-09T11:00:00", end: "2026-07-09T13:00:00" },
+    ];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, null)).toBe(false);
+  });
+
+  it("is unavailable for an open-ended request against another open-ended booking that has already started", () => {
+    const bookings: BookingWindow[] = [{ vehicle_id: "AB12345", start: "2026-07-09T06:00:00", end: null }];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, null)).toBe(false);
+  });
+
+  it("is available for an open-ended request when every existing booking already ended before it starts", () => {
+    const bookings: BookingWindow[] = [
+      { vehicle_id: "AB12345", start: "2026-07-09T06:00:00", end: "2026-07-09T08:00:00" },
+    ];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, null)).toBe(true);
+  });
+
+  it("is available for an open-ended request for a back-to-back booking ending exactly at its start", () => {
+    const bookings: BookingWindow[] = [{ vehicle_id: "AB12345", start: "2026-07-09T06:00:00", end: reservationStart }];
+    expect(isVehicleAvailable("AB12345", bookings, reservationStart, null)).toBe(true);
+  });
+
+  it("is still available when reservationStart alone is null (no period picked yet)", () => {
+    const bookings: BookingWindow[] = [
+      { vehicle_id: "AB12345", start: "2026-07-09T09:00:00", end: "2026-07-09T12:00:00" },
+    ];
+    expect(isVehicleAvailable("AB12345", bookings, null, reservationEnd)).toBe(true);
+  });
 });
 
 describe("computeFreePeriod", () => {

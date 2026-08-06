@@ -20,6 +20,9 @@ export const DEPARTMENT_COLUMN = "department_id";
 /** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email, user_ident) via the user_id FK (PostgREST resolves it automatically) so callers get display-ready email/Bruger-ID alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
 export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email, user_ident), ${DEPARTMENT_COLUMN}`;
 
+/** The five propellant values vehicle_profiles.drivmiddel (and costumer_orders.drivmiddel) allow, per their shared CHECK constraint — see supabase/applied/vehicle_profiles_add_drivmiddel.sql / costumer_orders_add_drivmiddel.sql. Kept as a plain array (not an enum type) so every "Drivmiddel:" <select> (HandleVehiclePage.tsx, VehicleCreatePage.tsx) always matches the DB's own constraint from one shared source. */
+export const DRIVMIDDEL_OPTIONS = ["Benzin", "Diesel", "El", "Hybrid", "Brint"] as const;
+
 export type DisplayVehicle = Vehicle2Hire & {
   vehicle: string;
   department: string;
@@ -240,6 +243,19 @@ export function isoPrefix(iso: string): string {
  * before the requested period starts" — it occupies the vehicle for all time
  * from its start onward, so the only way to be available around it is for
  * the requested period to end at or before that booking starts.
+ *
+ * reservationEnd being null is genuinely ambiguous on its own — it means
+ * either "no period picked yet" (nothing to check) or "Ingen sluttid", an
+ * intentionally open-ended REQUEST (occupies the vehicle for all time from
+ * reservationStart onward, so any existing booking must have ALREADY ended
+ * by then to not conflict — same reasoning as an open-ended booking above,
+ * just from the other side). reservationStart alone disambiguates this: it's
+ * only ever null before the form has a start time at all, at which point
+ * there's nothing meaningful to check yet either way — so ONLY a missing
+ * start short-circuits to "available", never a missing end on its own. (A
+ * previous version returned true whenever EITHER was null, which silently
+ * treated every vehicle as available the moment "Ingen sluttid" was picked,
+ * regardless of real conflicts — see AvailablePage.tsx's own bug report.)
  */
 export function isVehicleAvailable(
   vehicleId: string,
@@ -247,12 +263,12 @@ export function isVehicleAvailable(
   reservationStart: string | null,
   reservationEnd: string | null,
 ): boolean {
-  if (!reservationStart || !reservationEnd) return true;
+  if (!reservationStart) return true;
 
   const start = isoPrefix(reservationStart);
-  const end = isoPrefix(reservationEnd);
+  const end = reservationEnd ? isoPrefix(reservationEnd) : null;
   const carBookings = bookings.filter((b) => b.vehicle_id === vehicleId);
-  return carBookings.every((b) => isoPrefix(b.start) >= end || (b.end !== null && isoPrefix(b.end) <= start));
+  return carBookings.every((b) => (end !== null && isoPrefix(b.start) >= end) || (b.end !== null && isoPrefix(b.end) <= start));
 }
 
 /** A vehicle's free window either side of a reference period; a null bound means unbounded (no earlier/later booking constrains it). */

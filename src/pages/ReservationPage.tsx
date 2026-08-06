@@ -17,6 +17,30 @@ import {
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
+/**
+ * Every field this page's form needs to fully restore itself — stashed into
+ * this page's OWN history entry (replace, not push) right before "Find
+ * ledige"/"Skift køretøj" navigates to AvailablePage, and read back on
+ * mount. Without this, a browser back-navigation from AvailablePage remounts
+ * this page fresh: React Router's history state is only ever what a
+ * navigate() call explicitly set on an entry, never a live mirror of a
+ * component's local useState — so everything typed just vanished. The app's
+ * own "Fortryd"/back buttons never had this problem (they don't return HERE
+ * at all), only the browser's native back button does.
+ */
+type ReservationFormSnapshot = {
+  selectedDepartmentId: string;
+  bruger: string;
+  anvendelseOption: string;
+  anvendelseCustom: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  startIsNow: boolean;
+  endIgnored: boolean;
+};
+
 /** Hardcoded fallbacks used whenever "Standard varighed"/"Standard interval" (department_settings/user_settings, see StandardSettings.tsx) has no value for the current user/department. */
 const DEFAULT_DURATION_MINUTES = 3 * 60;
 const DEFAULT_INTERVAL_MINUTES = 15;
@@ -92,11 +116,15 @@ export function ReservationPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
+  /** Present only when this page was reached via a browser back-navigation from AvailablePage — see ReservationFormSnapshot's own doc comment. Wins over every other default below, but never over editing's OWN fields where a snapshot field is itself blank (e.g. anvendelseCustom empty) — see each initializer. */
+  const formSnapshot = (location.state as { formSnapshot?: ReservationFormSnapshot } | null)?.formSnapshot ?? null;
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
   /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
   /** Pre-fills to the booking being edited's own current department (see EditingBooking's departmentId) — otherwise unset, requiring an explicit pick, same as bruger's own editing?.userId prefill just below. */
-  const [selectedDepartmentId, setSelectedDepartmentId] = useState(editing?.departmentId ?? "");
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState(
+    formSnapshot?.selectedDepartmentId ?? editing?.departmentId ?? "",
+  );
   const [departmentOptions, setDepartmentOptions] = useState<
     { department_id: string; name: string; costumerName: string | null }[]
   >([]);
@@ -105,9 +133,9 @@ export function ReservationPage() {
   // exactly that for a non-admin booking for themselves. When editing an
   // existing booking, editing.userId (whoever it was originally for) wins
   // over both defaults.
-  const [bruger, setBruger] = useState(editing?.userId ?? (isAdmin ? "" : session?.user.id ?? ""));
-  const [anvendelseOption, setAnvendelseOption] = useState("");
-  const [anvendelseCustom, setAnvendelseCustom] = useState("");
+  const [bruger, setBruger] = useState(formSnapshot?.bruger ?? editing?.userId ?? (isAdmin ? "" : session?.user.id ?? ""));
+  const [anvendelseOption, setAnvendelseOption] = useState(formSnapshot?.anvendelseOption ?? "");
+  const [anvendelseCustom, setAnvendelseCustom] = useState(formSnapshot?.anvendelseCustom ?? "");
   /** The actual "anvendelse" value used downstream — the selected option, or (when ANDET_VALUE is picked) the user's own free-text reason. */
   const anvendelse = anvendelseOption === ANDET_VALUE ? anvendelseCustom : anvendelseOption;
   const [anvendelseOptions, setAnvendelseOptions] = useState<string[]>([]);
@@ -204,8 +232,8 @@ export function ReservationPage() {
     [standardIntervalMinutes],
   );
 
-  /** Pre-selects the booking-being-edited's Anvendelse once the options list has loaded — a plain "Anvendelse" match wins if the loaded list still has that exact option, otherwise it's treated as a free-text "Andet" reason (mirrors how the anvendelse getter below reconstructs the same distinction on submit). Guarded by editingPrefilled so a later options reload (e.g. afdelingId somehow changing) never clobbers a value the admin has since edited by hand. */
-  const editingAnvendelsePrefilled = useRef(false);
+  /** Pre-selects the booking-being-edited's Anvendelse once the options list has loaded — a plain "Anvendelse" match wins if the loaded list still has that exact option, otherwise it's treated as a free-text "Andet" reason (mirrors how the anvendelse getter below reconstructs the same distinction on submit). Guarded by editingPrefilled so a later options reload (e.g. afdelingId somehow changing) never clobbers a value the admin has since edited by hand — starts already-true when restoring from formSnapshot (both editing AND bouncing back from AvailablePage via "Skift køretøj"), since anvendelseOption/anvendelseCustom already came from the snapshot above and this effect must not overwrite them. */
+  const editingAnvendelsePrefilled = useRef(Boolean(formSnapshot));
   useEffect(() => {
     if (!editing || editingAnvendelsePrefilled.current || anvendelseOptions.length === 0) return;
     editingAnvendelsePrefilled.current = true;
@@ -222,9 +250,19 @@ export function ReservationPage() {
   // afdelingId — empty (and the Bruger select disabled, see above) until
   // one is chosen, never "every user platform-wide": picking a department
   // first is what makes the Bruger list meaningful at all.
+  //
+  // A plain admin can always book for THEMSELVES too, regardless of
+  // whether the active department (afdelingId) happens to be their own
+  // hjemmeafdeling — an admin with a user_departments grant for another
+  // department (see "Skift afdeling") would otherwise vanish from their
+  // own Bruger list the moment they switch into it, since their
+  // user_profiles.department_id (home department) no longer matches
+  // afdelingId. Their own row is always RLS-visible regardless (see
+  // user_profiles_select_own), so `users` already has it — just add it
+  // back in here instead of letting the department filter drop it.
   const departmentUsers = isFleetiiAdmin
     ? users.filter((u) => u.department_id === selectedDepartmentId)
-    : users.filter((u) => u.department_id === afdelingId);
+    : users.filter((u) => u.department_id === afdelingId || u.user_id === session?.user.id);
 
   const now = ceilToQuarterHour(new Date());
   const end = new Date(now.getTime() + effectiveDurationMinutes * 60 * 1000);
@@ -234,8 +272,16 @@ export function ReservationPage() {
     `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
   /** "date"/"time" parts of an ISO datetime string, for pre-filling Start/Slut from an existing booking being edited. Deliberately string-sliced rather than `new Date(iso).getHours()` — editing.startIso/endIso are raw Supabase timestamptz values with a real UTC offset (e.g. "...T14:00:00+00:00"), and `new Date()` would apply an actual timezone conversion here, silently shifting the pre-filled time by the browser's UTC offset. Every other place in this codebase (lib/bookings.ts's isoPrefix/addMinutesToIso) avoids exactly this by treating these strings as naive wall-clock digits — same convention applied here. */
   const splitIso = (iso: string) => ({ date: iso.slice(0, 10), time: iso.slice(11, 16) });
-  const initialStart = editing ? splitIso(editing.startIso) : { date: toIsoDate(now), time: formatTime(now) };
-  const initialEnd = editing?.endIso ? splitIso(editing.endIso) : { date: toIsoDate(end), time: formatTime(end) };
+  const initialStart = formSnapshot
+    ? { date: formSnapshot.startDate, time: formSnapshot.startTime }
+    : editing
+      ? splitIso(editing.startIso)
+      : { date: toIsoDate(now), time: formatTime(now) };
+  const initialEnd = formSnapshot
+    ? { date: formSnapshot.endDate, time: formSnapshot.endTime }
+    : editing?.endIso
+      ? splitIso(editing.endIso)
+      : { date: toIsoDate(end), time: formatTime(end) };
   /** Adds minutes to a "HH:mm" time, reporting how many calendar days the result rolled over (can be negative). */
   const addMinutes = (time: string, minutes: number): { time: string; daysAdded: number } => {
     const [hours, mins] = time.split(":").map(Number);
@@ -260,9 +306,9 @@ export function ReservationPage() {
   const [startTime, setStartTime] = useState(initialStart.time);
   const [endTime, setEndTime] = useState(initialEnd.time);
   /** When true (the "Nu" clock icon button is pressed/active), Start is locked to the current moment and its fields are disabled — see handleNowToggle. */
-  const [startIsNow, setStartIsNow] = useState(false);
-  /** When true, End is cleared and its fields are replaced by an "Ingen slutdato" label — see handleEndIgnoreToggle. Starts true when editing a booking that was itself open-ended (endIso null). */
-  const [endIgnored, setEndIgnored] = useState(Boolean(editing && editing.endIso === null));
+  const [startIsNow, setStartIsNow] = useState(formSnapshot?.startIsNow ?? false);
+  /** When true, End is cleared and its fields are replaced by an "Ingen slutdato" label — see handleEndIgnoreToggle. Starts true when editing a booking that was itself open-ended (endIso null), or when restoring a formSnapshot that had it on. */
+  const [endIgnored, setEndIgnored] = useState(formSnapshot?.endIgnored ?? Boolean(editing && editing.endIso === null));
   /** The End date/time as they were right before "ignore" was turned on, restored if it's turned back off. */
   const ignoredEndRef = useRef<{ date: string; time: string } | null>(null);
   const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
@@ -275,9 +321,11 @@ export function ReservationPage() {
    * doesn't re-run once the async fetch settles after first render. Skipped
    * when editing an existing booking (that already has its own concrete
    * End) and guarded to run only once, so it can't clobber an End the user
-   * has since edited by hand.
+   * has since edited by hand — starts already-applied when restoring from
+   * formSnapshot too, for the same reason: initialEnd already came from the
+   * snapshot, not effectiveDurationMinutes, and must not be overwritten.
    */
-  const durationAppliedRef = useRef(false);
+  const durationAppliedRef = useRef(Boolean(formSnapshot));
   useEffect(() => {
     if (editing || standardDurationMinutes === null || durationAppliedRef.current) return;
     durationAppliedRef.current = true;
@@ -437,6 +485,30 @@ export function ReservationPage() {
   /** Not editing: the plain "Find ledige" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. departmentId is the RESOLVED target department — the "Kunde/afdeling" pick for a FLEETii admin (validated below, required), or just afdelingId unchanged for every other role — carried all the way through AvailablePage (which scopes its own vehicle list to it) to ConfirmPage (which writes it as the booking's department_id). departmentLabel is its display-ready counterpart, for ConfirmPage's read-only summary row. */
   const handleFindAvailable = () => {
     const { start, end, brugerLabel } = currentPeriod();
+
+    // Snapshot the current form into THIS page's own history entry
+    // (replace, not push — no extra entry added) right before navigating
+    // away, so a browser back-navigation from AvailablePage lands on a
+    // "/reservation" entry that still has what was typed — see
+    // ReservationFormSnapshot's own doc comment. Preserves `editing` (and
+    // anything else already on this entry's state) rather than clobbering it.
+    const snapshot: ReservationFormSnapshot = {
+      selectedDepartmentId,
+      bruger,
+      anvendelseOption,
+      anvendelseCustom,
+      startDate,
+      startTime,
+      endDate,
+      endTime,
+      startIsNow,
+      endIgnored,
+    };
+    navigate(location.pathname, {
+      replace: true,
+      state: { ...(location.state as Record<string, unknown> | null), formSnapshot: snapshot },
+    });
+
     navigate("/available", {
       state: {
         user: bruger,

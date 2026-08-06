@@ -186,7 +186,7 @@ export function TwoHireTestPage() {
                     </span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle?.autonomyPercentage ?? "—"}
                       {twoHireVehicle?.autonomyPercentageUpdatedAt

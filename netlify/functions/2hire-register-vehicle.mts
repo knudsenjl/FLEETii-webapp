@@ -67,7 +67,7 @@ export default async (req: Request) => {
 
   const { data: order } = await admin
     .from("costumer_orders")
-    .select("order_type, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year")
+    .select("order_type, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel")
     .eq("order_id", orderId)
     .maybeSingle<{
       order_type: string;
@@ -79,6 +79,8 @@ export default async (req: Request) => {
       brand: string | null;
       model: string | null;
       model_year: string | null;
+      /** NOT NULL on both costumer_orders and vehicle_profiles (default "Benzin") — see costumer_orders_add_drivmiddel.sql / vehicle_profiles_add_drivmiddel.sql. Always a real value, unlike brand/model/model_year. */
+      drivmiddel: string;
     }>();
 
   if (!order) {
@@ -104,6 +106,7 @@ export default async (req: Request) => {
     brand: order.brand,
     model: order.model,
     model_year: order.model_year,
+    drivmiddel: order.drivmiddel,
     costumer_id: order.costumer_id,
     department_id: order.department_id,
   });

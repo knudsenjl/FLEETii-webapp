@@ -300,7 +300,7 @@ export function CostumerDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/fleetii-admin");
+    navigate("/fleetii-admin", { replace: true });
   };
 
   /** Blocks login for every user under this costumer (see costumers_add_deactivated_at.sql — is_admin()/current_department_id()/current_costumer_id() also stop resolving for them, and AuthContext/LoginPage force a sign-out/refuse sign-in client-side). Reversible via handleReactivate. Plain client-side update — costumers_update_fleetii_admin already covers any column, no new RLS policy needed. */

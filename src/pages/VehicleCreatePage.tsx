@@ -10,7 +10,7 @@ import { QrScanButton } from "../components/QrScanButton";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
-import { formatVehicleIdentLabel } from "../lib/bookings";
+import { DRIVMIDDEL_OPTIONS, formatVehicleIdentLabel } from "../lib/bookings";
 
 /** A pending "send-vehicle-request" submission — mirrors FleetiiAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
 type CostumerOrder = {
@@ -24,6 +24,8 @@ type CostumerOrder = {
   brand: string | null;
   model: string | null;
   model_year: string | null;
+  /** vehicle_profiles.drivmiddel's own default ("Benzin") applies here too — see costumer_orders_add_drivmiddel.sql. Unlike brand/model/model_year, not nullable: a <select> always has a value, so there's no "not filled in yet" state to represent. */
+  drivmiddel: string;
   needs_fleetii_device: boolean;
   fleetii_device_id: string | null;
   contactperson: string;
@@ -49,6 +51,7 @@ type CostumerOrderQueryRow = {
   brand: string | null;
   model: string | null;
   model_year: string | null;
+  drivmiddel: string;
   needs_fleetii_device: boolean;
   fleetii_device_id: string | null;
   contactperson: string;
@@ -197,7 +200,7 @@ export function VehicleCreatePage() {
     void supabase
       .from("costumer_orders")
       .select(
-        "order_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, vehicle_id, costumers(name), departments(name)",
+        "order_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, vehicle_id, costumers(name), departments(name)",
       )
       .eq("order_id", orderId)
       .maybeSingle<CostumerOrderQueryRow>()
@@ -214,6 +217,7 @@ export function VehicleCreatePage() {
                 brand: data.brand,
                 model: data.model,
                 model_year: data.model_year,
+                drivmiddel: data.drivmiddel,
                 needs_fleetii_device: data.needs_fleetii_device,
                 fleetii_device_id: data.fleetii_device_id,
                 contactperson: data.contactperson,
@@ -254,6 +258,8 @@ export function VehicleCreatePage() {
   const [brandInput, setBrandInput] = useState(order?.brand ?? "");
   const [modelInput, setModelInput] = useState(order?.model ?? "");
   const [modelYearInput, setModelYearInput] = useState(order?.model_year ?? "");
+  /** Editable Drivmiddel — same local-state-plus-persist-on-change pattern as Brand/Mærke/Årgang above, just a <select> instead of a free-text input (see the "Drivmiddel:" row below), so it saves immediately on change rather than needing a blur. */
+  const [drivmiddelInput, setDrivmiddelInput] = useState(order?.drivmiddel ?? "Benzin");
   const [orderFieldSaveError, setOrderFieldSaveError] = useState<string | null>(null);
 
   // Populates the step flags/vehicleId/editable fields once `order` resolves
@@ -271,10 +277,11 @@ export function VehicleCreatePage() {
     setBrandInput(order.brand ?? "");
     setModelInput(order.model ?? "");
     setModelYearInput(order.model_year ?? "");
+    setDrivmiddelInput(order.drivmiddel);
   }, [order]);
 
-  /** Persists a single edited Brand/Mærke/Årgang field to costumer_orders on blur — same direct-update pattern as markOtherStepDone/reactivateOtherStep below. Only called with a genuinely changed, non-empty trimmed value (see the input's onBlur handlers). */
-  const saveOrderField = async (field: "brand" | "model" | "model_year", value: string) => {
+  /** Persists a single edited Brand/Mærke/Årgang/Drivmiddel field to costumer_orders on blur (text fields) or change (the Drivmiddel <select>) — same direct-update pattern as markOtherStepDone/reactivateOtherStep below. Only called with a genuinely changed, non-empty trimmed value (see the input's onBlur/onChange handlers). */
+  const saveOrderField = async (field: "brand" | "model" | "model_year" | "drivmiddel", value: string) => {
     if (!order) return;
     setOrderFieldSaveError(null);
     const { error } = await supabase.from("costumer_orders").update({ [field]: value }).eq("order_id", order.order_id);
@@ -542,6 +549,7 @@ export function VehicleCreatePage() {
     ["Brand:", order.brand ?? "—"],
     ["Mærke:", order.model ?? "—"],
     ["Årgang:", order.model_year ?? "—"],
+    ["Drivmiddel:", drivmiddelInput],
     [
       "FLEETii device:",
       order.needs_fleetii_device ? "Nyt device skal installeres" : `Eksisterende device (id: ${order.fleetii_device_id})`,
@@ -574,6 +582,37 @@ export function VehicleCreatePage() {
             <div className="rounded-2xl border border-brand-100">
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                 {rows.map(([label, value]) => {
+                  // Drivmiddel is a fixed five-way choice (see DRIVMIDDEL_OPTIONS),
+                  // not a free-text/MotorAPI-fillable field like Brand/Mærke/
+                  // Årgang below, so it gets its own <select> branch here
+                  // instead of joining the generic editableField handling.
+                  // Same "editable only before registration" rule as those
+                  // three: once vehicleRegistered, this falls through to the
+                  // plain read-only span at the bottom of this map, showing
+                  // `value` (kept in sync with order.drivmiddel).
+                  if (label === "Drivmiddel:" && !vehicleRegistered) {
+                    return (
+                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                        <select
+                          value={drivmiddelInput}
+                          onChange={(e) => {
+                            const next = e.target.value;
+                            setDrivmiddelInput(next);
+                            void saveOrderField("drivmiddel", next);
+                          }}
+                          className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        >
+                          {DRIVMIDDEL_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    );
+                  }
+
                   /** Brand/Mærke/Årgang are editable (see saveOrderField) while the vehicle isn't registered yet — 2hire-register-vehicle.mts snapshots them onto vehicle_profiles at registration time, so editing afterward wouldn't change anything real and reverts to plain text (using `value`, which the sync effect keeps equal to order.brand/model/model_year regardless). getMotorApiValue is the confirmed-real MotorAPI field(s) the corner-down-left button below pulls from (see motorApiVehicleField) — Mærke combines "model" and "variant" into one string, matching how this app's own single Mærke field conflates model+variant. */
                   const editableField =
                     label === "Brand:"

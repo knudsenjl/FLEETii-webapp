@@ -261,7 +261,7 @@ export async function simulateTrip(identifier: string, positions: SimulatedTripP
  * Sets a simulated 2hire-board device's battery/autonomy percentage —
  * unlike position, this has no relation to simulateTrip()/starttrip at all
  * (that endpoint only accepts positions and never touches battery), so it's
- * the only way to move autonomy_percentage ("Brændstofniveau") off null for
+ * the only way to move autonomy_percentage ("Drivmiddelniveau") off null for
  * a simulated test vehicle. Confirmed by testing: distance_covered has no
  * equivalent setter anywhere in 2hire's docs — 2hire's own
  * GET /devices/{identifier}/state shows a distance_covered value after a

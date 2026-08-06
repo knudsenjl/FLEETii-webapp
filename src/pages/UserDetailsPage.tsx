@@ -449,7 +449,7 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department");
+    navigate("/department", { replace: true });
   };
 
   /** Reverses handleDelete via unblock-user.mts — lifts the Auth ban and clears deleted_at, then returns to DepartmentPage. No "last admin" pre-check needed here, unlike handleDelete: restoring access only ever adds admin coverage back, never removes it. */
@@ -483,7 +483,7 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department");
+    navigate("/department", { replace: true });
   };
 
   /** Calls update-user with the form's current values for this user, authenticated with the current session's access token, then persists any pending Rettigheder checkbox changes (staged locally via deferSave — see RettighederSettings' exposed save()). Shows the server's error message (or a generic connection-failure one) inline on failure. */
@@ -566,13 +566,13 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department");
+    navigate("/department", { replace: true });
   };
 
   /** Calls create-user with the form's values, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleConfirm = async () => {
     if (pendingAction === "close") {
-      navigate("/department");
+      navigate("/department", { replace: true });
       return;
     }
 
@@ -639,7 +639,7 @@ export function UserDetailsPage() {
 
       setIsSubmitting(false);
       setPendingAction(null);
-      navigate("/department", { state: { emailWarning: result.emailSent === false } });
+      navigate("/department", { replace: true, state: { emailWarning: result.emailSent === false } });
       return;
     } catch {
       setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");

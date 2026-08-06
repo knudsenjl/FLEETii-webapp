@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
-import { shortSignalTimestamp } from "../lib/bookings";
+import { DRIVMIDDEL_OPTIONS, shortSignalTimestamp } from "../lib/bookings";
 
 /** A department the vehicle could be assigned to — scoped to the vehicle's OWN costumer, fetched fresh alongside the vehicle's other fields (see vehicleCostumerId / the departments-loading effect below), not the viewer's — a FLEETii admin has no costumer of their own and must still be able to reassign a vehicle belonging to any costumer. */
 type DepartmentOption = { department_id: string; name: string };
@@ -32,7 +32,9 @@ type VehicleProfileRow = {
   model_year: string | null;
   department_id: string | null;
   costumer_id: string | null;
+  drivmiddel: string;
 };
+
 
 /**
  * Admin "edit vehicle" page ("/edit-vehicle", reached via
@@ -43,7 +45,7 @@ type VehicleProfileRow = {
  * and vehicle_profiles_update_allow_fleetii_admin.sql for the RLS scoping:
  * admin + vehicle in one of their own departments, or FLEETii admin +
  * any vehicle).
- * Kilometerstand/Brændstofniveau/Status stay read-only since they're live
+ * Kilometerstand/Drivmiddelniveau/Status stay read-only since they're live
  * telemetry written by the 2hire webhook — editing them wouldn't persist
  * past the next signal update anyway. Afdeling(er) is the first UI anywhere
  * in the app for managing vehicle_departments (previously read-only,
@@ -66,6 +68,7 @@ export function HandleVehiclePage() {
   const [make, setMake] = useState("");
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
+  const [drivmiddel, setDrivmiddel] = useState<string>("Benzin");
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -99,7 +102,7 @@ export function HandleVehiclePage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, brand, model, model_year, department_id, costumer_id")
+      .select("number_plate, vehicle_ident, brand, model, model_year, department_id, costumer_id, drivmiddel")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfileRow>()
       .then(({ data, error }) => {
@@ -116,6 +119,7 @@ export function HandleVehiclePage() {
         setYear(data?.model_year ?? "");
         setHomeDepartmentId(data?.department_id ?? null);
         setVehicleCostumerId(data?.costumer_id ?? null);
+        setDrivmiddel(data?.drivmiddel ?? "Benzin");
         setLoading(false);
       });
 
@@ -195,15 +199,11 @@ export function HandleVehiclePage() {
     return null;
   }
 
-  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM" (dropping the year). */
+  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM" (dropping the year). Just Kilometerstand — Drivmiddelniveau is rendered explicitly further down instead, right after the editable Drivmiddel row, so the two "Drivmiddel*" rows stay adjacent (Drivmiddel first). */
   const readOnlyRows: [string, string][] = [
     [
       "Kilometerstand:",
       `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
-    ],
-    [
-      "Brændstofniveau:",
-      `${vehicle.autonomyPercentage ?? "—"}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`,
     ],
   ];
 
@@ -294,6 +294,7 @@ export function HandleVehiclePage() {
         brand: trimmedMake,
         model: trimmedModel,
         model_year: trimmedYear,
+        drivmiddel,
         department_id: homeDepartmentId,
         costumer_id: vehicleCostumerId,
       })
@@ -448,6 +449,27 @@ export function HandleVehiclePage() {
                         <div className="whitespace-nowrap px-1">{value}</div>
                       </div>
                     ))}
+                    <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
+                      <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Drivmiddel:</label>
+                      <select
+                        value={drivmiddel}
+                        onChange={(e) => setDrivmiddel(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        {DRIVMIDDEL_OPTIONS.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
+                      <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Drivmiddelniveau:</div>
+                      <div className="whitespace-nowrap px-1">
+                        {vehicle.autonomyPercentage ?? "—"}
+                        {vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}
+                      </div>
+                    </div>
                     <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
                       <div className="flex items-center justify-between whitespace-nowrap border-r border-brand-100 pr-1 font-medium">
                         Status:

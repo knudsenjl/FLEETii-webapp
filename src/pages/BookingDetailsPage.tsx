@@ -93,28 +93,62 @@ export function BookingDetailsPage() {
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
 
-  /** The genuine Køretøj-ID/Nummerplade pair for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. */
-  const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{ vehicleIdent: string | null; numberPlate: string | null } | null>(
-    null,
-  );
+  /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel) for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. */
+  const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{
+    vehicleIdent: string | null;
+    numberPlate: string | null;
+    drivmiddel: string | null;
+  } | null>(null);
   useEffect(() => {
     if (!booking) return;
 
     let cancelled = false;
     void supabase
       .from("vehicle_profiles")
-      .select("vehicle_ident, number_plate")
+      .select("vehicle_ident, number_plate, drivmiddel")
       .eq("vehicle_id", booking.vehicle)
-      .maybeSingle<{ vehicle_ident: string | null; number_plate: string | null }>()
+      .maybeSingle<{ vehicle_ident: string | null; number_plate: string | null; drivmiddel: string | null }>()
       .then(({ data }) => {
         if (cancelled) return;
-        setVehicleIdentInfo(data ? { vehicleIdent: data.vehicle_ident, numberPlate: data.number_plate } : null);
+        setVehicleIdentInfo(
+          data ? { vehicleIdent: data.vehicle_ident, numberPlate: data.number_plate, drivmiddel: data.drivmiddel } : null,
+        );
       });
 
     return () => {
       cancelled = true;
     };
   }, [booking?.vehicle]);
+
+  /** "Kunde/afdeling:" row's data — this booking's own department (booking.departmentId) plus its costumer's name, fetched fresh rather than trusted from router state (unlike ConfirmPage, which resolves it once at booking-creation time and passes it straight through — a booking viewed here may be old, or reached by direct fetch-by-id, with no such state at all). departments'/costumers' SELECT RLS is unrestricted for any authenticated user, same as PageHeader's own "Skift afdeling" list. */
+  const [departmentInfo, setDepartmentInfo] = useState<{ name: string; costumerName: string | null } | null>(null);
+  useEffect(() => {
+    if (!booking?.departmentId) {
+      setDepartmentInfo(null);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("departments")
+      .select("name, costumers(name)")
+      .eq("department_id", booking.departmentId)
+      .maybeSingle<{ name: string; costumers: { name: string } | null }>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setDepartmentInfo(data ? { name: data.name, costumerName: data.costumers?.name ?? null } : null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [booking?.departmentId]);
+  /** "Kunde/afdeling:" row's display text — "Kunde / Afdeling" (space-slash-space), same format as ConfirmPage's own read-only summary row and PageHeader's "Skift afdeling" dropdown. */
+  const departmentLabel = departmentInfo
+    ? departmentInfo.costumerName
+      ? `${departmentInfo.costumerName} / ${departmentInfo.name}`
+      : departmentInfo.name
+    : "—";
   /** "Køretøj:" row's identifying text — "{ident} / {plate}: {brand} {model}" (see formatVehicleIdentLabel) when useVehicleIdent and vehicle_ident are both set, else just "{plate}: {brand} {model}". Falls back to formatVehicleLabel's own plate (which is itself ident-or-plate, ungated) while vehicle_profiles hasn't loaded yet, so the row doesn't flash blank. */
   const vehicleLabel =
     booking && vehicleIdentInfo && twoHireVehicle
@@ -189,18 +223,16 @@ export function BookingDetailsPage() {
     ) : null;
   }
 
-  /** Only admins can navigate from the map marker to VehicleDetailsPage (which is itself admin-gated for its map/edit/delete actions — see VehicleDetailsPage.tsx). */
-  const goToVehicleDetails = isAdmin
-    ? () => {
-        if (!twoHireVehicle) return;
-        navigate(`/vehicle-details/${twoHireVehicle.vehicleId}`, {
-          state: {
-            vehicle: toDisplayVehicle(twoHireVehicle),
-            booking: { id: booking.id, startIso: booking.startIso, endIso: booking.endIso },
-          },
-        });
-      }
-    : undefined;
+  /** Every role can navigate to VehicleDetailsPage — both from the "Køretøj:" row link below and the map marker — matching VehicleDetailsPage's own doc comment, which already accounts for a regular user landing there via their own booking (its map/edit/delete actions stay separately admin-gated within that page itself). */
+  const goToVehicleDetails = () => {
+    if (!twoHireVehicle) return;
+    navigate(`/vehicle-details/${twoHireVehicle.vehicleId}`, {
+      state: {
+        vehicle: toDisplayVehicle(twoHireVehicle),
+        booking: { id: booking.id, startIso: booking.startIso, endIso: booking.endIso },
+      },
+    });
+  };
 
   /** Starts the "Rediger reservation" flow: back through ReservationPage -> (optionally) AvailablePage -> ConfirmPage, pre-filled with this booking's current bruger/anvendelse/start/end/vehicle, updating this row (by booking_id) instead of inserting a new one. vehicleId is carried through to AvailablePage so this booking's current vehicle bypasses the department filter there (see AvailablePage's availableVehicles) even outside the editing admin's own department. */
   const goToEditBooking = () => {
@@ -296,6 +328,10 @@ export function BookingDetailsPage() {
                     <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
                     <span className="text-sm text-brand-800">{formatBookingPeriod(booking, true)}</span>
                   </div>
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">Kunde/afdeling:</label>
+                    <span className="text-sm text-brand-800">{departmentLabel}</span>
+                  </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
@@ -337,7 +373,7 @@ export function BookingDetailsPage() {
                         </svg>
                       )}
                     </label>
-                    {goToVehicleDetails && twoHireVehicle ? (
+                    {twoHireVehicle ? (
                       <button
                         type="button"
                         onClick={goToVehicleDetails}
@@ -349,17 +385,24 @@ export function BookingDetailsPage() {
                       <span className="text-sm text-brand-800">{vehicleLabel}</span>
                     )}
                   </div>
+                  {/* Kilometerstand and Status are only shown to admin/FLEETii admin — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                      <span className="text-sm text-brand-800">
+                        {twoHireVehicle?.distanceCovered ?? "—"}
+                        {twoHireVehicle?.distanceCoveredUpdatedAt
+                          ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
-                    <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.distanceCovered ?? "—"}
-                      {twoHireVehicle?.distanceCoveredUpdatedAt
-                        ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
-                        : ""}
-                    </span>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                    <span className="text-sm text-brand-800">{vehicleIdentInfo?.drivmiddel ?? "—"}</span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brændstofniveau:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle?.autonomyPercentage ?? "—"}
                       {twoHireVehicle?.autonomyPercentageUpdatedAt
@@ -367,24 +410,26 @@ export function BookingDetailsPage() {
                         : ""}
                     </span>
                   </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                      Status:
-                      {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. Omitted entirely when twoHireVehicle hasn't loaded (matching the value's own "—" fallback). */}
-                      {twoHireVehicle && (
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${twoHireVehicle.online === "TRUE" ? "bg-green-500" : "bg-red-500"}`}
-                          title={twoHireVehicle.online === "TRUE" ? "Online" : "Offline"}
-                        />
-                      )}
-                    </label>
-                    <span className="text-sm text-brand-800">
-                      {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
-                      {twoHireVehicle?.onlineUpdatedAt
-                        ? ` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
-                        : ""}
-                    </span>
-                  </div>
+                  {isAdmin && (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center justify-between text-sm font-medium text-brand-700">
+                        Status:
+                        {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. Omitted entirely when twoHireVehicle hasn't loaded (matching the value's own "—" fallback). */}
+                        {twoHireVehicle && (
+                          <span
+                            className={`h-2.5 w-2.5 rounded-full ${twoHireVehicle.online === "TRUE" ? "bg-green-500" : "bg-red-500"}`}
+                            title={twoHireVehicle.online === "TRUE" ? "Online" : "Offline"}
+                          />
+                        )}
+                      </label>
+                      <span className="text-sm text-brand-800">
+                        {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
+                        {twoHireVehicle?.onlineUpdatedAt
+                          ? ` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
+                          : ""}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 

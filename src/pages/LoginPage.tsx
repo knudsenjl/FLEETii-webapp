@@ -8,7 +8,7 @@
 // page.
 import { useEffect, useState, type FormEvent } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { setRememberMe, supabase } from "../lib/supabase";
 import { fetchCostumerDeactivatedAt, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
@@ -26,10 +26,13 @@ const stepVariants = {
 /** The login form. Renders unauthenticated at "/" (see RootRoute) and also reachable, unauthenticated, via LoginPage's own "i" about-button linking to /about. */
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  /** Present only when this page was reached via a browser back-navigation from AboutPage (the "i" button below) — see its own comment. Wins over the remembered-username effect just below, so credentials just typed aren't clobbered by whatever's in localStorage. */
+  const formSnapshot = (location.state as { formSnapshot?: { username: string; password: string } } | null)?.formSnapshot ?? null;
   const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+  const [username, setUsername] = useState(formSnapshot?.username ?? "");
+  const [password, setPassword] = useState(formSnapshot?.password ?? "");
   const [rememberMe, setRememberMeState] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -37,6 +40,10 @@ export function LoginPage() {
   const [resetSubmitting, setResetSubmitting] = useState(false);
 
   useEffect(() => {
+    // Skipped when restoring from formSnapshot — the just-typed username
+    // (possibly not the remembered one) already won above, and this would
+    // otherwise silently replace it with whatever's in localStorage.
+    if (formSnapshot) return;
     try {
       const stored = localStorage.getItem("fleetii_remember_username");
       if (stored) {
@@ -47,6 +54,7 @@ export function LoginPage() {
     } catch (_) {
       /* ignore */
     }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Covers the case where a costumer was deactivated while this tab already
@@ -186,7 +194,15 @@ export function LoginPage() {
         <div className="relative min-h-[22rem] p-6 sm:p-8">
           <button
             type="button"
-            onClick={() => navigate("/about")}
+            onClick={() => {
+              // Snapshot whatever's typed onto THIS page's own history entry
+              // (replace, not push) right before navigating away — same fix
+              // as ReservationPage's formSnapshot, so a browser
+              // back-navigation from AboutPage doesn't lose it (AboutPage
+              // has no back button of its own, only the browser's).
+              navigate(location.pathname, { replace: true, state: { formSnapshot: { username, password } } });
+              navigate("/about");
+            }}
             aria-label="Om FLEETii"
             className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
           >

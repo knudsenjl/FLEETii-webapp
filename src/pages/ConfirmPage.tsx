@@ -178,12 +178,12 @@ export function ConfirmPage() {
     navigate(profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/allbookings" : "/bookings", { replace: true });
   };
 
-  /** [label, value] — Start/Slut show "dd/mm" (dropping the year). Kunde/afdeling comes first — a final, read-only "security check" confirming which department this booking is actually about to be written to, before "Bekræft" is pressed. */
+  /** [label, value] — Start/Slut show "dd/mm" (dropping the year). Kunde/afdeling comes first — a final, read-only "security check" confirming which department this booking is actually about to be written to, before "Bekræft" is pressed. Køretøj comes right after it. */
   const rows: [string, string][] = [
     ["Kunde/afdeling:", state?.departmentLabel ?? ""],
+    ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`],
     ["Reserveret til:", brugerLabel],
     ["Anvendelse:", anvendelse],
-    ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`],
     ["Start:", reservationStart ? formatDanishDateTime(reservationStart, true) : ""],
     ["Slut:", reservationEnd ? formatDanishDateTime(reservationEnd, true) : "Ingen slutdato"],
   ];
