@@ -82,13 +82,38 @@ export function LeafletMap({
   // fresh every time the effect actually runs regardless, so their own
   // per-render identity churn shouldn't force a rebuild.
   const extraMarkersKey = extraMarkers.map((m) => `${m.lat}:${m.lng}:${m.tooltip ?? ""}`).join("|");
+  // Every prop change below tears down and rebuilds the WHOLE Leaflet map
+  // (simplest way to keep marker/cluster/tooltip rendering in sync — see the
+  // effect's own dependency array), which would normally also reset pan/zoom
+  // back to the lat/lng/zoom props on every single one of those changes —
+  // e.g. FleetManagementPage's "Vis enkeltvis"/"Saml køretøjer" toggle only
+  // changes `cluster`, not where the admin was actually looking, so
+  // rebuilding from the props alone would zoom back out to all of Denmark
+  // every time it's pressed. These two refs let the effect tell "the center/
+  // zoom props themselves genuinely changed" (a real recenter, e.g. this
+  // vehicle's live GPS position moved, or FleetManagementPage picked a new
+  // primary vehicle) apart from "some other, non-view prop changed" (cluster,
+  // tooltip config, marker positions/content) — only the former re-applies
+  // the incoming lat/lng/zoom and re-fits bounds; the latter restores
+  // whatever view the map actually had right before its teardown.
+  const lastViewPropsRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
+  const savedViewRef = useRef<{ center: L.LatLngTuple; zoom: number } | null>(null);
 
   useEffect(() => {
     if (!containerRef.current || mapRef.current) {
       return;
     }
 
-    const map = L.map(containerRef.current).setView([lat, lng], zoom);
+    const viewPropsUnchanged =
+      lastViewPropsRef.current !== null &&
+      lastViewPropsRef.current.lat === lat &&
+      lastViewPropsRef.current.lng === lng &&
+      lastViewPropsRef.current.zoom === zoom;
+    const initialView =
+      viewPropsUnchanged && savedViewRef.current ? savedViewRef.current : { center: [lat, lng] as L.LatLngTuple, zoom };
+
+    const map = L.map(containerRef.current).setView(initialView.center, initialView.zoom);
+    lastViewPropsRef.current = { lat, lng, zoom };
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       maxZoom: 19,
@@ -127,7 +152,12 @@ export function LeafletMap({
       }
     });
 
-    if (extraMarkers.length > 0) {
+    // Only fits to every marker's bounds on a genuine center/zoom prop
+    // change (or the very first mount) — a rebuild triggered by some OTHER
+    // prop (cluster, tooltip config, marker content) restores the saved view
+    // above instead, and re-fitting here would immediately override that
+    // right back out to fit everything again.
+    if (!viewPropsUnchanged && extraMarkers.length > 0) {
       const bounds = L.latLngBounds([
         [lat, lng],
         ...extraMarkers.map((marker): [number, number] => [marker.lat, marker.lng]),
@@ -145,6 +175,10 @@ export function LeafletMap({
 
     return () => {
       resizeObserver.disconnect();
+      // Captured before map.remove() (which tears down its internal state) —
+      // read back above if the map gets rebuilt again purely due to a
+      // non-view prop change, so that rebuild doesn't lose the user's pan/zoom.
+      savedViewRef.current = { center: [map.getCenter().lat, map.getCenter().lng], zoom: map.getZoom() };
       map.remove();
       mapRef.current = null;
     };
