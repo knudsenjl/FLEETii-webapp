@@ -7,7 +7,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `departments` table, scoped to this costumer. */
-type Department = { department_id: string; name: string | null };
+type Department = { department_id: string; name: string | null; address: string | null };
 
 /**
  * "Afdelinger hos {costumer}" page ("/department-details") — reachable only
@@ -45,7 +45,7 @@ export function DepartmentDetailsPage() {
 
     const { data, error } = await supabase
       .from("departments")
-      .select("department_id, name")
+      .select("department_id, name, address")
       .eq("costumer_id", forCostumerId)
       .order("name", { ascending: true })
       .returns<Department[]>();

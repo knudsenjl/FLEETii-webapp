@@ -6,10 +6,10 @@ import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
 /** A department row, as passed in via router state — same shape as DepartmentDetailsPage's own Department type. */
-type Department = { department_id: string; name: string | null };
+type Department = { department_id: string; name: string | null; address: string | null };
 
 /**
- * "Omdøb afdelinger" page ("/edit-departments") — any admin (see
+ * "Rediger afdelinger" page ("/edit-departments") — any admin (see
  * ProtectedRoute requireAdmin in App.tsx: "admin" and "FLEETii admin" both
  * reach this page, unlike DepartmentDetailsPage which stays FLEETii-admin-
  * only). Reachable from two places, both passing costumerId/costumerName/
@@ -20,13 +20,14 @@ type Department = { department_id: string; name: string | null };
  * knowing which departments to rename. Missing state redirects back to
  * "/costumer-details".
  *
- * Shows one editable "Ny navn" text field per department (pre-filled with
- * its current name), and on "Opdater" writes back only the departments
- * whose name actually changed (departments_update_policy_allow_admin_own_
- * costumer.sql — FLEETii admin: any costumer, admin: their own costumer_id
- * only). "Fortryd" discards all edits without writing anything. Both
- * buttons return to "/department-details" for a FLEETii admin (who can see
- * that page) or "/admin" for a regular admin (who can't).
+ * Shows one editable "Navn" and "Adresse" text field per department
+ * (pre-filled with their current values), and on "Opdater" writes back only
+ * the departments where either actually changed
+ * (departments_update_policy_allow_admin_own_costumer.sql — FLEETii admin:
+ * any costumer, admin: their own costumer_id only). "Fortryd" discards all
+ * edits without writing anything. Both buttons return to
+ * "/department-details" for a FLEETii admin (who can see that page) or
+ * "/admin" for a regular admin (who can't).
  */
 export function EditDepartmentsPage() {
   const navigate = useNavigate();
@@ -41,6 +42,9 @@ export function EditDepartmentsPage() {
 
   const [names, setNames] = useState<Record<string, string>>(() =>
     Object.fromEntries(departments.map((department) => [department.department_id, department.name ?? ""])),
+  );
+  const [addresses, setAddresses] = useState<Record<string, string>>(() =>
+    Object.fromEntries(departments.map((department) => [department.department_id, department.address ?? ""])),
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
@@ -67,19 +71,24 @@ export function EditDepartmentsPage() {
     }
   };
 
-  /** Writes back only the departments whose trimmed name actually changed — sequential, same "keep going, surface the first real error" approach as FleetiiAdministrationPage's bulk-migration loop. */
+  /** Writes back only the departments where the trimmed name and/or address actually changed — sequential, same "keep going, surface the first real error" approach as FleetiiAdministrationPage's bulk-migration loop. */
   const handleUpdate = async () => {
     setIsSubmitting(true);
     setUpdateError(null);
 
     const changed = departments.filter(
-      (department) => names[department.department_id].trim() !== (department.name ?? "").trim(),
+      (department) =>
+        names[department.department_id].trim() !== (department.name ?? "").trim() ||
+        addresses[department.department_id].trim() !== (department.address ?? "").trim(),
     );
 
     for (const department of changed) {
       const { error } = await supabase
         .from("departments")
-        .update({ name: names[department.department_id].trim() })
+        .update({
+          name: names[department.department_id].trim(),
+          address: addresses[department.department_id].trim() || null,
+        })
         .eq("department_id", department.department_id);
 
       if (error) {
@@ -110,14 +119,15 @@ export function EditDepartmentsPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Omdøb afdelinger</h2>
+            <h2 className="text-xl font-semibold text-brand-800">Rediger afdelinger</h2>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-sm">
                 <thead className="sticky top-0 z-10 bg-brand-50 text-xs font-semibold uppercase tracking-wide text-brand-700">
                   <tr>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-1 text-left">Afdeling</th>
-                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-1 text-left">Ny navn</th>
+                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-1 text-left">Navn</th>
+                    <th className="whitespace-nowrap border-b border-brand-200 px-2 py-1 text-left">Adresse</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
@@ -132,6 +142,16 @@ export function EditDepartmentsPage() {
                           value={names[department.department_id] ?? ""}
                           onChange={(e) =>
                             setNames((prev) => ({ ...prev, [department.department_id]: e.target.value }))
+                          }
+                          className="w-full rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </td>
+                      <td className="px-2 py-1">
+                        <input
+                          type="text"
+                          value={addresses[department.department_id] ?? ""}
+                          onChange={(e) =>
+                            setAddresses((prev) => ({ ...prev, [department.department_id]: e.target.value }))
                           }
                           className="w-full rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />

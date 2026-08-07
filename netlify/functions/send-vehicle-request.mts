@@ -26,6 +26,8 @@ type SendVehicleRequestBody = {
   afdeling?: string | null;
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
   vehicleIdent?: string | null;
+  /** Parking spot — optional free text, see costumer_orders_add_parking.sql. */
+  parking?: string | null;
   nummerplade?: string;
   /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx, fillable later on VehicleCreatePage.tsx (incl. its MotorAPI fill button). */
   brand?: string | null;
@@ -50,6 +52,7 @@ function buildHtmlBody(fields: {
   customerName: string;
   afdeling: string;
   vehicleIdent: string;
+  parking: string;
   nummerplade: string;
   brand: string;
   maerke: string;
@@ -77,6 +80,7 @@ function buildHtmlBody(fields: {
     <table style="border-collapse:collapse;font-family:sans-serif;font-size:14px;">
       ${row("Kunde", fields.customerName)}
       ${row("Afdeling", fields.afdeling)}
+      ${row("P-plads", fields.parking || "—")}
       ${row("Køretøj-ID", fields.vehicleIdent || "—")}
       ${row("Nummerplade", fields.nummerplade)}
       ${row("Brand", fields.brand || "—")}
@@ -100,7 +104,7 @@ function buildHtmlBody(fields: {
 }
 
 /**
- * POST { afdeling?, vehicleIdent?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
+ * POST { afdeling?, vehicleIdent?, parking?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
  * drivmiddel?, needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
  * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false) —
@@ -143,6 +147,7 @@ export default async (req: Request) => {
   }
 
   const vehicleIdent = asTrimmedString(body.vehicleIdent);
+  const parking = asTrimmedString(body.parking);
   const nummerplade = asTrimmedString(body.nummerplade);
   const brand = asTrimmedString(body.brand);
   const maerke = asTrimmedString(body.maerke);
@@ -205,6 +210,7 @@ export default async (req: Request) => {
       costumer_id: caller.costumer_id,
       department_id: caller.department_id,
       vehicle_ident: vehicleIdent || null,
+      parking: parking || null,
       number_plate: nummerplade,
       brand: brand || null,
       model: maerke || null,
@@ -241,6 +247,7 @@ export default async (req: Request) => {
       customerName,
       afdeling,
       vehicleIdent: vehicleIdent ?? "",
+      parking: parking ?? "",
       nummerplade,
       brand: brand ?? "",
       maerke: maerke ?? "",

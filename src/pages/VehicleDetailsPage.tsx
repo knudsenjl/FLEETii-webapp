@@ -41,12 +41,13 @@ type VehicleDepartmentRow = { department_id: string; departments: { name: string
 /** Raw shape of the vehicle_profiles row fetched here for its home department — just the scalar department_id, resolved to a name via a separate departments lookup (see the fetch effect below for why this isn't a single embedded query). */
 type VehicleProfileHomeRow = { department_id: string | null };
 
-/** Raw shape of the vehicle_profiles row fetched here for the genuine Nummerplade/vehicle_ident PLUS this vehicle's own department_id (for the useIdentSettings gate below) — see the numberPlate fetch effect below for why the plate part can't just reuse vehicle.plate. Piggybacks department_id and drivmiddel onto this same query rather than extra round-trips, since none of these are admin-gated (unlike the vehicleDepartments/homeDepartmentName effect above, which skips entirely for a non-admin viewer). */
+/** Raw shape of the vehicle_profiles row fetched here for the genuine Nummerplade/vehicle_ident PLUS this vehicle's own department_id (for the useIdentSettings gate below) — see the numberPlate fetch effect below for why the plate part can't just reuse vehicle.plate. Piggybacks department_id, drivmiddel, and parking onto this same query rather than extra round-trips, since none of these are admin-gated at the FETCH level (unlike the vehicleDepartments/homeDepartmentName effect above, which skips entirely for a non-admin viewer) — parking is still only ever shown inside the admin-only block below, just fetched here for simplicity. */
 type VehicleProfilePlateRow = {
   number_plate: string | null;
   vehicle_ident: string | null;
   department_id: string | null;
   drivmiddel: string | null;
+  parking: string | null;
 };
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
@@ -119,6 +120,8 @@ export function VehicleDetailsPage() {
   const [identDepartmentId, setIdentDepartmentId] = useState<string | null>(null);
   /** vehicle_profiles.drivmiddel — fetched alongside numberPlate below, shown in the "Drivmiddel:" row. */
   const [drivmiddel, setDrivmiddel] = useState<string | null>(null);
+  /** vehicle_profiles.parking — fetched alongside numberPlate below, shown in the admin-only "P-plads:" row right before "Hjemmeafdeling:". */
+  const [parking, setParking] = useState<string | null>(null);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 
@@ -229,7 +232,7 @@ export function VehicleDetailsPage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, department_id, drivmiddel")
+      .select("number_plate, vehicle_ident, department_id, drivmiddel, parking")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfilePlateRow>()
       .then(({ data }) => {
@@ -238,6 +241,7 @@ export function VehicleDetailsPage() {
         setVehicleIdent(data?.vehicle_ident ?? null);
         setIdentDepartmentId(data?.department_id ?? null);
         setDrivmiddel(data?.drivmiddel ?? null);
+        setParking(data?.parking ?? null);
         setNumberPlateLoading(false);
       });
 
@@ -413,6 +417,12 @@ export function VehicleDetailsPage() {
                   )}
                   {isAdmin && (
                     <>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
+                        <span className="text-sm text-brand-800">
+                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (parking ?? "—")}
+                        </span>
+                      </div>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">Hjemmeafdeling:</label>
                         <span className="text-sm text-brand-800">
