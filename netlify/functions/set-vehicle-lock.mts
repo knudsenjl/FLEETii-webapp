@@ -17,10 +17,18 @@
 // disabled-button state, matching this codebase's existing trust level
 // elsewhere (e.g. booking deletion's permission check is also client-side
 // only).
+//
+// Per the "per-costumer 2hire credentials" plan: the credential used to
+// authenticate the real 2hire command is resolved from the TARGET vehicle's
+// costumer_id (not the caller's own — a FLEETii admin has none) plus whether
+// the caller is a FLEETii admin, same as every other function this plan
+// touches. That lookup needs the service-role client, so it's built before
+// the sendGenericCommand call now instead of after it.
 import { createClient } from "@supabase/supabase-js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
+import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
 type SetVehicleLockBody = { vehicleId?: string; locked?: boolean };
 
@@ -59,6 +67,10 @@ export default async (req: Request) => {
   }
   const locked = body.locked;
 
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   // Real 2hire command first — the vehicle_signals write below only happens
   // if this actually succeeds, so "locked" always reflects a confirmed real
   // state rather than wishful thinking. Expected to fail for any vehicle
@@ -66,16 +78,33 @@ export default async (req: Request) => {
   // surfaced as a normal error, not swallowed, since a regular user pressing
   // Lås/Lås op needs to know the vehicle didn't actually respond.
   try {
-    await sendGenericCommand(vehicleId, locked ? "stop" : "start");
+    const [{ data: vehicle, error: vehicleError }, { data: caller, error: callerError }] = await Promise.all([
+      admin
+        .from("vehicle_profiles")
+        .select("costumer_id")
+        .eq("vehicle_id", vehicleId)
+        .maybeSingle<{ costumer_id: string | null }>(),
+      admin
+        .from("user_profiles")
+        .select("role")
+        .eq("user_id", authResult.userId)
+        .maybeSingle<{ role: string }>(),
+    ]);
+    if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
+    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
+
+    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const credentials = await resolveTwoHireCredentials(admin, {
+      isFleetiiAdmin,
+      costumerId: vehicle?.costumer_id ?? null,
+    });
+
+    await sendGenericCommand(vehicleId, locked ? "stop" : "start", credentials);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
     console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${locked ? "stop" : "start"}) failed:`, message);
     return new Response(JSON.stringify({ error: message }), { status: 502 });
   }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   // Upsert, not update: a vehicle may not have a vehicle_signals row yet
   // (today only created by the 2hire webhook on its first signal) — a plain

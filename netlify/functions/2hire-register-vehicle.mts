@@ -22,9 +22,16 @@
 // is recoverable by retrying with the same qrCode/profileId (2hire will
 // presumably reject/re-return the same registration) rather than by
 // silently deregistering something FLEETii staff may already be relying on.
+//
+// Per the "per-costumer 2hire credentials" plan: registerVehicle authenticates
+// with the order's own costumer_id's sub-account credential (resolved fresh
+// via resolveTwoHireCredentials, not hardcoded to global) even though this
+// route is itself FLEETii-admin-gated — see delete-vehicle.mts's identical
+// reasoning.
 import { createClient } from "@supabase/supabase-js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { registerVehicle } from "./_shared/twoHireClient.js";
+import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
 type RegisterVehicleOrderBody = { orderId?: string; qrCode?: string; profileId?: string };
 
@@ -67,7 +74,9 @@ export default async (req: Request) => {
 
   const { data: order } = await admin
     .from("costumer_orders")
-    .select("order_type, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel")
+    .select(
+      "order_type, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, parking",
+    )
     .eq("order_id", orderId)
     .maybeSingle<{
       order_type: string;
@@ -81,6 +90,8 @@ export default async (req: Request) => {
       model_year: string | null;
       /** NOT NULL on both costumer_orders and vehicle_profiles (default "Benzin") — see costumer_orders_add_drivmiddel.sql / vehicle_profiles_add_drivmiddel.sql. Always a real value, unlike brand/model/model_year. */
       drivmiddel: string;
+      /** Optional free text, see costumer_orders_add_parking.sql / vehicle_profiles_add_parking.sql — nullable on both sides, same as brand/model/model_year. */
+      parking: string | null;
     }>();
 
   if (!order) {
@@ -92,7 +103,17 @@ export default async (req: Request) => {
 
   let vehicleId: string;
   try {
-    const result = await registerVehicle({ qrCode, profileId });
+    const { data: caller, error: callerError } = await admin
+      .from("user_profiles")
+      .select("role")
+      .eq("user_id", authResult.userId)
+      .maybeSingle<{ role: string }>();
+    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
+
+    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const credentials = await resolveTwoHireCredentials(admin, { isFleetiiAdmin, costumerId: order.costumer_id });
+
+    const result = await registerVehicle({ qrCode, profileId }, credentials);
     vehicleId = result.vehicleId;
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
@@ -107,6 +128,7 @@ export default async (req: Request) => {
     model: order.model,
     model_year: order.model_year,
     drivmiddel: order.drivmiddel,
+    parking: order.parking,
     costumer_id: order.costumer_id,
     department_id: order.department_id,
   });

@@ -8,9 +8,18 @@
 // anon/authenticated), called via the service-role client exactly like
 // delete-costumer.mts calls purge_costumer: no ownership check inside the
 // SQL function itself, since the caller is fully trusted at this point.
+//
+// Per the "per-costumer 2hire credentials" plan: deregisterVehicle needs the
+// TARGET vehicle's own credential (its costumer's sub-account, not
+// necessarily the global one) even though this route is itself
+// FLEETii-admin-gated — resolveTwoHireCredentials always resolves the
+// caller's role fresh rather than assuming "FLEETii-admin route therefore
+// always global", so the logic stays correct if this route's access ever
+// widens.
 import { createClient } from "@supabase/supabase-js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { deregisterVehicle } from "./_shared/twoHireClient.js";
+import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
 type DeleteVehicleBody = { vehicleId?: string; orderId?: string };
 
@@ -58,17 +67,38 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "vehicleId og orderId er påkrævet." }), { status: 400 });
   }
 
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
   let deregisterWarning: string | null = null;
   try {
-    await deregisterVehicle(vehicleId);
+    const [{ data: vehicle, error: vehicleError }, { data: caller, error: callerError }] = await Promise.all([
+      admin
+        .from("vehicle_profiles")
+        .select("costumer_id")
+        .eq("vehicle_id", vehicleId)
+        .maybeSingle<{ costumer_id: string | null }>(),
+      admin
+        .from("user_profiles")
+        .select("role")
+        .eq("user_id", authResult.userId)
+        .maybeSingle<{ role: string }>(),
+    ]);
+    if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
+    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
+
+    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const credentials = await resolveTwoHireCredentials(admin, {
+      isFleetiiAdmin,
+      costumerId: vehicle?.costumer_id ?? null,
+    });
+
+    await deregisterVehicle(vehicleId, credentials);
   } catch (error) {
     deregisterWarning = error instanceof Error ? error.message : "Ukendt fejl ved 2hire-afregistrering.";
     console.warn(`[delete-vehicle] deregisterVehicle(${vehicleId}) failed (continuing):`, deregisterWarning);
   }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { error: deleteError } = await admin.rpc("delete_vehicle", { target_vehicle_id: vehicleId });
   if (deleteError) {

@@ -7,7 +7,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 
-/** The costumer row, as passed in via router state from FleetiiAdministrationPage. Absent when reached via "Opret kunde" — see the KNOWN LIMITATION below. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
+/** The costumer row, as passed in via router state from CostumerAdministrationPage. Absent when reached via "Opret kunde" — see the KNOWN LIMITATION below. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
   costumer_id: string;
   name: string | null;
@@ -27,7 +27,7 @@ type Costumer = {
  * reachable only by role "FLEETii admin" (see ProtectedRoute
  * requireRole="FLEETii admin" in App.tsx). Reads an existing costumer (Navn,
  * plus its departments) when reached with one pre-filled via router state
- * (FleetiiAdministrationPage's row click, which skips a round-trip); a
+ * (CostumerAdministrationPage's row click, which skips a round-trip); a
  * direct URL/refresh/bookmark to the :costumerId route (no router state)
  * falls back to fetching it by id instead, redirecting to "/fleetii-admin"
  * if it can't be found. "Rediger kunde" switches it into an editable form in
@@ -108,6 +108,15 @@ export function CostumerDetailsPage() {
   const [editContactPerson, setEditContactPerson] = useState(costumer?.contact_person ?? "");
   const [editPhone, setEditPhone] = useState(costumer?.phone ?? "");
   const [editEmail, setEditEmail] = useState(costumer?.email ?? "");
+  // Write-only from the browser's perspective — costumers.twohire_client_id/
+  // twohire_client_secret lose SELECT for anon/authenticated entirely (see
+  // costumers_add_twohire_credentials.sql), so there's no existing value to
+  // pre-fill these from, and Costumer above doesn't include them at all.
+  // Always starts blank; blank on save means "leave unchanged" (don't
+  // overwrite a real value with null) — same convention as
+  // HandleVehiclePage.tsx's saveOrderField.
+  const [editTwoHireClientId, setEditTwoHireClientId] = useState("");
+  const [editTwoHireClientSecret, setEditTwoHireClientSecret] = useState("");
   const [pendingAction, setPendingAction] = useState<
     "create" | "update" | "delete" | "close" | "deactivate" | "reactivate" | null
   >(null);
@@ -244,6 +253,10 @@ export function CostumerDetailsPage() {
         contact_person: editContactPerson.trim() || null,
         phone: editPhone.trim() || null,
         email: editEmail.trim() || null,
+        // Only written when genuinely typed — a blank field here means
+        // "leave whatever's already there alone", not "clear it".
+        ...(editTwoHireClientId.trim() ? { twohire_client_id: editTwoHireClientId.trim() } : {}),
+        ...(editTwoHireClientSecret.trim() ? { twohire_client_secret: editTwoHireClientSecret.trim() } : {}),
       })
       .eq("costumer_id", costumer.costumer_id);
 
@@ -474,6 +487,30 @@ export function CostumerDetailsPage() {
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">
+                          2hire client ID:
+                        </label>
+                        <input
+                          type="text"
+                          value={editTwoHireClientId}
+                          onChange={(e) => setEditTwoHireClientId(e.target.value)}
+                          placeholder="Udfyldt — lad stå tom for at bevare"
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">
+                          2hire client secret:
+                        </label>
+                        <input
+                          type="password"
+                          value={editTwoHireClientSecret}
+                          onChange={(e) => setEditTwoHireClientSecret(e.target.value)}
+                          placeholder="Udfyldt — lad stå tom for at bevare"
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
                     </div>
                   </div>
 
@@ -503,6 +540,8 @@ export function CostumerDetailsPage() {
                         setEditContactPerson(costumer.contact_person ?? "");
                         setEditPhone(costumer.phone ?? "");
                         setEditEmail(costumer.email ?? "");
+                        setEditTwoHireClientId("");
+                        setEditTwoHireClientSecret("");
                         setIsEditing(false);
                       }}
                       className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
@@ -596,6 +635,8 @@ export function CostumerDetailsPage() {
                             setEditContactPerson(costumer.contact_person ?? "");
                             setEditPhone(costumer.phone ?? "");
                             setEditEmail(costumer.email ?? "");
+                            setEditTwoHireClientId("");
+                            setEditTwoHireClientSecret("");
                             setIsEditing(true);
                           }}
                           className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"

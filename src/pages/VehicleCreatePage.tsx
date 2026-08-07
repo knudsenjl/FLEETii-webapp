@@ -12,7 +12,7 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS, formatVehicleIdentLabel } from "../lib/bookings";
 
-/** A pending "send-vehicle-request" submission — mirrors FleetiiAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
+/** A pending "send-vehicle-request" submission — mirrors InstallationAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
 type CostumerOrder = {
   order_id: string;
   costumer_id: string;
@@ -40,7 +40,7 @@ type CostumerOrder = {
   departmentName: string | null;
 };
 
-/** Raw shape of the fetch-by-id query below, before flattening the embedded costumers(name)/departments(name) relations — mirrors FleetiiAdministrationPage.tsx's own CostumerOrderQueryRow. */
+/** Raw shape of the fetch-by-id query below, before flattening the embedded costumers(name)/departments(name) relations — mirrors InstallationAdministrationPage.tsx's own CostumerOrderQueryRow. */
 type CostumerOrderQueryRow = {
   order_id: string;
   costumer_id: string;
@@ -145,11 +145,11 @@ type ReactivatableStep = "other_2hire_done";
  * requireRole="FLEETii admin" in App.tsx — there's no reason for a
  * customer's own admin to see this, mirroring VehicleDeletePage.tsx's own
  * gating). Reachable at plain "/vehicle-create" (order passed via router
- * state — FleetiiAdministrationPage's "Administration af installationer"
+ * state — InstallationAdministrationPage's "Administration af installationer"
  * table row click) or "/vehicle-create/:orderId" (fetches the order by id —
  * a direct URL/refresh/bookmark with no router state, mirroring
  * UserDetailsPage.tsx's own fetch-by-id fallback). Missing both state and a
- * resolvable :orderId redirects back to "/fleetii-admin". Shows everything
+ * resolvable :orderId redirects back to "/fleetii-admin-installations". Shows everything
  * the admin submitted via NewVehiclePage.tsx's "Ny bestilling" so FLEETii
  * staff can see what needs provisioning, plus:
  *   - "Registrér køretøj i 2hire": the real action — takes the physical
@@ -169,7 +169,7 @@ type ReactivatableStep = "other_2hire_done";
  *   - "Installation afsluttet - slettes": real once all three are done —
  *     deletes this order's costumer_orders row (its job is finished; the
  *     vehicle itself lives on in vehicle_profiles) and returns to
- *     "/fleetii-admin".
+ *     "/fleetii-admin-installations".
  */
 export function VehicleCreatePage() {
   const { session } = useAuth();
@@ -184,8 +184,8 @@ export function VehicleCreatePage() {
   // flipping it inside the fetch effect below raced the redirect effect
   // further down: both effects run in the same post-mount pass, so the
   // redirect effect would still see the ORIGINAL (false) value and fire
-  // immediately, bouncing straight back to "/fleetii-admin" before the fetch
-  // ever got a chance to resolve.
+  // immediately, bouncing straight back to "/fleetii-admin-installations"
+  // before the fetch ever got a chance to resolve.
   const [orderLoading, setOrderLoading] = useState(() => Boolean(orderId) && !stateOrder);
   const order = stateOrder ?? fetchedOrder;
   /** Whether this order's own department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
@@ -246,7 +246,7 @@ export function VehicleCreatePage() {
   // or outside RLS) once the fetch has finished.
   useEffect(() => {
     if (!order && !orderLoading) {
-      navigate("/fleetii-admin", { replace: true });
+      navigate("/fleetii-admin-installations", { replace: true });
     }
   }, [order, orderLoading, navigate]);
 
@@ -394,14 +394,14 @@ export function VehicleCreatePage() {
     if (opening) ensureMotorApiDataLoaded();
   };
 
-  /** Loads 2hire's own board profiles for the picker above — skipped once the vehicle is already registered (no longer needed). */
+  /** Loads 2hire's own board profiles for the picker above — skipped once the vehicle is already registered (no longer needed). costumerId is required by the Function since which 2hire credential answers this depends on it (see the "per-costumer 2hire credentials" plan). */
   useEffect(() => {
-    if (order?.vehicle_registered) return;
+    if (order?.vehicle_registered || !order?.costumer_id) return;
 
     let cancelled = false;
     setProfilesLoading(true);
     setProfilesError(null);
-    void fetch("/.netlify/functions/2hire-board-profiles", {
+    void fetch(`/.netlify/functions/2hire-board-profiles?costumerId=${encodeURIComponent(order.costumer_id)}`, {
       headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
     })
       .then(async (response) => {
@@ -424,7 +424,7 @@ export function VehicleCreatePage() {
     return () => {
       cancelled = true;
     };
-  }, [session, order?.vehicle_registered]);
+  }, [session, order?.vehicle_registered, order?.costumer_id]);
 
   /** "Which (if any) already-done step is pending a "skal denne handling genaktiveres?" confirmation — only "other_2hire_done" can go through this anymore (see ReactivatableStep's own doc comment). */
   const [pendingReactivateStep, setPendingReactivateStep] = useState<ReactivatableStep | null>(null);
@@ -441,7 +441,7 @@ export function VehicleCreatePage() {
 
   // Only while a SPECIFIC order is being fetched by id (:orderId present, no
   // router state yet) — without this guard, the page would flash-redirect
-  // toward "/fleetii-admin" for a moment before the fetch resolves.
+  // toward "/fleetii-admin-installations" for a moment before the fetch resolves.
   if (orderId && !order && orderLoading) {
     return (
       <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser bestilling…</div>
@@ -535,7 +535,7 @@ export function VehicleCreatePage() {
       return;
     }
 
-    navigate("/fleetii-admin", { replace: true });
+    navigate("/fleetii-admin-installations", { replace: true });
   };
 
   const rows: [string, string][] = [
