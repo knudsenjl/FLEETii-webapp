@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
@@ -22,6 +22,14 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 export function FleetManagementPage() {
   const { afdelingId, profile } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  /** The map view (center/zoom) and cluster toggle this page itself snapshotted right before navigating to VehicleDetailsPage — see goToVehicleDetails and LeafletMap's own onViewChange/skipInitialFitBounds doc comments. Only ever present on the history entry a browser-back actually lands back on; a fresh visit (direct link, "Flådestyring" button) has neither, falling back to the normal fit-all-vehicles/clustered defaults below. */
+  const savedSnapshot = (
+    location.state as { mapView?: { lat: number; lng: number; zoom: number }; clusterMarkers?: boolean } | null
+  ) ?? null;
+  const savedMapView = savedSnapshot?.mapView ?? null;
+  /** The map's own latest center/zoom, kept up to date via LeafletMap's onViewChange — read (not reacted to) right before navigating away in goToVehicleDetails, so browser-back can restore exactly where the admin was looking instead of resetting to the fleet's default fit-all-vehicles view. A ref, not state: this only ever needs to be read at the moment of navigating away, not on every pan/zoom re-render. */
+  const mapViewRef = useRef(savedMapView);
   const gpsPositions = use2hireGPS();
   const twoHireVehicles = use2hireVehicle();
   // A FLEETii admin sees every vehicle platform-wide (they have no
@@ -79,8 +87,8 @@ export function FleetManagementPage() {
   const vehicleTooltip = (vehicleId: string): string =>
     formatVehicleIdentLabel(identByVehicleId[vehicleId]?.vehicleIdent, identByVehicleId[vehicleId]?.numberPlate, useVehicleIdent);
 
-  /** Whether nearby vehicles group into a single cluster marker (LeafletMap's own `cluster` prop) or each show individually — user-toggleable, defaults to clustered (the previous fixed behavior). */
-  const [clusterMarkers, setClusterMarkers] = useState(true);
+  /** Whether nearby vehicles group into a single cluster marker (LeafletMap's own `cluster` prop) or each show individually — user-toggleable, defaults to clustered (the previous fixed behavior) unless restored from savedSnapshot (a browser-back from VehicleDetailsPage shouldn't silently re-cluster a map the admin had switched to "Vis enkeltvis"). */
+  const [clusterMarkers, setClusterMarkers] = useState(savedSnapshot?.clusterMarkers ?? true);
 
   // Shows immediately when the department has no vehicles, then auto-hides
   // after 3s (rather than staying up indefinitely).
@@ -98,6 +106,19 @@ export function FleetManagementPage() {
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
     if (!twoHireVehicle) return;
+    // Stamps the map's current view AND cluster toggle onto THIS page's own
+    // history entry (replace, not push) right before navigating away — so a
+    // browser-back from VehicleDetailsPage lands back on a "/fleet-map" entry
+    // that still remembers where the admin was looking and whether they'd
+    // switched to "Vis enkeltvis", instead of resetting both to their
+    // defaults. Same formSnapshot-style pattern as ReservationPage.tsx/
+    // AvailablePage.tsx. mapView is omitted (not just null) when unknown
+    // (moveend hasn't fired even once yet) — matches savedMapView's own
+    // "absent, not null" check for "no override" ??  fallback above.
+    navigate(location.pathname, {
+      replace: true,
+      state: { ...(mapViewRef.current ? { mapView: mapViewRef.current } : {}), clusterMarkers },
+    });
     navigate(`/vehicle-details/${vehicleId}`, { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
   };
 
@@ -132,9 +153,13 @@ export function FleetManagementPage() {
 
               <div className="relative mt-4 min-h-[16rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                 <LeafletMap
-                  lat={center.lat}
-                  lng={center.lng}
-                  zoom={primary ? 13 : 7}
+                  lat={savedMapView?.lat ?? center.lat}
+                  lng={savedMapView?.lng ?? center.lng}
+                  zoom={savedMapView?.zoom ?? (primary ? 13 : 7)}
+                  skipInitialFitBounds={savedMapView !== null}
+                  onViewChange={(view) => {
+                    mapViewRef.current = view;
+                  }}
                   showMarker={Boolean(primary)}
                   markerTooltip={primary ? vehicleTooltip(primary.vehicleId) : undefined}
                   onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}

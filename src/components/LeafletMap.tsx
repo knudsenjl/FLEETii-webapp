@@ -47,6 +47,10 @@ type LeafletMapProps = {
   permanentTooltips?: boolean;
   /** False renders every marker as a small FLEETii-blue position triangle instead of the full FLEETii pin — still clickable/tooltip-bearing, just a smaller position indicator. On by default. */
   showMarkerIcon?: boolean;
+  /** Skips the very-first-mount fitBounds-to-every-marker behavior, using the lat/lng/zoom props as the initial view exactly as given instead — for a caller restoring a view it saved itself (via onViewChange) across an unmount/remount, e.g. FleetManagementPage after a browser-back from VehicleDetailsPage. Off by default (the normal "fit everything on first load" behavior). */
+  skipInitialFitBounds?: boolean;
+  /** Fired whenever the map's own center/zoom settles (Leaflet's "moveend" — covers the initial view, a user's own pan/zoom, and every programmatic setView/fitBounds alike). Lets a caller remember what the admin was actually looking at across an unmount, since this component's own view-preservation refs (see below) only survive re-renders, not a full unmount/remount — e.g. FleetManagementPage snapshots the latest value into router state right before navigating to VehicleDetailsPage, so browser-back can restore it instead of recentering on the fleet's default fit-all-vehicles view. */
+  onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
 };
 
 /** Renders an OpenStreetMap tile map with a primary marker and optional extra markers/clustering. See LeafletMapProps for what each prop controls. */
@@ -62,6 +66,8 @@ export function LeafletMap({
   cluster = false,
   permanentTooltips = false,
   showMarkerIcon = true,
+  skipInitialFitBounds = false,
+  onViewChange,
 }: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -72,6 +78,9 @@ export function LeafletMap({
   // every unrelated re-render of the parent.
   const onMarkerClickRef = useRef(onMarkerClick);
   onMarkerClickRef.current = onMarkerClick;
+  // Same reasoning as onMarkerClickRef just above.
+  const onViewChangeRef = useRef(onViewChange);
+  onViewChangeRef.current = onViewChange;
   // Content-based signature for extraMarkers, used as the effect's actual
   // dependency below instead of the array reference — FleetManagementPage.tsx
   // passes a fresh `.map()` array every render even when the underlying
@@ -136,19 +145,70 @@ export function LeafletMap({
     if (showMarker) {
       const marker = L.marker([lat, lng], { icon });
       addMarkerToMap(marker);
+      // Binding the SAME logical click on both the marker and its own
+      // interactive tooltip below (two genuinely separate Leaflet layers,
+      // each independently registered with the map's own click-target
+      // resolution) has been observed to occasionally fire the handler
+      // twice for what the admin experiences as one physical click —
+      // enough to push two history entries onto the router instead of one,
+      // so a single browser-back landed back on the very page it came
+      // from. Coalescing anything within the same 300ms swallows a
+      // duplicate without ever being able to block two genuinely separate,
+      // deliberate clicks.
+      let lastHandledAt = 0;
+      const handleClick = () => {
+        const now = Date.now();
+        if (now - lastHandledAt < 300) return;
+        lastHandledAt = now;
+        onMarkerClickRef.current?.();
+      };
       if (markerTooltip) {
-        marker.bindTooltip(markerTooltip, { direction: "top", offset: tooltipOffset, permanent: permanentTooltips });
+        // A PERMANENT tooltip is the actual visible, legible label the user
+        // aims for (e.g. FleetManagementPage's "Køretøj-ID / Reg.nr" pill
+        // sitting above the tiny positionMarkerIcon triangle) — by default a
+        // Leaflet tooltip is `pointer-events: none` and purely decorative, so
+        // a click that lands on the label itself (very easy to do, given how
+        // small the triangle icon is beneath/beside it) would silently fall
+        // through to the map instead of registering as a marker click.
+        // `interactive: true` plus forwarding its own "click" here makes the
+        // label just as clickable as the marker it's attached to. A
+        // non-permanent (hover-only) tooltip skips this — the cursor is
+        // already over the marker's own hit area whenever it's visible.
+        marker.bindTooltip(markerTooltip, {
+          direction: "top",
+          offset: tooltipOffset,
+          permanent: permanentTooltips,
+          interactive: permanentTooltips,
+        });
+        if (permanentTooltips) marker.getTooltip()?.on("click", handleClick);
       }
-      marker.on("click", () => onMarkerClickRef.current?.());
+      marker.on("click", handleClick);
     }
     extraMarkers.forEach((marker) => {
       const extraMarker = L.marker([marker.lat, marker.lng], { icon });
       addMarkerToMap(extraMarker);
+      // See the primary marker's identical handling (including the
+      // dedupe-guard comment) just above.
+      let lastHandledAt = 0;
+      const handleExtraClick = () => {
+        const now = Date.now();
+        if (now - lastHandledAt < 300) return;
+        lastHandledAt = now;
+        marker.onClick?.();
+      };
       if (marker.tooltip) {
-        extraMarker.bindTooltip(marker.tooltip, { direction: "top", offset: tooltipOffset, permanent: permanentTooltips });
+        extraMarker.bindTooltip(marker.tooltip, {
+          direction: "top",
+          offset: tooltipOffset,
+          permanent: permanentTooltips,
+          interactive: permanentTooltips,
+        });
+        if (permanentTooltips && marker.onClick) {
+          extraMarker.getTooltip()?.on("click", handleExtraClick);
+        }
       }
       if (marker.onClick) {
-        extraMarker.on("click", marker.onClick);
+        extraMarker.on("click", handleExtraClick);
       }
     });
 
@@ -156,8 +216,9 @@ export function LeafletMap({
     // change (or the very first mount) — a rebuild triggered by some OTHER
     // prop (cluster, tooltip config, marker content) restores the saved view
     // above instead, and re-fitting here would immediately override that
-    // right back out to fit everything again.
-    if (!viewPropsUnchanged && extraMarkers.length > 0) {
+    // right back out to fit everything again. skipInitialFitBounds opts a
+    // fresh mount out of this too — see its own doc comment.
+    if (!viewPropsUnchanged && !skipInitialFitBounds && extraMarkers.length > 0) {
       const bounds = L.latLngBounds([
         [lat, lng],
         ...extraMarkers.map((marker): [number, number] => [marker.lat, marker.lng]),
@@ -166,6 +227,15 @@ export function LeafletMap({
     }
 
     mapRef.current = map;
+
+    // Reports the settled view back to the caller (see onViewChange's own
+    // doc comment) — fires for the initial view too, harmlessly redundant
+    // with whatever the caller already knew at that point.
+    const handleMoveEnd = () => {
+      const c = map.getCenter();
+      onViewChangeRef.current?.({ lat: c.lat, lng: c.lng, zoom: map.getZoom() });
+    };
+    map.on("moveend", handleMoveEnd);
 
     // Container size can change after init (flex/animated layouts), which
     // Leaflet doesn't pick up on its own — without this the tiles render
@@ -188,7 +258,7 @@ export function LeafletMap({
     // suggestion would be wrong (using the array reference directly would
     // rebuild the whole map on every caller re-render, see the comment above).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, showMarker, markerTooltip, cluster, permanentTooltips, showMarkerIcon, extraMarkersKey]);
+  }, [lat, lng, zoom, showMarker, markerTooltip, cluster, permanentTooltips, showMarkerIcon, skipInitialFitBounds, extraMarkersKey]);
 
   return <div ref={containerRef} className={className} />;
 }
