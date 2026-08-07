@@ -45,11 +45,12 @@ type ReservationFormSnapshot = {
 const DEFAULT_DURATION_MINUTES = 3 * 60;
 const DEFAULT_INTERVAL_MINUTES = 15;
 
-/** Every `stepMinutes` of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns — step comes from "Standard interval" (falling back to DEFAULT_INTERVAL_MINUTES). */
+/** Every `stepMinutes` of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns — step comes from "Standard interval" (falling back to DEFAULT_INTERVAL_MINUTES). "00" is a valid "Standard interval" value in its own right (see ceilToInterval) but isn't a meaningful STEP size — falls back to 1-minute granularity (every minute of the day, fully browsable) rather than dividing by zero. */
 function buildTimeOptions(stepMinutes: number): string[] {
-  const count = Math.floor((24 * 60) / stepMinutes);
+  const step = stepMinutes > 0 ? stepMinutes : 1;
+  const count = Math.floor((24 * 60) / step);
   return Array.from({ length: count }, (_, i) => {
-    const totalMinutes = i * stepMinutes;
+    const totalMinutes = i * step;
     const hours = Math.floor(totalMinutes / 60);
     const minutes = totalMinutes % 60;
     return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
@@ -66,10 +67,34 @@ function parseHHMMToMinutes(value: string): number | null {
   return hours * 60 + minutes;
 }
 
-/** Rounds a Date up to the next quarter-hour boundary (used for the default "now" start time). */
-function ceilToQuarterHour(date: Date): Date {
-  const ms = 15 * 60 * 1000;
-  return new Date(Math.ceil(date.getTime() / ms) * ms);
+/**
+ * Rounds a Date up to the next "Standard interval" boundary — 00 (see
+ * StandardSettings.tsx's Standard_interval options) means "no rounding at
+ * all", returned unchanged (a new reservation starts at the exact current
+ * moment); 15/30/45/60 rounds up to the next hh:15/hh:30/hh:45/hh+1:00,
+ * already sitting exactly on a boundary is left unchanged (matches the old
+ * ceilToQuarterHour's Math.ceil semantics: "the next boundary at or after
+ * this moment"). Deliberately computed from the Date's own LOCAL
+ * hours/minutes (getHours/getMinutes), not epoch milliseconds — an
+ * epoch-ms-based ceiling (the old ceilToQuarterHour's approach) only lines
+ * up with LOCAL wall-clock boundaries when the local UTC offset is itself a
+ * multiple of intervalMinutes, which breaks for 45 under Denmark's own
+ * +60/+120 minute offsets (60/120 aren't multiples of 45) — see
+ * CLAUDE.md's "naive wall-clock timestamps" convention for why this
+ * codebase avoids exactly this kind of instant-based arithmetic on times
+ * that are meant to read the same on-screen regardless of timezone.
+ */
+function ceilToInterval(date: Date, intervalMinutes: number): Date {
+  if (intervalMinutes <= 0) return date;
+
+  const result = new Date(date);
+  result.setSeconds(0, 0);
+  const totalMinutes = result.getHours() * 60 + result.getMinutes();
+  const remainder = totalMinutes % intervalMinutes;
+  if (remainder !== 0) {
+    result.setMinutes(result.getMinutes() + (intervalMinutes - remainder));
+  }
+  return result;
 }
 
 /**
@@ -222,15 +247,16 @@ export function ReservationPage() {
     });
     void fetchSettingText("Standard_interval", profile?.user_id, afdelingId).then((raw) => {
       const parsed = raw ? Number.parseInt(raw, 10) : NaN;
-      setStandardIntervalMinutes(Number.isFinite(parsed) && parsed > 0 ? parsed : null);
+      // >= 0, not > 0 — "00" (parsed to 0) is a real, meaningful override
+      // (see ceilToInterval: 0 means "no rounding, start right now"), not
+      // the same as "no override configured" (raw itself null/missing).
+      setStandardIntervalMinutes(Number.isFinite(parsed) && parsed >= 0 ? parsed : null);
     });
   }, [profile?.user_id, afdelingId]);
 
   const effectiveDurationMinutes = standardDurationMinutes ?? DEFAULT_DURATION_MINUTES;
-  const timeOptions = useMemo(
-    () => buildTimeOptions(standardIntervalMinutes ?? DEFAULT_INTERVAL_MINUTES),
-    [standardIntervalMinutes],
-  );
+  const effectiveIntervalMinutes = standardIntervalMinutes ?? DEFAULT_INTERVAL_MINUTES;
+  const timeOptions = useMemo(() => buildTimeOptions(effectiveIntervalMinutes), [effectiveIntervalMinutes]);
 
   /** Pre-selects the booking-being-edited's Anvendelse once the options list has loaded — a plain "Anvendelse" match wins if the loaded list still has that exact option, otherwise it's treated as a free-text "Andet" reason (mirrors how the anvendelse getter below reconstructs the same distinction on submit). Guarded by editingPrefilled so a later options reload (e.g. afdelingId somehow changing) never clobbers a value the admin has since edited by hand — starts already-true when restoring from formSnapshot (both editing AND bouncing back from AvailablePage via "Skift køretøj"), since anvendelseOption/anvendelseCustom already came from the snapshot above and this effect must not overwrite them. */
   const editingAnvendelsePrefilled = useRef(Boolean(formSnapshot));
@@ -264,7 +290,7 @@ export function ReservationPage() {
     ? users.filter((u) => u.department_id === selectedDepartmentId)
     : users.filter((u) => u.department_id === afdelingId || u.user_id === session?.user.id);
 
-  const now = ceilToQuarterHour(new Date());
+  const now = ceilToInterval(new Date(), effectiveIntervalMinutes);
   const end = new Date(now.getTime() + effectiveDurationMinutes * 60 * 1000);
   const toIsoDate = (date: Date) =>
     `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
@@ -336,8 +362,32 @@ export function ReservationPage() {
   }, [editing, standardDurationMinutes]);
 
   /**
+   * Same reapplication as durationAppliedRef just above, but for "Standard
+   * interval" and Start rather than "Standard varighed" and End — the
+   * initial `now`/initialStart computed above already used
+   * effectiveIntervalMinutes, but again only as a useState *initializer*.
+   * Recomputes both Start (ceilToInterval against a fresh "now") AND End
+   * (Start + whatever duration is currently known — effectiveDurationMinutes
+   * already falls back to the default while that's still loading, and gets
+   * corrected by durationAppliedRef above once it resolves, regardless of
+   * which of these two effects happens to fire first). Same
+   * editing/formSnapshot/run-once guards as durationAppliedRef.
+   */
+  const intervalAppliedRef = useRef(Boolean(formSnapshot));
+  useEffect(() => {
+    if (editing || standardIntervalMinutes === null || intervalAppliedRef.current) return;
+    intervalAppliedRef.current = true;
+    const start = ceilToInterval(new Date(), standardIntervalMinutes);
+    const newEnd = new Date(start.getTime() + effectiveDurationMinutes * 60 * 1000);
+    setStartDate(toIsoDate(start));
+    setStartTime(formatTime(start));
+    setEndDate(toIsoDate(newEnd));
+    setEndTime(formatTime(newEnd));
+  }, [editing, standardIntervalMinutes]);
+
+  /**
    * Commits a new start date/time. Rejects anything in the past (snapping
-   * back to "now", rounded up to the next quarter hour, with a warning)
+   * back to "now", rounded up to the next "Standard interval" boundary)
    * instead of accepting it. When `syncEndDate` is true (date input changed),
    * the end date follows the start date; when the resulting end time would
    * no longer be after the new start time on the same day, it's bumped
@@ -349,7 +399,7 @@ export function ReservationPage() {
     let time = candidateTime;
 
     if (new Date(`${date}T${time}:00`).getTime() < Date.now()) {
-      const current = ceilToQuarterHour(new Date());
+      const current = ceilToInterval(new Date(), effectiveIntervalMinutes);
       date = toIsoDate(current);
       time = formatTime(current);
       triggerWarning("start");

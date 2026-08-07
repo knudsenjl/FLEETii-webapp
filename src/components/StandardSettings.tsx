@@ -46,6 +46,17 @@ export type StandardSetting =
   | {
       name: string;
       label: string;
+      inputType: "select";
+      /** The fixed set of value_text strings this row may hold — e.g. Standard_interval's "00"/"15"/"30"/"45"/"60" (see STANDARDER below). Unlike "number", there's no free-typed value to validate/clamp — whatever's picked is already valid by construction. */
+      options: string[];
+      defaultValue: string;
+      unit: string;
+      /** Optional "?" info popover text shown right-aligned next to the label — see the openInfoName state below. Omit for a row with no explanation needed. */
+      info?: string;
+    }
+  | {
+      name: string;
+      label: string;
       inputType: "checkbox";
       defaultValue: "true" | "false";
       /** Optional "?" info popover text shown right-aligned next to the label — see the openInfoName state below. Omit for a row with no explanation needed. */
@@ -80,11 +91,11 @@ export const STANDARDER: StandardSetting[] = [
   {
     name: "Standard_interval",
     label: "Standard interval",
-    placeholder: "mm",
-    inputType: "number",
+    inputType: "select",
+    options: ["00", "15", "30", "45", "60"],
     defaultValue: "15",
     unit: "min.",
-    info: "Nye reservationer vil som default have intervaller på denne varighed",
+    info: "Hvis 00 er valgt, vil nye reservationer starte på tidspunktet for resrvationen. Hvis 15, 30, 45 eller 60 vælges, vil den nye reservation starte ved det næstkommende klokkeslæt, eksempelvis hvis reservationen foretages 12:07, vir start blive 12:15, 12:30, 12:45, eller 13:00. Samtidig vil intervallerne til sluttidspunktet som default være multipla af intervallet (fx ved 15: 15:15, 15:30, 15:45, osv.).",
   },
   {
     name: "Session_timeout",
@@ -181,11 +192,11 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
   const effectiveValue = (name: string, defaultValue: "true" | "false"): boolean =>
     values[name] !== undefined ? values[name] === "true" : (departmentValues[name] ?? (defaultValue === "true"));
 
-  /** "MM" for the interval field (padded to two digits), or the raw "HH:MM" string a native time input already provides as-is. */
-  const formatValue = (inputType: "time" | "number", raw: string): string =>
+  /** "MM" for a free-typed number field (padded to two digits), or the raw string a "time" input or "select" row already provides as-is (a select's options are already exactly the stored string, e.g. "00"/"15"). */
+  const formatValue = (inputType: "time" | "number" | "select", raw: string): string =>
     inputType === "number" ? raw.padStart(2, "0") : raw;
 
-  const handleChange = async (name: string, inputType: "time" | "number", raw: string) => {
+  const handleChange = async (name: string, inputType: "time" | "number" | "select", raw: string) => {
     if (!scopeId || raw === "") return;
 
     // The native <input type="number" min max> only affects spinner/validity
@@ -317,6 +328,23 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
                             onChange={setting.readOnly ? undefined : (e) => void handleToggle(setting.name, e.target.checked)}
                             className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
                           />
+                          {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
+                        </div>
+                      ) : setting.inputType === "select" ? (
+                        <div className="flex items-center gap-2">
+                          <select
+                            value={values[setting.name] ?? setting.defaultValue}
+                            disabled={savingName === setting.name}
+                            onChange={(e) => void handleChange(setting.name, setting.inputType, e.target.value)}
+                            className="w-16 shrink-0 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed"
+                          >
+                            {setting.options.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                          <span className="text-left text-sm text-brand-600">{setting.unit}</span>
                           {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
                         </div>
                       ) : (
