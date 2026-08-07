@@ -121,7 +121,7 @@ function profileMatchesOrder(profile: TwoHireBoardProfile, order: { brand: strin
   return makerMatches && modelMatches && yearMatches;
 }
 
-/** Pulls the first present, non-empty field (in priority order) out of the MotorAPI vehicle lookup's "vehicle" section (see motorapi-vehicle-lookup.mts — the { data } | { error } shape). Field names (make/model/variant/model_year) are confirmed real, not guessed — the "i" button's JSON popup shows the raw response if MotorAPI ever changes shape. */
+/** Pulls the first present, non-empty field (in priority order) out of the MotorAPI vehicle lookup's "vehicle" section (see motorapi-vehicle-lookup.mts — the { data } | { error } shape). Field names (make/model/variant/model_year/fuel_type) are confirmed real, not guessed — the "i" button's JSON popup shows the raw response if MotorAPI ever changes shape. */
 function motorApiVehicleField(motorApiResult: unknown, keys: string[]): string | null {
   if (!motorApiResult || typeof motorApiResult !== "object") return null;
   const vehicleSection = (motorApiResult as { vehicle?: unknown }).vehicle;
@@ -134,6 +134,19 @@ function motorApiVehicleField(motorApiResult: unknown, keys: string[]): string |
     if (typeof value === "string" && value.trim()) return value.trim();
     if (typeof value === "number") return String(value);
   }
+  return null;
+}
+
+/** Maps MotorAPI's free-text "fuel_type" value onto one of DRIVMIDDEL_OPTIONS's fixed five — unlike Brand/Mærke/Årgang, Drivmiddel is a <select> constrained by vehicle_profiles/costumer_orders' shared CHECK constraint, so MotorAPI's raw string (whatever exact wording it uses — not documented, and not worth hardcoding a guess for) can't be written straight through. Keyword match on a lowercased substring, checked in this specific order so "diesel" isn't mistaken for "el" (it contains that substring) — null (fill button disabled) if nothing recognizable matches, rather than guessing wrong. */
+function motorApiDrivmiddel(motorApiResult: unknown): (typeof DRIVMIDDEL_OPTIONS)[number] | null {
+  const raw = motorApiVehicleField(motorApiResult, ["fuel_type"]);
+  if (!raw) return null;
+  const normalized = raw.toLowerCase();
+  if (normalized.includes("hybrid")) return "Hybrid";
+  if (normalized.includes("brint") || normalized.includes("hydrogen")) return "Brint";
+  if (normalized.includes("diesel")) return "Diesel";
+  if (normalized.includes("benzin") || normalized.includes("petrol") || normalized.includes("gasoline")) return "Benzin";
+  if (normalized.includes("el") || normalized.includes("electric")) return "El";
   return null;
 }
 
@@ -583,32 +596,57 @@ export function VehicleCreatePage() {
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                 {rows.map(([label, value]) => {
                   // Drivmiddel is a fixed five-way choice (see DRIVMIDDEL_OPTIONS),
-                  // not a free-text/MotorAPI-fillable field like Brand/Mærke/
-                  // Årgang below, so it gets its own <select> branch here
-                  // instead of joining the generic editableField handling.
-                  // Same "editable only before registration" rule as those
-                  // three: once vehicleRegistered, this falls through to the
-                  // plain read-only span at the bottom of this map, showing
-                  // `value` (kept in sync with order.drivmiddel).
+                  // so it gets its own <select> branch here instead of joining
+                  // the generic editableField handling below — but otherwise
+                  // matches Brand/Mærke/Årgang's row shape exactly, including
+                  // the MotorAPI fill button (source field "fuel_type",
+                  // mapped onto one of the five fixed options — see
+                  // motorApiDrivmiddel). Same "editable only before
+                  // registration" rule as those three: once vehicleRegistered,
+                  // this falls through to the plain read-only span at the
+                  // bottom of this map, showing `value` (kept in sync with
+                  // order.drivmiddel).
                   if (label === "Drivmiddel:" && !vehicleRegistered) {
+                    const motorApiValue = motorApiDrivmiddel(motorApiResult);
                     return (
                       <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
-                        <select
-                          value={drivmiddelInput}
-                          onChange={(e) => {
-                            const next = e.target.value;
-                            setDrivmiddelInput(next);
-                            void saveOrderField("drivmiddel", next);
-                          }}
-                          className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        >
-                          {DRIVMIDDEL_OPTIONS.map((option) => (
-                            <option key={option} value={option}>
-                              {option}
-                            </option>
-                          ))}
-                        </select>
+                        <div className="flex items-center gap-1">
+                          <select
+                            value={drivmiddelInput}
+                            onChange={(e) => {
+                              const next = e.target.value;
+                              setDrivmiddelInput(next);
+                              void saveOrderField("drivmiddel", next);
+                            }}
+                            className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          >
+                            {DRIVMIDDEL_OPTIONS.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                          <button
+                            type="button"
+                            disabled={!motorApiValue}
+                            onClick={() => {
+                              if (!motorApiValue) return;
+                              setDrivmiddelInput(motorApiValue);
+                              if (motorApiValue !== drivmiddelInput) {
+                                void saveOrderField("drivmiddel", motorApiValue);
+                              }
+                            }}
+                            aria-label={`Udfyld ${label} fra MotorAPI`}
+                            title={motorApiValue ? `Udfyld fra MotorAPI: ${motorApiValue}` : "Ingen værdi fundet i MotorAPI endnu"}
+                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                          >
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                              <polyline points="9 10 4 15 9 20" />
+                              <path d="M20 4v7a4 4 0 0 1-4 4H4" />
+                            </svg>
+                          </button>
+                        </div>
                       </div>
                     );
                   }
