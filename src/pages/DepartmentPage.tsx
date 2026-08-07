@@ -46,7 +46,7 @@ type ProfileQueryRow = {
  * blocking/unblocking access (via delete-user.mts/unblock-user.mts) from
  * there, plus a link to create a new user. Blocked users stay listed here
  * rather than disappearing (a red "Blokeret" badge appears next to their
- * Rolle, same style as FleetiiAdministrationPage's own "Adgang blokeret"
+ * Rolle, same style as CostumerAdministrationPage's own "Adgang blokeret"
  * marker for a deactivated costumer), since blocking is reversible and they
  * need to stay reachable to unblock.
  */

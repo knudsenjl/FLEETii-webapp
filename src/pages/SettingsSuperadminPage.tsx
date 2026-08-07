@@ -2,7 +2,7 @@
 // the round settings button in PageHeader.tsx, only for role "FLEETii
 // admin"; see SettingsAdminPage.tsx/SettingsUserPage.tsx for the other two
 // roles' variants). Empty shell for now, same page frame as
-// AdminFrontpage/FleetiiAdministrationPage, no content yet.
+// AdminFrontpage/CostumerAdministrationPage, no content yet.
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 

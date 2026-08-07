@@ -9,7 +9,7 @@ import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
-/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so an extra "FLEETii platform administration" button (visible only to that role) links onward to "/fleetii-admin". Conversely, "Administration af afdelinger" (visible only to a regular "admin") fetches that admin's own costumer's departments and jumps straight to EditDepartmentsPage.tsx — a FLEETii admin already has a fuller path to the same page via CostumerDetailsPage/DepartmentDetailsPage. */
+/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so two extra buttons (visible only to that role) link onward to the FLEETii-admin-only costumer/installation lists — "FLEETii admin: Administration af kunder" (CostumerAdministrationPage.tsx, "/fleetii-admin") and "FLEETii admin: Administration af installationer" (InstallationAdministrationPage.tsx, "/fleetii-admin-installations") — always first and second on the page, ahead of every other button here. Conversely, "Administration af afdelinger" (visible only to a regular "admin") fetches that admin's own costumer's departments and jumps straight to EditDepartmentsPage.tsx — a FLEETii admin already has a fuller path to the same page via CostumerDetailsPage/DepartmentDetailsPage. */
 export function AdminFrontpage() {
   const navigate = useNavigate();
   const { profile, costumerId, costumerName } = useAuth();
@@ -25,7 +25,7 @@ export function AdminFrontpage() {
 
     const { data, error } = await supabase
       .from("departments")
-      .select("department_id, name")
+      .select("department_id, name, address")
       .eq("costumer_id", costumerId)
       .order("name", { ascending: true });
 
@@ -59,13 +59,22 @@ export function AdminFrontpage() {
               <h2 className="text-xl font-semibold text-brand-800">Administration</h2>
 
               {profile?.role === "FLEETii admin" && (
-                <button
-                  type="button"
-                  onClick={() => navigate("/fleetii-admin")}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                >
-                  FLEETii platform administration
-                </button>
+                <div className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleetii-admin")}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    FLEETii admin: Administration af kunder
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleetii-admin-installations")}
+                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    FLEETii admin: Administration af installationer
+                  </button>
+                </div>
               )}
 
               <div className="flex flex-col gap-3">

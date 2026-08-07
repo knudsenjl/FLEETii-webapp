@@ -17,7 +17,8 @@ import { AllBookingsPage } from "./pages/AllBookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { TwoHireTestPage } from "./pages/TwoHireTestPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
-import { FleetiiAdministrationPage } from "./pages/FleetiiAdministrationPage";
+import { CostumerAdministrationPage } from "./pages/CostumerAdministrationPage";
+import { InstallationAdministrationPage } from "./pages/InstallationAdministrationPage";
 import { CostumerDetailsPage } from "./pages/CostumerDetailsPage";
 import { DepartmentDetailsPage } from "./pages/DepartmentDetailsPage";
 import { EditDepartmentsPage } from "./pages/EditDepartmentsPage";
@@ -45,9 +46,10 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
  * to their role's home page (admin dashboard vs. bookings list) instead of
  * showing the login form again. A "FLEETii admin" role now lands on "/admin"
  * too, same as a regular admin (it's a superset of "admin" — see
- * ProtectedRoute's requireAdmin check) — AdminFrontpage.tsx shows them an
- * extra "FLEETii platform administration" button onward to "/fleetii-admin"
- * when they actually need it, rather than defaulting there on every login.
+ * ProtectedRoute's requireAdmin check) — AdminFrontpage.tsx shows them two
+ * extra buttons ("FLEETii admin: Administration af kunder"/"...installationer")
+ * onward to "/fleetii-admin"/"/fleetii-admin-installations" when they
+ * actually need it, rather than defaulting there on every login.
  * Renders LoginPage while loading or once it's confirmed there's no session.
  */
 function RootRoute() {
@@ -161,7 +163,15 @@ function App() {
             path="/fleetii-admin"
             element={
               <ProtectedRoute requireRole="FLEETii admin">
-                <FleetiiAdministrationPage />
+                <CostumerAdministrationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/fleetii-admin-installations"
+            element={
+              <ProtectedRoute requireRole="FLEETii admin">
+                <InstallationAdministrationPage />
               </ProtectedRoute>
             }
           />

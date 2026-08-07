@@ -11,7 +11,7 @@ interface FleetiiLogoProps {
   linkToHome?: boolean;
 }
 
-/** The role-appropriate home route for a given `user_profiles.role` — matches RootRoute's (App.tsx) handling of the same roles: "FLEETii admin" now lands on "/admin" too, same as a regular admin (AdminFrontpage.tsx's own "FLEETii platform administration" button links onward to "/fleetii-admin" from there). */
+/** The role-appropriate home route for a given `user_profiles.role` — matches RootRoute's (App.tsx) handling of the same roles: "FLEETii admin" now lands on "/admin" too, same as a regular admin (AdminFrontpage.tsx's own "FLEETii admin: Administration af kunder"/"...installationer" buttons link onward to "/fleetii-admin"/"/fleetii-admin-installations" from there). */
 function homePathForRole(role?: string | null): string {
   return role === "admin" || role === "FLEETii admin" ? "/admin" : "/bookings";
 }

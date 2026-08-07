@@ -7,7 +7,7 @@ import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel } from "../lib/bookings";
 
-/** A pending "Nedlæg" (deletion) costumer_orders row — mirrors VehicleCreatePage.tsx's own CostumerOrder shape/reasoning, for the reverse flow (see costumer_orders_merge_deletion_requests.sql: both order types share this one table now, distinguished by order_type). Normally arrives pre-filled via router state (FleetiiAdministrationPage's "Administration af installationer" table row click), but also fetchable by id alone so "/vehicle-delete/:orderId" works as a direct link (the email's own link). */
+/** A pending "Nedlæg" (deletion) costumer_orders row — mirrors VehicleCreatePage.tsx's own CostumerOrder shape/reasoning, for the reverse flow (see costumer_orders_merge_deletion_requests.sql: both order types share this one table now, distinguished by order_type). Normally arrives pre-filled via router state (InstallationAdministrationPage's "Administration af installationer" table row click), but also fetchable by id alone so "/vehicle-delete/:orderId" works as a direct link (the email's own link). */
 type VehicleDeletionOrder = {
   order_id: string;
   order_type: string;
@@ -52,12 +52,13 @@ type VehicleDeletionOrderQueryRow = {
  * requireRole="FLEETii admin" in App.tsx; there's no reason for a customer's
  * own admin to see this, unlike VehicleCreatePage.tsx's looser gating).
  * Reachable at plain "/vehicle-delete" (order passed via router state —
- * FleetiiAdministrationPage's "Administration af installationer" table row
- * click) or "/vehicle-delete/:orderId" (fetches the order by id — the link
- * in send-vehicle-deletion-request.mts's email). Missing both state and a
- * resolvable :orderId — or an order that isn't actually order_type "Nedlæg"
- * (a stale/mistyped link to what's really a creation order) — redirects back
- * to "/fleetii-admin". Shows what the customer admin's "Slet køretøj"
+ * InstallationAdministrationPage's "Administration af installationer" table
+ * row click) or "/vehicle-delete/:orderId" (fetches the order by id — the
+ * link in send-vehicle-deletion-request.mts's email). Missing both state and
+ * a resolvable :orderId — or an order that isn't actually order_type
+ * "Nedlæg" (a stale/mistyped link to what's really a creation order) —
+ * redirects back to "/fleetii-admin-installations". Shows what the customer
+ * admin's "Slet køretøj"
  * request carries, a real step toggle for confirming the physical 2hire
  * device has been removed, and a final action that actually deregisters the
  * vehicle from 2hire and deletes it from our own DB (delete-vehicle.mts) —
@@ -74,7 +75,8 @@ export function VehicleDeletePage() {
   // (orderId present, no stateOrder yet) — same reasoning as
   // VehicleCreatePage.tsx's orderLoading: starting this false would race the
   // redirect effect below, which would see the original (false) value and
-  // bounce back to "/fleetii-admin" before the fetch had a chance to resolve.
+  // bounce back to "/fleetii-admin-installations" before the fetch had a
+  // chance to resolve.
   const [orderLoading, setOrderLoading] = useState(() => Boolean(orderId) && !stateOrder);
   const rawOrder = stateOrder ?? fetchedOrder;
   // Treated as "not found" if it resolved to an Opret order — this page only
@@ -147,7 +149,7 @@ export function VehicleDeletePage() {
   // turned out to be order_type "Opret" (not this page's job).
   useEffect(() => {
     if (!order && !orderLoading) {
-      navigate("/fleetii-admin", { replace: true });
+      navigate("/fleetii-admin-installations", { replace: true });
     }
   }, [order, orderLoading, navigate]);
 
@@ -304,7 +306,7 @@ export function VehicleDeletePage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => navigate("/fleetii-admin", { replace: true })}
+                  onClick={() => navigate("/fleetii-admin-installations", { replace: true })}
                   className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
                   Tilbage til oversigt
