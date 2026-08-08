@@ -25,6 +25,8 @@ type SendVehicleDeletionRequestBody = { vehicleId?: string };
 
 /** Builds the HTML body of the "please delete this vehicle" email. */
 function buildHtmlBody(fields: {
+  /** This deploy's own origin (process.env.URL, set automatically by Netlify — same fallback convention as create-user.mts's loginUrl), so the emailed link follows the site wherever it's hosted instead of a domain baked in at write-time. */
+  baseUrl: string;
   orderId: string;
   customerName: string;
   departmentName: string;
@@ -62,7 +64,7 @@ function buildHtmlBody(fields: {
 
     <p>Når det fysiske 2hire-device er afmonteret, kan køretøjet slettes i FLEETii og
     afregistreres i 2hire gennem flg. link:
-    <a href="https://fleetii-webapp.netlify.app/vehicle-delete/${fields.orderId}">https://fleetii-webapp.netlify.app/vehicle-delete/${fields.orderId}</a></p>
+    <a href="${fields.baseUrl}/vehicle-delete/${fields.orderId}">${fields.baseUrl}/vehicle-delete/${fields.orderId}</a></p>
 
     <p>For at gennemføre sletningen skal du logge ind på FLEETii med en
     FLEETii admin-bruger.</p>
@@ -212,6 +214,7 @@ export default async (req: Request) => {
     to: mailReceiver,
     subject: `${customerName} - Anmodning om sletning af køretøj (${vehicle.number_plate ?? "—"}) i FLEETii`,
     html: buildHtmlBody({
+      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp.netlify.app",
       orderId: insertedOrder.order_id,
       customerName,
       departmentName,

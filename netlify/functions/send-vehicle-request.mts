@@ -48,6 +48,8 @@ type SendVehicleRequestBody = {
 
 /** Builds the HTML table of vehicle-request fields that becomes the email body. */
 function buildHtmlBody(fields: {
+  /** This deploy's own origin (process.env.URL, set automatically by Netlify — same fallback convention as create-user.mts's loginUrl), so the emailed link follows the site wherever it's hosted instead of a domain baked in at write-time. */
+  baseUrl: string;
   orderId: string;
   customerName: string;
   afdeling: string;
@@ -96,7 +98,7 @@ function buildHtmlBody(fields: {
     </table>
     
     <p>Du kan oprette køretøjet og registrere det i 2hire og FLEETii gennem flg. link:
-    <a href="https://fleetii-webapp.netlify.app/vehicle-create/${fields.orderId}">https://fleetii-webapp.netlify.app/vehicle-create</a></p>
+    <a href="${fields.baseUrl}/vehicle-create/${fields.orderId}">${fields.baseUrl}/vehicle-create</a></p>
 
     <p>For at oprette køretøjet i FLEETii skal du logge ind på FLEETii med en
     FLEETii admin-bruger.</p>
@@ -243,6 +245,7 @@ export default async (req: Request) => {
     to: mailReceiver,
     subject: `${customerName} - Oprettelse af nyt køretøj (${nummerplade}) i FLEETii`,
     html: buildHtmlBody({
+      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp.netlify.app",
       orderId: insertedOrder.order_id,
       customerName,
       afdeling,
