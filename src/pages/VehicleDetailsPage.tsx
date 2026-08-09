@@ -54,50 +54,32 @@ type VehicleProfilePlateRow = {
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
-/** Shape of a Nominatim `format=geojson&addressdetails=1` reverse-geocoding response — the structured `address` fields (not `display_name`) are used to format "street number, postal code city" for the row below the map. */
-type NominatimReverseResponse = {
-  features: Array<{
-    properties: {
-      address?: {
-        road?: string;
-        house_number?: string;
-        postcode?: string;
-        suburb?: string;
-        city_district?: string;
-        city?: string;
-        town?: string;
-        village?: string;
-      };
-    };
-  }>;
+/**
+ * Shape of a DAWA (Danmarks Adressers Web API, api.dataforsyningen.dk —
+ * Denmark's own free, authoritative, no-API-key-required address registry)
+ * `/adgangsadresser/reverse` response — only the fields needed to format
+ * "street number, postal code city" for the row below the map.
+ *
+ * Used INSTEAD OF Nominatim/OSM here (unlike LeafletMap's tiles, which
+ * still come from OSM) — Nominatim's `suburb`/`town`/`city` tags are
+ * crowdsourced and don't reliably match Denmark's actual registered postal
+ * town per postcode (confirmed wrong twice: "Sydbyen" instead of
+ * "Silkeborg" for 8600, and "Strømmen" instead of "Randers NØ" for 8930).
+ * DAWA's `postnummer.navn` IS that official registered name directly, no
+ * suburb-vs-town guessing needed. Every FLEETii vehicle is in Denmark, so
+ * there's no coverage gap from dropping Nominatim's worldwide reach here.
+ */
+type DawaReverseResponse = {
+  vejstykke?: { navn?: string };
+  husnr?: string;
+  postnummer?: { nr?: string; navn?: string };
 };
 
-/**
- * Formats a Nominatim `address` object as "street number, postal code city"
- * (e.g. "Vejnavn 12, 8000 Aarhus C"), omitting any parts that are missing.
- * Prefers `town` first, THEN `suburb`/`city_district`, THEN `city` for the
- * place name — Nominatim only ever returns one of `town`/`city` for a given
- * address (OSM's place=town vs. place=city distinction), never both:
- * - A plain town (e.g. Silkeborg, 8600) comes back as `town: "Silkeborg"`
- *   PLUS `suburb: "Sydbyen"` (a neighbourhood within it) — `town` here IS
- *   already the correct postal-town name; picking `suburb` instead would
- *   wrongly show the neighbourhood ("Sydbyen") instead of the town.
- * - A big subdivided city (e.g. København, 2700) comes back as
- *   `city: "København"` PLUS `suburb: "Brønshøj"`, with NO `town` field at
- *   all — here `city` is the overarching municipality name that doesn't
- *   match the postcode, while `suburb` is the actual local postal-district
- *   name that does.
- * `town` being present is what distinguishes the two cases, since it's
- * never set alongside `city`. Falls back to null if nothing usable came
- * back at all.
- */
-function formatNominatimAddress(address: NominatimReverseResponse["features"][number]["properties"]["address"]): string | null {
-  if (!address) return null;
-  const street = [address.road, address.house_number].filter(Boolean).join(" ");
-  const place = [
-    address.postcode,
-    address.town ?? address.suburb ?? address.city_district ?? address.city ?? address.village,
-  ].filter(Boolean).join(" ");
+/** Formats a DAWA reverse-geocoding response as "street number, postal code city" (e.g. "Vejnavn 12, 8000 Aarhus C"), omitting any parts that are missing. Falls back to null if nothing usable came back at all. */
+function formatDawaAddress(data: DawaReverseResponse | null): string | null {
+  if (!data) return null;
+  const street = [data.vejstykke?.navn, data.husnr].filter(Boolean).join(" ");
+  const place = [data.postnummer?.nr, data.postnummer?.navn].filter(Boolean).join(" ");
   const parts = [street, place].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
 }
@@ -309,7 +291,7 @@ export function VehicleDetailsPage() {
     };
   }, [vehicle]);
 
-  /** Reverse-geocodes the vehicle's current GPS position (Nominatim, OpenStreetMap's free reverse-geocoding API — same tile provider LeafletMap already uses) into a human-readable address, for the row below the map. Admin-only and position-gated to match the map itself; keyed on the coordinates rather than `position` so an unrelated re-render of the gpsPositions array doesn't refire it. */
+  /** Reverse-geocodes the vehicle's current GPS position (DAWA — see DawaReverseResponse's own doc comment for why this, not Nominatim) into a human-readable address, for the row below the map. Admin-only and position-gated to match the map itself; keyed on the coordinates rather than `position` so an unrelated re-render of the gpsPositions array doesn't refire it. */
   useEffect(() => {
     if (!isAdmin || !position) {
       setAddress(null);
@@ -320,12 +302,12 @@ export function VehicleDetailsPage() {
     setAddressLoading(true);
 
     void fetch(
-      `https://nominatim.openstreetmap.org/reverse?format=geojson&lat=${position.lat}&lon=${position.lng}&layer=address&addressdetails=1`,
+      `https://api.dataforsyningen.dk/adgangsadresser/reverse?x=${position.lng}&y=${position.lat}`,
     )
-      .then((response) => response.json() as Promise<NominatimReverseResponse>)
+      .then((response) => response.json() as Promise<DawaReverseResponse>)
       .then((data) => {
         if (cancelled) return;
-        setAddress(formatNominatimAddress(data.features[0]?.properties.address));
+        setAddress(formatDawaAddress(data));
       })
       .catch(() => {
         if (!cancelled) setAddress(null);
