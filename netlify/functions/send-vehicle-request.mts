@@ -15,8 +15,8 @@
 // create-user.mts's own costumer scoping.
 //
 // Mail transport (SMTP vs. Resend) lives in _shared/mailer.ts, shared with
-// create-user.mts's welcome email. RESEND_MAIL_RECIEVER is this function's
-// own recipient (FLEETii staff) — unrelated to who create-user.mts emails.
+// create-user.mts's welcome email. MAIL_RECIEVER is this function's own
+// recipient (FLEETii staff) — unrelated to who create-user.mts emails.
 import { createClient } from "@supabase/supabase-js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
@@ -114,7 +114,7 @@ function buildHtmlBody(fields: {
  * at request time (brand/model/model_year can be filled in later on
  * VehicleCreatePage.tsx, see costumer_orders_brand_model_year_nullable.sql).
  * Inserts a matching costumer_orders row (costumer_id/department_id from the
- * caller's own profile), then emails the request to RESEND_MAIL_RECIEVER —
+ * caller's own profile), then emails the request to MAIL_RECIEVER —
  * via SMTP or Resend, see sendMail.
  */
 export default async (req: Request) => {
@@ -127,9 +127,9 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const mailReceiver = process.env.RESEND_MAIL_RECIEVER;
+  const mailReceiver = process.env.MAIL_RECIEVER;
   if (!mailReceiver) {
-    return new Response(JSON.stringify({ error: "Serveren mangler RESEND_MAIL_RECIEVER." }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Serveren mangler MAIL_RECIEVER." }), { status: 500 });
   }
 
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;

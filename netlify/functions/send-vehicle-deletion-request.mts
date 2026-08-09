@@ -76,7 +76,7 @@ function buildHtmlBody(fields: {
  * the caller's own costumer_id/department_id/contact info AND the target
  * vehicle's snapshot fields server-side, rejects if the vehicle doesn't
  * belong to the caller's own costumer, inserts a matching costumer_orders
- * row (order_type "Nedlæg"), then emails the request to RESEND_MAIL_RECIEVER
+ * row (order_type "Nedlæg"), then emails the request to MAIL_RECIEVER
  * — via SMTP or Resend, see sendMail.
  */
 export default async (req: Request) => {
@@ -89,9 +89,9 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const mailReceiver = process.env.RESEND_MAIL_RECIEVER;
+  const mailReceiver = process.env.MAIL_RECIEVER;
   if (!mailReceiver) {
-    return new Response(JSON.stringify({ error: "Serveren mangler RESEND_MAIL_RECIEVER." }), { status: 500 });
+    return new Response(JSON.stringify({ error: "Serveren mangler MAIL_RECIEVER." }), { status: 500 });
   }
 
   const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
