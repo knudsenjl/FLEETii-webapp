@@ -77,7 +77,7 @@ function buildHtmlBody(fields: {
  * vehicle's snapshot fields server-side, rejects if the vehicle doesn't
  * belong to the caller's own costumer, inserts a matching costumer_orders
  * row (order_type "Nedlæg"), then emails the request to MAIL_RECIEVER
- * — via SMTP or Resend, see sendMail.
+ * — via SMTP, see sendMail.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
