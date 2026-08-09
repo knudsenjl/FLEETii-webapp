@@ -29,15 +29,7 @@
       "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=9764 or ProcessId=27300 or ProcessId=7612\")",
       "PowerShell(Get-NetTCPConnection -LocalPort 8888,5173 -State Listen -ErrorAction SilentlyContinue)",
       "WebFetch(domain:developer.2hire.io)",
-      "Read(//c/Users/JørgenLindskovKnudse/OneDrive - MH3 ApS/Shared folders/Documents-FLEETii/FLEETii webapp/**)",
-      "WebFetch(domain:v1.motorapi.dk)",
-      "PowerShell(Stop-Process -Id 27692 -Force -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 8888 -ErrorAction SilentlyContinue)",
-      "PowerShell(Stop-Process -Id 5024 -Force -ErrorAction SilentlyContinue)",
-      "PowerShell(Stop-Process -Id 9388 -Force -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 5173,5174,8888 -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-NetTCPConnection -LocalPort 8888,5173,5174 -State Listen -ErrorAction SilentlyContinue)",
-      "PowerShell(Get-Process node -ErrorAction SilentlyContinue)"
+      "Read(//c/Users/JørgenLindskovKnudse/OneDrive - MH3 ApS/Shared folders/Documents-FLEETii/FLEETii webapp/**)"
     ]
   }
 }
