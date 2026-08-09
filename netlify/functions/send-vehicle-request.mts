@@ -14,7 +14,7 @@
 // attribute an order to a different costumer — same reasoning as
 // create-user.mts's own costumer scoping.
 //
-// Mail transport (SMTP vs. Resend) lives in _shared/mailer.ts, shared with
+// Mail transport (SMTP) lives in _shared/mailer.ts, shared with
 // create-user.mts's welcome email. MAIL_RECIEVER is this function's own
 // recipient (FLEETii staff) — unrelated to who create-user.mts emails.
 import { createClient } from "@supabase/supabase-js";

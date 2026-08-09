@@ -7,11 +7,11 @@
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 
-/** Static "About FLEETii" page: product description, Brugerguide/Administratormanual/FLEETii-administratormanual links, and contact info. Content is static Danish copy — no data fetching. */
+/** Static "About FLEETii" page: product description, Brugerguide/Administratormanual/FLEETii-administratormanual links, and contact info. Content is static Danish copy — no data fetching. Each manual link comes from its own env var (VITE_BRUGERMANUAL_URL/VITE_ADMINMANUAL_URL/VITE_FLEETIIMANUAL_URL, same VITE_ convention as VITE_SUPABASE_URL — see .env.example) rather than being hardcoded, so a button is simply omitted when its var is unset instead of linking to a placeholder. VITE_BRUGERMANUAL_URL is shared with create-user.mts's welcome-email link — same manual, one source of truth. */
 export function AboutPage() {
-  const brugerguideUrl = "https://claude.ai/code/artifact/1a30e6f4-0097-4097-b860-8bbeca07f60c";
-  const administratormanualUrl = "https://claude.ai/code/artifact/aa12dd5c-25b8-4da6-afa1-10d4d09ec232";
-  const fleetiiAdministratormanualUrl = "https://claude.ai/code/artifact/9a0bbb5e-b770-4713-a7cb-b44fc2adcd60";
+  const brugerguideUrl = import.meta.env.VITE_BRUGERMANUAL_URL;
+  const administratormanualUrl = import.meta.env.VITE_ADMINMANUAL_URL;
+  const fleetiiAdministratormanualUrl = import.meta.env.VITE_FLEETIIMANUAL_URL;
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -34,30 +34,36 @@ export function AboutPage() {
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Om FLEETii</h2>
                 <div className="flex shrink-0 flex-col gap-2">
-                  <a
-                    href={brugerguideUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Brugerguide
-                  </a>
-                  <a
-                    href={administratormanualUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    Administratormanual
-                  </a>
-                  <a
-                    href={fleetiiAdministratormanualUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
-                  >
-                    FLEETii-administratormanual
-                  </a>
+                  {brugerguideUrl && (
+                    <a
+                      href={brugerguideUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Brugerguide
+                    </a>
+                  )}
+                  {administratormanualUrl && (
+                    <a
+                      href={administratormanualUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Administratormanual
+                    </a>
+                  )}
+                  {fleetiiAdministratormanualUrl && (
+                    <a
+                      href={fleetiiAdministratormanualUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      FLEETii-administratormanual
+                    </a>
+                  )}
                 </div>
               </div>
 
