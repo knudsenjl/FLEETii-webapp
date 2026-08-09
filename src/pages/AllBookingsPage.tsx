@@ -69,9 +69,9 @@ export function AllBookingsPage() {
   >([]);
   /** Which of the listed bookings' vehicles are currently locked (vehicle_signals.locked), keyed by vehicleId — same bulk-fetch pattern as VehiclesPage.tsx's own Lås column. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
-  /** The genuine Køretøj-ID/Reg.nr (number_plate) pair per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the new first column below must respect useVehicleIdent. Same bulk-fetch pattern as lockedByVehicleId. */
+  /** The genuine Køretøj-ID/Reg.nr (number_plate) pair PLUS blocked-state per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the new first column below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge next to that column. Same bulk-fetch pattern as lockedByVehicleId. */
   const [identByVehicleId, setIdentByVehicleId] = useState<
-    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
+    Record<string, { vehicleIdent: string | null; numberPlate: string | null; blocked: boolean }>
   >({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
@@ -264,14 +264,17 @@ export function AllBookingsPage() {
     let cancelled = false;
     void supabase
       .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate")
+      .select("vehicle_id, vehicle_ident, number_plate, blocked_at")
       .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
+      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null; blocked_at: string | null }[]>()
       .then(({ data }) => {
         if (cancelled) return;
         setIdentByVehicleId(
           Object.fromEntries(
-            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
+            (data ?? []).map((row) => [
+              row.vehicle_id,
+              { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate, blocked: row.blocked_at !== null },
+            ]),
           ),
         );
       });
@@ -502,6 +505,11 @@ export function AllBookingsPage() {
                                 identByVehicleId[booking.vehicle]?.vehicleIdent,
                                 identByVehicleId[booking.vehicle]?.numberPlate,
                                 useVehicleIdent,
+                              )}
+                              {identByVehicleId[booking.vehicle]?.blocked && (
+                                <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                  Blokeret
+                                </span>
                               )}
                             </td>
                             <td

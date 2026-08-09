@@ -48,10 +48,49 @@ type VehicleProfilePlateRow = {
   department_id: string | null;
   drivmiddel: string | null;
   parking: string | null;
+  blocked_at: string | null;
 };
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
+
+/** Shape of a Nominatim `format=geojson&addressdetails=1` reverse-geocoding response — the structured `address` fields (not `display_name`) are used to format "street number, postal code city" for the row below the map. */
+type NominatimReverseResponse = {
+  features: Array<{
+    properties: {
+      address?: {
+        road?: string;
+        house_number?: string;
+        postcode?: string;
+        suburb?: string;
+        city_district?: string;
+        city?: string;
+        town?: string;
+        village?: string;
+      };
+    };
+  }>;
+};
+
+/**
+ * Formats a Nominatim `address` object as "street number, postal code city"
+ * (e.g. "Vejnavn 12, 8000 Aarhus C"), omitting any parts that are missing.
+ * Prefers `suburb`/`city_district` over `city` for the place name — Danish
+ * postal codes are keyed to the local district name (e.g. "Brønshøj" for
+ * 2700), which OSM tags as suburb/city_district, while `city` holds the
+ * broader municipality name ("København"/"Copenhagen") that doesn't match
+ * the postcode. Falls back to null if nothing usable came back at all.
+ */
+function formatNominatimAddress(address: NominatimReverseResponse["features"][number]["properties"]["address"]): string | null {
+  if (!address) return null;
+  const street = [address.road, address.house_number].filter(Boolean).join(" ");
+  const place = [
+    address.postcode,
+    address.suburb ?? address.city_district ?? address.city ?? address.town ?? address.village,
+  ].filter(Boolean).join(" ");
+  const parts = [street, place].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
 
 /**
  * Vehicle detail view ("/vehicle-details/:vehicleId"): plate, model, fuel
@@ -106,6 +145,10 @@ export function VehicleDetailsPage() {
   /** Whether a deletion request has been sent this session — hides "Slet køretøj" in favor of a confirmation message, so a duplicate request isn't one click away. Not persisted (mirrors NewVehiclePage.tsx's own `sent` state), since the vehicle itself is untouched until FLEETii fulfils the request. */
   const [deleteRequestSent, setDeleteRequestSent] = useState(false);
 
+  const [showBlockConfirm, setShowBlockConfirm] = useState(false);
+  const [isBlocking, setIsBlocking] = useState(false);
+  const [blockError, setBlockError] = useState<string | null>(null);
+
   const [vehicleDepartments, setVehicleDepartments] = useState<VehicleDepartment[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
@@ -122,6 +165,11 @@ export function VehicleDetailsPage() {
   const [drivmiddel, setDrivmiddel] = useState<string | null>(null);
   /** vehicle_profiles.parking — fetched alongside numberPlate below, shown in the admin-only "P-plads:" row right before "Hjemmeafdeling:". */
   const [parking, setParking] = useState<string | null>(null);
+  /** vehicle_profiles.blocked_at — fetched alongside numberPlate below, non-null once "Bloker køretøj" has been used (see handleBlockVehicle). Drives the "Blokeret" badge next to the "Køretøj:" row. */
+  const [blockedAt, setBlockedAt] = useState<string | null>(null);
+  /** Reverse-geocoded address for the vehicle's current GPS position (Nominatim), shown in the full-width row below the map — see the fetch effect below. */
+  const [address, setAddress] = useState<string | null>(null);
+  const [addressLoading, setAddressLoading] = useState(false);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 
@@ -232,7 +280,7 @@ export function VehicleDetailsPage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, department_id, drivmiddel, parking")
+      .select("number_plate, vehicle_ident, department_id, drivmiddel, parking, blocked_at")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfilePlateRow>()
       .then(({ data }) => {
@@ -242,6 +290,7 @@ export function VehicleDetailsPage() {
         setIdentDepartmentId(data?.department_id ?? null);
         setDrivmiddel(data?.drivmiddel ?? null);
         setParking(data?.parking ?? null);
+        setBlockedAt(data?.blocked_at ?? null);
         setNumberPlateLoading(false);
       });
 
@@ -249,6 +298,36 @@ export function VehicleDetailsPage() {
       cancelled = true;
     };
   }, [vehicle]);
+
+  /** Reverse-geocodes the vehicle's current GPS position (Nominatim, OpenStreetMap's free reverse-geocoding API — same tile provider LeafletMap already uses) into a human-readable address, for the row below the map. Admin-only and position-gated to match the map itself; keyed on the coordinates rather than `position` so an unrelated re-render of the gpsPositions array doesn't refire it. */
+  useEffect(() => {
+    if (!isAdmin || !position) {
+      setAddress(null);
+      return;
+    }
+
+    let cancelled = false;
+    setAddressLoading(true);
+
+    void fetch(
+      `https://nominatim.openstreetmap.org/reverse?format=geojson&lat=${position.lat}&lon=${position.lng}&layer=address&addressdetails=1`,
+    )
+      .then((response) => response.json() as Promise<NominatimReverseResponse>)
+      .then((data) => {
+        if (cancelled) return;
+        setAddress(formatNominatimAddress(data.features[0]?.properties.address));
+      })
+      .catch(() => {
+        if (!cancelled) setAddress(null);
+      })
+      .finally(() => {
+        if (!cancelled) setAddressLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdmin, position?.lat, position?.lng]);
 
   if (!vehicle) {
     return vehiclesLoading ? (
@@ -297,6 +376,89 @@ export function VehicleDetailsPage() {
     setIsDeleting(false);
     setShowDeleteConfirm(false);
     setDeleteRequestSent(true);
+  };
+
+  /**
+   * "Bloker køretøj": immobilizes the vehicle via 2hire's real "stop"
+   * generic command (2hire has no distinct "immobilize" command — "stop" IS
+   * the immobilize command, confirmed against 2hire's own API reference;
+   * same command the regular "Lås" button sends) via the existing
+   * useVehicleLockState.setLock, then additionally persists
+   * vehicle_profiles.blocked_at so the vehicle is marked "Blokeret"
+   * everywhere (VehiclesPage/AllBookingsPage/BookingDetailsPage/
+   * FleetManagementPage), the same way costumers.deactivated_at marks a
+   * blocked costumer — distinct from vehicle_signals.locked, which only
+   * tracks the last Lås/Lås op press. Admin-only (see the button below);
+   * setLock's own lockEnabled/unlockEnabled gate is already forced true for
+   * isAdmin regardless of booking state, so this always succeeds
+   * independent of whether the vehicle is currently reserved.
+   */
+  const handleBlockVehicle = async () => {
+    setIsBlocking(true);
+    setBlockError(null);
+
+    const lockSuccess = await setLock(true);
+    if (!lockSuccess) {
+      setBlockError("Kunne ikke låse køretøjet via 2hire. Prøv igen.");
+      setIsBlocking(false);
+      return;
+    }
+
+    const blockedTimestamp = new Date().toISOString();
+    const { error } = await supabase
+      .from("vehicle_profiles")
+      .update({ blocked_at: blockedTimestamp })
+      .eq("vehicle_id", vehicle.vehicleId);
+
+    if (error) {
+      setBlockError("Køretøjet blev låst, men kunne ikke markeres som blokeret. Prøv igen.");
+      setIsBlocking(false);
+      return;
+    }
+
+    setBlockedAt(blockedTimestamp);
+    setIsBlocking(false);
+    setShowBlockConfirm(false);
+  };
+
+  /**
+   * "Frigiv køretøj" (shown instead of "Bloker køretøj" once blockedAt is
+   * set): sends 2hire's real "start" generic command — releasing the
+   * 2hire-side immobilization "stop" put in place by handleBlockVehicle —
+   * via setLock's new `command` override, but still persists
+   * vehicle_signals.locked: true (NOT false/unlocked), since releasing an
+   * administrative block should leave the vehicle in its normal resting
+   * state (locked, waiting for the next renter's own booking to unlock it),
+   * not in an actually-unlocked state with nobody renting it. Then clears
+   * vehicle_profiles.blocked_at. Reuses the same isBlocking/blockError/
+   * showBlockConfirm state as handleBlockVehicle — the two are mutually
+   * exclusive (only one of "Bloker"/"Frigiv" is ever rendered at a time).
+   */
+  const handleUnblockVehicle = async () => {
+    setIsBlocking(true);
+    setBlockError(null);
+
+    const releaseSuccess = await setLock(true, "start");
+    if (!releaseSuccess) {
+      setBlockError("Kunne ikke frigive køretøjet. Prøv igen.");
+      setIsBlocking(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("vehicle_profiles")
+      .update({ blocked_at: null })
+      .eq("vehicle_id", vehicle.vehicleId);
+
+    if (error) {
+      setBlockError("Køretøjet blev frigivet, men blokeringen kunne ikke fjernes. Prøv igen.");
+      setIsBlocking(false);
+      return;
+    }
+
+    setBlockedAt(null);
+    setIsBlocking(false);
+    setShowBlockConfirm(false);
   };
 
   /** "Blink lygterne": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split), not admin-only. */
@@ -361,6 +523,12 @@ export function VehicleDetailsPage() {
                         <span className="text-brand-500">Indlæser…</span>
                       ) : (
                         formatVehicleIdentLabel(vehicleIdent, numberPlate, useVehicleIdent)
+                      )}
+                      {/* Same "Blokeret" badge convention as CostumerAdministrationPage.tsx's blocked-costumer row — mirrors blockedAt (vehicle_profiles.blocked_at) everywhere this vehicle is shown. */}
+                      {blockedAt && (
+                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                          Blokeret
+                        </span>
                       )}
                     </span>
                   </div>
@@ -462,20 +630,29 @@ export function VehicleDetailsPage() {
               </div>
 
               {isAdmin && (
-                <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                  <LeafletMap
-                    lat={position?.lat ?? DENMARK_CENTER.lat}
-                    lng={position?.lng ?? DENMARK_CENTER.lng}
-                    zoom={position ? 17 : 7}
-                    showMarker={Boolean(position)}
-                    markerTooltip={vehicle.plate}
-                    className="absolute inset-0"
-                  />
-                  {!position && (
-                    <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                      <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                        Der er ingen GPS position tilgængelig for dette køretøj
+                <div className="flex min-h-0 flex-1 flex-col gap-1">
+                  <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
+                    <LeafletMap
+                      lat={position?.lat ?? DENMARK_CENTER.lat}
+                      lng={position?.lng ?? DENMARK_CENTER.lng}
+                      zoom={position ? 17 : 7}
+                      showMarker={Boolean(position)}
+                      markerTooltip={vehicle.plate}
+                      className="absolute inset-0"
+                    />
+                    {!position && (
+                      <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
+                        <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
+                          Der er ingen GPS position tilgængelig for dette køretøj
+                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Reverse-geocoded address of the map position above (Nominatim) — full width, smaller text than the detail rows since it's supplementary context, not a primary field. Kept in the same flex-col as the map (gap-1) rather than a sibling of it, so it sits closer to the map than the parent's own gap-4 would otherwise allow. Only rendered with a real GPS fix. */}
+                  {position && (
+                    <div className="w-full rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
+                      {addressLoading ? "Henter adresse…" : (address ?? "Ingen adresse fundet")}
                     </div>
                   )}
                 </div>
@@ -564,7 +741,7 @@ export function VehicleDetailsPage() {
               {locateError && <p className="text-sm text-red-600">{locateError}</p>}
 
               {isAdmin && (
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
@@ -572,6 +749,24 @@ export function VehicleDetailsPage() {
                   >
                     Rediger køretøj
                   </button>
+                  {/* Toggles to "Frigiv køretøj" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
+                  {blockedAt ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowBlockConfirm(true)}
+                      className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      Frigiv køretøj
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowBlockConfirm(true)}
+                      className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                    >
+                      Bloker køretøj
+                    </button>
+                  )}
                   {deleteRequestSent ? (
                     <span className="flex items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
                       Anmodning om sletning er sendt
@@ -580,7 +775,7 @@ export function VehicleDetailsPage() {
                     <button
                       type="button"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
                       Slet køretøj
                     </button>
@@ -600,6 +795,21 @@ export function VehicleDetailsPage() {
           onConfirm={() => void handleDeleteVehicle()}
           isPending={isDeleting}
           confirmPendingLabel="Sender…"
+        />
+      )}
+
+      {showBlockConfirm && (
+        <ConfirmDialog
+          message={
+            blockedAt
+              ? "Er du sikker på, at du vil frigive dette køretøj? Køretøjet frigives med det samme i låst tilstand."
+              : "Er du sikker på, at du vil blokere dette køretøj? Køretøjet låses med det samme og kan ikke startes igen før det frigives."
+          }
+          error={blockError}
+          onCancel={() => setShowBlockConfirm(false)}
+          onConfirm={() => void (blockedAt ? handleUnblockVehicle() : handleBlockVehicle())}
+          isPending={isBlocking}
+          confirmPendingLabel={blockedAt ? "Frigiver…" : "Blokerer…"}
         />
       )}
     </div>

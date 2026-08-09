@@ -46,9 +46,9 @@ export function FleetManagementPage() {
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in each marker's tooltip below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx: vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire) is an UNGATED vehicle_ident-or-number_plate fallback, so it can't be reused directly here — the genuine pair is fetched straight from vehicle_profiles instead. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
-  /** The genuine Køretøj-ID/Reg.nr pair per department vehicle, keyed by vehicleId — same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. */
+  /** The genuine Køretøj-ID/Reg.nr pair PLUS blocked-state per department vehicle, keyed by vehicleId — same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") is appended as "(Blokeret)" text onto vehicleTooltip below, since a map marker tooltip is plain text, not a badge-capable element. */
   const [identByVehicleId, setIdentByVehicleId] = useState<
-    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
+    Record<string, { vehicleIdent: string | null; numberPlate: string | null; blocked: boolean }>
   >({});
 
   useEffect(() => {
@@ -61,14 +61,17 @@ export function FleetManagementPage() {
     let cancelled = false;
     void supabase
       .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate")
+      .select("vehicle_id, vehicle_ident, number_plate, blocked_at")
       .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
+      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null; blocked_at: string | null }[]>()
       .then(({ data }) => {
         if (cancelled) return;
         setIdentByVehicleId(
           Object.fromEntries(
-            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
+            (data ?? []).map((row) => [
+              row.vehicle_id,
+              { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate, blocked: row.blocked_at !== null },
+            ]),
           ),
         );
       });
@@ -83,9 +86,10 @@ export function FleetManagementPage() {
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [departmentGpsPositions.map((g) => g.vehicleId).join("|")]);
 
-  /** Køretøj-ID/Reg.nr tooltip text for one vehicle — "{ident} / {plate}" or just plate, same combined semantics as formatVehicleIdentLabel everywhere else; falls back to "—" only if vehicle_profiles hasn't loaded yet for it. */
+  /** Køretøj-ID/Reg.nr tooltip text for one vehicle — "{ident} / {plate}" or just plate, same combined semantics as formatVehicleIdentLabel everywhere else; falls back to "—" only if vehicle_profiles hasn't loaded yet for it. Appends " (Blokeret)" when the vehicle is administratively blocked. */
   const vehicleTooltip = (vehicleId: string): string =>
-    formatVehicleIdentLabel(identByVehicleId[vehicleId]?.vehicleIdent, identByVehicleId[vehicleId]?.numberPlate, useVehicleIdent);
+    formatVehicleIdentLabel(identByVehicleId[vehicleId]?.vehicleIdent, identByVehicleId[vehicleId]?.numberPlate, useVehicleIdent) +
+    (identByVehicleId[vehicleId]?.blocked ? " (Blokeret)" : "");
 
   /** Whether nearby vehicles group into a single cluster marker (LeafletMap's own `cluster` prop) or each show individually — user-toggleable, defaults to clustered (the previous fixed behavior) unless restored from savedSnapshot (a browser-back from VehicleDetailsPage shouldn't silently re-cluster a map the admin had switched to "Vis enkeltvis"). */
   const [clusterMarkers, setClusterMarkers] = useState(savedSnapshot?.clusterMarkers ?? true);

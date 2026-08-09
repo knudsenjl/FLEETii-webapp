@@ -104,12 +104,12 @@ function ceilToInterval(date: Date, intervalMinutes: number): Date {
  * "now" through "+Standard varighed" (falling back to +3 hours when unset),
  * with the Start/Slut TimeSelect stepping by "Standard interval" (falling
  * back to 15 minutes) — see StandardSettings.tsx. Continues to AvailablePage
- * (via router state, not a DB write yet) once "Find ledige" is pressed. No
+ * (via router state, not a DB write yet) once "Find ledigt køretøj" is pressed. No
  * DB write happens on this page itself, whether creating or editing — the
  * actual insert/update only ever happens on ConfirmPage's "Bekræft".
  * When editing an existing booking (reached via BookingDetailsPage's
- * "Rediger reservation"), "Find ledige" is instead two buttons: "Bekræft/
- * skift køretøj" (same action as "Find ledige" — always goes through AvailablePage,
+ * "Rediger reservation"), "Find ledigt køretøj" is instead two buttons: "Bekræft/
+ * skift køretøj" (same action as "Find ledigt køretøj" — always goes through AvailablePage,
  * even to just keep the same vehicle, so the current period's actual
  * availability is checked and shown rather than only discovered as an error
  * on ConfirmPage; AvailablePage lets this booking's own current vehicle
@@ -126,7 +126,7 @@ function ceilToInterval(date: Date, intervalMinutes: number): Date {
  * is what ConfirmPage eventually writes as the booking's department_id.
  * Pre-filled to the booking's own current department when editing (via
  * EditingBooking's departmentId), unset when creating a brand-new one —
- * "Find ledige"/"Bekræft/skift køretøj" both stay disabled until it's
+ * "Find ledigt køretøj"/"Bekræft/skift køretøj" both stay disabled until it's
  * chosen. The "Bruger" picker is gated on it too: disabled and scoped to
  * ONLY that department's own users (departmentUsers) rather than every user
  * platform-wide, and cleared back to unset the moment "Kunde/afdeling"
@@ -532,7 +532,7 @@ export function ReservationPage() {
       ? `${costumerName} / ${afdeling ?? ""}`
       : (afdeling ?? "");
 
-  /** Not editing: the plain "Find ledige" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. departmentId is the RESOLVED target department — the "Kunde/afdeling" pick for a FLEETii admin (validated below, required), or just afdelingId unchanged for every other role — carried all the way through AvailablePage (which scopes its own vehicle list to it) to ConfirmPage (which writes it as the booking's department_id). departmentLabel is its display-ready counterpart, for ConfirmPage's read-only summary row. */
+  /** Not editing: the plain "Find ledigt køretøj" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. departmentId is the RESOLVED target department — the "Kunde/afdeling" pick for a FLEETii admin (validated below, required), or just afdelingId unchanged for every other role — carried all the way through AvailablePage (which scopes its own vehicle list to it) to ConfirmPage (which writes it as the booking's department_id). departmentLabel is its display-ready counterpart, for ConfirmPage's read-only summary row. */
   const handleFindAvailable = () => {
     const { start, end, brugerLabel } = currentPeriod();
 
@@ -823,7 +823,7 @@ export function ReservationPage() {
                     disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
                     className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Find ledige
+                    Find ledigt køretøj
                   </button>
                 </div>
               )}

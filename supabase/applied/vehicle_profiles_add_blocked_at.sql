@@ -1,0 +1,37 @@
+-- Adds a "Bloker køretøj" flag to vehicle_profiles (VehicleDetailsPage.tsx,
+-- admin/FLEETii admin only) — a reversible administrative block, distinct
+-- from vehicle_signals.locked (that's the day-to-day Lås/Lås op virtual
+-- flag mirroring the last confirmed 2hire start/stop command; this is a
+-- separate "this vehicle should not be in service" marker, same reversible
+-- "row flag" shape as costumers.deactivated_at — see
+-- costumers_add_deactivated_at.sql).
+--
+-- Lives on vehicle_profiles (not vehicle_signals) since it's an
+-- admin-set/administrative attribute, not live telemetry — matching where
+-- number_plate/vehicle_ident/drivmiddel/parking already live on this table.
+-- Written directly from the client (no Netlify function), the same way
+-- HandleVehiclePage.tsx's "Rediger køretøj" save and
+-- CostumerDetailsPage.tsx's "Bloker kundens adgang" both write their own
+-- tables — vehicle_profiles already has a client-writable UPDATE policy
+-- scoped to admin/FLEETii admin (see vehicle_profiles_update_policy.sql /
+-- vehicle_profiles_update_allow_fleetii_admin.sql), which already covers
+-- every column on the row including this new one, so no new RLS policy is
+-- needed here.
+--
+-- Blocking also sends the real 2hire "stop" (immobilize) generic command
+-- via the existing set-vehicle-lock.mts/useVehicleLockState.setLock (same
+-- call the Lås button makes) — there is no separate 2hire "immobilize"
+-- command; "stop" is 2hire's actual immobilization command for this
+-- vehicle line (confirmed against developer.2hire.io/reference/commandgeneric,
+-- which only ever defines start/stop/locate).
+--
+-- "Frigiv køretøj" (VehicleDetailsPage.tsx, same button slot, toggled by
+-- whether blocked_at is set) un-blocks: sends 2hire's real "start" command
+-- to release the "stop" immobilization above, via setLock's `command`
+-- override (see useVehicleLockState.ts) so it can persist vehicle_signals
+-- locked: true (the normal resting state for an available, unbooked
+-- vehicle) rather than false, then clears blocked_at back to null.
+--
+-- Safe to run more than once.
+
+alter table public.vehicle_profiles add column if not exists blocked_at timestamptz;
