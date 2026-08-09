@@ -214,7 +214,7 @@ export default async (req: Request) => {
     to: mailReceiver,
     subject: `${customerName} - Anmodning om sletning af køretøj (${vehicle.number_plate ?? "—"}) i FLEETii`,
     html: buildHtmlBody({
-      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp.netlify.app",
+      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp-staging.netlify.app",
       orderId: insertedOrder.order_id,
       customerName,
       departmentName,
