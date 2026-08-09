@@ -17,6 +17,18 @@ Danish-language fleet/vehicle-reservation admin tool. The domain terms below app
 - WB20499 (`vehicle_profiles.vehicle_id` `6ae6ac0e-b918-4843-b3c4-eae02560c06b`) is a dedicated, real 2hire-registered test vehicle with `costumer_id`/`department_id` both NULL — safe to poke at via `/2hire-test` without touching real customer data.
 - The e2e simulator's `distance_covered`/`autonomy_percentage` don't reliably reach our webhook, even though `position` does and even though `GET /state` shows the values genuinely changed — confirmed as an open issue with 2hire support (as of 2026-07-29). Don't assume it's been fixed without checking.
 
+## Environments
+Two real deployments, both starting from this one codebase:
+- **`main` branch → staging** (`dev.fleetii.dk`, Netlify site `fleetii-webapp-staging`, Supabase project `owbbihnbocuczbdogzxv`/"FLEETii-DB-staging", test 2hire adapter). Where development actually happens — commit here directly.
+- **`production` branch → production** (`app.fleetii.dk`, Netlify site `fleetii-webapp-production`, Supabase project `adjnqjziyblusrruqigt`, real 2hire production adapter). GitHub-protected: no direct pushes, only a PR from `main` with the `build-and-test` CI check (`.github/workflows/ci.yml`) passing. This is where real costumers eventually live — `main`/staging has none yet.
+
+Gotchas from setting this split up (2026-08-09), worth knowing before touching either environment's database directly:
+- **`supabase/applied/*.sql` is incremental-only, NOT a full schema** — only 7 of its 120 files contain `CREATE TABLE`. Core tables (`bookings`, `vehicle_profiles`, `costumers`, `user_profiles`, etc.) predate this migration-tracking convention and only exist in the live databases. Replaying this folder against an empty database will not reproduce the schema — cloning it requires a structural dump (`pg_dump --schema-only --schema=public`) from a live project instead.
+- **A `--schema=public` dump silently drops triggers defined on non-public tables**, even when the trigger's own function lives in `public` and gets dumped fine. `handle_new_user`/`handle_auth_user_email_change` exist as functions but do nothing until their `auth.users` triggers (`on_auth_user_created`/`on_auth_user_updated`) are recreated by hand afterward — check `pg_trigger` joined to `pg_namespace where nspname != 'public'` on the source project to catch any others.
+- **Supabase's direct DB host (`db.<ref>.supabase.co`) is often IPv6-only** and won't resolve on an IPv4-only network — use the **Session pooler** connection string instead (`postgres.<ref>@aws-0-<region>.pooler.supabase.com:5432`, region varies per project, copy it fresh from that project's own dashboard rather than assuming it matches another project).
+- **A freshly reset Supabase DB password can take up to ~a minute to propagate** to the pooler layer — a "password authentication failed" right after a reset isn't necessarily a wrong password, retry once before assuming so.
+- **A brand-new Supabase project has no users and no self-signup flow** — bootstrapping the first admin means creating a user via the dashboard's Authentication tab, then manually `insert`/`update`-ing their `public.user_profiles.role` to `'FLEETii admin'` via the SQL editor, since `handle_new_user` always defaults new signups to `role = 'user'`.
+
 ## Working conventions
 - Comment every file, type, and function, and keep comments updated as code changes — this project wants heavier commenting than a typical default.
 - Never do a raw/full read of `.env` or run `netlify env:list` — always use a targeted, redacted lookup for a single key.
