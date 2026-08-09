@@ -65,6 +65,8 @@ export function VehiclesPage() {
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   /** Which of the listed vehicles are currently locked (vehicle_signals.locked — see useVehicleLockState's own doc comment for why it's virtual, not a real 2hire signal), keyed by vehicleId, for the Lås column below. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
+  /** Which of the listed vehicles are administratively blocked (vehicle_profiles.blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") — keyed by vehicleId, for the "Blokeret" badge next to the Køretøj cell below. Same bulk-fetch pattern as lockedByVehicleId. */
+  const [blockedByVehicleId, setBlockedByVehicleId] = useState<Record<string, boolean>>({});
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
@@ -142,6 +144,34 @@ export function VehiclesPage() {
       .then(({ data }) => {
         if (cancelled) return;
         setLockedByVehicleId(Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.locked])));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [vehicles]);
+
+  /** Bulk-loads the "Blokeret" badge state for every listed vehicle in one query — same pattern as the Lås-column fetch above. */
+  useEffect(() => {
+    if (vehicles.length === 0) {
+      setBlockedByVehicleId({});
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id, blocked_at")
+      .in(
+        "vehicle_id",
+        vehicles.map((v) => v.vehicleId),
+      )
+      .returns<{ vehicle_id: string; blocked_at: string | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setBlockedByVehicleId(
+          Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.blocked_at !== null])),
+        );
       });
 
     return () => {
@@ -332,7 +362,14 @@ export function VehiclesPage() {
                               : "bg-white text-brand-700 hover:bg-brand-50"
                           }`}
                         >
-                          <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{vehicle.plate}</td>
+                          <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
+                            {vehicle.plate}
+                            {blockedByVehicleId[vehicle.vehicleId] && (
+                              <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                Blokeret
+                              </span>
+                            )}
+                          </td>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{vehicle.vehicle}</td>
                           <td className="w-px whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
                             {(lockedByVehicleId[vehicle.vehicleId] ?? true) && (

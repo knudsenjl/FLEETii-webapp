@@ -30,7 +30,14 @@ import { requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
-type SetVehicleLockBody = { vehicleId?: string; locked?: boolean };
+// `command`, if present, overrides which real 2hire generic command is sent
+// (default: `locked ? "stop" : "start"`) while `locked` still controls what
+// gets persisted to vehicle_signals — lets a caller send one physical
+// command while recording a different resting state. Used by
+// VehicleDetailsPage.tsx's "Frigiv køretøj" (sends "start" to release the
+// 2hire-side immobilization, but persists locked: true, the normal
+// available-vehicle resting state — see useVehicleLockState.ts's setLock).
+type SetVehicleLockBody = { vehicleId?: string; locked?: boolean; command?: "start" | "stop" };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -65,7 +72,11 @@ export default async (req: Request) => {
   if (typeof body.locked !== "boolean") {
     return new Response(JSON.stringify({ error: "locked skal være true eller false." }), { status: 400 });
   }
+  if (body.command !== undefined && body.command !== "start" && body.command !== "stop") {
+    return new Response(JSON.stringify({ error: "command skal være start eller stop." }), { status: 400 });
+  }
   const locked = body.locked;
+  const command = body.command ?? (locked ? "stop" : "start");
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -99,10 +110,10 @@ export default async (req: Request) => {
       costumerId: vehicle?.costumer_id ?? null,
     });
 
-    await sendGenericCommand(vehicleId, locked ? "stop" : "start", credentials);
+    await sendGenericCommand(vehicleId, command, credentials);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${locked ? "stop" : "start"}) failed:`, message);
+    console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${command}) failed:`, message);
     return new Response(JSON.stringify({ error: message }), { status: 502 });
   }
 

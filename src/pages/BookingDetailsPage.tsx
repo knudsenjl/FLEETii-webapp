@@ -93,11 +93,12 @@ export function BookingDetailsPage() {
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
 
-  /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel) for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. */
+  /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel and blocked-state) for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge on that row. */
   const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{
     vehicleIdent: string | null;
     numberPlate: string | null;
     drivmiddel: string | null;
+    blocked: boolean;
   } | null>(null);
   useEffect(() => {
     if (!booking) return;
@@ -105,13 +106,20 @@ export function BookingDetailsPage() {
     let cancelled = false;
     void supabase
       .from("vehicle_profiles")
-      .select("vehicle_ident, number_plate, drivmiddel")
+      .select("vehicle_ident, number_plate, drivmiddel, blocked_at")
       .eq("vehicle_id", booking.vehicle)
-      .maybeSingle<{ vehicle_ident: string | null; number_plate: string | null; drivmiddel: string | null }>()
+      .maybeSingle<{ vehicle_ident: string | null; number_plate: string | null; drivmiddel: string | null; blocked_at: string | null }>()
       .then(({ data }) => {
         if (cancelled) return;
         setVehicleIdentInfo(
-          data ? { vehicleIdent: data.vehicle_ident, numberPlate: data.number_plate, drivmiddel: data.drivmiddel } : null,
+          data
+            ? {
+                vehicleIdent: data.vehicle_ident,
+                numberPlate: data.number_plate,
+                drivmiddel: data.drivmiddel,
+                blocked: data.blocked_at !== null,
+              }
+            : null,
         );
       });
 
@@ -373,17 +381,24 @@ export function BookingDetailsPage() {
                         </svg>
                       )}
                     </label>
-                    {twoHireVehicle ? (
-                      <button
-                        type="button"
-                        onClick={goToVehicleDetails}
-                        className="text-left text-sm text-accent-600 hover:underline"
-                      >
-                        {vehicleLabel}
-                      </button>
-                    ) : (
-                      <span className="text-sm text-brand-800">{vehicleLabel}</span>
-                    )}
+                    <span>
+                      {twoHireVehicle ? (
+                        <button
+                          type="button"
+                          onClick={goToVehicleDetails}
+                          className="text-left text-sm text-accent-600 hover:underline"
+                        >
+                          {vehicleLabel}
+                        </button>
+                      ) : (
+                        <span className="text-sm text-brand-800">{vehicleLabel}</span>
+                      )}
+                      {vehicleIdentInfo?.blocked && (
+                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                          Blokeret
+                        </span>
+                      )}
+                    </span>
                   </div>
                   {/* Kilometerstand and Status are only shown to admin/FLEETii admin — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
                   {isAdmin && (

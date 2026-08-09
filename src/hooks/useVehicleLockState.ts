@@ -25,8 +25,20 @@ export type VehicleLockState = {
   lockEnabled: boolean;
   unlockEnabled: boolean;
   loading: boolean;
-  /** Persists a new lock state via set-vehicle-lock, then refreshes all derived state. Resolves true on success, false on failure (error is also set on the returned state either way) — callers use this to know whether to show a "now locked/unlocked" confirmation. */
-  setLock: (locked: boolean) => Promise<boolean>;
+  /**
+   * Persists a new lock state via set-vehicle-lock, then refreshes all
+   * derived state. Resolves true on success, false on failure (error is
+   * also set on the returned state either way) — callers use this to know
+   * whether to show a "now locked/unlocked" confirmation.
+   *
+   * `command` optionally overrides which real 2hire generic command is
+   * actually sent (default: `locked ? "stop" : "start"`, i.e. the plain
+   * Lås/Lås op mapping) — used by VehicleDetailsPage.tsx's "Frigiv
+   * køretøj", which needs to send "start" (release the 2hire-side
+   * immobilization) while still persisting `locked: true` (the normal
+   * resting state for an available, not-currently-booked vehicle).
+   */
+  setLock: (locked: boolean, command?: "start" | "stop") => Promise<boolean>;
   error: string | null;
 };
 
@@ -100,7 +112,7 @@ export function useVehicleLockState(
   }, [reload]);
 
   const setLock = useCallback(
-    async (nextLocked: boolean) => {
+    async (nextLocked: boolean, command?: "start" | "stop") => {
       setError(null);
       try {
         const response = await fetch("/.netlify/functions/set-vehicle-lock", {
@@ -109,7 +121,7 @@ export function useVehicleLockState(
             "Content-Type": "application/json",
             ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
           },
-          body: JSON.stringify({ vehicleId, locked: nextLocked }),
+          body: JSON.stringify({ vehicleId, locked: nextLocked, command }),
         });
 
         const result = (await response.json()) as { error?: string };

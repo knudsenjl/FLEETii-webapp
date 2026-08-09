@@ -28,6 +28,15 @@ Gotchas from setting this split up (2026-08-09), worth knowing before touching e
 - **Supabase's direct DB host (`db.<ref>.supabase.co`) is often IPv6-only** and won't resolve on an IPv4-only network — use the **Session pooler** connection string instead (`postgres.<ref>@aws-0-<region>.pooler.supabase.com:5432`, region varies per project, copy it fresh from that project's own dashboard rather than assuming it matches another project).
 - **A freshly reset Supabase DB password can take up to ~a minute to propagate** to the pooler layer — a "password authentication failed" right after a reset isn't necessarily a wrong password, retry once before assuming so.
 - **A brand-new Supabase project has no users and no self-signup flow** — bootstrapping the first admin means creating a user via the dashboard's Authentication tab, then manually `insert`/`update`-ing their `public.user_profiles.role` to `'FLEETii admin'` via the SQL editor, since `handle_new_user` always defaults new signups to `role = 'user'`.
+- **Marking a Netlify env var "secret" can fail the next build** if that exact value happens to appear anywhere else in the repo (Netlify's build-time secret scanner treats any literal match outside intended use as a leak). Hit this with `TWOHIRE_WEBHOOK_SECRET` matching `.env.example`'s placeholder text, and `SMTP_USER` matching a demo-account email documented in `doc/manualer/*.html`. Fix known-legitimate matches with the `SECRETS_SCAN_OMIT_KEYS` build env var (comma-separated key names) rather than un-marking the variable as secret.
+- **`TWOHIRE_WEBHOOK_SECRET` is captured by 2hire at `2hire-subscribe` time, not read live** — 2hire signs future webhook deliveries with whatever secret was in `hub.secret` when you last subscribed. Changing the env var alone breaks signature verification immediately (the webhook handler reads the *new* value, 2hire still sends the *old* signature) until you re-run the one-time `2hire-subscribe` browser-console call (see `2hire-subscribe.mts`'s own header comment) on that environment.
+
+## Environments — production promotion
+Promoting `main` → `production` requires two separate, explicit requests from the user — never chain them automatically, even when a change looks trivial or CI is green:
+1. The user asks to promote/release — only then open the PR.
+2. CI passes — report it and STOP. Merge only after the user separately confirms.
+
+Routine commits/pushes to `main` need no mention of `production` at all — most `main` work is just iterative testing on `dev.fleetii.dk`.
 
 ## Working conventions
 - Comment every file, type, and function, and keep comments updated as code changes — this project wants heavier commenting than a typical default.
