@@ -75,18 +75,28 @@ type NominatimReverseResponse = {
 /**
  * Formats a Nominatim `address` object as "street number, postal code city"
  * (e.g. "Vejnavn 12, 8000 Aarhus C"), omitting any parts that are missing.
- * Prefers `suburb`/`city_district` over `city` for the place name — Danish
- * postal codes are keyed to the local district name (e.g. "Brønshøj" for
- * 2700), which OSM tags as suburb/city_district, while `city` holds the
- * broader municipality name ("København"/"Copenhagen") that doesn't match
- * the postcode. Falls back to null if nothing usable came back at all.
+ * Prefers `town` first, THEN `suburb`/`city_district`, THEN `city` for the
+ * place name — Nominatim only ever returns one of `town`/`city` for a given
+ * address (OSM's place=town vs. place=city distinction), never both:
+ * - A plain town (e.g. Silkeborg, 8600) comes back as `town: "Silkeborg"`
+ *   PLUS `suburb: "Sydbyen"` (a neighbourhood within it) — `town` here IS
+ *   already the correct postal-town name; picking `suburb` instead would
+ *   wrongly show the neighbourhood ("Sydbyen") instead of the town.
+ * - A big subdivided city (e.g. København, 2700) comes back as
+ *   `city: "København"` PLUS `suburb: "Brønshøj"`, with NO `town` field at
+ *   all — here `city` is the overarching municipality name that doesn't
+ *   match the postcode, while `suburb` is the actual local postal-district
+ *   name that does.
+ * `town` being present is what distinguishes the two cases, since it's
+ * never set alongside `city`. Falls back to null if nothing usable came
+ * back at all.
  */
 function formatNominatimAddress(address: NominatimReverseResponse["features"][number]["properties"]["address"]): string | null {
   if (!address) return null;
   const street = [address.road, address.house_number].filter(Boolean).join(" ");
   const place = [
     address.postcode,
-    address.suburb ?? address.city_district ?? address.city ?? address.town ?? address.village,
+    address.town ?? address.suburb ?? address.city_district ?? address.city ?? address.village,
   ].filter(Boolean).join(" ");
   const parts = [street, place].filter(Boolean);
   return parts.length > 0 ? parts.join(", ") : null;
