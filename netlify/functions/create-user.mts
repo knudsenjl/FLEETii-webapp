@@ -56,13 +56,18 @@ function roleLabel(role: Role): string {
  * Builds the "your account is ready" HTML email sent to a newly created
  * user: FLEETii logo, a short intro with links to the user manual and the
  * login page (both omitted gracefully if their URL isn't known — the
- * manual's via VITE_BRUGERMANUAL_URL, unset until configured; the login
- * page's via process.env.URL, set automatically by Netlify but absent in
- * some local setups), the login credentials, and what happens on first
- * login. logoUrl points at public/fleetii-logo.png (served at the site's
- * own root by Netlify) rather than the Vite-hashed src/assets copy the app
- * itself uses, since an email needs one stable, publicly-fetchable URL, not
- * a build-time asset import a Netlify Function has no access to anyway.
+ * manual's via VITE_BRUGERMANUAL_URL — a site-relative path to a
+ * self-hosted static file under public/manualer/ (see AboutPage.tsx's own
+ * doc comment), NOT an absolute URL, so building the email's manualUrl
+ * requires prefixing it with loginUrl (the site's own base URL) below —
+ * omitted if EITHER is unset, since a relative href is meaningless in an
+ * email client with no "current page" to resolve against; the login page's
+ * via process.env.URL, set automatically by Netlify but absent in some
+ * local setups), the login credentials, and what happens on first login.
+ * logoUrl points at public/fleetii-logo.png (served at the site's own root
+ * by Netlify) rather than the Vite-hashed src/assets copy the app itself
+ * uses, since an email needs one stable, publicly-fetchable URL, not a
+ * build-time asset import a Netlify Function has no access to anyway.
  */
 function buildWelcomeEmailHtml(args: {
   role: Role;
@@ -283,7 +288,10 @@ export default async (req: Request) => {
   // failure — the admin still sees it via emailSent below and can pass the
   // credentials on some other way.
   const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
-  const manualUrl = process.env.VITE_BRUGERMANUAL_URL ?? null;
+  // VITE_BRUGERMANUAL_URL is a site-relative path (e.g.
+  // "/manualer/fleetii-brugermanual-bruger.html"), not an absolute URL —
+  // needs loginUrl to become one for the email; omitted if either is unset.
+  const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
   const emailResult = await sendMail({
     to: email,
     subject: "Din FLEETii-konto er oprettet",

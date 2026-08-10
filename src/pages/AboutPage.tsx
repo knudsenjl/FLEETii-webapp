@@ -7,7 +7,27 @@
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 
-/** Static "About FLEETii" page: product description, Brugerguide/Administratormanual/FLEETii-administratormanual links, and contact info. Content is static Danish copy — no data fetching. Each manual link comes from its own env var (VITE_BRUGERMANUAL_URL/VITE_ADMINMANUAL_URL/VITE_FLEETIIMANUAL_URL, same VITE_ convention as VITE_SUPABASE_URL — see .env.example) rather than being hardcoded, so a button is simply omitted when its var is unset instead of linking to a placeholder. VITE_BRUGERMANUAL_URL is shared with create-user.mts's welcome-email link — same manual, one source of truth. */
+/**
+ * Static "About FLEETii" page: product description, Brugerguide/
+ * Administratormanual/FLEETii-administratormanual links, and contact info.
+ * Content is static Danish copy — no data fetching. Each manual link comes
+ * from its own env var (VITE_BRUGERMANUAL_URL/VITE_ADMINMANUAL_URL/
+ * VITE_FLEETIIMANUAL_URL, same VITE_ convention as VITE_SUPABASE_URL — see
+ * .env.example) rather than being hardcoded, so a button is simply omitted
+ * when its var is unset instead of linking to a placeholder.
+ *
+ * Each var is a SITE-RELATIVE path to a self-hosted static file under
+ * public/manualer/ (e.g. "/manualer/fleetii-brugermanual-bruger.html"), NOT
+ * an external link — switched away from claude.ai artifact URLs since
+ * published artifacts start private and aren't reliably viewable by a real
+ * customer who isn't logged into the account that created them. A relative
+ * path works fine as an href here (resolves against the current page), but
+ * create-user.mts's welcome email needs to prefix it with the site's own
+ * base URL first — see that file's own doc comment.
+ *
+ * VITE_BRUGERMANUAL_URL is shared with create-user.mts's welcome-email
+ * link — same manual, one source of truth.
+ */
 export function AboutPage() {
   const brugerguideUrl = import.meta.env.VITE_BRUGERMANUAL_URL;
   const administratormanualUrl = import.meta.env.VITE_ADMINMANUAL_URL;
