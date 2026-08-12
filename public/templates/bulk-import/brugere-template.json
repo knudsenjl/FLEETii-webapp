@@ -1,0 +1,18 @@
+[
+  {
+    "Email": "anna.hansen@eksempel.dk",
+    "Navn": "Anna Hansen",
+    "Telefon": "+45 12345678",
+    "Bruger-ID": "B-1042",
+    "Afdeling": "København",
+    "Rolle": "Bruger"
+  },
+  {
+    "Email": "bo.jensen@eksempel.dk",
+    "Navn": "Bo Jensen",
+    "Telefon": "",
+    "Bruger-ID": "",
+    "Afdeling": "Aarhus",
+    "Rolle": "Administrator"
+  }
+]

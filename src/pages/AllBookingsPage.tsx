@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { LockStatusIcon } from "../components/LockStatusIcon";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
@@ -522,23 +523,7 @@ export function AllBookingsPage() {
                               {formatBookingPeriod(booking, true)}
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
-                              {(lockedByVehicleId[booking.vehicle] ?? true) && (
-                                <svg
-                                  viewBox="0 0 24 24"
-                                  fill="none"
-                                  stroke="currentColor"
-                                  strokeWidth={2}
-                                  strokeLinecap="round"
-                                  strokeLinejoin="round"
-                                  className="mx-auto h-4 w-4 text-brand-500"
-                                  role="img"
-                                  aria-label="Køretøjet er låst"
-                                >
-                                  <title>Køretøjet er låst</title>
-                                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                                </svg>
-                              )}
+                              <LockStatusIcon locked={lockedByVehicleId[booking.vehicle] ?? true} className="mx-auto" />
                             </td>
                             <td className="whitespace-nowrap px-1 py-0.5 text-center">
                               <span

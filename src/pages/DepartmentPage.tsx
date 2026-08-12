@@ -214,13 +214,22 @@ export function DepartmentPage() {
                 </table>
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate("/user-details")}
-                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
-                Opret ny bruger
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/user-details")}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Opret ny bruger
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/import-users")}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Opret nye brugere fra fil
+                </button>
+              </div>
             </div>
           </section>
         </motion.main>

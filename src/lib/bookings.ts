@@ -4,7 +4,14 @@
 // Danish date/time formatting. Kept dependency-free (no React) so it's
 // usable from both pages and (via the requestValidation-style .js extension
 // import trick) Netlify Functions.
-import type { Vehicle2Hire } from "./vehicleDataSource";
+// Imported straight from vehicleDataSource/types.ts (not the ./vehicleDataSource
+// barrel) with an explicit .js extension — bookings.ts is also pulled into
+// the Netlify Functions build (see this file's own header comment), whose
+// tsconfig.functions.json uses Node's stricter "nodenext" module
+// resolution, which requires an explicit extension on every relative
+// import; types.ts is a dependency-free leaf file, so importing it directly
+// avoids that requirement cascading into vehicleDataSource/index.ts too.
+import type { Vehicle2Hire } from "./vehicleDataSource/types.js";
 
 // The "bookings" table's columns are named differently from the local field
 // names pages use (see MappedBooking) — these constants are the single

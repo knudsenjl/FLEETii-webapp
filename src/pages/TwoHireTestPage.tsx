@@ -4,8 +4,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { shortSignalTimestamp } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
+import { HeadlightIcon } from "../components/HeadlightIcon";
+import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
+import { LockStatusIcon } from "../components/LockStatusIcon";
+import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 
@@ -129,6 +133,11 @@ export function TwoHireTestPage() {
     if (success) triggerLockConfirmation("located");
   };
 
+  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink lygterne rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
+  const handleHonk = () => {
+    triggerLockConfirmation("horn");
+  };
+
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -154,23 +163,7 @@ export function TwoHireTestPage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center justify-between text-sm font-medium text-brand-700">
                       Køretøj:
-                      {locked && (
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4 text-brand-500"
-                          role="img"
-                          aria-label="Køretøjet er låst"
-                        >
-                          <title>Køretøjet er låst</title>
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                      )}
+                      {locked !== null && <LockStatusIcon locked={locked} />}
                     </label>
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle ? `${twoHireVehicle.plate}: ${twoHireVehicle.brand} ${twoHireVehicle.model}` : TEST_VEHICLE_ID}
@@ -233,52 +226,53 @@ export function TwoHireTestPage() {
                 )}
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="group relative">
+              {/* No directional gating on this admin diagnostics page — both
+                  directions are always allowed except while loading/pending,
+                  unlike VehicleDetailsPage/BookingDetailsPage's
+                  reservation-window gating. handleSetLock already triggers
+                  its own confirmation, so onToggle just awaits it. */}
+              <div className="flex gap-3">
+                <VehicleLockToggle
+                  className="flex-1"
+                  locked={locked}
+                  lockEnabled={true}
+                  unlockEnabled={true}
+                  loading={lockStateLoading || isLockActionPending}
+                  onToggle={async (nextLocked) => {
+                    await handleSetLock(nextLocked);
+                    return true;
+                  }}
+                  confirmationMessage={
+                    lockConfirmationKey === "unlocked"
+                      ? "Køretøjet er nu låst op. God tur"
+                      : lockConfirmationKey === "locked"
+                        ? "Køretøjet er nu låst"
+                        : null
+                  }
+                />
+                <div className="group relative flex-1">
                   <button
                     type="button"
-                    onClick={() => void handleSetLock(false)}
-                    disabled={lockStateLoading || isLockActionPending}
-                    aria-label="Lås op"
-                    className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void handleLocate()}
+                    disabled={isLocating}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                    </svg>
+                    <HeadlightIcon />
+                    {isLocating ? "Blinker…" : "Blink lygterne"}
                   </button>
-                  <InlinePopup
-                    visible={lockConfirmationKey === "unlocked"}
-                    message="Køretøjet er nu låst op. God tur"
-                  />
+                  <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>
-                <div className="group relative">
+                <div className="group relative flex-1">
                   <button
                     type="button"
-                    onClick={() => void handleSetLock(true)}
-                    disabled={lockStateLoading || isLockActionPending}
-                    aria-label="Lås"
-                    className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleHonk}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
+                    <HornIcon />
+                    Horn
                   </button>
-                  <InlinePopup visible={lockConfirmationKey === "locked"} message="Køretøjet er nu låst" />
+                  <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
                 </div>
-              </div>
-
-              <div className="group relative">
-                <button
-                  type="button"
-                  onClick={() => void handleLocate()}
-                  disabled={isLocating}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isLocating ? "Blinker…" : "Blink lygterne"}
-                </button>
-                <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
               </div>
 
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}
