@@ -1,4 +1,5 @@
-<title>FLEETii Brugermanual — FLEETii-administrator</title>
+<meta charset="utf-8">
+<title>FLEETii-administrator manual</title>
 <style>
   :root {
     --paper: #f3f5f7;
@@ -200,8 +201,8 @@
     padding: 4px 11px;
   }
   .masthead h1 { font-size: 2.3rem; margin: 4px 0 0; }
-  .masthead .dek { color: var(--ink-soft); font-size: 1.05rem; max-width: 62ch; margin: 0; }
-  .masthead .meta { color: var(--ink-faint); font-size: 0.82rem; margin-top: 6px; max-width: 62ch; }
+  .masthead .dek { color: var(--ink-soft); font-size: 1.05rem; margin: 0; }
+  .masthead .meta { color: var(--ink-faint); font-size: 0.82rem; margin-top: 6px; }
 
   section.part { margin-bottom: 50px; }
   section.part > .part-head { margin-bottom: 6px; }
@@ -209,8 +210,7 @@
   section.feature { margin: 34px 0; scroll-margin-top: 20px; }
   section.feature h3 { font-size: 1.1rem; margin: 0 0 4px; }
   section.feature > .lede { color: var(--ink-soft); margin: 0 0 14px; max-width: 60ch; }
-  p { max-width: 60ch; }
-  ol, ul { max-width: 58ch; padding-left: 1.3em; }
+  ol, ul { padding-left: 1.3em; }
   li { margin: 5px 0; }
   ol li::marker { color: var(--brand); font-weight: 600; font-variant-numeric: tabular-nums; }
 
@@ -260,7 +260,6 @@
     border-radius: 4px;
     padding: 12px 16px;
     margin: 16px 0;
-    max-width: 60ch;
     font-size: 0.92rem;
     box-shadow: var(--shadow);
   }
@@ -321,27 +320,48 @@
   th, td { text-align: left; padding: 7px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
   th { font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--ink-faint); font-weight: 600; }
 
-  /* ---------- Screenshot frames ---------- */
+  /* ---------- Screenshot frames ----------
+     Mobile-first: every ordinary shot-row stacks as first-paragraph, then
+     screenshot, then the rest of the text — 'display: contents' lifts
+     shot-text's own children up to be direct siblings of the screenshot so
+     each can get its own 'order', with no per-section markup split needed.
+     The side-by-side row-reverse layout (screenshot left, full text column
+     right) only turns on at 620px, the measured width where figure(200) +
+     gap(26) + shot-text's own 300px min-width actually stop wrapping —
+     anything narrower and row-reverse's automatic wrap wrongly stacks
+     [all the text][screenshot] instead of respecting this order, so the
+     side-by-side rule must not apply until content genuinely fits.
+     shot-row--stacked (a numbered shot-strip sequence, if any) keeps its
+     own always-column, text-before-images layout at every width and is
+     excluded throughout. */
   .shot-row {
     display: flex;
-    gap: 26px;
-    align-items: flex-start;
-    flex-wrap: wrap;
+    flex-direction: column;
+    gap: 18px;
     margin: 18px 0;
   }
-  .shot-text {
-    flex: 1 1 300px;
-    min-width: 240px;
-    align-self: stretch;
-    display: flex;
-    flex-direction: column;
+  .shot-row:not(.shot-row--stacked) .shot-text {
+    display: contents;
+  }
+  .shot-row:not(.shot-row--stacked) .shot-text > *:first-child {
+    order: 1;
+  }
+  .shot-row:not(.shot-row--stacked) figure.shot {
+    order: 2;
+    width: 100%;
+    max-width: 240px;
+    margin: 0 auto;
+  }
+  .shot-row:not(.shot-row--stacked) .shot-text > *:not(:first-child) {
+    order: 3;
   }
   .shot-text .callout {
-    flex: 1;
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: none;
   }
   .shot-text > *:first-child { margin-top: 0; }
   figure.shot {
-    flex: 0 0 200px;
     margin: 0;
     border-radius: 18px;
     overflow: hidden;
@@ -364,7 +384,33 @@
     padding: 4px 2px 12px;
     margin: 14px 0 4px;
   }
-  .shot-strip figure.shot { flex: 0 0 168px; }
+  .shot-strip figure.shot { flex: 0 0 168px; width: auto; max-width: none; margin: 0; }
+
+  @media (min-width: 620px) {
+    .shot-row:not(.shot-row--stacked) {
+      flex-direction: row-reverse;
+      justify-content: flex-end;
+      gap: 26px;
+      align-items: flex-start;
+    }
+    .shot-row:not(.shot-row--stacked) .shot-text {
+      display: flex;
+      flex-direction: column;
+      flex: 1 1 300px;
+      min-width: 240px;
+      align-self: flex-start;
+    }
+    .shot-row:not(.shot-row--stacked) .shot-text > * {
+      order: initial;
+    }
+    .shot-row:not(.shot-row--stacked) figure.shot {
+      order: initial;
+      flex: 0 0 200px;
+      width: auto;
+      max-width: none;
+      margin: 0;
+    }
+  }
 
   hr.rule { border: none; border-top: 1px solid var(--line); margin: 40px 0; }
 
@@ -409,7 +455,7 @@
 
     <div class="masthead">
       <span class="eyebrow">10. august 2026 · Version 1.0</span>
-      <h1>FLEETii Brugermanual — FLEETii-administrator</h1>
+      <h1>FLEETii-administrator manual</h1>
       <p class="dek">Sådan administrerer du kunder, afdelinger og køretøjs-installationer på tværs af hele FLEETii-platformen. Gennemgået trin for trin med skærmbilleder fra den rigtige app.</p>
       <p class="meta">Denne udgave dækker rollen <strong>FLEETii-administrator</strong> — den mest omfattende rolle i systemet, med adgang til enhver kunde. Den forudsætter, at du allerede kender <a href="fleetii-brugermanual-administrator.html">Administrator-manualen</a>; her fokuserer vi udelukkende på det, der ligger ud over en almindelig afdelings-administrator.</p>
     </div>
