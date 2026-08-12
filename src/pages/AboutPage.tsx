@@ -6,6 +6,7 @@
 // row based on whether the visitor is actually logged in.
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
+import { useAuth } from "../contexts/AuthContext";
 
 /**
  * Static "About FLEETii" page: product description, Brugerguide/
@@ -27,8 +28,18 @@ import { PageHeader } from "../components/PageHeader";
  *
  * VITE_BRUGERMANUAL_URL is shared with create-user.mts's welcome-email
  * link — same manual, one source of truth.
+ *
+ * Administratormanual/FLEETii-administratormanual are further gated by the
+ * viewer's role (profile?.role from useAuth()) — irrelevant to a regular
+ * Bruger, and profile is null for an anonymous visitor reaching this page
+ * from LoginPage, so both stay hidden for them too. Administratormanual
+ * shows for "admin" AND "FLEETii admin" (a FLEETii admin is a superset of
+ * admin and still administers departments day-to-day); FLEETii-administrator-
+ * manual shows only for "FLEETii admin". Brugerguide has no such gate; every
+ * role may want it.
  */
 export function AboutPage() {
+  const { profile } = useAuth();
   const brugerguideUrl = import.meta.env.VITE_BRUGERMANUAL_URL;
   const administratormanualUrl = import.meta.env.VITE_ADMINMANUAL_URL;
   const fleetiiAdministratormanualUrl = import.meta.env.VITE_FLEETIIMANUAL_URL;
@@ -64,7 +75,7 @@ export function AboutPage() {
                       Brugerguide
                     </a>
                   )}
-                  {administratormanualUrl && (
+                  {administratormanualUrl && (profile?.role === "admin" || profile?.role === "FLEETii admin") && (
                     <a
                       href={administratormanualUrl}
                       target="_blank"
@@ -74,7 +85,7 @@ export function AboutPage() {
                       Administratormanual
                     </a>
                   )}
-                  {fleetiiAdministratormanualUrl && (
+                  {fleetiiAdministratormanualUrl && profile?.role === "FLEETii admin" && (
                     <a
                       href={fleetiiAdministratormanualUrl}
                       target="_blank"
