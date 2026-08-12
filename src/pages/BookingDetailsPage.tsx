@@ -22,8 +22,12 @@ import {
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { HeadlightIcon } from "../components/HeadlightIcon";
+import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
+import { LockStatusIcon } from "../components/LockStatusIcon";
+import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useVehicleLockState } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
@@ -286,6 +290,11 @@ export function BookingDetailsPage() {
     if (success) triggerLockConfirmation("located");
   };
 
+  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink lygterne rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
+  const handleHonk = () => {
+    triggerLockConfirmation("horn");
+  };
+
   /** Ends this booking early: locks the vehicle, then sets its "end" to now — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. If locking fails, the booking is left untouched (see useVehicleLockState's own error, shown below the Lås/Lås op buttons) rather than shortening a booking whose vehicle didn't actually get secured. */
   const handleFinishBooking = async () => {
     setIsFinishing(true);
@@ -363,23 +372,7 @@ export function BookingDetailsPage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center justify-between text-sm font-medium text-brand-700">
                       Køretøj:
-                      {vehicleLocked && (
-                        <svg
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth={2}
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="h-4 w-4 text-brand-500"
-                          role="img"
-                          aria-label="Køretøjet er låst"
-                        >
-                          <title>Køretøjet er låst</title>
-                          <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                          <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                        </svg>
-                      )}
+                      {vehicleLocked !== null && <LockStatusIcon locked={vehicleLocked} />}
                     </label>
                     <span>
                       {twoHireVehicle ? (
@@ -469,82 +462,51 @@ export function BookingDetailsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-3">
-                {/* Self-built hover tooltip (group/group-hover), not the
-                    native `title` attribute — that's unreliable on a
-                    disabled button across browsers. CSS :hover/group-hover
-                    still applies to a disabled button fine, since that's a
-                    style state, not a JS mouse event. */}
-                <div className="group relative">
+              <div className="flex gap-3">
+                <VehicleLockToggle
+                  className="flex-1"
+                  locked={vehicleLocked}
+                  lockEnabled={lockEnabled}
+                  unlockEnabled={unlockEnabled}
+                  loading={lockStateLoading}
+                  onToggle={async (nextLocked) => {
+                    const success = await setLock(nextLocked);
+                    if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
+                    return success;
+                  }}
+                  cannotUnlockMessage="Du kan først låse op, når din reservation er startet"
+                  cannotLockMessage="Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en anden"
+                  confirmationMessage={
+                    lockConfirmationKey === "unlocked"
+                      ? "Køretøjet er nu låst op. God tur"
+                      : lockConfirmationKey === "locked"
+                        ? "Køretøjet er nu låst"
+                        : null
+                  }
+                />
+                <div className="group relative flex-1">
                   <button
                     type="button"
-                    onClick={() => void (async () => {
-                      const success = await setLock(false);
-                      if (success) triggerLockConfirmation("unlocked");
-                    })()}
-                    disabled={!unlockEnabled || lockStateLoading}
-                    aria-label="Lås op"
-                    className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void handleLocate()}
+                    disabled={isLocating}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 9.9-1" />
-                    </svg>
+                    <HeadlightIcon />
+                    {isLocating ? "Blinker…" : "Blink lygterne"}
                   </button>
-                  {/* Not shown at all once the vehicle is actually unlocked
-                      (vehicleLocked === false): unlockEnabled is false there
-                      too, but for a completely different reason (nothing
-                      left to unlock, not "wait for your reservation"), so
-                      this specific message would be actively misleading
-                      rather than just premature — matters every time you
-                      re-hover after unlocking, not just right after the
-                      click. */}
-                  {!unlockEnabled && vehicleLocked !== false && (
-                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                      Du kan først låse op, når din reservation er startet
-                    </div>
-                  )}
-                  <InlinePopup
-                    visible={lockConfirmationKey === "unlocked"}
-                    message="Køretøjet er nu låst op. God tur"
-                  />
+                  <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>
-                <div className="group relative">
+                <div className="group relative flex-1">
                   <button
                     type="button"
-                    onClick={() => void (async () => {
-                      const success = await setLock(true);
-                      if (success) triggerLockConfirmation("locked");
-                    })()}
-                    disabled={!lockEnabled || lockStateLoading}
-                    aria-label="Lås"
-                    className="flex w-full items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={handleHonk}
+                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                      <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                    </svg>
+                    <HornIcon />
+                    Horn
                   </button>
-                  {!lockEnabled && lockConfirmationKey !== "locked" && (
-                    <div className="pointer-events-none absolute bottom-full left-1/2 z-20 mb-2 w-56 -translate-x-1/2 rounded-lg border border-brand-200 bg-white px-3 py-2 text-center text-xs text-brand-700 opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
-                      Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en
-                      anden
-                    </div>
-                  )}
-                  <InlinePopup visible={lockConfirmationKey === "locked"} message="Køretøjet er nu låst" />
+                  <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
                 </div>
-              </div>
-
-              <div className="group relative">
-                <button
-                  type="button"
-                  onClick={() => void handleLocate()}
-                  disabled={isLocating}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isLocating ? "Blinker…" : "Blink lygterne"}
-                </button>
-                <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
               </div>
 
               <button

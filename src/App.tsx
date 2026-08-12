@@ -26,6 +26,8 @@ import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
 import { HandleVehiclePage } from "./pages/HandleVehiclePage";
 import { UserDetailsPage } from "./pages/UserDetailsPage";
+import { ImportUsersPage } from "./pages/ImportUsersPage";
+import { ImportVehiclesPage } from "./pages/ImportVehiclesPage";
 import { VehiclesPage } from "./pages/VehiclesPage";
 import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
 import { NewVehiclePage } from "./pages/NewVehiclePage";
@@ -280,6 +282,14 @@ function App() {
             }
           />
           <Route
+            path="/import-users"
+            element={
+              <ProtectedRoute requireAdmin>
+                <ImportUsersPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
             path="/fleet-table"
             element={
               <ProtectedRoute requireAdmin>
@@ -300,6 +310,14 @@ function App() {
             element={
               <ProtectedRoute requireAdmin>
                 <NewVehiclePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/import-vehicles"
+            element={
+              <ProtectedRoute requireAdmin>
+                <ImportVehiclesPage />
               </ProtectedRoute>
             }
           />

@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { LockStatusIcon } from "../components/LockStatusIcon";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
@@ -372,23 +373,7 @@ export function VehiclesPage() {
                           </td>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{vehicle.vehicle}</td>
                           <td className="w-px whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
-                            {(lockedByVehicleId[vehicle.vehicleId] ?? true) && (
-                              <svg
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth={2}
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                className="mx-auto h-4 w-4 text-brand-500"
-                                role="img"
-                                aria-label="Køretøjet er låst"
-                              >
-                                <title>Køretøjet er låst</title>
-                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-                                <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                              </svg>
-                            )}
+                            <LockStatusIcon locked={lockedByVehicleId[vehicle.vehicleId] ?? true} className="mx-auto" />
                           </td>
                           <td className="w-px whitespace-nowrap px-1 py-0.5 text-center">
                             <span
@@ -405,13 +390,22 @@ export function VehiclesPage() {
                 </table>
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate("/new-vehicle")}
-                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-              >
-                Registrer nyt køretøj
-              </button>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => navigate("/new-vehicle")}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Registrer nyt køretøj
+                </button>
+                <button
+                  type="button"
+                  onClick={() => navigate("/import-vehicles")}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Registrer nye køretøjer fra fil
+                </button>
+              </div>
             </div>
           </section>
         </motion.main>

@@ -1,0 +1,26 @@
+[
+  {
+    "Nummerplade": "AB12345",
+    "Køretøj-ID": "K-2031",
+    "Afdeling": "København",
+    "Brand": "Volkswagen",
+    "Mærke": "Transporter",
+    "Årgang": "2021",
+    "Drivmiddel": "Diesel",
+    "P-plads": "P-12",
+    "Kilometerstand": "84500",
+    "Drivmiddelniveau": "45"
+  },
+  {
+    "Nummerplade": "CD67890",
+    "Køretøj-ID": "",
+    "Afdeling": "Aarhus",
+    "Brand": "Tesla",
+    "Mærke": "Model Y",
+    "Årgang": "2023",
+    "Drivmiddel": "El",
+    "P-plads": "",
+    "Kilometerstand": "12300",
+    "Drivmiddelniveau": "78"
+  }
+]
