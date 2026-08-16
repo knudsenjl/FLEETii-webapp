@@ -34,6 +34,7 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
+import { useReverseGeocode } from "../lib/geocode";
 
 /** A booking as passed in via router state from BookingsPage/AllBookingsPage. */
 type BookingDetails = {
@@ -96,6 +97,10 @@ export function BookingDetailsPage() {
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
+  /** Only within the same window the map itself is shown (see isMapVisible below) — no point reverse-geocoding a position that isn't currently displayed. */
+  const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;
+  /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. Not admin-gated, unlike VehicleDetailsPage's own use of this hook: the map itself is shown to a regular user for their own booking, so the address is too. */
+  const { address, addressLoading } = useReverseGeocode(position, mapVisible);
 
   /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel and blocked-state) for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge on that row. */
   const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{
@@ -189,7 +194,7 @@ export function BookingDetailsPage() {
     booking ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso } : null,
     isAdmin,
   );
-  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink lygterne" buttons below. */
+  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink" buttons below. */
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
   const { isLocating, locateError, locate } = useLocateVehicle();
 
@@ -284,13 +289,13 @@ export function BookingDetailsPage() {
   const bookingExpired = booking.endIso !== null && nowPrefix >= isoPrefix(booking.endIso);
   const canFinishBooking = bookingStarted && !bookingExpired;
 
-  /** "Blink lygterne": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split). */
+  /** "Blink": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split). */
   const handleLocate = async () => {
     const success = await locate(booking.vehicle);
     if (success) triggerLockConfirmation("located");
   };
 
-  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink lygterne rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
+  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
   const handleHonk = () => {
     triggerLockConfirmation("horn");
   };
@@ -405,16 +410,13 @@ export function BookingDetailsPage() {
                       </span>
                     </div>
                   )}
+                  {/* Drivmiddelniveau (fuel/battery %) is appended onto this same row rather than shown as its own — the two are closely related enough not to need a separate label. */}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
-                    <span className="text-sm text-brand-800">{vehicleIdentInfo?.drivmiddel ?? "—"}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
                     <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.autonomyPercentage ?? "—"}
-                      {twoHireVehicle?.autonomyPercentageUpdatedAt
-                        ? ` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})`
+                      {vehicleIdentInfo?.drivmiddel ?? "—"}
+                      {twoHireVehicle?.autonomyPercentage
+                        ? ` ${twoHireVehicle.autonomyPercentage}${isAdmin && twoHireVehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})` : ""}`
                         : ""}
                     </span>
                   </div>
@@ -441,22 +443,31 @@ export function BookingDetailsPage() {
                 </div>
               </div>
 
-              {isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) && (
-                <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                  <LeafletMap
-                    lat={position?.lat ?? DENMARK_CENTER.lat}
-                    lng={position?.lng ?? DENMARK_CENTER.lng}
-                    zoom={position ? 17 : 7}
-                    showMarker={Boolean(position)}
-                    markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
-                    onMarkerClick={goToVehicleDetails}
-                    className="absolute inset-0"
-                  />
-                  {!position && (
-                    <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                      <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                        Der er ingen GPS position tilgængelig for dette køretøj
+              {mapVisible && (
+                <div className="flex min-h-0 flex-1 flex-col gap-1">
+                  <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
+                    <LeafletMap
+                      lat={position?.lat ?? DENMARK_CENTER.lat}
+                      lng={position?.lng ?? DENMARK_CENTER.lng}
+                      zoom={position ? 17 : 7}
+                      showMarker={Boolean(position)}
+                      markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
+                      onMarkerClick={goToVehicleDetails}
+                      className="absolute inset-0"
+                    />
+                    {!position && (
+                      <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
+                        <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
+                          Der er ingen GPS position tilgængelig for dette køretøj
+                        </div>
                       </div>
+                    )}
+                  </div>
+
+                  {/* Reverse-geocoded address of the map position above — see VehicleDetailsPage.tsx's identical row for why this styling/placement. Only rendered with a real GPS fix. */}
+                  {position && (
+                    <div className="w-full rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
+                      {addressLoading ? "Henter adresse…" : (address ?? "Ingen adresse fundet")}
                     </div>
                   )}
                 </div>
@@ -492,7 +503,7 @@ export function BookingDetailsPage() {
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <HeadlightIcon />
-                    {isLocating ? "Blinker…" : "Blink lygterne"}
+                    {isLocating ? "Blinker…" : "Blink"}
                   </button>
                   <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>
@@ -509,43 +520,41 @@ export function BookingDetailsPage() {
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => setShowFinishConfirm(true)}
-                disabled={!canFinishBooking || isFinishing}
-                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                Afslut reservation
-              </button>
+              {/* Afslut/Rediger/Slet, all on one row (labels shortened from "... reservation" since the section they're in already makes that context clear). */}
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowFinishConfirm(true)}
+                  disabled={!canFinishBooking || isFinishing}
+                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  Afslut
+                </button>
+                {canShowEditButton && (
+                  <button
+                    type="button"
+                    onClick={goToEditBooking}
+                    className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  >
+                    Rediger
+                  </button>
+                )}
+                {canShowDeleteButton && (
+                  <button
+                    type="button"
+                    onClick={() => setShowCancelConfirm(true)}
+                    disabled={isCancelling}
+                    className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isCancelling ? "Aflyser…" : "Slet"}
+                  </button>
+                )}
+              </div>
 
               {lockError && <p className="text-sm text-red-600">{lockError}</p>}
               {locateError && <p className="text-sm text-red-600">{locateError}</p>}
 
               {error && <p className="text-sm text-red-600">{error}</p>}
-
-              {(canShowEditButton || canShowDeleteButton) && (
-                <div className="grid grid-cols-2 gap-3">
-                  {canShowEditButton && (
-                    <button
-                      type="button"
-                      onClick={goToEditBooking}
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                    >
-                      Rediger reservation
-                    </button>
-                  )}
-                  {canShowDeleteButton && (
-                    <button
-                      type="button"
-                      onClick={() => setShowCancelConfirm(true)}
-                      disabled={isCancelling}
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {isCancelling ? "Aflyser…" : "Slet reservation"}
-                    </button>
-                  )}
-                </div>
-              )}
             </div>
           </section>
         </motion.main>

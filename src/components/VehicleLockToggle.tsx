@@ -26,7 +26,7 @@ interface VehicleLockToggleProps {
   cannotLockMessage?: string;
   /** Page-controlled success confirmation (e.g. from useTimedFlag) — "Køretøjet er nu låst op. God tur" / "Køretøjet er nu låst". Rendered below the button; null/false hides it. */
   confirmationMessage?: ReactNode | null;
-  /** Extra classes on the root wrapper, e.g. `flex-1` to sit evenly alongside the "Blink lygterne"/"Horn" buttons in a shared row. */
+  /** Extra classes on the root wrapper, e.g. `flex-1` to sit evenly alongside the "Blink"/"Horn" buttons in a shared row. */
   className?: string;
 }
 

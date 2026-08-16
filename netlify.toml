@@ -2,6 +2,14 @@
   command = "npm run build"
   publish = "dist"
 
+# Pin the framework dev-server port `netlify dev` proxies to. Without this,
+# netlify dev auto-detects by polling Vite's default port (5173) — if a
+# sibling project's Vite server already happens to be listening there, it
+# gets mistaken for this project's and localhost:8888 silently serves the
+# wrong app instead. Must match vite.config.ts's server.port.
+[dev]
+  targetPort = 5183
+
 [functions]
   directory = "netlify/functions"
 

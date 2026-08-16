@@ -34,7 +34,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 /**
  * 2hire test page ("/2hire-test", admin-only): a trimmed-down copy of
  * BookingDetailsPage for poking at the 2hire integration (live fuel/mileage/
- * status/position, Lås/Lås op, "Blink lygterne") against a single dedicated
+ * status/position, Lås/Lås op, "Blink") against a single dedicated
  * test vehicle (TEST_VEHICLE_ID) instead of a real booking's real vehicle —
  * so testing here can't hamper the system as it stands. Unlike
  * BookingDetailsPage, there's no underlying booking at all: no Periode/
@@ -62,7 +62,7 @@ export function TwoHireTestPage() {
   const [lockStateLoading, setLockStateLoading] = useState(true);
   const [isLockActionPending, setIsLockActionPending] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
-  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful lock/unlock, and "Lygterne blinker" after a successful "Blink lygterne" — see the buttons below. */
+  /** "Køretøjet er nu låst/låst op" confirmation shown for 3s right after a successful lock/unlock, and "Lygterne blinker" after a successful "Blink" — see the buttons below. */
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
   const { isLocating, locateError, locate } = useLocateVehicle();
 
@@ -127,13 +127,13 @@ export function TwoHireTestPage() {
     await fetchLockState();
   };
 
-  /** "Blink lygterne": sends 2hire's real generic "locate" command (blinks the headlights) via useLocateVehicle (2hire-vehicle-command.mts). */
+  /** "Blink": sends 2hire's real generic "locate" command (blinks the headlights) via useLocateVehicle (2hire-vehicle-command.mts). */
   const handleLocate = async () => {
     const success = await locate(TEST_VEHICLE_ID);
     if (success) triggerLockConfirmation("located");
   };
 
-  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink lygterne rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
+  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
   const handleHonk = () => {
     triggerLockConfirmation("horn");
   };
@@ -258,7 +258,7 @@ export function TwoHireTestPage() {
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <HeadlightIcon />
-                    {isLocating ? "Blinker…" : "Blink lygterne"}
+                    {isLocating ? "Blinker…" : "Blink"}
                   </button>
                   <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>

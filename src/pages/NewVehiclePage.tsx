@@ -7,6 +7,10 @@ import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
+import { supabase } from "../lib/supabase";
+
+/** A department belonging to the Kunde picked below (FLEETii admin only) — same shape as UserDetailsPage.tsx's own DepartmentOption. */
+type DepartmentOption = { department_id: string; name: string };
 
 /**
  * Admin "Opret nyt køretøj" page ("/new-vehicle"): rather than creating the
@@ -18,8 +22,69 @@ import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
  */
 export function NewVehiclePage() {
   const { afdeling, afdelingId, session, profile } = useAuth();
-  /** Whether afdelingId's department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
-  const { useVehicleIdent } = useIdentSettings(afdelingId);
+  /** A FLEETii admin has no costumer/department of their own (platform-wide role) — for them alone, the Kunde/Afdeling rows below pick which costumer/department this request is for, required since there's no viewer-own default to fall back to (same convention as UserDetailsPage.tsx's "Ny bruger" Kunde picker). */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const [selectedCostumerId, setSelectedCostumerId] = useState("");
+  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
+  const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
+  /** Whichever department's "Køretøj-ID:" gate applies — the FLEETii admin's own pick when relevant, otherwise the viewing admin's own fixed afdelingId (unchanged from before this page had a picker at all). */
+  const identGateDepartmentId = isFleetiiAdmin ? selectedDepartmentId || null : afdelingId;
+  /** Whether identGateDepartmentId's department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
+  const { useVehicleIdent } = useIdentSettings(identGateDepartmentId);
+
+  /** Loads every costumer for the Kunde picker — FLEETii admin only, mirrors UserDetailsPage.tsx's identical effect. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+
+    let cancelled = false;
+    void supabase
+      .from("costumers")
+      .select("costumer_id, name")
+      .order("name", { ascending: true })
+      .returns<{ costumer_id: string; name: string }[]>()
+      .then(({ data }) => {
+        if (!cancelled) setCostumerOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin]);
+
+  /** Loads the departments under the picked Kunde — FLEETii admin only, mirrors UserDetailsPage.tsx's identical effect. Also clears any previously selected department that belonged to a different costumer. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+    setSelectedDepartmentId("");
+    if (!selectedCostumerId) {
+      setDepartmentOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("departments")
+      .select("department_id, name")
+      .eq("costumer_id", selectedCostumerId)
+      .order("name", { ascending: true })
+      .returns<DepartmentOption[]>()
+      .then(({ data }) => {
+        if (!cancelled) setDepartmentOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isFleetiiAdmin, selectedCostumerId]);
+
+  // A costumer with only one department has no real choice to make — force
+  // it and lock the field, same as UserDetailsPage.tsx's identical case.
+  useEffect(() => {
+    if (departmentOptions.length === 1) {
+      setSelectedDepartmentId(departmentOptions[0].department_id);
+    }
+  }, [departmentOptions]);
   /** Company-wide "Køretøj-ID" identifier — optional (unlike Nummerplade, not required to send), see costumer_orders_add_vehicle_ident.sql. Carried straight onto the created vehicle_profiles row once FLEETii fulfils the request (2hire-register-vehicle.mts), so it doesn't have to be re-entered later. */
   const [vehicleIdent, setVehicleIdent] = useState("");
   /** Parking spot — optional free text, see costumer_orders_add_parking.sql. Carried straight onto the created vehicle_profiles row once FLEETii fulfils the request, same as vehicleIdent above. */
@@ -64,6 +129,10 @@ export function NewVehiclePage() {
     kontaktperson.trim().length > 0 &&
     EMAIL_PATTERN.test(kontaktemail.trim()) &&
     PHONE_PATTERN.test(kontaktnummer.trim()) &&
+    // A FLEETii admin has no viewer-own costumer/department to fall back to
+    // — both picks are required before the request means anything (see the
+    // Kunde/Afdeling rows below).
+    (!isFleetiiAdmin || (selectedCostumerId.length > 0 && selectedDepartmentId.length > 0)) &&
     !isSending;
 
   /** Posts the vehicle-request form to send-vehicle-request, authenticated with the current session's access token. Shows a server-supplied error message (or a generic connection-failure one) inline on failure. */
@@ -80,7 +149,15 @@ export function NewVehiclePage() {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({
-          afdeling,
+          afdeling: isFleetiiAdmin
+            ? (departmentOptions.find((d) => d.department_id === selectedDepartmentId)?.name ?? null)
+            : afdeling,
+          // Only meaningful (and only trusted server-side) for a FLEETii
+          // admin — see send-vehicle-request.mts's own resolution of this,
+          // which re-derives costumer_id/department_id from THIS id rather
+          // than trusting afdeling's display name for anything but the
+          // email text.
+          departmentId: isFleetiiAdmin ? selectedDepartmentId : null,
           vehicleIdent: vehicleIdent.trim() || null,
           parking: parking.trim() || null,
           nummerplade,
@@ -142,10 +219,57 @@ export function NewVehiclePage() {
                     aren't clipped when they overflow this box's edge (same
                     fix as RettighederSettings.tsx/UserDetailsPage.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
-                    <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
-                  </div>
+                  {isFleetiiAdmin ? (
+                    <>
+                      {/* FLEETii-admin-only Kunde/Afdeling picker — a FLEETii admin has no costumer/department of their own, so unlike the regular-admin read-only row below, both are required selects (see canSend/handleSend above). */}
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">
+                          Kunde: <span className="ml-0.5 text-red-600">*</span>
+                        </label>
+                        <select
+                          required
+                          aria-required="true"
+                          value={selectedCostumerId}
+                          onChange={(e) => setSelectedCostumerId(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        >
+                          <option value="" className="bg-brand-100">Vælg kunde:</option>
+                          {costumerOptions.map((costumer) => (
+                            <option key={costumer.costumer_id} value={costumer.costumer_id}>
+                              {costumer.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">
+                          Afdeling: <span className="ml-0.5 text-red-600">*</span>
+                        </label>
+                        <select
+                          required
+                          aria-required="true"
+                          disabled={departmentOptions.length <= 1}
+                          value={selectedDepartmentId}
+                          onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          <option value="" className="bg-brand-100">
+                            {selectedCostumerId ? "Vælg afdeling:" : "Vælg kunde først"}
+                          </option>
+                          {departmentOptions.map((department) => (
+                            <option key={department.department_id} value={department.department_id}>
+                              {department.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
+                      <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
+                    </div>
+                  )}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
                     <input
@@ -306,10 +430,25 @@ export function NewVehiclePage() {
 
               {sendError && <p className="text-sm text-red-600">{sendError}</p>}
 
+              {sent ? (
+                <span className="flex w-full items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
+                  Bestillingen er sendt
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  disabled={!canSend}
+                  onClick={() => void handleSend()}
+                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isSending ? "Sender…" : "Send bestilling til FLEETii"}
+                </button>
+              )}
+
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <p className="text-xs text-brand-700">
-                  Hvis du trykker på knappen herunder, sendes der besked til FLEETii, som
-                  herefter vil vi oprette bilen i FLEETii, og kontakte dig vedr. aftale omkring evt.
+                  Hvis du trykker på knappen ovenfor, sendes der besked til FLEETii, som
+                  herefter vil oprette bilen i FLEETii, og kontakte dig vedr. aftale omkring evt.
                   installering af FLEETii device i køretøjet.
                 </p>
                 <p className="text-xs text-brand-700">
@@ -331,21 +470,6 @@ export function NewVehiclePage() {
                   </div>
                 </div>
               </div>
-
-              {sent ? (
-                <span className="flex w-full items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
-                  Bestillingen er sendt
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  disabled={!canSend}
-                  onClick={() => void handleSend()}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {isSending ? "Sender…" : "Send bestilling til FLEETii"}
-                </button>
-              )}
             </div>
           </section>
         </motion.main>

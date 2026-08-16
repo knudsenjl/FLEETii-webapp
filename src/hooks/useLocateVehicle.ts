@@ -1,4 +1,4 @@
-// Shared "Blink lygterne" action for TwoHireTestPage.tsx,
+// Shared "Blink" action for TwoHireTestPage.tsx,
 // BookingDetailsPage.tsx, and VehicleDetailsPage.tsx — posts 2hire's real
 // "locate" generic command via 2hire-vehicle-command.mts (requireUser-gated
 // for this specific command, same audience as Lås/Lås op — see that
