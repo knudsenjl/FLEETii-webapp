@@ -640,16 +640,16 @@ export function VehicleDetailsPage() {
                     onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
                     className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Rediger køretøj
+                    Rediger
                   </button>
-                  {/* Toggles to "Frigiv køretøj" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
+                  {/* Toggles to "Frigiv" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
                   {blockedAt ? (
                     <button
                       type="button"
                       onClick={() => setShowBlockConfirm(true)}
                       className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
-                      Frigiv køretøj
+                      Frigiv
                     </button>
                   ) : (
                     <button
@@ -657,7 +657,7 @@ export function VehicleDetailsPage() {
                       onClick={() => setShowBlockConfirm(true)}
                       className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
-                      Bloker køretøj
+                      Bloker
                     </button>
                   )}
                   {deleteRequestSent ? (
@@ -670,7 +670,7 @@ export function VehicleDetailsPage() {
                       onClick={() => setShowDeleteConfirm(true)}
                       className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
-                      Slet køretøj
+                      Slet
                     </button>
                   )}
                 </div>
