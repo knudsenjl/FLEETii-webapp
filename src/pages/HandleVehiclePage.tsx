@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
-import { DRIVMIDDEL_OPTIONS, shortSignalTimestamp } from "../lib/bookings";
+import { DRIVMIDDEL_OPTIONS, formatKilometerstand, shortSignalTimestamp } from "../lib/bookings";
 
 /** A department the vehicle could be assigned to — scoped to the vehicle's OWN costumer, fetched fresh alongside the vehicle's other fields (see vehicleCostumerId / the departments-loading effect below), not the viewer's — a FLEETii admin has no costumer of their own and must still be able to reassign a vehicle belonging to any costumer. */
 type DepartmentOption = { department_id: string; name: string };
@@ -199,11 +199,11 @@ export function HandleVehiclePage() {
     return null;
   }
 
-  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM" (dropping the year). Just Kilometerstand — Drivmiddelniveau is rendered explicitly further down instead, appended onto the same row as the editable Drivmiddel select (it can't be folded into a [label, value] string pair since that row isn't plain text). */
+  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH:MM" (dropping the year). Just Kilometerstand — Drivmiddelniveau is rendered explicitly further down instead, appended onto the same row as the editable Drivmiddel select (it can't be folded into a [label, value] string pair since that row isn't plain text). */
   const readOnlyRows: [string, string][] = [
     [
       "Kilometerstand:",
-      `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
+      `${vehicle.distanceCovered ? formatKilometerstand(vehicle.distanceCovered) : "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
     ],
   ];
 
@@ -483,7 +483,7 @@ export function HandleVehiclePage() {
                       </div>
                       <div className="whitespace-nowrap px-1">
                         {vehicle.status}
-                        {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
+                        {vehicle.onlineUpdatedAt ? ` (${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </div>
                     </div>
                     {/* Afdeling(er) + Hjemmeafdeling share this box rather

@@ -15,7 +15,7 @@ import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/us
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
-import { formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
+import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
 import { useReverseGeocode } from "../lib/geocode";
 import { supabase } from "../lib/supabase";
 
@@ -469,7 +469,7 @@ export function VehicleDetailsPage() {
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                       <span className="text-sm text-brand-800">
                         {vehicle.distanceCovered ? (
-                          `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
+                          `${formatKilometerstand(vehicle.distanceCovered)}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
                         ) : (
                           <span className="italic">Ingen information</span>
                         )}
@@ -504,7 +504,7 @@ export function VehicleDetailsPage() {
                       </label>
                       <span className="text-sm text-brand-800">
                         {vehicle.status}
-                        {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
+                        {vehicle.onlineUpdatedAt ? ` (${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </span>
                     </div>
                   )}

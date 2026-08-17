@@ -10,6 +10,7 @@ import {
   findAdjacentBookings,
   formatBookingPeriod,
   formatFreePeriod,
+  formatKilometerstand,
   formatVehicleLabel,
   isMapVisible,
   isVehicleAvailable,
@@ -424,8 +425,26 @@ describe("shortDanishDate", () => {
 });
 
 describe("shortSignalTimestamp", () => {
-  it("drops the year from a 2hire wire-format timestamp", () => {
-    expect(shortSignalTimestamp("09/07/2026 14.05")).toBe("09/07 14.05");
+  it("drops the year from a 2hire wire-format timestamp, and converts '.' to ':' in the time", () => {
+    expect(shortSignalTimestamp("09/07/2026 14.05")).toBe("09/07 14:05");
+  });
+});
+
+describe("formatKilometerstand", () => {
+  it("re-formats en-US-style thousands grouping (2hire's wire format) as Danish", () => {
+    expect(formatKilometerstand("298,409 km")).toBe("298.409 km");
+  });
+
+  it("rounds a decimal km value and applies Danish thousands separators", () => {
+    expect(formatKilometerstand("298,409.7 km")).toBe("298.410 km");
+  });
+
+  it("rounds down a decimal below .5", () => {
+    expect(formatKilometerstand("62.3 km")).toBe("62 km");
+  });
+
+  it("returns non-matching input (e.g. empty string for 'no data yet') unchanged", () => {
+    expect(formatKilometerstand("")).toBe("");
   });
 });
 

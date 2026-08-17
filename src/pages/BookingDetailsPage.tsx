@@ -7,6 +7,7 @@ import {
   BOOKING_ID_COLUMN,
   BOOKINGS_SELECT_COLUMNS,
   formatBookingPeriod,
+  formatKilometerstand,
   formatVehicleIdentLabel,
   formatVehicleLabel,
   isMapVisible,
@@ -61,9 +62,11 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * Reservation detail view ("/booking-details/:bookingId"): the booking's
  * period/usage, the vehicle's current fuel/mileage/status (looked up live
  * from VehicleContext by vehicleId, not stored on the booking itself), a map
- * of its last known position (only shown from 15 minutes before the
- * booking's start to 15 minutes after its end — see isMapVisible — outside
- * that window it's not rendered at all), a "Slet reservation" cancel flow,
+ * of its last known position — for a regular user, only shown from 15
+ * minutes before the booking's start to 15 minutes after its end (see
+ * isMapVisible; outside that window it's not rendered at all), but always
+ * shown to admin/FLEETii admin regardless of that window — a "Slet
+ * reservation" cancel flow,
  * an "Afslut reservation" flow (enabled only within the booking's own
  * period — locks the vehicle and shortens the booking to end now, without
  * deleting it), and a "Rediger reservation" flow that re-enters
@@ -97,8 +100,8 @@ export function BookingDetailsPage() {
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
-  /** Only within the same window the map itself is shown (see isMapVisible below) — no point reverse-geocoding a position that isn't currently displayed. */
-  const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;
+  /** admin/FLEETii admin always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. */
+  const mapVisible = isAdmin || (booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false);
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. Not admin-gated, unlike VehicleDetailsPage's own use of this hook: the map itself is shown to a regular user for their own booking, so the address is too. */
   const { address, addressLoading } = useReverseGeocode(position, mapVisible);
 
@@ -403,7 +406,7 @@ export function BookingDetailsPage() {
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                       <span className="text-sm text-brand-800">
-                        {twoHireVehicle?.distanceCovered ?? "—"}
+                        {twoHireVehicle?.distanceCovered ? formatKilometerstand(twoHireVehicle.distanceCovered) : "—"}
                         {twoHireVehicle?.distanceCoveredUpdatedAt
                           ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
                           : ""}
@@ -435,7 +438,7 @@ export function BookingDetailsPage() {
                       <span className="text-sm text-brand-800">
                         {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
                         {twoHireVehicle?.onlineUpdatedAt
-                          ? ` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
+                          ? ` (${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
                           : ""}
                       </span>
                     </div>

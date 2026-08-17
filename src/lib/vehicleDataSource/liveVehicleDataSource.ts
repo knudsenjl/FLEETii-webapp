@@ -60,9 +60,9 @@ function formatDistanceMeters(meters: number | null): string {
   return `${Math.round(meters / 1000).toLocaleString("en-US")} km`;
 }
 
-/** Formats a raw percentage as "NN%" (2hire's wire format), or "" if null. */
+/** Formats a raw percentage as "NN%" (2hire's wire format), or "" if null. Rounded — 2hire's real API has been observed to occasionally report a fractional percentage (e.g. battery level), which would otherwise render with a "." decimal point (JS's own Number->string convention) rather than the "," a Danish reader expects; rounding to a whole number sidesteps that separator question entirely, matching how a fuel/battery gauge is normally shown anyway. */
 function formatPercentage(percentage: number | null): string {
-  return percentage === null ? "" : `${percentage}%`;
+  return percentage === null ? "" : `${Math.round(percentage)}%`;
 }
 
 /**

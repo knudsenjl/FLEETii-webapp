@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
-import { shortSignalTimestamp } from "../lib/bookings";
+import { formatKilometerstand, shortSignalTimestamp } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
@@ -172,7 +172,7 @@ export function TwoHireTestPage() {
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                     <span className="text-sm text-brand-800">
-                      {twoHireVehicle?.distanceCovered ?? "—"}
+                      {twoHireVehicle?.distanceCovered ? formatKilometerstand(twoHireVehicle.distanceCovered) : "—"}
                       {twoHireVehicle?.distanceCoveredUpdatedAt
                         ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
                         : ""}
@@ -201,7 +201,7 @@ export function TwoHireTestPage() {
                     <span className="text-sm text-brand-800">
                       {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
                       {twoHireVehicle?.onlineUpdatedAt
-                        ? ` (opdateret ${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
+                        ? ` (${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
                         : ""}
                     </span>
                   </div>

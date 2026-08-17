@@ -126,15 +126,40 @@ export function shortDanishDate(danishDate: string): string {
 }
 
 /**
- * "dd/mm/yyyy HH.MM" -> "dd/mm HH.MM" (drops the year). Same idea as
- * shortDanishDate, but for 2hire's raw wire-format timestamps (see
- * liveVehicleDataSource.ts's formatSignalTimestamp / the mock 2hire data),
- * which already use "/" as the date separator and "." between hour/minute.
+ * "dd/mm/yyyy HH.MM" -> "dd/mm HH:MM" (drops the year, and — since this is
+ * what's actually shown to the user — converts the hour/minute separator
+ * from "." to ":"). 2hire's raw wire-format timestamps (see
+ * liveVehicleDataSource.ts's formatSignalTimestamp / the mock 2hire data)
+ * use "." between hour/minute internally, matching their own API's own
+ * convention, but that reads as a decimal point rather than a time
+ * separator to a Danish (or most other locales') reader — same idea as
+ * shortDanishDate, which likewise converts the internal wire format into
+ * what's actually displayed rather than passing it through as-is.
  */
 export function shortSignalTimestamp(fullTimestamp: string): string {
   const [datePart, timePart] = fullTimestamp.split(" ");
   const [day, month] = datePart.split("/");
-  return `${day}/${month} ${timePart}`;
+  return `${day}/${month} ${timePart.replace(".", ":")}`;
+}
+
+/**
+ * Rounds a "Kilometerstand" display value (distanceCovered — 2hire's wire
+ * format, "N,NNN km", see liveVehicleDataSource.ts's formatDistanceMeters)
+ * to a whole number of km, stripping any decimal fraction, and re-formats
+ * the thousands grouping for a Danish reader: "." as the group separator,
+ * not "," — 2hire's own wire format (and this function's own INPUT parsing
+ * below) uses "," the way en-US does, which reads as a DECIMAL point to a
+ * Danish reader instead of a thousands separator (confirmed: a real
+ * "154,220 km" reading was misread as ~154.22 km before this fix). Returns
+ * the input unchanged if it isn't in the expected "<number> km" shape (e.g.
+ * "" for "no data yet").
+ */
+export function formatKilometerstand(distanceCovered: string): string {
+  const match = distanceCovered.match(/^([\d.,]+)\s*km$/);
+  if (!match) return distanceCovered;
+  const numeric = Number(match[1].replace(/,/g, ""));
+  if (!Number.isFinite(numeric)) return distanceCovered;
+  return `${Math.round(numeric).toLocaleString("da-DK")} km`;
 }
 
 /** Converts a raw BookingRow (DB column names, single ISO start/end strings) into the MappedBooking shape pages actually render. A null row.end (open-ended booking) stays null throughout — never passed to splitIsoDateTime. */
