@@ -73,7 +73,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * kommende reservation." case rather than showing an empty page here.
  *
  * Differs from BookingDetailsPage.tsx in exactly two other ways (both
- * intentional, not omissions): the header reads "Reservation" with a "Next"
+ * intentional, not omissions): the header reads "Reservation" with an "Alle"
  * button (→ "/bookings", so the user can always reach the full list from
  * here) instead of "Reservationsdetaljer", and the "Kunde/afdeling:" row is
  * dropped — both requested specifically for this landing-page variant.
@@ -327,13 +327,13 @@ export function BookingNextPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Reservation</h2>
-                {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Next" is the way to see everything else. */}
+                {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Alle" ("all") is the way to see everything else. */}
                 <button
                   type="button"
                   onClick={() => navigate("/bookings")}
                   className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                 >
-                  Next
+                  Alle
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                     <path d="M5 12h14" />
                     <path d="m13 5 7 7-7 7" />
