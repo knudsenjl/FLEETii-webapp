@@ -9,19 +9,21 @@ interface InlinePopupProps {
   message: ReactNode;
   /** Which side of the anchor the popup hugs. Defaults to left. */
   align?: "left" | "right";
+  /** Which side of the anchor the popup sits on. Defaults to "bottom" (below the anchor). "top" is for anchors with something immediately below them that a downward popup would overlap (e.g. VehicleLockToggle, directly above the Afslut/Rediger/Slet row). */
+  position?: "top" | "bottom";
   /** "info" (default): neutral brand-colored border/text, for tooltips and "not implemented" notices. "warning": red border/text, for guard/blocked-action messages (e.g. "can't delete the last admin"). */
   variant?: "info" | "warning";
 }
 
-/** Renders nothing when `visible` is false; otherwise a small white card positioned just below the parent element. */
-export function InlinePopup({ visible, message, align = "left", variant = "info" }: InlinePopupProps) {
+/** Renders nothing when `visible` is false; otherwise a small white card positioned just above/below the parent element (parent needs `relative` positioning). */
+export function InlinePopup({ visible, message, align = "left", position = "bottom", variant = "info" }: InlinePopupProps) {
   if (!visible) return null;
 
   return (
     <div
-      className={`animate-fade-in absolute top-full z-20 mt-2 w-56 rounded-lg border px-3 py-2 text-xs shadow-lg ${
+      className={`animate-fade-in absolute z-20 w-56 rounded-lg border px-3 py-2 text-xs shadow-lg ${
         variant === "warning" ? "border-red-300 bg-white text-red-600" : "border-brand-200 bg-white text-brand-700"
-      } ${align === "right" ? "right-0" : "left-0"}`}
+      } ${align === "right" ? "right-0" : "left-0"} ${position === "top" ? "bottom-full mb-2" : "top-full mt-2"}`}
     >
       {message}
     </div>
