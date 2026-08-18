@@ -809,14 +809,24 @@ export function UserDetailsPage() {
                                               {option.name}
                                             </td>
                                             <td className="px-2 py-0.5 text-center">
-                                              <input
-                                                type="checkbox"
-                                                checked={isHome || userDepartmentIds.has(option.department_id)}
-                                                disabled={isHome}
-                                                title={isHome ? "Kan ikke fjernes fra brugerens hjemmeafdeling" : undefined}
-                                                onChange={(e) => toggleUserDepartment(option, e.target.checked)}
-                                                className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                                              />
+                                              <span className="inline-flex items-center gap-1.5">
+                                                <input
+                                                  type="checkbox"
+                                                  checked={isHome || userDepartmentIds.has(option.department_id)}
+                                                  disabled={isHome}
+                                                  onChange={(e) => toggleUserDepartment(option, e.target.checked)}
+                                                  className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                                />
+                                                {/* Always-visible, not a hover tooltip (this table can be short enough — max-h-32 — that a tap-popup risks getting clipped by its own overflow-auto) — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
+                                                {isHome && (
+                                                  <span
+                                                    className="rounded bg-brand-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-brand-700"
+                                                    title="Kan ikke fjernes fra brugerens hjemmeafdeling"
+                                                  >
+                                                    Hjem
+                                                  </span>
+                                                )}
+                                              </span>
                                             </td>
                                           </tr>
                                         );

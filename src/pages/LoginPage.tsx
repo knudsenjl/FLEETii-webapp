@@ -17,6 +17,9 @@ import { TypingHeader } from "../components/TypingHeader";
 /** Placeholder for a possible future multi-step login flow; today there's only one step. */
 type Step = { name: "credentials" };
 
+/** Shown for any signInWithPassword failure (wrong credentials, or — per the open "first attempt after a fresh page load sometimes fails, retry immediately succeeds" investigation — possibly a getSession()-race/timeout too, see errorDetail's own comment below). Deliberately generic regardless of the real cause, same reasoning as before this was pulled into a named constant. */
+const CREDENTIALS_ERROR_MESSAGE = "Login fejlede - tjek venligst brugernavn og adgangskode, og prøv igen";
+
 const stepVariants = {
   initial: { opacity: 0, x: 24 },
   animate: { opacity: 1, x: 0 },
@@ -29,12 +32,26 @@ export function LoginPage() {
   const location = useLocation();
   /** Present only when this page was reached via a browser back-navigation from AboutPage (the "i" button below) — see its own comment. Wins over the remembered-username effect just below, so credentials just typed aren't clobbered by whatever's in localStorage. */
   const formSnapshot = (location.state as { formSnapshot?: { username: string; password: string } } | null)?.formSnapshot ?? null;
-  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage } = useAuth();
+  // `loading`: true until AuthContext's own initial supabase.auth.getSession()
+  // call (fired on mount, see AuthContext.tsx) resolves. Supabase-js
+  // serializes ALL auth calls (getSession, signInWithPassword, token
+  // refresh) behind an internal lock, so submitting while that first
+  // getSession() is still in flight — right after a cold page load, slower
+  // than usual — queues signInWithPassword behind it and can surface as a
+  // failure that isn't actually about the entered credentials (see the
+  // "first attempt after a fresh page load sometimes wrongly fails, retry
+  // immediately succeeds" investigation). Disabling submit until loading is
+  // false removes that race outright instead of working around its symptom.
+  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage, loading } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState(formSnapshot?.username ?? "");
   const [password, setPassword] = useState(formSnapshot?.password ?? "");
   const [rememberMe, setRememberMeState] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** The real signInWithPassword error's own message — null unless this is at least the SECOND consecutive failed attempt (see handleCredentialsSubmit). The generic error text above never reveals whether a failure is genuinely bad credentials or something else (network/CORS/the getSession()-race above); surfacing the raw detail on a repeat failure lets that be diagnosed straight from the UI, without needing devtools open to read the console.error below. */
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
+  /** Consecutive failed sign-in attempts since the last success — drives errorDetail above. Intentionally never reset on input change: a difference in WHAT was typed doesn't change whether repeat failures are worth surfacing raw detail for. */
+  const [failedAttempts, setFailedAttempts] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [resetSubmitting, setResetSubmitting] = useState(false);
@@ -83,6 +100,13 @@ export function LoginPage() {
   async function handleCredentialsSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+    setErrorDetail(null);
+
+    // Belt-and-suspenders alongside the submit button's own disabled={loading}
+    // below — a disabled button already stops the browser from submitting
+    // via Enter, but this guards handleCredentialsSubmit itself regardless
+    // of how it gets called.
+    if (loading) return;
 
     if (!username || !password) {
       setError("Indtast både brugernavn og adgangskode.");
@@ -111,13 +135,21 @@ export function LoginPage() {
       if (signInError) {
         // Logged so a login failure that ISN'T actually bad credentials
         // (network/CORS issue, restricted browser environment, etc.) is
-        // distinguishable in devtools — the message shown below is always
-        // the same generic Danish text regardless of the real cause.
+        // distinguishable in devtools — the message shown to the user is
+        // always the same generic Danish text regardless of the real cause,
+        // EXCEPT from the second consecutive failure onward, where the raw
+        // message is also surfaced inline (errorDetail) — see its own
+        // comment above for why.
         console.error("[login] signInWithPassword failed:", signInError);
-        setError("Forkert brugernavn eller adgangskode.");
+        const nextFailedAttempts = failedAttempts + 1;
+        setFailedAttempts(nextFailedAttempts);
+        setErrorDetail(nextFailedAttempts >= 2 ? signInError.message : null);
+        setError(CREDENTIALS_ERROR_MESSAGE);
         setSubmitting(false);
         return;
       }
+
+      setFailedAttempts(0);
 
       // Checked here, right after sign-in, rather than relying solely on
       // AuthContext's own async profile load (below) — that load races
@@ -292,6 +324,9 @@ export function LoginPage() {
                     className="animate-fade-in rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700"
                   >
                     {error}
+                    {errorDetail && (
+                      <span className="mt-1 block text-xs text-red-500">Detaljer: {errorDetail}</span>
+                    )}
                   </p>
                 )}
 
@@ -306,10 +341,10 @@ export function LoginPage() {
 
                 <button
                   type="submit"
-                  disabled={submitting}
+                  disabled={submitting || loading}
                   className="mt-2 inline-flex items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {submitting ? "Logger ind…" : "Log ind"}
+                  {submitting ? "Logger ind…" : loading ? "Indlæser…" : "Log ind"}
                 </button>
               </motion.form>
             )}

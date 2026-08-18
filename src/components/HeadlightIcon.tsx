@@ -1,4 +1,4 @@
-// Flat, filled headlight-with-beams glyph for the "Blink lygterne" button
+// Flat, filled headlight-with-beams glyph for the "Blink" button
 // (VehicleDetailsPage, BookingDetailsPage, TwoHireTestPage) — decorative
 // only, so it's always aria-hidden; the button itself carries the label.
 interface HeadlightIconProps {

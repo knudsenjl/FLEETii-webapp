@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
-import { DRIVMIDDEL_OPTIONS, shortSignalTimestamp } from "../lib/bookings";
+import { DRIVMIDDEL_OPTIONS, formatKilometerstand, shortSignalTimestamp } from "../lib/bookings";
 
 /** A department the vehicle could be assigned to — scoped to the vehicle's OWN costumer, fetched fresh alongside the vehicle's other fields (see vehicleCostumerId / the departments-loading effect below), not the viewer's — a FLEETii admin has no costumer of their own and must still be able to reassign a vehicle belonging to any costumer. */
 type DepartmentOption = { department_id: string; name: string };
@@ -199,11 +199,11 @@ export function HandleVehiclePage() {
     return null;
   }
 
-  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH.MM" (dropping the year). Just Kilometerstand — Drivmiddelniveau is rendered explicitly further down instead, right after the editable Drivmiddel row, so the two "Drivmiddel*" rows stay adjacent (Drivmiddel first). */
+  /** [label, value] — the UpdatedAt timestamps are shortened to "dd/mm HH:MM" (dropping the year). Just Kilometerstand — Drivmiddelniveau is rendered explicitly further down instead, appended onto the same row as the editable Drivmiddel select (it can't be folded into a [label, value] string pair since that row isn't plain text). */
   const readOnlyRows: [string, string][] = [
     [
       "Kilometerstand:",
-      `${vehicle.distanceCovered ?? "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
+      `${vehicle.distanceCovered ? formatKilometerstand(vehicle.distanceCovered) : "—"}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`,
     ],
   ];
 
@@ -449,25 +449,27 @@ export function HandleVehiclePage() {
                         <div className="whitespace-nowrap px-1">{value}</div>
                       </div>
                     ))}
+                    {/* Drivmiddelniveau (fuel/battery %) is appended next to the select rather than shown as its own row — the two are closely related enough not to need a separate label. */}
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                       <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Drivmiddel:</label>
-                      <select
-                        value={drivmiddel}
-                        onChange={(e) => setDrivmiddel(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      >
-                        {DRIVMIDDEL_OPTIONS.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
-                      <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">Drivmiddelniveau:</div>
-                      <div className="whitespace-nowrap px-1">
-                        {vehicle.autonomyPercentage ?? "—"}
-                        {vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}
+                      <div className="flex items-center gap-2">
+                        <select
+                          value={drivmiddel}
+                          onChange={(e) => setDrivmiddel(e.target.value)}
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        >
+                          {DRIVMIDDEL_OPTIONS.map((option) => (
+                            <option key={option} value={option}>
+                              {option}
+                            </option>
+                          ))}
+                        </select>
+                        {vehicle.autonomyPercentage && (
+                          <span className="whitespace-nowrap text-brand-800">
+                            {vehicle.autonomyPercentage}
+                            {vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}
+                          </span>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
@@ -481,7 +483,7 @@ export function HandleVehiclePage() {
                       </div>
                       <div className="whitespace-nowrap px-1">
                         {vehicle.status}
-                        {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
+                        {vehicle.onlineUpdatedAt ? ` (${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </div>
                     </div>
                     {/* Afdeling(er) + Hjemmeafdeling share this box rather

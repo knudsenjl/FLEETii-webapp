@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import {
   BOOKING_ID_COLUMN,
   BOOKINGS_SELECT_COLUMNS,
+  USER_ID_COLUMN,
   formatBookingPeriod,
   formatKilometerstand,
   formatVehicleIdentLabel,
@@ -37,7 +38,7 @@ import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import { useReverseGeocode } from "../lib/geocode";
 
-/** A booking as passed in via router state from BookingsPage/AllBookingsPage. */
+/** A booking as fetched fresh on mount below (see mapBookingRow) — same shape BookingDetailsPage.tsx's own fetch-by-id fallback produces. */
 type BookingDetails = {
   id: string;
   vehicle: string;
@@ -59,36 +60,34 @@ type BookingDetails = {
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
- * Reservation detail view ("/booking-details/:bookingId"): the booking's
- * period/usage, the vehicle's current fuel/mileage/status (looked up live
- * from VehicleContext by vehicleId, not stored on the booking itself), a map
- * of its last known position — for a regular user, only shown from 15
- * minutes before the booking's start to 15 minutes after its end (see
- * isMapVisible; outside that window it's not rendered at all), but always
- * shown to admin/FLEETii admin regardless of that window — a "Slet
- * reservation" cancel flow,
- * an "Afslut reservation" flow (enabled only within the booking's own
- * period — locks the vehicle and shortens the booking to end now, without
- * deleting it), and a "Rediger reservation" flow that re-enters
- * ReservationPage/AvailablePage/ConfirmPage pre-filled with this booking's
- * data, updating it on confirm instead of creating a new one. Normally
- * reached with the
- * booking pre-filled via router state (BookingsPage/AllBookingsPage), which
- * skips a round-trip; a direct URL/refresh/bookmark (no router state) falls
- * back to fetching it by the :bookingId route param instead, redirecting to
- * "/bookings" if it can't be found (deleted, or an invalid id).
+ * Landing page for role "user" ("/booking-next", see RootRoute in App.tsx —
+ * admin/FLEETii admin still land on "/admin"). A copy of
+ * BookingDetailsPage.tsx, adapted to be reachable with no booking to link
+ * from: rather than a "/booking-details/:bookingId" route param or router
+ * state, it fetches the viewer's OWN currently-active booking, or if none,
+ * their soonest upcoming one — the same "end >= now OR end is null, ordered
+ * by start ascending, take the first" query BookingsPage.tsx's own
+ * "Næste reservation" row uses, just scoped to a single result. Redirects
+ * straight to "/bookings" (replace, no flash) if the viewer has no
+ * current/upcoming booking at all, matching BookingsPage's own "Ingen
+ * kommende reservation." case rather than showing an empty page here.
+ *
+ * Differs from BookingDetailsPage.tsx in exactly two other ways (both
+ * intentional, not omissions): the header reads "Reservation" with an "Alle"
+ * button (→ "/bookings", so the user can always reach the full list from
+ * here) instead of "Reservationsdetaljer", and the "Kunde/afdeling:" row is
+ * dropped — both requested specifically for this landing-page variant.
+ * Everything else (map, Lås/Lås op, Blink/Horn, Afslut/Rediger/Slet) is
+ * unchanged from BookingDetailsPage.tsx; keep the two in sync by hand if one
+ * changes, since they're deliberately not sharing a component.
  */
-export function BookingDetailsPage() {
+export function BookingNextPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { bookingId } = useParams<{ bookingId: string }>();
-  const { profile, afdelingId } = useAuth();
+  const { session, profile, afdelingId } = useAuth();
   /** Whether afdelingId's department shows the Bruger-ID value (vs. plain E-mail) in the "Bruger:" row below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/DepartmentPage.tsx: the label is always "Bruger", only the value source swaps — who a booking belongs to is core information, not an optional extra. */
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
-  const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
-  const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
-  const booking = stateBooking ?? fetchedBooking;
+  const [booking, setBooking] = useState<BookingDetails | null>(null);
+  const [bookingLoading, setBookingLoading] = useState(true);
 
   const [isCancelling, setIsCancelling] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -100,7 +99,7 @@ export function BookingDetailsPage() {
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
-  /** admin/FLEETii admin always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. */
+  /** admin/FLEETii admin always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. Same rule as BookingDetailsPage.tsx. */
   const mapVisible = isAdmin || (booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false);
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. Not admin-gated, unlike VehicleDetailsPage's own use of this hook: the map itself is shown to a regular user for their own booking, so the address is too. */
   const { address, addressLoading } = useReverseGeocode(position, mapVisible);
@@ -140,35 +139,6 @@ export function BookingDetailsPage() {
     };
   }, [booking?.vehicle]);
 
-  /** "Kunde/afdeling:" row's data — this booking's own department (booking.departmentId) plus its costumer's name, fetched fresh rather than trusted from router state (unlike ConfirmPage, which resolves it once at booking-creation time and passes it straight through — a booking viewed here may be old, or reached by direct fetch-by-id, with no such state at all). departments'/costumers' SELECT RLS is unrestricted for any authenticated user, same as PageHeader's own "Skift afdeling" list. */
-  const [departmentInfo, setDepartmentInfo] = useState<{ name: string; costumerName: string | null } | null>(null);
-  useEffect(() => {
-    if (!booking?.departmentId) {
-      setDepartmentInfo(null);
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("departments")
-      .select("name, costumers(name)")
-      .eq("department_id", booking.departmentId)
-      .maybeSingle<{ name: string; costumers: { name: string } | null }>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setDepartmentInfo(data ? { name: data.name, costumerName: data.costumers?.name ?? null } : null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [booking?.departmentId]);
-  /** "Kunde/afdeling:" row's display text — "Kunde / Afdeling" (space-slash-space), same format as ConfirmPage's own read-only summary row and PageHeader's "Skift afdeling" dropdown. */
-  const departmentLabel = departmentInfo
-    ? departmentInfo.costumerName
-      ? `${departmentInfo.costumerName} / ${departmentInfo.name}`
-      : departmentInfo.name
-    : "—";
   /** "Køretøj:" row's identifying text — "{ident} / {plate}: {brand} {model}" (see formatVehicleIdentLabel) when useVehicleIdent and vehicle_ident are both set, else just "{plate}: {brand} {model}". Falls back to formatVehicleLabel's own plate (which is itself ident-or-plate, ungated) while vehicle_profiles hasn't loaded yet, so the row doesn't flash blank. */
   const vehicleLabel =
     booking && vehicleIdentInfo && twoHireVehicle
@@ -209,27 +179,37 @@ export function BookingDetailsPage() {
     void isSettingTilladt("Tillad_rediger_reservation", profile?.user_id, afdelingId).then(setUserMayEditBooking);
   }, [profile?.user_id, afdelingId]);
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark (no router state) — skipped entirely when stateBooking is already present, since that's the common, cheaper path. */
+  /** Finds the viewer's own currently-active booking, or failing that their soonest upcoming one — see this page's own doc comment for why (no bookingId to link from, unlike BookingDetailsPage.tsx). Same query BookingsPage.tsx's "Næste reservation" row uses (end >= now OR end is null, ordered by start ascending), just limited to the single first result and scoped to this viewer only (no admin cross-department branch — this page is reached only as role "user"'s landing page). */
   useEffect(() => {
-    if (stateBooking || !bookingId) return;
+    const userId = session?.user.id;
+    if (!userId) {
+      setBookingLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setBookingLoading(true);
     void supabase
       .from("bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
-      .eq(BOOKING_ID_COLUMN, bookingId)
-      .maybeSingle<BookingRow>()
+      .eq(USER_ID_COLUMN, userId)
+      // "end >= now" OR "end is null" — a plain .gte() would silently drop
+      // every open-ended booking, since NULL >= x is NULL/falsy in Postgres
+      // (same reasoning as BookingsPage.tsx's identical query).
+      .or(`end.gte.${nowIsoString()},end.is.null`)
+      .order("start", { ascending: true })
+      .limit(1)
+      .returns<BookingRow[]>()
       .then(({ data }) => {
         if (cancelled) return;
-        setFetchedBooking(data ? mapBookingRow(data) : null);
+        setBooking(data && data.length > 0 ? mapBookingRow(data[0]) : null);
         setBookingLoading(false);
       });
 
     return () => {
       cancelled = true;
     };
-  }, [bookingId, stateBooking]);
+  }, [session?.user.id]);
 
   useEffect(() => {
     if (!booking && !bookingLoading) {
@@ -345,17 +325,27 @@ export function BookingDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
+              <div className="flex items-center justify-between gap-3">
+                <h2 className="text-xl font-semibold text-brand-800">Reservation</h2>
+                {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Alle" ("all") is the way to see everything else. */}
+                <button
+                  type="button"
+                  onClick={() => navigate("/bookings")}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                >
+                  Alle
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                    <path d="M5 12h14" />
+                    <path d="m13 5 7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
 
               <div className="overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
                     <span className="text-sm text-brand-800">{formatBookingPeriod(booking, true)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kunde/afdeling:</label>
-                    <span className="text-sm text-brand-800">{departmentLabel}</span>
                   </div>
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">

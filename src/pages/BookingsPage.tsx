@@ -5,7 +5,6 @@ import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { useIdentSettings } from "../hooks/useIdentSettings";
-import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import {
@@ -33,13 +32,15 @@ type Booking = {
 };
 
 /**
- * "My reservations" page ("/bookings"): a regular user's own upcoming
- * bookings, or (for admins) every upcoming booking, split into "next" (the
- * single soonest one) and "other" (everything else) — clicking either
- * navigates straight to BookingDetailsPage (view/cancel a booking from
- * there). See AllBookingsPage for the admin-only cross-department
- * equivalent — the two pages share almost all of this logic but haven't
- * been consolidated.
+ * "My reservations" page ("/bookings"): a single table of a regular user's
+ * own upcoming bookings (or, for admins, every upcoming booking), ordered
+ * soonest-first — clicking a row navigates straight to BookingDetailsPage
+ * (view/cancel a booking from there). Role "user" also has a dedicated
+ * landing page for just their own current/next booking (BookingNextPage.tsx,
+ * "/booking-next") — this page is the full list reached from there via its
+ * "Next" button, not a replacement for it. See AllBookingsPage for the
+ * admin-only cross-department equivalent — the two pages share almost all of
+ * this logic but haven't been consolidated.
  */
 export function BookingsPage() {
   const { session, profile, afdelingId } = useAuth();
@@ -52,7 +53,6 @@ export function BookingsPage() {
 
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
   const departmentBookings = activeBookings.filter((b) => b.departmentId === afdelingId);
-  const [nextBooking, ...remainingBookings] = departmentBookings;
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in the new first column below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/FleetManagementPage.tsx. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
@@ -91,8 +91,6 @@ export function BookingsPage() {
     // actually determines whether a re-fetch is needed.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [departmentBookings.map((b) => b.vehicle).join("|")]);
-
-  const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
 
   /** Whether a non-admin user is allowed to create a new reservation, per Tillad_ny_reservation. Admins can always create one regardless (see AllBookingsPage). */
   const [userMayCreateBooking, setUserMayCreateBooking] = useState(false);
@@ -141,8 +139,7 @@ export function BookingsPage() {
   }, [user, isAdmin]);
 
   /**
-   * Shared column-header row for both the "next" and "other" booking tables
-   * below. Not table-fixed: Køretøj-ID/Reg.nr and Periode are both w-px
+   * Column-header row for the booking table below. Not table-fixed: Køretøj-ID/Reg.nr and Periode are both w-px
    * (shrink to their actual content, only meaningful under
    * table-layout:auto — same trick as AllBookingsPage.tsx's own table).
    * Model has neither — combined with `truncate` on its cells (which
@@ -158,7 +155,7 @@ export function BookingsPage() {
     </tr>
   );
 
-  /** Renders one booking row that navigates to BookingDetailsPage on click (or Enter/Space) — used for both the "next" booking and the "other" bookings list. */
+  /** Renders one booking row that navigates to BookingDetailsPage on click (or Enter/Space). */
   const renderBookingRow = (booking: Booking, isAlternate: boolean, onClick: () => void) => {
     const twoHireVehicle = vehicles.find((v) => v.vehicleId === booking.vehicle);
     const modelLabel = twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle;
@@ -193,26 +190,6 @@ export function BookingsPage() {
     );
   };
 
-  /** A section title with an inline info "?" button that shows `message` via useTimedFlag, keyed so the "next" and "other" sections' popups don't interfere with each other. */
-  const renderSubheader = (title: string, key: "next" | "other", message: string) => (
-    <div className="relative flex items-center justify-between gap-2">
-      <h3 className="text-sm font-semibold text-brand-700">{title}</h3>
-      <button
-        type="button"
-        onClick={() => triggerNotImplemented(key)}
-        aria-label="Mere information"
-        className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-      >
-        ?
-      </button>
-      {notImplementedKey === key && (
-        <div className="animate-fade-in absolute right-0 top-full z-20 mt-2 w-64 rounded-lg border border-brand-200 bg-white px-3 py-2 text-xs text-brand-700 shadow-lg">
-          {message}
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -235,51 +212,6 @@ export function BookingsPage() {
                 {profile?.role === "user" ? "Dine reservationer" : "Flådens reservationer"}
               </h2>
 
-              {renderSubheader(
-                "Næste reservation",
-                "next",
-                "Vælg denne reservation for at se detaljer eller aflyse reservationen",
-              )}
-              <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
-                <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                    {bookingTableHeaderRow}
-                  </thead>
-                  <tbody className="divide-y divide-brand-100 bg-white">
-                    {loading && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
-                      </tr>
-                    )}
-                    {!loading && error && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
-                      </tr>
-                    )}
-                    {!loading && !error && !nextBooking && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
-                          {canShowNewBookingButton
-                            ? "Ingen kommende reservation."
-                            : "Anmod administratoren om at lave en reservation til dig."}
-                        </td>
-                      </tr>
-                    )}
-                    {!loading &&
-                      !error &&
-                      nextBooking &&
-                      renderBookingRow(nextBooking, false, () =>
-                        navigate(`/booking-details/${nextBooking.id}`, { state: { booking: nextBooking } }),
-                      )}
-                  </tbody>
-                </table>
-              </div>
-
-              {renderSubheader(
-                "Øvrige reservationer",
-                "other",
-                "Vælg en af disse reservationer for at se detaljer eller aflyse reservationen",
-              )}
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
@@ -296,14 +228,18 @@ export function BookingsPage() {
                         <td colSpan={3} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
-                    {!loading && !error && remainingBookings.length === 0 && (
+                    {!loading && !error && departmentBookings.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Ingen øvrige reservationer.</td>
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                          {canShowNewBookingButton
+                            ? "Ingen kommende reservation."
+                            : "Anmod administratoren om at lave en reservation til dig."}
+                        </td>
                       </tr>
                     )}
                     {!loading &&
                       !error &&
-                      remainingBookings.map((booking, index) =>
+                      departmentBookings.map((booking, index) =>
                         renderBookingRow(booking, index % 2 === 1, () =>
                           navigate(`/booking-details/${booking.id}`, { state: { booking } }),
                         ),

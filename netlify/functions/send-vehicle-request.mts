@@ -24,6 +24,8 @@ import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
+  /** FLEETii-admin-only (see NewVehiclePage.tsx's Kunde/Afdeling picker, isFleetiiAdmin branch) — a regular admin has no need for this (their own profile's department_id is used instead, same as before this field existed) and it's IGNORED unless the caller's own role is genuinely "FLEETii admin" (checked server-side below, never trusted from the body alone). When present, this — not afdeling's display name, nor the caller's own profile — is what actually determines the inserted row's costumer_id/department_id (departments.costumer_id is looked up from it). */
+  departmentId?: string | null;
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
   vehicleIdent?: string | null;
   /** Parking spot — optional free text, see costumer_orders_add_parking.sql. */
@@ -106,16 +108,19 @@ function buildHtmlBody(fields: {
 }
 
 /**
- * POST { afdeling?, vehicleIdent?, parking?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
+ * POST { afdeling?, departmentId?, vehicleIdent?, parking?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
  * drivmiddel?, needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
- * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false) —
- * brand/maerke/aargang/fuelLevel/mileage are all optional, not always known
- * at request time (brand/model/model_year can be filled in later on
- * VehicleCreatePage.tsx, see costumer_orders_brand_model_year_nullable.sql).
- * Inserts a matching costumer_orders row (costumer_id/department_id from the
- * caller's own profile), then emails the request to MAIL_RECIEVER —
- * via SMTP or Resend, see sendMail.
+ * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false, plus
+ * departmentId when the caller is a FLEETii admin — see the departmentId
+ * resolution below) — brand/maerke/aargang/fuelLevel/mileage are all
+ * optional, not always known at request time (brand/model/model_year can be
+ * filled in later on VehicleCreatePage.tsx, see
+ * costumer_orders_brand_model_year_nullable.sql). Inserts a matching
+ * costumer_orders row (costumer_id/department_id from the caller's own
+ * profile, or from the resolved departmentId for a FLEETii admin — see
+ * below), then emails the request to MAIL_RECIEVER — via SMTP or Resend, see
+ * sendMail.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -179,7 +184,7 @@ export default async (req: Request) => {
   }
   const fleetiiDevice = needsFleetiiDevice ? "Nyt device skal installeres" : `Eksisterende device (id: ${fleetiiDeviceId})`;
 
-  const afdeling = asTrimmedString(body.afdeling) || "—";
+  let afdeling = asTrimmedString(body.afdeling) || "—";
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
@@ -187,11 +192,43 @@ export default async (req: Request) => {
 
   const { data: caller } = await admin
     .from("user_profiles")
-    .select("costumer_id, department_id")
+    .select("role, costumer_id, department_id")
     .eq("user_id", authResult.userId)
-    .maybeSingle<{ costumer_id: string | null; department_id: string | null }>();
+    .maybeSingle<{ role: string; costumer_id: string | null; department_id: string | null }>();
 
-  if (!caller?.costumer_id) {
+  // A FLEETii admin isn't scoped to one costumer (platform-wide role — same
+  // exception as create-user.mts's own isFleetiiAdmin branch), so their own
+  // profile's costumer_id/department_id can't be relied on here — the
+  // Kunde/Afdeling picker they used (NewVehiclePage.tsx) supplies
+  // departmentId instead, resolved to its OWN costumer_id below rather than
+  // trusted as-is, same "don't trust the body directly" reasoning as the
+  // module comment up top.
+  let costumerId: string | null;
+  let departmentId: string | null;
+  if (caller?.role === "FLEETii admin") {
+    const requestedDepartmentId = asTrimmedString(body.departmentId);
+    if (!requestedDepartmentId) {
+      return new Response(JSON.stringify({ error: "Kunde og afdeling er påkrævet." }), { status: 400 });
+    }
+    const { data: requestedDepartment } = await admin
+      .from("departments")
+      .select("department_id, name, costumer_id")
+      .eq("department_id", requestedDepartmentId)
+      .maybeSingle<{ department_id: string; name: string; costumer_id: string | null }>();
+    if (!requestedDepartment?.costumer_id) {
+      return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+    }
+    costumerId = requestedDepartment.costumer_id;
+    departmentId = requestedDepartment.department_id;
+    // Authoritative, not the client's own afdeling text — see the type's
+    // own doc comment on departmentId.
+    afdeling = requestedDepartment.name;
+  } else {
+    costumerId = caller?.costumer_id ?? null;
+    departmentId = caller?.department_id ?? null;
+  }
+
+  if (!costumerId) {
     return new Response(
       JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde — kan ikke oprette bestillingen." }),
       { status: 403 },
@@ -201,7 +238,7 @@ export default async (req: Request) => {
   const { data: customer } = await admin
     .from("costumers")
     .select("name")
-    .eq("costumer_id", caller.costumer_id)
+    .eq("costumer_id", costumerId)
     .maybeSingle<{ name: string | null }>();
   const customerName = customer?.name ?? "—";
 
@@ -209,8 +246,8 @@ export default async (req: Request) => {
     .from("costumer_orders")
     .insert({
       order_type: "Opret",
-      costumer_id: caller.costumer_id,
-      department_id: caller.department_id,
+      costumer_id: costumerId,
+      department_id: departmentId,
       vehicle_ident: vehicleIdent || null,
       parking: parking || null,
       number_plate: nummerplade,

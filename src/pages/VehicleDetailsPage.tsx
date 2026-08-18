@@ -15,7 +15,8 @@ import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/us
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
-import { formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
+import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
+import { useReverseGeocode } from "../lib/geocode";
 import { supabase } from "../lib/supabase";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
@@ -57,36 +58,6 @@ type VehicleProfilePlateRow = {
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
-
-/**
- * Shape of a DAWA (Danmarks Adressers Web API, api.dataforsyningen.dk —
- * Denmark's own free, authoritative, no-API-key-required address registry)
- * `/adgangsadresser/reverse` response — only the fields needed to format
- * "street number, postal code city" for the row below the map.
- *
- * Used INSTEAD OF Nominatim/OSM here (unlike LeafletMap's tiles, which
- * still come from OSM) — Nominatim's `suburb`/`town`/`city` tags are
- * crowdsourced and don't reliably match Denmark's actual registered postal
- * town per postcode (confirmed wrong twice: "Sydbyen" instead of
- * "Silkeborg" for 8600, and "Strømmen" instead of "Randers NØ" for 8930).
- * DAWA's `postnummer.navn` IS that official registered name directly, no
- * suburb-vs-town guessing needed. Every FLEETii vehicle is in Denmark, so
- * there's no coverage gap from dropping Nominatim's worldwide reach here.
- */
-type DawaReverseResponse = {
-  vejstykke?: { navn?: string };
-  husnr?: string;
-  postnummer?: { nr?: string; navn?: string };
-};
-
-/** Formats a DAWA reverse-geocoding response as "street number, postal code city" (e.g. "Vejnavn 12, 8000 Aarhus C"), omitting any parts that are missing. Falls back to null if nothing usable came back at all. */
-function formatDawaAddress(data: DawaReverseResponse | null): string | null {
-  if (!data) return null;
-  const street = [data.vejstykke?.navn, data.husnr].filter(Boolean).join(" ");
-  const place = [data.postnummer?.nr, data.postnummer?.navn].filter(Boolean).join(" ");
-  const parts = [street, place].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
-}
 
 /**
  * Vehicle detail view ("/vehicle-details/:vehicleId"): plate, model, fuel
@@ -163,9 +134,8 @@ export function VehicleDetailsPage() {
   const [parking, setParking] = useState<string | null>(null);
   /** vehicle_profiles.blocked_at — fetched alongside numberPlate below, non-null once "Bloker køretøj" has been used (see handleBlockVehicle). Drives the "Blokeret" badge next to the "Køretøj:" row. */
   const [blockedAt, setBlockedAt] = useState<string | null>(null);
-  /** Reverse-geocoded address for the vehicle's current GPS position (Nominatim), shown in the full-width row below the map — see the fetch effect below. */
-  const [address, setAddress] = useState<string | null>(null);
-  const [addressLoading, setAddressLoading] = useState(false);
+  /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. */
+  const { address, addressLoading } = useReverseGeocode(position, isAdmin);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 
@@ -180,7 +150,7 @@ export function VehicleDetailsPage() {
     setLock,
     error: lockError,
   } = useVehicleLockState(vehicle?.vehicleId ?? "", bookingContext, isAdmin);
-  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink lygterne" buttons below. */
+  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink" buttons below. */
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
   const { isLocating, locateError, locate } = useLocateVehicle();
 
@@ -294,36 +264,6 @@ export function VehicleDetailsPage() {
       cancelled = true;
     };
   }, [vehicle]);
-
-  /** Reverse-geocodes the vehicle's current GPS position (DAWA — see DawaReverseResponse's own doc comment for why this, not Nominatim) into a human-readable address, for the row below the map. Admin-only and position-gated to match the map itself; keyed on the coordinates rather than `position` so an unrelated re-render of the gpsPositions array doesn't refire it. */
-  useEffect(() => {
-    if (!isAdmin || !position) {
-      setAddress(null);
-      return;
-    }
-
-    let cancelled = false;
-    setAddressLoading(true);
-
-    void fetch(
-      `https://api.dataforsyningen.dk/adgangsadresser/reverse?x=${position.lng}&y=${position.lat}`,
-    )
-      .then((response) => response.json() as Promise<DawaReverseResponse>)
-      .then((data) => {
-        if (cancelled) return;
-        setAddress(formatDawaAddress(data));
-      })
-      .catch(() => {
-        if (!cancelled) setAddress(null);
-      })
-      .finally(() => {
-        if (!cancelled) setAddressLoading(false);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isAdmin, position?.lat, position?.lng]);
 
   if (!vehicle) {
     return vehiclesLoading ? (
@@ -457,13 +397,13 @@ export function VehicleDetailsPage() {
     setShowBlockConfirm(false);
   };
 
-  /** "Blink lygterne": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split), not admin-only. */
+  /** "Blink": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split), not admin-only. */
   const handleLocate = async () => {
     const success = await locate(vehicle.vehicleId);
     if (success) triggerLockConfirmation("located");
   };
 
-  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink lygterne rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
+  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
   const handleHonk = () => {
     triggerLockConfirmation("horn");
   };
@@ -529,26 +469,26 @@ export function VehicleDetailsPage() {
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
                       <span className="text-sm text-brand-800">
                         {vehicle.distanceCovered ? (
-                          `${vehicle.distanceCovered}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
+                          `${formatKilometerstand(vehicle.distanceCovered)}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
                         ) : (
                           <span className="italic">Ingen information</span>
                         )}
                       </span>
                     </div>
                   )}
+                  {/* Drivmiddelniveau (fuel/battery %) is appended onto this same row rather than shown as its own — the two are closely related enough not to need a separate label. */}
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
                     <span className="text-sm text-brand-800">
-                      {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (drivmiddel ?? "—")}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
-                    <span className="text-sm text-brand-800">
-                      {vehicle.autonomyPercentage ? (
-                        `${vehicle.autonomyPercentage}${vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
+                      {numberPlateLoading ? (
+                        <span className="text-brand-500">Indlæser…</span>
                       ) : (
-                        <span className="italic">Ingen information</span>
+                        <>
+                          {drivmiddel ?? "—"}
+                          {vehicle.autonomyPercentage
+                            ? ` ${vehicle.autonomyPercentage}${isAdmin && vehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(vehicle.autonomyPercentageUpdatedAt)})` : ""}`
+                            : ""}
+                        </>
                       )}
                     </span>
                   </div>
@@ -564,7 +504,7 @@ export function VehicleDetailsPage() {
                       </label>
                       <span className="text-sm text-brand-800">
                         {vehicle.status}
-                        {vehicle.onlineUpdatedAt ? ` (opdateret ${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
+                        {vehicle.onlineUpdatedAt ? ` (${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
                       </span>
                     </div>
                   )}
@@ -673,7 +613,7 @@ export function VehicleDetailsPage() {
                     className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <HeadlightIcon />
-                    {isLocating ? "Blinker…" : "Blink lygterne"}
+                    {isLocating ? "Blinker…" : "Blink"}
                   </button>
                   <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>
@@ -700,16 +640,16 @@ export function VehicleDetailsPage() {
                     onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
                     className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
-                    Rediger køretøj
+                    Rediger
                   </button>
-                  {/* Toggles to "Frigiv køretøj" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
+                  {/* Toggles to "Frigiv" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
                   {blockedAt ? (
                     <button
                       type="button"
                       onClick={() => setShowBlockConfirm(true)}
                       className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
-                      Frigiv køretøj
+                      Frigiv
                     </button>
                   ) : (
                     <button
@@ -717,7 +657,7 @@ export function VehicleDetailsPage() {
                       onClick={() => setShowBlockConfirm(true)}
                       className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
-                      Bloker køretøj
+                      Bloker
                     </button>
                   )}
                   {deleteRequestSent ? (
@@ -730,7 +670,7 @@ export function VehicleDetailsPage() {
                       onClick={() => setShowDeleteConfirm(true)}
                       className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
                     >
-                      Slet køretøj
+                      Slet
                     </button>
                   )}
                 </div>
