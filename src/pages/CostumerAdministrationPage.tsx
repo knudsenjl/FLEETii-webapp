@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { CarGlyph } from "../components/CarGlyph";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address fields/contact_person/phone/email until its own fetch-by-id fallback kicked in. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
@@ -75,6 +76,15 @@ export function CostumerAdministrationPage() {
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
+
+            {/* TEMP: CarGlyph evaluation preview — remove before shipping. FLEETii-admin-only page, purely to judge the shape at intended sizes/colors before wiring it into a real table. */}
+            <div className="flex flex-wrap items-center gap-6 rounded-lg border border-dashed border-brand-300 bg-brand-50/60 p-3">
+              <span className="text-[0.7rem] font-medium text-brand-500">CarGlyph-evaluering:</span>
+              <CarGlyph className="h-4 w-6 text-brand-800" title="Køretøj i bevægelse" />
+              <CarGlyph className="h-6 w-9 text-brand-800" title="Køretøj i bevægelse" />
+              <CarGlyph className="h-8 w-12 text-brand-800" title="Køretøj i bevægelse" />
+              <CarGlyph className="h-6 w-9 text-brand-600" title="Køretøj i bevægelse" />
+            </div>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-[0.7rem]">
