@@ -18,7 +18,8 @@ type Department = { department_id: string; name: string | null; address: string 
  * afdelinger" (a regular admin, their own costumer only). No direct-URL
  * fallback — there's no meaningful way to reach this page without already
  * knowing which departments to rename. Missing state redirects back to
- * "/costumer-details".
+ * "/admin" (reachable by both roles that can land on this page, unlike a
+ * FLEETii-admin-only page).
  *
  * Shows one editable "Navn" and "Adresse" text field per department
  * (pre-filled with their current values), and on "Opdater" writes back only
@@ -51,7 +52,7 @@ export function EditDepartmentsPage() {
 
   useEffect(() => {
     if (!costumerId || departments.length === 0) {
-      navigate("/costumer-details", { replace: true });
+      navigate("/admin", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

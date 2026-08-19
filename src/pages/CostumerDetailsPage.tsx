@@ -6,8 +6,9 @@ import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
+import { friendlyCostumerError } from "../lib/costumerErrors";
 
-/** The costumer row, as passed in via router state from CostumerAdministrationPage. Absent when reached via "Opret kunde" — see the KNOWN LIMITATION below. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
+/** The costumer row, as passed in via router state from CostumerAdministrationPage. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
   costumer_id: string;
   name: string | null;
@@ -19,27 +20,46 @@ type Costumer = {
   contact_person: string | null;
   phone: string | null;
   email: string | null;
+  /** Generated column (twohire_client_id/twohire_client_secret both set — see supabase/applied/costumers_add_has_twohire_credentials.sql). Never exposes the raw credential values, only whether they're both present — drives the view-mode "2hire:" summary row. */
+  has_twohire_credentials: boolean | null;
+  /** The RAW client ID (see supabase/applied/costumers_expose_twohire_client_id.sql) — unlike the secret, an OAuth2 client_id is treated as a semi-public identifier, not a secret, so it's readable and shown directly in the edit form's own row rather than behind a boolean. */
+  twohire_client_id: string | null;
+  /** Presence-only companion for the SECRET (see supabase/applied/costumers_add_has_twohire_client_id_and_secret.sql) — the raw value itself stays SELECT-revoked (it's the actual credential), so this is all the edit form's own row can show: whether one is set, never what it is. */
+  has_twohire_client_secret: boolean | null;
 };
 
 /**
- * Costumer view — plain "/costumer-details" (create, matches App.tsx's
- * route with no :costumerId) or "/costumer-details/:costumerId" (edit) —
- * reachable only by role "FLEETii admin" (see ProtectedRoute
- * requireRole="FLEETii admin" in App.tsx). Reads an existing costumer (Navn,
- * plus its departments) when reached with one pre-filled via router state
- * (CostumerAdministrationPage's row click, which skips a round-trip); a
- * direct URL/refresh/bookmark to the :costumerId route (no router state)
- * falls back to fetching it by id instead, redirecting to "/fleetii-admin"
- * if it can't be found. "Rediger kunde" switches it into an editable form in
- * place (in-place rather than a separate page like VehicleDetailsPage/
- * HandleVehiclePage, since costumers only have one editable field). Reached
- * without a costumer (its "Opret kunde" button, or the plain "/costumer-details"
- * route), shows a create form instead — inserting a new costumers row
- * auto-creates its first department (see
- * supabase/applied/departments_default_name_alle_koretojer.sql). Department
- * management itself (create/select/delete) now lives on its own page — see
- * DepartmentDetailsPage.tsx — reached via "Administration af afdelinger"
- * below.
+ * Costumer view — "/costumer-details/:costumerId", reachable only by role
+ * "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in
+ * App.tsx). Reads an existing costumer when reached with one pre-filled via
+ * router state (CostumerAdministrationPage's row click, which skips a
+ * round-trip); a direct URL/refresh/bookmark (no router state) falls back
+ * to fetching it by id instead, redirecting to "/fleetii-admin" if it can't
+ * be found. "Rediger kunde" switches it into an editable form in place
+ * (in-place rather than a separate page like VehicleDetailsPage/
+ * HandleVehiclePage, since costumers only have a handful of editable
+ * fields). Department management itself (create/select/delete) lives on its
+ * own page — see DepartmentDetailsPage.tsx — reached via "Administration af
+ * afdelinger" below.
+ *
+ * This page's job is purely viewing/editing a costumer that ALREADY exists
+ * — creating a new one (including the required "register it on 2hire's own
+ * side, then paste the client ID/secret back in" step) is a separate,
+ * self-contained flow on CostumerNewPage.tsx ("/costumer-new"), reached via
+ * CostumerAdministrationPage's own "Opret kunde" button. Splitting these two
+ * apart keeps this page's own state simple (one costumer, either viewed or
+ * edited) instead of also juggling "which step of a multi-step creation
+ * wizard is this". A costumer whose 2hire registration was interrupted
+ * mid-way (CostumerNewPage abandoned without finishing, or without hitting
+ * its own "Fortryd") still lands here like any other costumer — it shows up
+ * with "Ikke konfigureret" below and CostumerAdministrationPage's own
+ * "Mangler 2hire registrering" badge, and can be finished by simply typing
+ * the two 2hire fields into the ordinary edit form and saving: handleUpdate
+ * below ALSO calls 2hire-subscribe.mts (scoped to just this one costumer)
+ * whenever those two fields are actually typed into, whether that's
+ * finishing an interrupted draft or just rotating an existing costumer's
+ * key — so this page never reintroduces the "credentials saved but nothing
+ * ever subscribes the webhook" gap CostumerNewPage was built to close.
  *
  * Costumer lifecycle (see supabase/applied/costumers_add_deactivated_at.sql /
  * costumer_purge_function.sql, and delete-costumer.mts):
@@ -65,7 +85,7 @@ export function CostumerDetailsPage() {
   const { session } = useAuth();
   const location = useLocation();
   const { costumerId } = useParams<{ costumerId: string }>();
-  const state = location.state as { costumer?: Costumer; startEditing?: boolean } | null;
+  const state = location.state as { costumer?: Costumer } | null;
   const stateCostumer = state?.costumer ?? null;
   // undefined = "haven't fetched yet" (so costumer below falls back to
   // stateCostumer for an instant first paint); null = "fetched, confirmed
@@ -83,23 +103,7 @@ export function CostumerDetailsPage() {
   // before a later schema change, missing fields entirely.
   const costumer = fetchedCostumer !== undefined ? fetchedCostumer : stateCostumer;
 
-  const [name, setName] = useState("");
-  const [cvr, setCvr] = useState("");
-  const [street, setStreet] = useState("");
-  const [postalCity, setPostalCity] = useState("");
-  // Defaults to "Danmark" rather than empty — almost every costumer is
-  // Danish, matching the DB column's own default (see
-  // costumers_address_country_default_denmark.sql) — still a plain
-  // editable field, just pre-filled.
-  const [country, setCountry] = useState("Danmark");
-  const [contactPerson, setContactPerson] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  // Seeded from router state's startEditing flag — handleCreate navigates
-  // here right after "Opret kunde" with that flag set, so the newly created
-  // costumer lands directly in its edit view instead of the plain
-  // Kundedetaljer view.
-  const [isEditing, setIsEditing] = useState(Boolean(state?.startEditing));
+  const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(costumer?.name ?? "");
   const [editCvr, setEditCvr] = useState(costumer?.cvr ?? "");
   const [editStreet, setEditStreet] = useState(costumer?.address_street ?? "");
@@ -108,18 +112,18 @@ export function CostumerDetailsPage() {
   const [editContactPerson, setEditContactPerson] = useState(costumer?.contact_person ?? "");
   const [editPhone, setEditPhone] = useState(costumer?.phone ?? "");
   const [editEmail, setEditEmail] = useState(costumer?.email ?? "");
-  // Write-only from the browser's perspective — costumers.twohire_client_id/
-  // twohire_client_secret lose SELECT for anon/authenticated entirely (see
-  // costumers_add_twohire_credentials.sql), so there's no existing value to
-  // pre-fill these from, and Costumer above doesn't include them at all.
-  // Always starts blank; blank on save means "leave unchanged" (don't
-  // overwrite a real value with null) — same convention as
-  // HandleVehiclePage.tsx's saveOrderField.
+  // Only ever populated by typing — the render logic below (see the 2hire
+  // client ID/secret rows) swaps each field to a locked, read-only display
+  // (the real id / a fixed mask) the moment it's already set, same
+  // treatment as CVR above, so these two only stay wired to an actual
+  // <input> while genuinely empty. handleUpdate's own payload construction
+  // relies on that: a still-blank value here means "nothing was typed,
+  // leave whatever's in the DB alone" (it's either already set — locked, so
+  // there was no input to type into — or still empty and the admin simply
+  // didn't fill it in this time).
   const [editTwoHireClientId, setEditTwoHireClientId] = useState("");
   const [editTwoHireClientSecret, setEditTwoHireClientSecret] = useState("");
-  const [pendingAction, setPendingAction] = useState<
-    "create" | "update" | "delete" | "close" | "deactivate" | "reactivate" | null
-  >(null);
+  const [pendingAction, setPendingAction] = useState<"update" | "delete" | "deactivate" | "reactivate" | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   // Local copy of costumer.deactivated_at, updated after a successful
@@ -133,18 +137,16 @@ export function CostumerDetailsPage() {
   // (reversible), so a plain Ja/Fortryd dialog isn't enough friction.
   const [purgeConfirmText, setPurgeConfirmText] = useState("");
 
-  const canSubmit =
-    name.trim().length > 0 &&
-    cvr.trim().length > 0 &&
-    street.trim().length > 0 &&
-    postalCity.trim().length > 0 &&
-    country.trim().length > 0 &&
-    contactPerson.trim().length > 0 &&
-    phone.trim().length > 0 &&
-    email.trim().length > 0;
-  const canSubmitEdit = editName.trim().length > 0;
+  const canSubmitEdit =
+    editName.trim().length > 0 &&
+    editStreet.trim().length > 0 &&
+    editPostalCity.trim().length > 0 &&
+    editCountry.trim().length > 0 &&
+    editContactPerson.trim().length > 0 &&
+    editPhone.trim().length > 0 &&
+    editEmail.trim().length > 0;
 
-  /** Always (re)fetches the costumer by id when one is present — even when router state already has one, since that state can be stale (see costumer's own comment above). stateCostumer still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. */
+  /** Always (re)fetches the costumer by id — even when router state already has one, since that state can be stale (see costumer's own comment above). stateCostumer still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. */
   useEffect(() => {
     if (!costumerId) return;
 
@@ -153,7 +155,7 @@ export function CostumerDetailsPage() {
     void supabase
       .from("costumers")
       .select(
-        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email",
+        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email, has_twohire_credentials, twohire_client_id, has_twohire_client_secret",
       )
       .eq("costumer_id", costumerId)
       .maybeSingle<Costumer>()
@@ -186,61 +188,36 @@ export function CostumerDetailsPage() {
     setEditEmail(costumer.email ?? "");
   }, [costumer]);
 
-  // Redirects back to the FLEETii-admin costumer list if a SPECIFIC costumer
-  // was requested (a :costumerId in the URL) but couldn't be loaded —
-  // mirrors BookingDetailsPage/VehicleDetailsPage/UserDetailsPage's same
-  // redirect-on-missing-data pattern. Never fires for the plain
-  // "/costumer-details" create route, which has no costumerId at all.
+  // Redirects back to the FLEETii-admin costumer list if the requested
+  // costumer couldn't be loaded — mirrors BookingDetailsPage/
+  // VehicleDetailsPage/UserDetailsPage's same redirect-on-missing-data
+  // pattern.
   useEffect(() => {
     if (costumerId && !costumer && !costumerLoading) {
       navigate("/fleetii-admin", { replace: true });
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
 
-  /** Inserts the new costumer row, then redirects straight into its own edit view (replace, with the fresh row already in router state) so "Administration af afdelinger" is immediately reachable — there's no trigger seeding a first department anymore (costumers_create_default_department was dropped in remove_alle_koretojer.sql), so a brand-new costumer genuinely starts with zero departments until an admin adds one there. */
-  const handleCreate = async () => {
-    setIsSubmitting(true);
-    setSubmitError(null);
-
-    // .select().single() so the newly created row (including its
-    // costumer_id) comes straight back — needed to navigate onward into
-    // its edit view without a redundant fetch.
-    const { data, error } = await supabase
-      .from("costumers")
-      .insert({
-        name: name.trim(),
-        cvr: cvr.trim() || null,
-        address_street: street.trim() || null,
-        address_postal_city: postalCity.trim() || null,
-        address_country: country.trim() || null,
-        contact_person: contactPerson.trim() || null,
-        phone: phone.trim() || null,
-        email: email.trim() || null,
-      })
-      .select(
-        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email",
-      )
-      .single<Costumer>();
-
-    if (error || !data) {
-      setSubmitError(error?.message ?? "Kunne ikke oprette kunden.");
-      setIsSubmitting(false);
-      return;
-    }
-
-    setIsSubmitting(false);
-    setPendingAction(null);
-    navigate(`/costumer-details/${data.costumer_id}`, {
-      replace: true,
-      state: { costumer: data, startEditing: true },
-    });
-  };
-
+  /**
+   * Saves the edit form. If the 2hire client ID/secret fields were actually
+   * typed into (as opposed to left blank, which means "leave unchanged" —
+   * see their own comment above), this ALSO calls 2hire-subscribe.mts
+   * (scoped to just this one costumer) right after the save succeeds, so
+   * setting/rotating a costumer's 2hire credentials here never leaves them
+   * saved-but-not-subscribed — see this page's own doc comment for why that
+   * matters even though the main creation-time registration flow now lives
+   * on CostumerNewPage.tsx. A failed subscribe leaves the typed field
+   * values and pendingAction untouched (ConfirmDialog stays open showing
+   * the error) so pressing "Opdater kunde" again is an obvious, safe-
+   * looking retry — the Supabase update itself already succeeded by then.
+   */
   const handleUpdate = async () => {
     if (!costumer) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
+
+    const twoHireFieldsTyped = Boolean(editTwoHireClientId.trim() || editTwoHireClientSecret.trim());
 
     const { error } = await supabase
       .from("costumers")
@@ -261,9 +238,37 @@ export function CostumerDetailsPage() {
       .eq("costumer_id", costumer.costumer_id);
 
     if (error) {
-      setSubmitError(error.message);
+      setSubmitError(friendlyCostumerError(error, "Kunne ikke opdatere kunden."));
       setIsSubmitting(false);
       return;
+    }
+
+    if (twoHireFieldsTyped) {
+      try {
+        const response = await fetch("/.netlify/functions/2hire-subscribe", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ costumerId: costumer.costumer_id }),
+        });
+
+        const result = (await response.json()) as { error?: string };
+        if (!response.ok) {
+          setSubmitError(
+            result.error ?? "2hire-oplysningerne blev gemt, men registrering hos 2hire mislykkedes. Prøv at gemme igen.",
+          );
+          setIsSubmitting(false);
+          return;
+        }
+      } catch {
+        setSubmitError(
+          "2hire-oplysningerne blev gemt, men kunne ikke kontakte serveren for at fuldføre 2hire-registreringen. Prøv at gemme igen.",
+        );
+        setIsSubmitting(false);
+        return;
+      }
     }
 
     setIsSubmitting(false);
@@ -364,37 +369,30 @@ export function CostumerDetailsPage() {
   };
 
   const handleConfirm = async () => {
-    if (pendingAction === "close") {
-      navigate("/fleetii-admin");
-      return;
-    }
     if (pendingAction === "update") {
       await handleUpdate();
-      return;
-    }
-    if (pendingAction === "delete") {
+    } else if (pendingAction === "delete") {
       await handleDelete();
-      return;
-    }
-    if (pendingAction === "deactivate") {
+    } else if (pendingAction === "deactivate") {
       await handleDeactivate();
-      return;
-    }
-    if (pendingAction === "reactivate") {
+    } else if (pendingAction === "reactivate") {
       await handleReactivate();
-      return;
     }
-    await handleCreate();
   };
 
-  // Only while a SPECIFIC costumer is being fetched by id (:costumerId
-  // present, no router state yet) — without this guard, the form would
-  // flash as "Opret kunde" (create mode) for a moment before the fetch resolves
-  // and `costumer` becomes non-null.
+  // While the costumer is still being fetched by id (:costumerId present,
+  // no router state yet) — without this guard, the JSX below would try to
+  // read costumer.* before it exists.
   if (costumerId && !costumer && costumerLoading) {
     return (
       <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser kunde…</div>
     );
+  }
+  // costumerId present but the fetch confirmed it's gone — the redirect
+  // effect above is about to navigate away; render nothing in the meantime
+  // rather than crash on a null costumer.
+  if (!costumer) {
+    return null;
   }
 
   return (
@@ -414,371 +412,59 @@ export function CostumerDetailsPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">
-              {costumer ? (isEditing ? "Rediger kunde" : "Kundedetaljer") : "Opret kunde"}
-            </h2>
+            <h2 className="text-xl font-semibold text-brand-800">{isEditing ? "Rediger kunde" : "Kundedetaljer"}</h2>
 
-            {costumer ? (
-              isEditing ? (
-                <>
-                  <div className="overflow-hidden rounded-2xl border border-brand-100">
-                    <div className="divide-y divide-brand-100 bg-white">
-                      <RequiredFieldRow label="Navn:" value={editName} onChange={setEditName} />
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
-                        <input
-                          type="text"
-                          value={editCvr}
-                          onChange={(e) => setEditCvr(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
-                        <input
-                          type="text"
-                          value={editStreet}
-                          onChange={(e) => setEditStreet(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
-                        <input
-                          type="text"
-                          value={editPostalCity}
-                          onChange={(e) => setEditPostalCity(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
-                        <input
-                          type="text"
-                          value={editCountry}
-                          onChange={(e) => setEditCountry(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
-                        <input
-                          type="text"
-                          value={editContactPerson}
-                          onChange={(e) => setEditContactPerson(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
-                        <input
-                          type="tel"
-                          value={editPhone}
-                          onChange={(e) => setEditPhone(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
-                        <input
-                          type="email"
-                          value={editEmail}
-                          onChange={(e) => setEditEmail(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">
-                          2hire client ID:
-                        </label>
+            {isEditing ? (
+              <>
+                <div className="overflow-hidden rounded-2xl border border-brand-100">
+                  <div className="divide-y divide-brand-100 bg-white">
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                      {/* Locked — CVR is the unique Danish company registration number and shouldn't change after the fact (see costumers_cvr_unique.sql). Read-only here, unlike every other field in this form. Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left. */}
+                      <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
+                        {editCvr || "—"}
+                      </span>
+                    </div>
+                    <RequiredFieldRow label="Navn:" value={editName} onChange={setEditName} />
+                    <RequiredFieldRow label="Vej og husnr.:" value={editStreet} onChange={setEditStreet} />
+                    <RequiredFieldRow label="Postnr. og by:" value={editPostalCity} onChange={setEditPostalCity} />
+                    <RequiredFieldRow label="Land:" value={editCountry} onChange={setEditCountry} />
+                    <RequiredFieldRow label="Kontaktperson:" value={editContactPerson} onChange={setEditContactPerson} />
+                    <RequiredFieldRow label="Tlf:" value={editPhone} onChange={setEditPhone} type="tel" />
+                    <RequiredFieldRow label="E-mail:" value={editEmail} onChange={setEditEmail} type="email" />
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">2hire client ID:</label>
+                      {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, see costumers_expose_twohire_client_id.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. */}
+                      {costumer.twohire_client_id ? (
+                        <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
+                          {costumer.twohire_client_id}
+                        </span>
+                      ) : (
                         <input
                           type="text"
                           value={editTwoHireClientId}
                           onChange={(e) => setEditTwoHireClientId(e.target.value)}
-                          placeholder="Udfyldt — lad stå tom for at bevare"
+                          placeholder="Indtast 2hire Client ID her"
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">
-                          2hire client secret:
-                        </label>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">2hire client secret:</label>
+                      {/* Never the raw secret — a fixed mask once set, same locked treatment as the ID row above. Only editable while genuinely empty. */}
+                      {costumer.has_twohire_client_secret ? (
+                        <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
+                          **********
+                        </span>
+                      ) : (
                         <input
                           type="password"
                           value={editTwoHireClientSecret}
                           onChange={(e) => setEditTwoHireClientSecret(e.target.value)}
-                          placeholder="Udfyldt — lad stå tom for at bevare"
+                          placeholder="Indtast 2hire Client Secret her"
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
-                      </div>
-                    </div>
-                  </div>
-
-                  <p className="text-right text-xs text-brand-500">
-                    <span className="text-red-600">*</span> Feltet skal udfyldes
-                  </p>
-
-                  {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setPendingAction("update")}
-                      disabled={!canSubmitEdit}
-                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      Opdater kunde
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditName(costumer.name ?? "");
-                        setEditCvr(costumer.cvr ?? "");
-                        setEditStreet(costumer.address_street ?? "");
-                        setEditPostalCity(costumer.address_postal_city ?? "");
-                        setEditCountry(costumer.address_country ?? "");
-                        setEditContactPerson(costumer.contact_person ?? "");
-                        setEditPhone(costumer.phone ?? "");
-                        setEditEmail(costumer.email ?? "");
-                        setEditTwoHireClientId("");
-                        setEditTwoHireClientSecret("");
-                        setIsEditing(false);
-                      }}
-                      className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                    >
-                      Fortryd
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="overflow-hidden rounded-2xl border border-brand-100">
-                    <div className="divide-y divide-brand-100 bg-white">
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Navn:</label>
-                        <span className="text-sm text-brand-800">{costumer.name ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
-                        <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
-                        <span className="text-sm text-brand-800">{costumer.address_street ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
-                        <span className="text-sm text-brand-800">{costumer.address_postal_city ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
-                        <span className="text-sm text-brand-800">{costumer.address_country ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
-                        <span className="text-sm text-brand-800">{costumer.contact_person ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
-                        <span className="text-sm text-brand-800">{costumer.phone ?? "—"}</span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
-                        <span className="text-sm text-brand-800">{costumer.email ?? "—"}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {deactivatedAt && (
-                    <p className="text-sm font-medium text-red-600">
-                      Kundens adgang er blokeret — alle brugere er låst ude.
-                    </p>
-                  )}
-
-                  {submitError && <p className="text-sm text-red-600">{submitError}</p>}
-
-                  <div className="grid grid-cols-2 gap-3">
-                    {deactivatedAt ? (
-                      <>
-                        {/* Rediger kunde is intentionally hidden while access
-                            is blocked — only two actions are meaningful for a
-                            blocked costumer: restore access, or purge it for
-                            good. */}
-                        <button
-                          type="button"
-                          onClick={() => setPendingAction("reactivate")}
-                          className="col-span-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                        >
-                          Genetabler kundens adgang
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPurgeConfirmText("");
-                            setPendingAction("delete");
-                          }}
-                          className="col-span-2 rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
-                        >
-                          Slet kunden permanent
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditName(costumer.name ?? "");
-                            setEditCvr(costumer.cvr ?? "");
-                            setEditStreet(costumer.address_street ?? "");
-                            setEditPostalCity(costumer.address_postal_city ?? "");
-                            setEditCountry(costumer.address_country ?? "");
-                            setEditContactPerson(costumer.contact_person ?? "");
-                            setEditPhone(costumer.phone ?? "");
-                            setEditEmail(costumer.email ?? "");
-                            setEditTwoHireClientId("");
-                            setEditTwoHireClientSecret("");
-                            setIsEditing(true);
-                          }}
-                          className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                        >
-                          Rediger kunde
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPendingAction("deactivate")}
-                          className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
-                        >
-                          Bloker kundens adgang
-                        </button>
-                      </>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate("/fleet-table", {
-                            state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                          })
-                        }
-                        className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                      >
-                        Administration af køretøjer
-                      </button>
-                    </div>
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigate("/department-details", {
-                            state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                          })
-                        }
-                        className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
-                      >
-                        Administration af afdelinger
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )
-            ) : (
-              <>
-                <div className="overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
-                    <RequiredFieldRow label="Navn:" value={name} onChange={setName} />
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        CVR. <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        aria-required="true"
-                        value={cvr}
-                        onChange={(e) => setCvr(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Vej og husnr.: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        aria-required="true"
-                        value={street}
-                        onChange={(e) => setStreet(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Postnr. og by: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        aria-required="true"
-                        value={postalCity}
-                        onChange={(e) => setPostalCity(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Land: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        aria-required="true"
-                        value={country}
-                        onChange={(e) => setCountry(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Kontaktperson: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        aria-required="true"
-                        value={contactPerson}
-                        onChange={(e) => setContactPerson(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Tlf: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="tel"
-                        required
-                        aria-required="true"
-                        value={phone}
-                        onChange={(e) => setPhone(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        E-mail: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <input
-                        type="email"
-                        required
-                        aria-required="true"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
+                      )}
                     </div>
                   </div>
                 </div>
@@ -792,19 +478,174 @@ export function CostumerDetailsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
-                    onClick={() => setPendingAction("create")}
-                    disabled={!canSubmit}
+                    onClick={() => setPendingAction("update")}
+                    disabled={!canSubmitEdit}
                     className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    Opret kunde
+                    Opdater kunde
                   </button>
                   <button
                     type="button"
-                    onClick={() => setPendingAction("close")}
+                    onClick={() => {
+                      setEditName(costumer.name ?? "");
+                      setEditCvr(costumer.cvr ?? "");
+                      setEditStreet(costumer.address_street ?? "");
+                      setEditPostalCity(costumer.address_postal_city ?? "");
+                      setEditCountry(costumer.address_country ?? "");
+                      setEditContactPerson(costumer.contact_person ?? "");
+                      setEditPhone(costumer.phone ?? "");
+                      setEditEmail(costumer.email ?? "");
+                      setEditTwoHireClientId("");
+                      setEditTwoHireClientSecret("");
+                      setIsEditing(false);
+                    }}
                     className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
                   >
                     Fortryd
                   </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="overflow-hidden rounded-2xl border border-brand-100">
+                  <div className="divide-y divide-brand-100 bg-white">
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                      <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Navn:</label>
+                      <span className="text-sm text-brand-800">{costumer.name ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
+                      <span className="text-sm text-brand-800">{costumer.address_street ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
+                      <span className="text-sm text-brand-800">{costumer.address_postal_city ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
+                      <span className="text-sm text-brand-800">{costumer.address_country ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
+                      <span className="text-sm text-brand-800">{costumer.contact_person ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
+                      <span className="text-sm text-brand-800">{costumer.phone ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
+                      <span className="text-sm text-brand-800">{costumer.email ?? "—"}</span>
+                    </div>
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">2hire:</label>
+                      <span className="text-sm text-brand-800">
+                        {costumer.has_twohire_credentials ? (
+                          <span className="font-semibold text-green-700">Konfigureret</span>
+                        ) : (
+                          <span className="font-semibold text-amber-700">Ikke konfigureret</span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {deactivatedAt && (
+                  <p className="text-sm font-medium text-red-600">
+                    Kundens adgang er blokeret — alle brugere er låst ude.
+                  </p>
+                )}
+
+                {submitError && <p className="text-sm text-red-600">{submitError}</p>}
+
+                <div className="grid grid-cols-2 gap-3">
+                  {deactivatedAt ? (
+                    <>
+                      {/* Rediger kunde is intentionally hidden while access
+                          is blocked — only two actions are meaningful for a
+                          blocked costumer: restore access, or purge it for
+                          good. */}
+                      <button
+                        type="button"
+                        onClick={() => setPendingAction("reactivate")}
+                        className="col-span-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      >
+                        Genetabler kundens adgang
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPurgeConfirmText("");
+                          setPendingAction("delete");
+                        }}
+                        className="col-span-2 rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      >
+                        Slet kunden permanent
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditName(costumer.name ?? "");
+                          setEditCvr(costumer.cvr ?? "");
+                          setEditStreet(costumer.address_street ?? "");
+                          setEditPostalCity(costumer.address_postal_city ?? "");
+                          setEditCountry(costumer.address_country ?? "");
+                          setEditContactPerson(costumer.contact_person ?? "");
+                          setEditPhone(costumer.phone ?? "");
+                          setEditEmail(costumer.email ?? "");
+                          setEditTwoHireClientId("");
+                          setEditTwoHireClientSecret("");
+                          setIsEditing(true);
+                        }}
+                        className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      >
+                        Rediger kunde
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPendingAction("deactivate")}
+                        className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      >
+                        Bloker kundens adgang
+                      </button>
+                    </>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate("/fleet-table", {
+                          state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                        })
+                      }
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Administration af køretøjer
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate("/department-details", {
+                          state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                        })
+                      }
+                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    >
+                      Administration af afdelinger
+                    </button>
+                  </div>
                 </div>
               </>
             )}
@@ -815,42 +656,35 @@ export function CostumerDetailsPage() {
       {pendingAction && (
         <ConfirmDialog
           message={
-            pendingAction === "create"
-              ? "Er du sikker på, at du vil oprette denne kunde?"
-              : pendingAction === "update"
-                ? "Er du sikker på, at du vil opdatere denne kunde?"
-                : pendingAction === "delete"
-                  ? (
-                      <>
-                        <p>
-                          Dette sletter PERMANENT al data for "{costumer?.name ?? "denne kunde"}" — bookinger,
-                          køretøjer, indstillinger og brugerkonti. Kan ikke fortrydes.
-                        </p>
-                        <p className="mt-2">
-                          Skriv kundens navn for at bekræfte:
-                        </p>
-                        <input
-                          type="text"
-                          value={purgeConfirmText}
-                          onChange={(e) => setPurgeConfirmText(e.target.value)}
-                          placeholder={costumer?.name ?? ""}
-                          className="mt-1.5 w-full rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-1.5 text-sm text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
-                        />
-                      </>
-                    )
-                  : pendingAction === "deactivate"
-                    ? "Er du sikker på, at du vil blokere kundens adgang? Alle brugere under kunden bliver låst ude med det samme."
-                    : pendingAction === "reactivate"
-                      ? "Er du sikker på, at du vil genetablere kundens adgang? Alle brugere under kunden får adgang igen."
-                      : "Er du sikker på, at du vil lukke uden at gemme?"
+            pendingAction === "update"
+              ? "Er du sikker på, at du vil opdatere denne kunde?"
+              : pendingAction === "delete"
+                ? (
+                    <>
+                      <p>
+                        Dette sletter PERMANENT al data for "{costumer.name ?? "denne kunde"}" — bookinger,
+                        køretøjer, indstillinger og brugerkonti. Kan ikke fortrydes.
+                      </p>
+                      <p className="mt-2">Skriv kundens navn for at bekræfte:</p>
+                      <input
+                        type="text"
+                        value={purgeConfirmText}
+                        onChange={(e) => setPurgeConfirmText(e.target.value)}
+                        placeholder={costumer.name ?? ""}
+                        className="mt-1.5 w-full rounded-lg border border-brand-200 bg-brand-50/50 px-3 py-1.5 text-sm text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                      />
+                    </>
+                  )
+                : pendingAction === "deactivate"
+                  ? "Er du sikker på, at du vil blokere kundens adgang? Alle brugere under kunden bliver låst ude med det samme."
+                  : "Er du sikker på, at du vil genetablere kundens adgang? Alle brugere under kunden får adgang igen."
           }
           error={submitError}
           onCancel={() => setPendingAction(null)}
           onConfirm={() => void handleConfirm()}
           isPending={isSubmitting}
           confirmDisabled={
-            pendingAction === "delete" &&
-            (!costumer?.name?.trim() || purgeConfirmText.trim() !== costumer.name.trim())
+            pendingAction === "delete" && (!costumer.name?.trim() || purgeConfirmText.trim() !== costumer.name.trim())
           }
           confirmPendingLabel={
             pendingAction === "delete"

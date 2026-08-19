@@ -24,6 +24,8 @@ type Costumer = {
   contact_person: string | null;
   phone: string | null;
   email: string | null;
+  /** Generated column (twohire_client_id/twohire_client_secret both set — see supabase/applied/costumers_add_has_twohire_credentials.sql). Never exposes the raw credential values, only whether they're both present — drives the "Mangler 2hire registrering" badge below. */
+  has_twohire_credentials: boolean | null;
 };
 
 /** FLEETii admin's costumer list. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
@@ -41,7 +43,9 @@ export function CostumerAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("costumers")
-        .select("costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email")
+        .select(
+          "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email, has_twohire_credentials",
+        )
         .order("name", { ascending: true })
         .returns<Costumer[]>();
 
@@ -134,12 +138,21 @@ export function CostumerAdministrationPage() {
                           }`}
                         >
                           <td className="whitespace-nowrap px-2 py-0.5 font-medium">
-                            {costumer.name ?? "—"}
-                            {costumer.deactivated_at && (
-                              <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                Adgang blokeret
-                              </span>
-                            )}
+                            <div className="flex items-center justify-between gap-2">
+                              <span>{costumer.name ?? "—"}</span>
+                              <div className="flex shrink-0 items-center gap-2">
+                                {costumer.deactivated_at && (
+                                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                    Adgang blokeret
+                                  </span>
+                                )}
+                                {!costumer.has_twohire_credentials && (
+                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
+                                    Mangler 2hire registrering
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -150,7 +163,7 @@ export function CostumerAdministrationPage() {
 
             <button
               type="button"
-              onClick={() => navigate("/costumer-details")}
+              onClick={() => navigate("/costumer-new")}
               className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Opret kunde

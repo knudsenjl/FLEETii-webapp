@@ -1,0 +1,12 @@
+-- Re-exposes the RAW twohire_client_id (not just its has_twohire_client_id
+-- presence boolean) to anon/authenticated -- an OAuth2 client_id is
+-- ordinarily treated as a semi-public identifier, not a secret (unlike
+-- client_secret, which stays SELECT-revoked -- see
+-- costumers_add_twohire_credentials.sql and its own reasoning). Lets
+-- CostumerDetailsPage.tsx's edit form show the actual configured client ID
+-- next to that field, the same way every other non-secret costumer column
+-- (name, cvr, address, ...) is already readable by any authenticated user
+-- via the existing wide-open costumers_select_authenticated RLS policy --
+-- this is a straightforward extension of that same precedent, not a new
+-- exposure category.
+grant select (twohire_client_id) on public.costumers to anon, authenticated;
