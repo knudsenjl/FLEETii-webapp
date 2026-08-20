@@ -68,9 +68,10 @@ flowchart LR
     `VITE_DATA_SOURCE` env var (`mockup-data` / `2hire-test-adaptor` /
     `2hire-production-adaptor`) — the one setting that decides which
     environment both the client *and* the Netlify Functions treat as "real".
-- **Pages** (`src/pages/`, ~30 files) are the routed screens; **components**
-  (`src/components/`) are shared building blocks (`PageHeader`, popups,
-  glyphs, etc.); **hooks** (`src/hooks/`) wrap small pieces of reusable
+- **Pages** (`src/pages/`, ~30 files) are the routed screens;
+  **components**  (`src/components/`) are shared building blocks (`PageHeader`, popups,
+  glyphs, etc.);
+  **hooks** (`src/hooks/`) wrap small pieces of reusable
   stateful logic (lock state, idle-flag popups, ident-column settings).
 - **`src/lib/bookings.ts`** deliberately compares reservation timestamps as
   raw ISO string prefixes rather than parsing them into `Date` objects — see
@@ -137,13 +138,21 @@ fuel/battery level, trip state. Three separate hosts, picked by
 | `e2e.adapter.2hire.io` | Device creation + trip simulation for local/test tooling only (`e2e-*` helpers in `twoHireClient.ts`) |
 | `adapter.2hire.io` | The real production fleet — only reachable when `VITE_DATA_SOURCE=2hire-production-adaptor` |
 
-**Per-costumer credentials**: in production, each costumer can have its own
-2hire sub-account (`costumers.twohire_client_id`/`twohire_client_secret`,
-service-role-only columns). `resolveTwoHireCredentials()` decides which
-credential set an operation uses: the global/FLEETii credential in test mode
-or for a FLEETii-admin-initiated action, otherwise the *target* costumer's
-own sub-account credential, always resolved server-side from the actual
-vehicle/order being acted on — never trusted from the client.
+**Per-costumer credentials**: each costumer can have its own 2hire
+sub-account (`costumers.twohire_client_id`, readable; `twohire_client_secret`,
+service-role-only). `resolveTwoHireCredentials()` decides which credential
+set an operation uses, always resolved server-side from the actual
+vehicle/order being acted on — never trusted from the client: a
+FLEETii-admin-initiated action always uses the global `TWOHIRE_CLIENT_ID`/
+`SECRET` credential, in every environment ("one master account that can
+reach every sub-account too"); otherwise the *target* costumer's own
+sub-account credential is used whenever it's actually configured, in every
+environment too — this is deliberate, since it's what lets a staging
+costumer's own columns be pointed at the test adapter's credential to
+exercise this path before touching production. Only when nothing's
+configured does it fall back to the global credential — and in production
+specifically, that "nothing configured" case is a hard error instead, so a
+real costumer can never silently borrow the master credential.
 
 2hire delivers webhook events (`2hire-webhook.mts`), HMAC-signed with
 `TWOHIRE_WEBHOOK_SECRET`. That secret is captured by 2hire at
