@@ -1,10 +1,15 @@
 // Netlify Function: public webhook callback for 2hire's generic vehicle
-// signals (online, position, distance_covered, autonomy_percentage),
-// subscribed to via 2hire-subscribe.mts. Persists the latest value of each
-// signal into the `vehicle_signals` Supabase table (service-role write —
-// there is no SQL INSERT/UPDATE policy for this table, see
-// supabase/vehicle_signals_table.sql), which liveVehicleDataSource.ts then
-// reads (RLS-gated, authenticated users only) to serve VehicleGPS2Hire data.
+// signals, subscribed to via 2hire-subscribe.mts. Every delivery — known or
+// not — is recorded into `vehicle_signal_history` (append-only, service-
+// role write, see vehicle_signal_history_table.sql), so nothing 2hire sends
+// is ever silently lost. On top of that, the four signals this app actually
+// tracks live (online, position, distance_covered, autonomy_percentage)
+// ALSO update the `vehicle_signals` "current state" table (service-role
+// write — there is no SQL INSERT/UPDATE policy for this table, see
+// vehicle_signals_table.sql), which liveVehicleDataSource.ts then reads
+// (RLS-gated, authenticated users only) to serve VehicleGPS2Hire data. These
+// two writes are deliberately independent: an unrecognized signal still
+// gets a history row even though it has no live-state column to update yet.
 //
 // Docs: https://developer.2hire.io/docs/receiving-signals
 import { createClient } from "@supabase/supabase-js";
@@ -15,7 +20,7 @@ const TOPIC_PATTERN = /^vehicle:([^:]+):generic:([a-z_]+)$/;
 type SignalPayload = { timestamp: number; data: Record<string, unknown> };
 type WebhookBody = { topic: string; payload: SignalPayload };
 
-/** Maps one recognized 2hire generic signal to the `vehicle_signals` columns it updates. Unrecognized signals return null (ignored, not an error — the wildcard subscription may deliver signals we don't track). */
+/** Maps one recognized 2hire generic signal to the `vehicle_signals` columns it updates. Unrecognized signals return null — that's fine for LIVE state (nothing in the UI has anywhere to show it yet), but it's still recorded into vehicle_signal_history regardless, see the handler below. */
 function toColumnUpdate(
   signal: string,
   payload: SignalPayload,
@@ -85,24 +90,42 @@ export default async (req: Request) => {
   const topicMatch = TOPIC_PATTERN.exec(body.topic);
   if (!topicMatch) {
     // Not a shape we recognize (e.g. a "specific" signal) — acknowledge so
-    // 2hire doesn't retry, but do nothing with it.
+    // 2hire doesn't retry, but do nothing with it. Unlike an unrecognized
+    // GENERIC signal below, there's no vehicle_id/signal name to record
+    // here at all, so there's nothing meaningful to put in the history
+    // table either.
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   const [, vehicleId, signal] = topicMatch;
-  const columnUpdate = toColumnUpdate(signal, body.payload);
-  if (!columnUpdate) {
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
-  }
 
   const admin = createClient(supabaseUrl, serviceRoleKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  const { error } = await admin.from("vehicle_signals").upsert({ vehicle_id: vehicleId, ...columnUpdate });
-  if (error) {
-    console.error("[2hire-webhook] failed to persist signal:", error);
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+  // Every generic signal gets a history row — known or not, see this
+  // file's own header comment and vehicle_signal_history_table.sql.
+  const { error: historyError } = await admin.from("vehicle_signal_history").insert({
+    vehicle_id: vehicleId,
+    signal_type: signal,
+    signal_value: body.payload.data,
+    signal_timestamp: new Date(body.payload.timestamp).toISOString(),
+  });
+  if (historyError) {
+    console.error("[2hire-webhook] failed to record signal history:", historyError);
+    return new Response(JSON.stringify({ error: historyError.message }), { status: 500 });
+  }
+
+  // Only the signals this app actually tracks live update vehicle_signals —
+  // an unrecognized one is already preserved in the history insert above,
+  // so there's nothing lost by leaving it out of "current state" here.
+  const columnUpdate = toColumnUpdate(signal, body.payload);
+  if (columnUpdate) {
+    const { error } = await admin.from("vehicle_signals").upsert({ vehicle_id: vehicleId, ...columnUpdate });
+    if (error) {
+      console.error("[2hire-webhook] failed to persist signal:", error);
+      return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    }
   }
 
   return new Response(JSON.stringify({ ok: true }), {
