@@ -21,6 +21,7 @@ import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { CostumerAdministrationPage } from "./pages/CostumerAdministrationPage";
 import { InstallationAdministrationPage } from "./pages/InstallationAdministrationPage";
 import { CostumerDetailsPage } from "./pages/CostumerDetailsPage";
+import { CostumerNewPage } from "./pages/CostumerNewPage";
 import { DepartmentDetailsPage } from "./pages/DepartmentDetailsPage";
 import { EditDepartmentsPage } from "./pages/EditDepartmentsPage";
 import { DepartmentPage } from "./pages/DepartmentPage";
@@ -190,10 +191,10 @@ function App() {
             }
           />
           <Route
-            path="/costumer-details"
+            path="/costumer-new"
             element={
               <ProtectedRoute requireRole="FLEETii admin">
-                <CostumerDetailsPage />
+                <CostumerNewPage />
               </ProtectedRoute>
             }
           />

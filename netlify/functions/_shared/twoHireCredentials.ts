@@ -7,17 +7,24 @@
 // dependency at all.
 //
 // The rule, in order:
-//   1. Test mode (VITE_DATA_SOURCE !== "2hire-production-adaptor") — always
-//      the global credential, for EVERY costumer and FLEETii admin alike.
-//      Nothing below this point ever runs outside production.
-//   2. A FLEETii-admin-initiated operation — always the global credential,
-//      regardless of which costumer's vehicle is being touched (2hire's own
-//      "best practice" pattern: one master account whose credential can
-//      reach every sub-account too).
-//   3. Everyone else — the TARGET costumer's own sub-account credential,
-//      read fresh from costumers.twohire_client_id/twohire_client_secret.
-//      Never trust a client-supplied client_id/secret; this always goes
-//      through a service-role query.
+//   1. A FLEETii-admin-initiated operation — always the global credential,
+//      in EVERY environment, regardless of which costumer's vehicle is
+//      being touched (2hire's own "best practice" pattern: one master
+//      account whose credential can reach every sub-account too).
+//   2. The TARGET costumer's own sub-account credential — used whenever
+//      it's actually configured (both costumers.twohire_client_id AND
+//      twohire_client_secret set), in EVERY environment, not just
+//      production. This is deliberate: pointing a staging costumer's own
+//      columns at the test adapter's credential is what makes this whole
+//      per-costumer path testable before touching production at all —
+//      previously test mode short-circuited to the global credential
+//      unconditionally and never even queried these columns, so there was
+//      no way to exercise this branch outside production.
+//   3. Not configured — in production, a hard error (a real costumer must
+//      never silently borrow the master/global credential just because
+//      nobody's set theirs up yet). In every other environment, falls back
+//      to the global credential instead, same as every costumer nobody has
+//      bothered to configure test credentials for has always behaved.
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getGlobalCredentials, type TwoHireCredentials } from "./twoHireClient.js";
 
@@ -33,36 +40,41 @@ function isProductionMode(): boolean {
  * always be resolved from the actual vehicle/order being acted on, not
  * assumed from the caller's profile — see each calling Function's own
  * comment for how it resolves this). `admin` must be a service-role client
- * (RLS on costumers already restricts SELECT of these two columns to no
- * client-side role at all — see costumers_add_twohire_credentials.sql — so
- * only a service-role query can read them regardless).
+ * (RLS on costumers already restricts SELECT of twohire_client_secret to no
+ * client-side role at all — see costumers_add_twohire_credentials.sql —
+ * twohire_client_id is separately readable, see
+ * costumers_expose_twohire_client_id.sql, but this always goes through a
+ * service-role query regardless so both columns come back in one round trip).
  */
 export async function resolveTwoHireCredentials(
   admin: SupabaseClient,
   opts: { isFleetiiAdmin: boolean; costumerId: string | null },
 ): Promise<TwoHireCredentials> {
-  if (!isProductionMode() || opts.isFleetiiAdmin) {
+  if (opts.isFleetiiAdmin) {
     return getGlobalCredentials();
   }
 
-  if (!opts.costumerId) {
+  if (opts.costumerId) {
+    const { data, error } = await admin
+      .from("costumers")
+      .select("name, twohire_client_id, twohire_client_secret")
+      .eq("costumer_id", opts.costumerId)
+      .maybeSingle<{ name: string | null; twohire_client_id: string | null; twohire_client_secret: string | null }>();
+
+    if (error) {
+      throw new Error(`Kunne ikke hente 2hire-adgang for kunden: ${error.message}`);
+    }
+    if (data?.twohire_client_id && data?.twohire_client_secret) {
+      return { clientId: data.twohire_client_id, clientSecret: data.twohire_client_secret };
+    }
+    if (isProductionMode()) {
+      throw new Error(
+        `${data?.name ?? "Denne kunde"} har ikke fået konfigureret 2hire-adgang endnu — kontakt FLEETii.`,
+      );
+    }
+  } else if (isProductionMode()) {
     throw new Error("Kunne ikke bestemme hvilken kunde denne handling gælder for.");
   }
 
-  const { data, error } = await admin
-    .from("costumers")
-    .select("name, twohire_client_id, twohire_client_secret")
-    .eq("costumer_id", opts.costumerId)
-    .maybeSingle<{ name: string | null; twohire_client_id: string | null; twohire_client_secret: string | null }>();
-
-  if (error) {
-    throw new Error(`Kunne ikke hente 2hire-adgang for kunden: ${error.message}`);
-  }
-  if (!data?.twohire_client_id || !data?.twohire_client_secret) {
-    throw new Error(
-      `${data?.name ?? "Denne kunde"} har ikke fået konfigureret 2hire-adgang endnu — kontakt FLEETii.`,
-    );
-  }
-
-  return { clientId: data.twohire_client_id, clientSecret: data.twohire_client_secret };
+  return getGlobalCredentials();
 }

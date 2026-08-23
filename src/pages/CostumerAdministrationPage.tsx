@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { CarGlyph } from "../components/CarGlyph";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address fields/contact_person/phone/email until its own fetch-by-id fallback kicked in. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
@@ -23,6 +24,8 @@ type Costumer = {
   contact_person: string | null;
   phone: string | null;
   email: string | null;
+  /** Generated column (twohire_client_id/twohire_client_secret both set — see supabase/applied/costumers_add_has_twohire_credentials.sql). Never exposes the raw credential values, only whether they're both present — drives the "Mangler 2hire registrering" badge below. */
+  has_twohire_credentials: boolean | null;
 };
 
 /** FLEETii admin's costumer list. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
@@ -40,7 +43,9 @@ export function CostumerAdministrationPage() {
 
       const { data, error: fetchError } = await supabase
         .from("costumers")
-        .select("costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email")
+        .select(
+          "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email, has_twohire_credentials",
+        )
         .order("name", { ascending: true })
         .returns<Costumer[]>();
 
@@ -75,6 +80,15 @@ export function CostumerAdministrationPage() {
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
+
+            {/* TEMP: CarGlyph evaluation preview — remove before shipping. FLEETii-admin-only page, purely to judge the shape at intended sizes/colors before wiring it into a real table. */}
+            <div className="flex flex-wrap items-center gap-6 rounded-lg border border-dashed border-brand-300 bg-brand-50/60 p-3">
+              <span className="text-[0.7rem] font-medium text-brand-500">CarGlyph-evaluering:</span>
+              <CarGlyph className="h-4 w-6 text-brand-800" title="Køretøj i bevægelse" />
+              <CarGlyph className="h-6 w-9 text-brand-800" title="Køretøj i bevægelse" />
+              <CarGlyph className="h-8 w-12 text-brand-800" title="Køretøj i bevægelse" />
+              <CarGlyph className="h-6 w-9 text-brand-600" title="Køretøj i bevægelse" />
+            </div>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-[0.7rem]">
@@ -124,12 +138,21 @@ export function CostumerAdministrationPage() {
                           }`}
                         >
                           <td className="whitespace-nowrap px-2 py-0.5 font-medium">
-                            {costumer.name ?? "—"}
-                            {costumer.deactivated_at && (
-                              <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                Adgang blokeret
-                              </span>
-                            )}
+                            <div className="flex items-center justify-between gap-2">
+                              <span>{costumer.name ?? "—"}</span>
+                              <div className="flex shrink-0 items-center gap-2">
+                                {costumer.deactivated_at && (
+                                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                    Adgang blokeret
+                                  </span>
+                                )}
+                                {!costumer.has_twohire_credentials && (
+                                  <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
+                                    Mangler 2hire registrering
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -140,7 +163,7 @@ export function CostumerAdministrationPage() {
 
             <button
               type="button"
-              onClick={() => navigate("/costumer-details")}
+              onClick={() => navigate("/costumer-new")}
               className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
             >
               Opret kunde
