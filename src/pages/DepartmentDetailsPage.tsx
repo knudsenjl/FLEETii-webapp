@@ -200,7 +200,7 @@ export function DepartmentDetailsPage() {
                     type="button"
                     onClick={() => setPendingAction("create-department")}
                     disabled={!canSubmitDepartment}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret afdeling
                   </button>
@@ -210,7 +210,7 @@ export function DepartmentDetailsPage() {
                       setNewDepartmentName("");
                       setIsAddingDepartment(false);
                     }}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                   >
                     Annuller
                   </button>
@@ -221,7 +221,7 @@ export function DepartmentDetailsPage() {
                     type="button"
                     disabled={departments.length === 0}
                     onClick={() => navigate("/edit-departments", { state: { costumerId, costumerName, departments } })}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Rediger afdelinger
                   </button>
@@ -232,7 +232,7 @@ export function DepartmentDetailsPage() {
                       setDepartmentError(null);
                       setIsAddingDepartment(true);
                     }}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                   >
                     Opret afdeling
                   </button>
@@ -245,7 +245,7 @@ export function DepartmentDetailsPage() {
                 type="button"
                 onClick={() => setPendingAction("delete-department")}
                 disabled={!selectedDepartmentId}
-                className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Slet afdeling
               </button>

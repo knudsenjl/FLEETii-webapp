@@ -181,7 +181,7 @@ Three roles, checked both client-side (`ProtectedRoute`'s `requireAdmin` /
 in every privileged Function — the client-side check is UX only, never the
 actual security boundary):
 
-- **`user`** — books/ends its own reservations. Lands on `/booking-next`.
+- **`user`** — books/ends its own reservations. Lands on `/booking`.
 - **`admin`** — manages one costumer's users/vehicles/departments. Lands on
   `/admin`.
 - **`FLEETii admin`** — platform-wide superset of `admin` (every `admin`

@@ -70,7 +70,7 @@ export function AboutPage() {
                       href={brugerguideUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                      className="rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-center text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                     >
                       Brugerguide
                     </a>
@@ -80,7 +80,7 @@ export function AboutPage() {
                       href={administratormanualUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                      className="rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-center text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                     >
                       Administratormanual
                     </a>
@@ -90,7 +90,7 @@ export function AboutPage() {
                       href={fleetiiAdministratormanualUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="rounded-lg bg-brand-600 px-3 py-1.5 text-center text-sm font-semibold text-white transition hover:bg-brand-700"
+                      className="rounded-lg border border-brand-200 bg-white px-3 py-1.5 text-center text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                     >
                       FLEETii-administratormanual
                     </a>

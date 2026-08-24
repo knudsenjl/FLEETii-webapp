@@ -444,9 +444,9 @@ export function HandleVehiclePage() {
                       />
                     </div>
                     {readOnlyRows.map(([label, value]) => (
-                      <div key={label} className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
+                      <div key={label} className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                         <div className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">{label}</div>
-                        <div className="whitespace-nowrap px-1">{value}</div>
+                        <div className="whitespace-nowrap rounded-lg border border-transparent px-2 py-0.5">{value}</div>
                       </div>
                     ))}
                     {/* Drivmiddelniveau (fuel/battery %) is appended next to the select rather than shown as its own row — the two are closely related enough not to need a separate label. */}
@@ -552,7 +552,7 @@ export function HandleVehiclePage() {
                               readOnly
                               disabled
                               value={departmentOptions.length === 1 ? departmentOptions[0].name : (soleSelectedDepartment?.name ?? "")}
-                              className="cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
+                              className="cursor-not-allowed rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800"
                             />
                           ) : (
                             <select
@@ -584,7 +584,7 @@ export function HandleVehiclePage() {
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={!canSave || isSaving}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSaving ? "Gemmer…" : "Gem ændringer"}
                 </button>
@@ -592,7 +592,7 @@ export function HandleVehiclePage() {
                   type="button"
                   onClick={() => navigate(-1)}
                   disabled={isSaving}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Fortryd
                 </button>

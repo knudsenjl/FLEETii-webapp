@@ -342,7 +342,7 @@ export function LoginPage() {
                 <button
                   type="submit"
                   disabled={submitting || loading}
-                  className="mt-2 inline-flex items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-2 inline-flex items-center justify-center rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 shadow-sm transition hover:bg-brand-50 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Logger ind…" : loading ? "Indlæser…" : "Log ind"}
                 </button>

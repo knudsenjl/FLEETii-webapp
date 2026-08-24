@@ -228,7 +228,7 @@ export function ConfirmPage() {
                   type="button"
                   onClick={() => navigate("/available", { state })}
                   disabled={isSubmitting}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Annuller
                 </button>
@@ -236,7 +236,7 @@ export function ConfirmPage() {
                   type="button"
                   onClick={() => void handleConfirm()}
                   disabled={isSubmitting}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1 rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSubmitting ? "Bekræfter…" : editingBookingId ? "Bekræft ændring" : "Bekræft reservation"}
                 </button>
