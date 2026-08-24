@@ -3,8 +3,13 @@
 // the result as vehicle_signals.locked — so that flag now reflects the last
 // CONFIRMED real command, not a purely virtual toggle (see
 // supabase/vehicle_signals_add_locked.sql's original "deferred" framing,
-// since superseded by this). Reached from useVehicleLockState.ts, used by
-// the Lås/Lås op buttons on BookingDetailsPage.tsx and VehicleDetailsPage.tsx.
+// since superseded by this). Also appends a 'lock'/'unlock' row to
+// vehicle_signal_history (see vehicle_signal_history_table.sql) recording
+// which user_id fulfilled the command and when — this is a real 2hire
+// command FLEETii itself sent, not a signal 2hire pushed to us, so it can't
+// go through 2hire-webhook.mts; this is the only other writer of that table.
+// Reached from useVehicleLockState.ts, used by the Lås/Lås op buttons on
+// BookingDetailsPage.tsx and VehicleDetailsPage.tsx.
 //
 // requireUser-gated, not admin-only — a regular user needs to toggle the
 // lock on their own reservation. Uses the service-role key for the
@@ -115,6 +120,25 @@ export default async (req: Request) => {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
     console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${command}) failed:`, message);
     return new Response(JSON.stringify({ error: message }), { status: 502 });
+  }
+
+  // Record who drove: a 'lock'/'unlock' history row per fulfilled command,
+  // keyed off the real physical `command` sent (not the persisted `locked`
+  // resting-state flag below) — "Frigiv køretøj" sends command "start"
+  // (a real unlock) while persisting locked: true, and it's the physical
+  // unlock that matters for "who had the vehicle driveable", not the resting
+  // flag. signal_value holds the driver's user_id, same shape convention as
+  // 2hire-webhook.mts's own vehicle_signal_history inserts.
+  const fulfilledAt = new Date().toISOString();
+  const { error: historyError } = await admin.from("vehicle_signal_history").insert({
+    vehicle_id: vehicleId,
+    signal_type: command === "start" ? "unlock" : "lock",
+    signal_value: { user_id: authResult.userId },
+    signal_timestamp: fulfilledAt,
+  });
+  if (historyError) {
+    console.error("[set-vehicle-lock] failed to record signal history:", historyError);
+    return new Response(JSON.stringify({ error: "Kunne ikke gemme lås-historik. Prøv igen." }), { status: 500 });
   }
 
   // Upsert, not update: a vehicle may not have a vehicle_signals row yet
