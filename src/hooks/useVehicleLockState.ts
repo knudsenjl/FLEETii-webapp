@@ -27,9 +27,12 @@ export type VehicleLockState = {
   loading: boolean;
   /**
    * Persists a new lock state via set-vehicle-lock, then refreshes all
-   * derived state. Resolves true on success, false on failure (error is
-   * also set on the returned state either way) — callers use this to know
-   * whether to show a "now locked/unlocked" confirmation.
+   * derived state. Updates `locked` OPTIMISTICALLY, before the request
+   * resolves — reverted back to its prior value if the request fails, so
+   * the button doesn't wait on the 2hire round-trip to visually respond to
+   * a tap. Resolves true on success, false on failure (error is also set on
+   * the returned state either way) — callers use this to know whether to
+   * show a "now locked/unlocked" confirmation.
    *
    * `command` optionally overrides which real 2hire generic command is
    * actually sent (default: `locked ? "stop" : "start"`, i.e. the plain
@@ -114,6 +117,15 @@ export function useVehicleLockState(
   const setLock = useCallback(
     async (nextLocked: boolean, command?: "start" | "stop") => {
       setError(null);
+      // Optimistic flip: the real 2hire command + DB write below is a
+      // network round-trip (can easily run 1-3s), and waiting for it before
+      // updating `locked` made the button feel unresponsive. Flip it the
+      // instant the tap is registered, then reconcile with the server —
+      // reverting back to `previousLocked` if the request turns out to have
+      // failed, or refreshing via reload() (which also recomputes
+      // lockEnabled/unlockEnabled) once it's confirmed to have succeeded.
+      const previousLocked = locked;
+      setLocked(nextLocked);
       try {
         const response = await fetch("/.netlify/functions/set-vehicle-lock", {
           method: "POST",
@@ -126,10 +138,12 @@ export function useVehicleLockState(
 
         const result = (await response.json()) as { error?: string };
         if (!response.ok) {
+          setLocked(previousLocked);
           setError(result.error ?? "Kunne ikke opdatere lås-status.");
           return false;
         }
       } catch {
+        setLocked(previousLocked);
         setError("Kunne ikke kontakte serveren. Prøv igen senere.");
         return false;
       }
@@ -137,7 +151,7 @@ export function useVehicleLockState(
       await reload();
       return true;
     },
-    [vehicleId, session, reload],
+    [vehicleId, session, reload, locked],
   );
 
   return { locked, lockEnabled, unlockEnabled, loading, setLock, error };
