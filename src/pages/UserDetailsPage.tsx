@@ -951,7 +951,7 @@ export function UserDetailsPage() {
                       setPendingAction("update");
                     }}
                     disabled={!canSubmit}
-                    className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opdater bruger
                   </button>
@@ -962,7 +962,7 @@ export function UserDetailsPage() {
                         setSubmitError(null);
                         setPendingAction("reactivate");
                       }}
-                      className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Genetabler brugers adgang
                     </button>
@@ -999,14 +999,14 @@ export function UserDetailsPage() {
                       setPendingAction("create");
                     }}
                     disabled={!canSubmit}
-                    className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret bruger
                   </button>
                   <button
                     type="button"
                     onClick={() => setPendingAction("close")}
-                    className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Fortryd
                   </button>

@@ -169,7 +169,7 @@ export function EditDepartmentsPage() {
               <button
                 type="button"
                 onClick={goBack}
-                className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
               >
                 Fortryd
               </button>
@@ -177,7 +177,7 @@ export function EditDepartmentsPage() {
                 type="button"
                 disabled={!canUpdate || isSubmitting}
                 onClick={() => void handleUpdate()}
-                className="rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isSubmitting ? "Opdaterer…" : "Opdater"}
               </button>

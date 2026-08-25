@@ -149,7 +149,7 @@ export function FleetManagementPage() {
                 <button
                   type="button"
                   onClick={() => setClusterMarkers((prev) => !prev)}
-                  className="shrink-0 rounded-lg border border-brand-200 bg-white px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-50"
+                  className="shrink-0 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
                 >
                   {clusterMarkers ? "Vis enkeltvis" : "Saml køretøjer"}
                 </button>
@@ -190,7 +190,7 @@ export function FleetManagementPage() {
               <button
                 type="button"
                 onClick={() => navigate("/fleet-table")}
-                className="mt-4 w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="mt-4 w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
               >
                 Administration af køretøjer
               </button>

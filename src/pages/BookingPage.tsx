@@ -348,7 +348,7 @@ export function BookingPage() {
               <button
                 type="button"
                 onClick={() => navigate("/bookings")}
-                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-200 bg-white px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+                className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
               >
                 Alle
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
@@ -386,7 +386,7 @@ export function BookingPage() {
                   type="button"
                   onClick={() => void handleLocate()}
                   disabled={isLocating}
-                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-200 bg-white px-2 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <HeadlightIcon className="h-4 w-4" />
                   {isLocating ? "Blinker…" : "Blink"}
@@ -397,7 +397,7 @@ export function BookingPage() {
                 <button
                   type="button"
                   onClick={handleHonk}
-                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-200 bg-white px-2 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-50"
+                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   <HornIcon className="h-4 w-4" />
                   Horn

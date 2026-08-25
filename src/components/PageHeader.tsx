@@ -149,7 +149,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
               onClick={() => void signOut()}
               aria-label="Log ud"
               title="Log ud"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
             >
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
@@ -169,7 +169,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                 }
                 aria-label="Skift afdeling"
                 title="Skift afdeling"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
                   {/* Hierarchy/org-chart icon (root -> two child departments) —
@@ -223,7 +223,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                 }
                 aria-label="Indstillinger"
                 title="Indstillinger"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
                   <circle cx="12" cy="12" r="3" />
@@ -257,7 +257,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
             onClick={() => navigate("/about")}
             aria-label="Om FLEETii"
             title="Om FLEETii"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-100"
           >
             i
           </button>

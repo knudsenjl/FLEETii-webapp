@@ -544,7 +544,7 @@ export function AllBookingsPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Opret reservation
                 </button>
