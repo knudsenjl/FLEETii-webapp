@@ -29,7 +29,14 @@ export function PadlockGlyph({ locked, className = "h-4 w-4", title }: PadlockGl
       {title && <title>{title}</title>}
       <rect x="4" y="10" width="16" height="11" rx="3" fill="currentColor" />
       <path
-        d={locked ? "M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10" : "M7.5 10V7.5a4.5 4.5 0 0 1 9.5 -4"}
+        // Unlocked: the requested 4.5 radius can't reach an endpoint 9.5
+        // right/4 up from its start (that chord is longer than 2*radius),
+        // so the SVG spec auto-scales the radius up until it fits — which
+        // pushes the arc's peak above y=0 and gets clipped by the <svg>'s
+        // own viewBox. 8 right/3.5 up keeps the same "swung open,
+        // detached" look but stays within the radius the arc can actually
+        // draw without any auto-scaling, so nothing clips.
+        d={locked ? "M7.5 10V7.5a4.5 4.5 0 0 1 9 0V10" : "M7.5 10V7.5a4.5 4.5 0 0 1 8 -3.5"}
         fill="none"
         stroke="currentColor"
         strokeWidth={2.5}
