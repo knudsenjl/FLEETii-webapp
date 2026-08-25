@@ -734,7 +734,7 @@ export function VehicleCreatePage() {
                           readOnly
                           disabled
                           value={value}
-                          className="w-full min-w-0 cursor-not-allowed rounded-lg border border-brand-200 bg-brand-100/60 px-2 py-0.5 text-sm text-brand-800"
+                          className="w-full min-w-0 cursor-not-allowed rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800"
                         />
                         {/* Right-aligned in the input/value column, same placement as the Brand/Mærke/Årgang MotorAPI fill ("arrow") buttons below — not in the label column like before. */}
                         <div className="relative shrink-0" ref={motorApiRef}>
@@ -765,7 +765,8 @@ export function VehicleCreatePage() {
                   ) : (
                     <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
-                      <span className="text-sm text-brand-800">{value}</span>
+                      {/* Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left — same trick as CostumerDetailsPage's locked CVR row. */}
+                      <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
                     </div>
                   );
                 })}
@@ -876,7 +877,7 @@ export function VehicleCreatePage() {
                     type="button"
                     disabled={!qrCode.trim() || !selectedProfileId || isRegistering}
                     onClick={() => void handleRegisterVehicle()}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isRegistering ? "Registrerer…" : "Registrér køretøj i 2hire"}
                   </button>
@@ -894,8 +895,10 @@ export function VehicleCreatePage() {
                     }
                     void markOtherStepDone();
                   }}
-                  className={`w-full rounded-lg px-2 py-1.5 text-sm font-semibold text-white transition ${
-                    other2hireDone ? "bg-green-600 hover:bg-green-700" : "bg-brand-600 hover:bg-brand-700"
+                  className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-sm font-semibold transition ${
+                    other2hireDone
+                      ? "border-green-600 text-green-600 hover:bg-green-50"
+                      : "border-brand-600 text-brand-600 hover:bg-brand-50"
                   }`}
                 >
                   {other2hireDone ? "✓ " : ""}Other 2hire registrations
@@ -908,7 +911,7 @@ export function VehicleCreatePage() {
                 type="button"
                 disabled={!(vehicleRegistered && iotDeviceAssociated && other2hireDone) || isDeletingOrder}
                 onClick={() => setShowDeleteOrderConfirm(true)}
-                className="w-full rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                className="w-full rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {isDeletingOrder ? "Sletter…" : "Installation afsluttet - slettes"}
               </button>

@@ -439,7 +439,7 @@ export function NewVehiclePage() {
                   type="button"
                   disabled={!canSend}
                   onClick={() => void handleSend()}
-                  className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {isSending ? "Sender…" : "Send bestilling til FLEETii"}
                 </button>

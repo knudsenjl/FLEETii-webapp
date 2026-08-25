@@ -29,6 +29,8 @@ interface VehicleLockToggleProps {
   confirmationMessage?: ReactNode | null;
   /** Extra classes on the root wrapper, e.g. `flex-1` to sit evenly alongside the "Blink"/"Horn" buttons in a shared row. */
   className?: string;
+  /** "pill" (default): the original red/green pill button. "circle" (BookingPage.tsx's mobile-first hero control): a large circular button with the "Låst"/"Låst op" label and a "Tryk for at låse/låse op" hint printed BELOW it instead of inside — same gating/popup/confirmation logic either way, only the markup differs. */
+  variant?: "pill" | "circle";
 }
 
 /**
@@ -56,6 +58,7 @@ export function VehicleLockToggle({
   cannotLockMessage,
   confirmationMessage,
   className = "",
+  variant = "pill",
 }: VehicleLockToggleProps) {
   const [showBlockedReason, setShowBlockedReason] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -94,6 +97,42 @@ export function VehicleLockToggle({
     return () => document.removeEventListener("pointerdown", handlePointerDown);
   }, [showBlockedReason]);
 
+  if (variant === "circle") {
+    return (
+      <div ref={containerRef} className={`relative flex flex-col items-center gap-1 ${className}`}>
+        <button
+          type="button"
+          aria-pressed={locked === true}
+          aria-label={locked ? "Låst — tryk for at låse op" : "Låst op — tryk for at låse"}
+          disabled={isInert}
+          onClick={handleClick}
+          className={`flex h-[132px] w-[132px] items-center justify-center rounded-full border-2 bg-white transition-colors ${
+            looksDisabled ? "cursor-not-allowed opacity-50" : ""
+          } ${
+            locked === null
+              ? "border-brand-300 text-brand-300"
+              : locked
+                ? "border-red-600 text-red-600 hover:bg-red-50"
+                : "border-green-600 text-green-600 hover:bg-green-50"
+          }`}
+        >
+          <PadlockGlyph locked={locked ?? true} className="h-[52px] w-[52px]" />
+        </button>
+        <span className="text-base font-semibold text-brand-800">{locked === false ? "Låst op" : "Låst"}</span>
+        {!isInert && (
+          <span className="-mt-1 text-xs text-brand-500">Tryk for at {locked ? "låse op" : "låse"}</span>
+        )}
+        <InlinePopup
+          visible={Boolean(showBlockedReason && blockedReason)}
+          message={blockedReason}
+          variant="warning"
+          position="top"
+        />
+        <InlinePopup visible={Boolean(confirmationMessage)} message={confirmationMessage} />
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <button
@@ -102,14 +141,14 @@ export function VehicleLockToggle({
         aria-label={locked ? "Låst — tryk for at låse op" : "Låst op — tryk for at låse"}
         disabled={isInert}
         onClick={handleClick}
-        className={`flex w-full items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold text-white shadow transition-colors ${
+        className={`flex w-full items-center justify-center gap-2 rounded-full border-2 bg-white px-4 py-2 text-sm font-semibold transition-colors ${
           looksDisabled ? "cursor-not-allowed opacity-50" : ""
         } ${
           locked === null
-            ? "bg-brand-300"
+            ? "border-brand-300 text-brand-300"
             : locked
-              ? "bg-red-600 hover:bg-red-700"
-              : "bg-green-600 hover:bg-green-700"
+              ? "border-red-600 text-red-600 hover:bg-red-50"
+              : "border-green-600 text-green-600 hover:bg-green-50"
         }`}
       >
         <PadlockGlyph locked={locked ?? true} className="h-5 w-5" />

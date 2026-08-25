@@ -6,10 +6,7 @@
 // filter icon in VehiclesPage.tsx/DepartmentPage.tsx
 // (stroke="currentColor", strokeWidth 2, round caps/joins, fill="none") —
 // and was reworked to match a reference outline-car icon the user liked.
-//
-// EVALUATION NOTE (see CostumerAdministrationPage.tsx's own preview block):
-// this is a first-pass shape being judged visually before it's wired into
-// any real page — remove this note once it graduates out of evaluation.
+// Used in BookingPage.tsx/BookingsPage.tsx's mobile-first hero/list cards.
 interface CarGlyphProps {
   className?: string;
   /**

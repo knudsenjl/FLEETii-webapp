@@ -466,14 +466,14 @@ export function DepartmentPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/user-details")}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Opret ny bruger
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate("/import-users")}
-                  className="flex-1 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Opret nye brugere fra fil
                 </button>

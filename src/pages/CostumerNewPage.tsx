@@ -246,7 +246,7 @@ export function CostumerNewPage() {
                 <button
                   type="button"
                   onClick={() => navigate("/fleetii-admin")}
-                  className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                  className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Til kundeliste
                 </button>
@@ -289,14 +289,14 @@ export function CostumerNewPage() {
                     type="button"
                     onClick={() => setPendingAction("register")}
                     disabled={!canSubmitRegister}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Registrer i 2hire
                   </button>
                   <button
                     type="button"
                     onClick={() => setPendingAction("discardDraft")}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Fortryd
                   </button>
@@ -328,14 +328,14 @@ export function CostumerNewPage() {
                     type="button"
                     onClick={() => setPendingAction("create")}
                     disabled={!canSubmitCreate}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret kunde
                   </button>
                   <button
                     type="button"
                     onClick={() => setPendingAction("closeCreate")}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Fortryd
                   </button>

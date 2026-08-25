@@ -718,7 +718,7 @@ export function ReservationPage() {
                       aria-label="Nu"
                       className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
                         startIsNow
-                          ? "border-brand-600 bg-brand-600 text-white"
+                          ? "border-brand-600 bg-brand-100 text-brand-700"
                           : "border-brand-200 bg-brand-50/60 text-brand-700 hover:bg-brand-100"
                       }`}
                     >
@@ -753,7 +753,7 @@ export function ReservationPage() {
                       aria-label="Ignorer slut"
                       className={`flex h-9 w-9 items-center justify-center rounded-lg border transition ${
                         endIgnored
-                          ? "border-brand-600 bg-brand-600 text-white"
+                          ? "border-brand-600 bg-brand-100 text-brand-700"
                           : "border-brand-200 bg-brand-50/60 text-brand-700 hover:bg-brand-100"
                       }`}
                     >
@@ -803,14 +803,14 @@ export function ReservationPage() {
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Bekræft/skift køretøj
                   </button>
                   <button
                     type="button"
                     onClick={handleCancelEdit}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Fortryd
                   </button>
@@ -821,7 +821,7 @@ export function ReservationPage() {
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
-                    className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Find ledigt køretøj
                   </button>

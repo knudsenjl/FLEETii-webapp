@@ -236,7 +236,7 @@ export function LoginPage() {
               navigate("/about");
             }}
             aria-label="Om FLEETii"
-            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full border border-brand-200 bg-brand-50 font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-100"
           >
             i
           </button>
@@ -342,7 +342,7 @@ export function LoginPage() {
                 <button
                   type="submit"
                   disabled={submitting || loading}
-                  className="mt-2 inline-flex items-center justify-center rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-2 inline-flex items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Logger ind…" : loading ? "Indlæser…" : "Log ind"}
                 </button>

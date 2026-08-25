@@ -15,7 +15,7 @@ import { ConfirmPage } from "./pages/ConfirmPage";
 import { BookingsPage } from "./pages/BookingsPage";
 import { AllBookingsPage } from "./pages/AllBookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
-import { BookingNextPage } from "./pages/BookingNextPage";
+import { BookingPage } from "./pages/BookingPage";
 import { TwoHireTestPage } from "./pages/TwoHireTestPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { CostumerAdministrationPage } from "./pages/CostumerAdministrationPage";
@@ -48,8 +48,8 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
  * link (isPasswordRecovery — see AuthContext.tsx; this is also where a
  * clicked recovery link's redirect_to actually lands), otherwise straight
  * to their role's home page instead of showing the login form again: role
- * "user" lands on "/booking-next" (their current/next booking, with a "Next"
- * button through to the full list — see BookingNextPage.tsx's own doc
+ * "user" lands on "/booking" (their current/next booking, with a "Next"
+ * button through to the full list — see BookingPage.tsx's own doc
  * comment), admin/FLEETii admin land on "/admin". A "FLEETii admin" role
  * lands on "/admin" too, same as a regular admin (it's a superset of "admin"
  * — see ProtectedRoute's requireAdmin check) — AdminFrontpage.tsx shows them
@@ -68,7 +68,7 @@ function RootRoute() {
     }
     return (
       <Navigate
-        to={profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/admin" : "/booking-next"}
+        to={profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/admin" : "/booking"}
         replace
       />
     );
@@ -129,7 +129,7 @@ function App() {
           <Route
             path="/bookings"
             element={
-              <ProtectedRoute>
+              <ProtectedRoute requireRole="user">
                 <BookingsPage />
               </ProtectedRoute>
             }
@@ -151,10 +151,10 @@ function App() {
             }
           />
           <Route
-            path="/booking-next"
+            path="/booking"
             element={
-              <ProtectedRoute>
-                <BookingNextPage />
+              <ProtectedRoute requireRole="user">
+                <BookingPage />
               </ProtectedRoute>
             }
           />

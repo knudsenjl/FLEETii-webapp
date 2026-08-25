@@ -480,7 +480,7 @@ export function CostumerDetailsPage() {
                     type="button"
                     onClick={() => setPendingAction("update")}
                     disabled={!canSubmitEdit}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opdater kunde
                   </button>
@@ -499,7 +499,7 @@ export function CostumerDetailsPage() {
                       setEditTwoHireClientSecret("");
                       setIsEditing(false);
                     }}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Fortryd
                   </button>
@@ -572,7 +572,7 @@ export function CostumerDetailsPage() {
                       <button
                         type="button"
                         onClick={() => setPendingAction("reactivate")}
-                        className="col-span-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                       >
                         Genetabler kundens adgang
                       </button>
@@ -582,7 +582,7 @@ export function CostumerDetailsPage() {
                           setPurgeConfirmText("");
                           setPendingAction("delete");
                         }}
-                        className="col-span-2 rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                        className="col-span-2 rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                       >
                         Slet kunden permanent
                       </button>
@@ -604,14 +604,14 @@ export function CostumerDetailsPage() {
                           setEditTwoHireClientSecret("");
                           setIsEditing(true);
                         }}
-                        className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                       >
                         Rediger kunde
                       </button>
                       <button
                         type="button"
                         onClick={() => setPendingAction("deactivate")}
-                        className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                        className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                       >
                         Bloker kundens adgang
                       </button>
@@ -628,7 +628,7 @@ export function CostumerDetailsPage() {
                           state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
                         })
                       }
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Administration af køretøjer
                     </button>
@@ -641,7 +641,7 @@ export function CostumerDetailsPage() {
                           state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
                         })
                       }
-                      className="w-full rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Administration af afdelinger
                     </button>

@@ -610,7 +610,7 @@ export function VehicleDetailsPage() {
                     type="button"
                     onClick={() => void handleLocate()}
                     disabled={isLocating}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <HeadlightIcon />
                     {isLocating ? "Blinker…" : "Blink"}
@@ -621,7 +621,7 @@ export function VehicleDetailsPage() {
                   <button
                     type="button"
                     onClick={handleHonk}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     <HornIcon />
                     Horn
@@ -638,7 +638,7 @@ export function VehicleDetailsPage() {
                   <button
                     type="button"
                     onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
-                    className="rounded-lg bg-brand-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-brand-700"
+                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Rediger
                   </button>
@@ -647,7 +647,7 @@ export function VehicleDetailsPage() {
                     <button
                       type="button"
                       onClick={() => setShowBlockConfirm(true)}
-                      className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                     >
                       Frigiv
                     </button>
@@ -655,7 +655,7 @@ export function VehicleDetailsPage() {
                     <button
                       type="button"
                       onClick={() => setShowBlockConfirm(true)}
-                      className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                     >
                       Bloker
                     </button>
@@ -668,7 +668,7 @@ export function VehicleDetailsPage() {
                     <button
                       type="button"
                       onClick={() => setShowDeleteConfirm(true)}
-                      className="rounded-lg bg-red-600 px-2 py-1.5 text-sm font-semibold text-white transition hover:bg-red-700"
+                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
                     >
                       Slet
                     </button>

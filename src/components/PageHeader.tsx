@@ -42,8 +42,16 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (only when NOT already on it, i.e. afdelingId !== null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there. */
-export function PageHeader() {
+/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (only when NOT already on it, i.e. afdelingId !== null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+ *
+ * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
+ * every other page stays the full header): shrinks the logo and drops the
+ * role/afdeling text row below it, since that context is either obvious
+ * (role "user", the only role reaching a compact page) or already shown
+ * elsewhere on those pages. Every icon button and its dropdown/menu logic is
+ * untouched — same state, same handlers — only the two things named above
+ * change, so there's nothing to duplicate on the compact pages. */
+export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
   const {
     signOut,
     profile,
@@ -115,7 +123,7 @@ export function PageHeader() {
   return (
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
-        <FleetiiLogo className="h-8 w-auto shrink-0" linkToHome />
+        <FleetiiLogo className={compact ? "h-6 w-auto shrink-0" : "h-8 w-auto shrink-0"} linkToHome />
         <div className="flex items-center justify-end gap-3">
           {isFullyAuthenticated && isTestMode && (
             <div className="relative">
@@ -137,10 +145,17 @@ export function PageHeader() {
           )}
           {isFullyAuthenticated && (
             <button
+              type="button"
               onClick={() => void signOut()}
-              className="rounded-lg border border-brand-200 bg-white px-3 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+              aria-label="Log ud"
+              title="Log ud"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
             >
-              Log ud
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5" />
+                <path d="M21 12H9" />
+              </svg>
             </button>
           )}
           {isFullyAuthenticated && (
@@ -154,7 +169,7 @@ export function PageHeader() {
                 }
                 aria-label="Skift afdeling"
                 title="Skift afdeling"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
                   {/* Hierarchy/org-chart icon (root -> two child departments) —
@@ -208,7 +223,7 @@ export function PageHeader() {
                 }
                 aria-label="Indstillinger"
                 title="Indstillinger"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-50"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
               >
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
                   <circle cx="12" cy="12" r="3" />
@@ -242,13 +257,13 @@ export function PageHeader() {
             onClick={() => navigate("/about")}
             aria-label="Om FLEETii"
             title="Om FLEETii"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-50"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 font-serif text-base font-bold italic text-brand-700 transition hover:bg-brand-100"
           >
             i
           </button>
         </div>
       </div>
-      {isFullyAuthenticated && (
+      {!compact && isFullyAuthenticated && (
         <div className="flex min-w-0 items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
