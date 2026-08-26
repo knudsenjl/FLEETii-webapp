@@ -13,6 +13,15 @@ import { InlinePopup } from "./InlinePopup";
 /** One entry in the settings button's dropdown menu (admin/FLEETii admin only — see settingsMenuItemsForRole). */
 type SettingsMenuItem = { label: string; path: string };
 
+/** Marks the currently-active entry in the "Skift afdeling" dropdown below. */
+function DepartmentCheckmark() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-accent-600">
+      <path d="M20 6 9 17l-5-5" />
+    </svg>
+  );
+}
+
 /**
  * The settings destination(s) for a given `user_profiles.role`. A plain
  * "user" (any non-"admin"/"FLEETii admin" role, including null/undefined,
@@ -42,7 +51,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown of the user's other user_departments grants, or a 3s "no other departments" InlinePopup if they have none; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (only when NOT already on it, i.e. afdelingId !== null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -72,9 +81,8 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
-  const otherDepartments = availableDepartments.filter((d) => d.department_id !== afdelingId);
-  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a FLEETii admin, and only when they're NOT already on it (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. */
-  const canSwitchToAll = profile?.role === "FLEETii admin" && afdelingId !== null;
+  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a FLEETii admin (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. */
+  const canSwitchToAll = profile?.role === "FLEETii admin";
 
   /** departmentId null means "Alle" (see canSwitchToAll/AuthContext's switchDepartment) — the FLEETii admin's own default, unscoped state. */
   const handleSwitch = async (departmentId: string | null) => {
@@ -163,7 +171,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
               <button
                 type="button"
                 onClick={() =>
-                  otherDepartments.length === 0 && !canSwitchToAll
+                  availableDepartments.length === 0 && !canSwitchToAll
                     ? triggerNotImplemented("no-other-departments")
                     : setSwitcherOpen((open) => !open)
                 }
@@ -182,7 +190,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                   <rect x="15" y="14" width="6" height="6" rx="1" />
                 </svg>
               </button>
-              <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen andre afdelinger tilgængelige" align="right" />
+              <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen afdelinger tilgængelige" align="right" />
               <InlinePopup visible={notImplementedKey === "switch-department-error"} message={switchError ?? "Kunne ikke skifte afdeling."} align="right" />
               {switcherOpen && (
                 <>
@@ -192,19 +200,23 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                       <button
                         type="button"
                         onClick={() => void handleSwitch(null)}
-                        className="block w-full truncate px-3 py-2 text-left font-medium text-brand-700 transition hover:bg-brand-50"
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left font-medium text-brand-700 transition hover:bg-brand-50"
                       >
-                        Alle
+                        <span className="truncate">Alle</span>
+                        {afdelingId === null && <DepartmentCheckmark />}
                       </button>
                     )}
-                    {otherDepartments.map((department) => (
+                    {availableDepartments.map((department) => (
                       <button
                         key={department.department_id}
                         type="button"
                         onClick={() => void handleSwitch(department.department_id)}
-                        className="block w-full truncate px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
                       >
-                        {department.costumerName ? `${department.costumerName} / ${department.name}` : department.name}
+                        <span className="truncate">
+                          {department.costumerName ? `${department.costumerName} / ${department.name}` : department.name}
+                        </span>
+                        {department.department_id === afdelingId && <DepartmentCheckmark />}
                       </button>
                     ))}
                   </div>

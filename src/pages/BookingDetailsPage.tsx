@@ -87,7 +87,13 @@ export function BookingDetailsPage() {
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
   const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
-  const [bookingLoading, setBookingLoading] = useState(false);
+  // Starts true whenever a fetch-by-id is actually needed (no stateBooking)
+  // — starting false let a direct URL load's "not found yet, and not
+  // loading" redirect-to-/bookings effect below fire on the very first
+  // render, before the fetch effect's own setBookingLoading(true) had a
+  // chance to apply (state updates from an earlier effect in the same
+  // commit aren't visible to a later effect until the next render).
+  const [bookingLoading, setBookingLoading] = useState(!stateBooking);
   const booking = stateBooking ?? fetchedBooking;
 
   const [isCancelling, setIsCancelling] = useState(false);
