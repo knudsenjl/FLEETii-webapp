@@ -44,6 +44,15 @@ type NewCostumer = {
  * CostumerDetailsPage.tsx itself no longer has a "no costumerId" create
  * mode — this page replaced that entirely, so CostumerDetailsPage's own job
  * is purely viewing/editing a costumer that already exists.
+ *
+ * The "create" step's CVR field has a small lookup button (see
+ * handleCvrLookup/cvr-lookup.mts) that fills Navn/Vej og husnr./Postnr. og
+ * by from cvrapi.dk in one shot — same external-lookup-fills-the-form shape
+ * as VehicleCreatePage.tsx's MotorAPI button, just one combined fetch
+ * instead of several independently-cached per-field ones, since cvrapi.dk
+ * already returns everything needed together. Purely a convenience: every
+ * field stays a plain editable input, so a failed/skipped lookup never
+ * blocks manual entry.
  */
 export function CostumerNewPage() {
   const navigate = useNavigate();
@@ -74,6 +83,10 @@ export function CostumerNewPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
+  /** "Slå op i CVR-registret" state (see cvr-lookup.mts / handleCvrLookup below) — same shape as VehicleCreatePage.tsx's MotorAPI lookup (loading/error state, a small circular fetch button), just without a cached result to fill several DIFFERENT fields from one lookup response instead of caching a single result for several independent per-field fill buttons. */
+  const [cvrLookupLoading, setCvrLookupLoading] = useState(false);
+  const [cvrLookupError, setCvrLookupError] = useState<string | null>(null);
+
   const canSubmitCreate =
     name.trim().length > 0 &&
     cvr.trim().length > 0 &&
@@ -84,6 +97,41 @@ export function CostumerNewPage() {
     phone.trim().length > 0 &&
     email.trim().length > 0;
   const canSubmitRegister = twoHireClientId.trim().length > 0 && twoHireClientSecret.trim().length > 0;
+
+  /** Looks up the typed CVR number via cvr-lookup.mts (cvrapi.dk) and fills Navn/Vej og husnr./Postnr. og by from the result — Land is left untouched (already defaults to "Danmark", and cvrapi.dk's own "country=dk" search scope means every result is Danish anyway). A failed lookup just shows the error below the field; nothing already typed gets cleared, so a manual fallback is always still possible. */
+  const handleCvrLookup = async () => {
+    setCvrLookupLoading(true);
+    setCvrLookupError(null);
+
+    try {
+      const response = await fetch(`/.netlify/functions/cvr-lookup?cvr=${encodeURIComponent(cvr.trim())}`, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+      });
+      const result = (await response.json()) as {
+        error?: string;
+        name?: string;
+        address?: string;
+        zipcode?: string | number;
+        city?: string;
+        cityname?: string;
+      };
+
+      if (!response.ok || result.error) {
+        setCvrLookupError(result.error ?? "Kunne ikke slå CVR-nummeret op.");
+        setCvrLookupLoading(false);
+        return;
+      }
+
+      if (result.name) setName(result.name);
+      if (result.address) setStreet(result.address);
+      const city = result.city ?? result.cityname;
+      if (result.zipcode && city) setPostalCity(`${result.zipcode} ${city}`);
+    } catch {
+      setCvrLookupError("Kunne ikke kontakte serveren. Prøv igen senere.");
+    } finally {
+      setCvrLookupLoading(false);
+    }
+  };
 
   /** Inserts the new costumer row and advances to the register step — no navigation, this stays on "/costumer-new" the whole time. */
   const handleCreate = async () => {
@@ -306,7 +354,40 @@ export function CostumerNewPage() {
               <>
                 <div className="overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
-                    <RequiredFieldRow label="CVR:" value={cvr} onChange={setCvr} />
+                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        CVR: <span className="ml-0.5 text-red-600">*</span>
+                      </label>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          required
+                          aria-required="true"
+                          value={cvr}
+                          onChange={(e) => setCvr(e.target.value)}
+                          className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => void handleCvrLookup()}
+                          disabled={cvrLookupLoading || !/^\d{8}$/.test(cvr.trim())}
+                          title="Slå op i CVR-registret"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          {cvrLookupLoading ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
+                              <path d="M21 12a9 9 0 1 1-9-9" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                              <circle cx="11" cy="11" r="7" />
+                              <path d="m21 21-4.3-4.3" />
+                            </svg>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                    {cvrLookupError && <p className="px-0.5 pb-1 text-xs text-red-600">{cvrLookupError}</p>}
                     <RequiredFieldRow label="Navn:" value={name} onChange={setName} />
                     <RequiredFieldRow label="Vej og husnr.:" value={street} onChange={setStreet} />
                     <RequiredFieldRow label="Postnr. og by:" value={postalCity} onChange={setPostalCity} />
