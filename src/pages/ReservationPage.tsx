@@ -676,12 +676,13 @@ export function ReservationPage() {
                       <label className="flex items-center text-sm font-medium text-brand-700">
                         Anvendelse <span className="ml-0.5 text-red-600">*</span>
                       </label>
+                      {/* text-[16px], not text-sm — every role (incl. plain "user" on a phone) reaches this field, so it needs the same iOS-zoom-on-focus protection as LoginPage.tsx's own inputs (see its comment) — unlike the FLEETii-admin-only Kunde/afdeling and admin-only Bruger <select>s above, which stay text-sm since a Bruger never focuses those. */}
                       <select
                         required
                         aria-required="true"
                         value={anvendelseOption}
                         onChange={(e) => setAnvendelseOption(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-[16px] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       >
                         <option value="">Vælg anvendelse</option>
                         {anvendelseOptions.map((option) => (
@@ -696,13 +697,14 @@ export function ReservationPage() {
                         <label className="flex items-center justify-end text-sm font-medium text-brand-700">
                           Angiv årsag <span className="ml-0.5 text-red-600">*</span>
                         </label>
+                        {/* text-[16px] — same iOS-zoom reasoning as the Anvendelse <select> above. */}
                         <input
                           type="text"
                           required
                           aria-required="true"
                           value={anvendelseCustom}
                           onChange={(e) => setAnvendelseCustom(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-[16px] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       </div>
                     )}
@@ -727,12 +729,13 @@ export function ReservationPage() {
                         <polyline points="12 6 12 12 16 14" />
                       </svg>
                     </button>
+                    {/* text-[16px] — same iOS-zoom reasoning as the Anvendelse fields above. */}
                     <input
                       type="date"
                       value={startDate}
                       disabled={startIsNow}
                       onChange={(e) => applyStartDateTime(e.target.value, startTime, true)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-[16px] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                     />
                     <TimeSelect
                       value={startTime}
@@ -772,7 +775,7 @@ export function ReservationPage() {
                           type="date"
                           value={endDate}
                           onChange={(e) => applyEndDateTime(e.target.value, endTime)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-[16px] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                         <TimeSelect
                           value={endTime}
