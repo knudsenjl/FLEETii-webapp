@@ -6,7 +6,9 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
+import { motorApiDrivmiddel, motorApiVehicleField } from "../lib/motorApi";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
+import { stripNumberSpacing } from "../lib/textNormalization";
 import { supabase } from "../lib/supabase";
 
 /** A department belonging to the Kunde picked below (FLEETii admin only) — same shape as UserDetailsPage.tsx's own DepartmentOption. */
@@ -120,15 +122,87 @@ export function NewVehiclePage() {
     setKontaktnummer(profile.phone ?? "");
   }, [profile]);
 
+  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the Nummerplade row's lookup button — same button/icon and { data } | { error } JSON popup as VehicleCreatePage.tsx's own identical Køretøj-row button. Unlike that page (a fixed, already-saved order's plate), nummerplade here is still being typed, so no "fetch once and cache forever" guard — see handleOpenMotorApiPopup below. */
+  const [motorApiResult, setMotorApiResult] = useState<unknown>(null);
+  const [motorApiLoading, setMotorApiLoading] = useState(false);
+  const [motorApiError, setMotorApiError] = useState<string | null>(null);
+  const [showMotorApiPopup, setShowMotorApiPopup] = useState(false);
+  const motorApiRef = useRef<HTMLDivElement>(null);
+
+  /** Closes the MotorAPI popup on an outside click — same pattern as PageHeader.tsx's "Skift afdeling" dropdown. */
+  useEffect(() => {
+    if (!showMotorApiPopup) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (motorApiRef.current && !motorApiRef.current.contains(event.target as Node)) {
+        setShowMotorApiPopup(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showMotorApiPopup]);
+
+  /** Fills Brand/Mærke/Årgang/Drivmiddel from a just-loaded MotorAPI result — same field mapping/priority as VehicleCreatePage.tsx's own identical autofillFromMotorApi, just against this page's own plain useState setters (these are simple typed-in fields here, not persisted per-keystroke the way that page's order fields are). Only overwrites a field MotorAPI actually has a value for. */
+  const autofillFromMotorApi = (result: unknown) => {
+    const brandValue = motorApiVehicleField(result, ["make"]);
+    if (brandValue) setBrand(brandValue);
+
+    const modelValue =
+      [motorApiVehicleField(result, ["model"]), motorApiVehicleField(result, ["variant"])].filter(Boolean).join(" ") || null;
+    if (modelValue) setMaerke(modelValue);
+
+    const modelYearValue = motorApiVehicleField(result, ["model_year"]);
+    if (modelYearValue) setAargang(modelYearValue);
+
+    const drivmiddelValue = motorApiDrivmiddel(result);
+    if (drivmiddelValue) setDrivmiddel(drivmiddelValue);
+  };
+
+  /** Opens the MotorAPI popup and fetches fresh data for whatever's currently typed into Nummerplade, autofilling Brand/Mærke/Årgang/Drivmiddel from it. Always fetches fresh on open (no cache, unlike VehicleCreatePage.tsx's ensureMotorApiDataLoaded) — nummerplade can still change here, and a stale cached result for a since-edited plate would silently autofill the wrong vehicle's data. A re-click while already open just closes it. */
+  const handleOpenMotorApiPopup = () => {
+    const opening = !showMotorApiPopup;
+    setShowMotorApiPopup(opening);
+    // Stripped of ALL whitespace (not just trimmed) — passed on to MotorAPI,
+    // which expects the plain registration number, not a spaced-out one.
+    const regNo = stripNumberSpacing(nummerplade);
+    if (!opening || !regNo) return;
+
+    setMotorApiLoading(true);
+    setMotorApiError(null);
+    setMotorApiResult(null);
+    void fetch(`/.netlify/functions/motorapi-vehicle-lookup?regNo=${encodeURIComponent(regNo)}`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as unknown;
+        if (!response.ok) {
+          const message = (result as { error?: string } | null)?.error ?? "Kunne ikke hente data fra MotorAPI.";
+          setMotorApiError(message);
+          setMotorApiLoading(false);
+          return;
+        }
+        setMotorApiResult(result);
+        autofillFromMotorApi(result);
+        setMotorApiLoading(false);
+      })
+      .catch(() => {
+        setMotorApiError("Kunne ikke kontakte serveren. Prøv igen senere.");
+        setMotorApiLoading(false);
+      });
+  };
+
   const emailFormatInvalid = kontaktemail.trim().length > 0 && !EMAIL_PATTERN.test(kontaktemail.trim());
-  const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(kontaktnummer.trim());
+  // PHONE_PATTERN is digits-only — tested against the whitespace-STRIPPED
+  // value, not just trimmed, so a phone typed with spaces still validates.
+  const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(stripNumberSpacing(kontaktnummer));
 
   const canSend =
     nummerplade.trim().length > 0 &&
     (needsFleetiiDevice || fleetiiDeviceId.trim().length > 0) &&
     kontaktperson.trim().length > 0 &&
     EMAIL_PATTERN.test(kontaktemail.trim()) &&
-    PHONE_PATTERN.test(kontaktnummer.trim()) &&
+    PHONE_PATTERN.test(stripNumberSpacing(kontaktnummer)) &&
     // A FLEETii admin has no viewer-own costumer/department to fall back to
     // — both picks are required before the request means anything (see the
     // Kunde/Afdeling rows below).
@@ -291,7 +365,52 @@ export function NewVehiclePage() {
                       />
                     </div>
                   )}
-                  <RequiredFieldRow label="Nummerplade:" value={nummerplade} onChange={setNummerplade} />
+                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <label className="flex items-center text-sm font-medium text-brand-700">
+                      Nummerplade: <span className="ml-0.5 text-red-600">*</span>
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="text"
+                        required
+                        aria-required="true"
+                        value={nummerplade}
+                        onChange={(e) => setNummerplade(e.target.value)}
+                        className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      />
+                      {/* Same lookup-button look/behavior as VehicleCreatePage.tsx's own Køretøj-row button (magnifying glass, spinner while in flight, JSON popup) — see handleOpenMotorApiPopup/autofillFromMotorApi above for why this one always fetches fresh instead of caching. */}
+                      <div className="relative shrink-0" ref={motorApiRef}>
+                        <button
+                          type="button"
+                          onClick={handleOpenMotorApiPopup}
+                          disabled={motorApiLoading || !nummerplade.trim()}
+                          aria-label="Slå nummerplade op i MotorAPI og udfyld Brand/Mærke/Årgang/Drivmiddel"
+                          title="Slå op i MotorAPI"
+                          className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
+                        >
+                          {motorApiLoading ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
+                              <path d="M21 12a9 9 0 1 1-9-9" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                              <circle cx="11" cy="11" r="7" />
+                              <path d="m21 21-4.3-4.3" />
+                            </svg>
+                          )}
+                        </button>
+                        <InlinePopup
+                          visible={showMotorApiPopup}
+                          align="right"
+                          message={
+                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                              {motorApiLoading ? "Henter fra MotorAPI…" : motorApiError ? motorApiError : JSON.stringify(motorApiResult, null, 2)}
+                            </pre>
+                          }
+                        />
+                      </div>
+                    </div>
+                  </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">Brand:</label>
                     <input
