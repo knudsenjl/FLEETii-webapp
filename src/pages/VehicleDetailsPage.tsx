@@ -54,6 +54,10 @@ type VehicleProfilePlateRow = {
   drivmiddel: string | null;
   parking: string | null;
   blocked_at: string | null;
+  /** The 2hire-board device's own identifier (its QR code, as scanned at registration — see 2hire-register-vehicle.mts) — shown in the "QR-kode:" row below, FLEETii-admin only. */
+  iot_id: string | null;
+  /** The human-readable label of the 2hire vehicle-configuration profile picked at registration (see vehicle_profiles_add_twohire_profile.sql) — shown in the "2hire-profil:" row below, FLEETii-admin only. */
+  twohire_profile: string | null;
 };
 
 /** Fallback map center (Denmark) used when a vehicle has no GPS fix. */
@@ -90,6 +94,8 @@ export function VehicleDetailsPage() {
   // this page has no requireAdmin route gate of its own (see doc comment
   // above), so it has to make this check itself.
   const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
+  /** Stricter than isAdmin — gates the "QR-kode:"/"2hire-profil:" rows below, which a regular admin has no reason to see (2hire-board device internals, not fleet-management info). */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
   const state = location.state as { vehicle?: Vehicle; booking?: RouterBooking } | null;
   const stateVehicle = state?.vehicle ?? null;
   const booking = state?.booking ?? null;
@@ -134,6 +140,10 @@ export function VehicleDetailsPage() {
   const [parking, setParking] = useState<string | null>(null);
   /** vehicle_profiles.blocked_at — fetched alongside numberPlate below, non-null once "Bloker køretøj" has been used (see handleBlockVehicle). Drives the "Blokeret" badge next to the "Køretøj:" row. */
   const [blockedAt, setBlockedAt] = useState<string | null>(null);
+  /** vehicle_profiles.iot_id — fetched alongside numberPlate below, shown in the FLEETii-admin-only "QR-kode:" row. */
+  const [iotId, setIotId] = useState<string | null>(null);
+  /** vehicle_profiles.twohire_profile — fetched alongside numberPlate below, shown in the FLEETii-admin-only "2hire-profil:" row. */
+  const [twohireProfile, setTwohireProfile] = useState<string | null>(null);
   /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. */
   const { address, addressLoading } = useReverseGeocode(position, isAdmin);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
@@ -246,7 +256,7 @@ export function VehicleDetailsPage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, department_id, drivmiddel, parking, blocked_at")
+      .select("number_plate, vehicle_ident, department_id, drivmiddel, parking, blocked_at, iot_id, twohire_profile")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfilePlateRow>()
       .then(({ data }) => {
@@ -257,6 +267,8 @@ export function VehicleDetailsPage() {
         setDrivmiddel(data?.drivmiddel ?? null);
         setParking(data?.parking ?? null);
         setBlockedAt(data?.blocked_at ?? null);
+        setIotId(data?.iot_id ?? null);
+        setTwohireProfile(data?.twohire_profile ?? null);
         setNumberPlateLoading(false);
       });
 
@@ -548,6 +560,23 @@ export function VehicleDetailsPage() {
                             </table>
                           )}
                         </div>
+                      </div>
+                    </>
+                  )}
+                  {/* FLEETii-admin-only — 2hire-board device internals, not fleet-management info a regular admin has any reason to see. See vehicle_profiles_add_twohire_profile.sql / 2hire-register-vehicle.mts for where these two are set. */}
+                  {isFleetiiAdmin && (
+                    <>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">QR-kode:</label>
+                        <span className="text-sm text-brand-800">
+                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (iotId ?? "—")}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">2hire-profil:</label>
+                        <span className="text-sm text-brand-800">
+                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (twohireProfile ?? "—")}
+                        </span>
                       </div>
                     </>
                   )}

@@ -1,11 +1,22 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { QrScanButton } from "../components/QrScanButton";
+import { InlinePopup } from "../components/InlinePopup";
+import { useAuth } from "../contexts/AuthContext";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS, formatKilometerstand, shortSignalTimestamp } from "../lib/bookings";
+import { normalizeNumberSpacing } from "../lib/textNormalization";
+import {
+  boardProfileId,
+  boardProfileLabel,
+  profileMatchesVehicle,
+  TWOHIRE_SIMULATOR_PROFILE_ID,
+  type TwoHireBoardProfile,
+} from "../lib/twoHireProfiles";
 
 /** A department the vehicle could be assigned to — scoped to the vehicle's OWN costumer, fetched fresh alongside the vehicle's other fields (see vehicleCostumerId / the departments-loading effect below), not the viewer's — a FLEETii admin has no costumer of their own and must still be able to reassign a vehicle belonging to any costumer. */
 type DepartmentOption = { department_id: string; name: string };
@@ -33,6 +44,10 @@ type VehicleProfileRow = {
   department_id: string | null;
   costumer_id: string | null;
   drivmiddel: string;
+  /** The 2hire-board device's own identifier (its QR code, as scanned at registration — see 2hire-register-vehicle.mts). Editable here, FLEETii-admin only — see the "QR-kode/2hire-profil" section below. */
+  iot_id: string | null;
+  /** The human-readable label of the 2hire vehicle-configuration profile picked at registration (see vehicle_profiles_add_twohire_profile.sql) — a plain free-text label, not a live 2hire association, so editing it here only corrects OUR OWN record, it doesn't re-associate anything with 2hire itself. */
+  twohire_profile: string | null;
 };
 
 
@@ -59,6 +74,9 @@ export function HandleVehiclePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const refreshVehicles = useRefreshVehicles();
+  const { profile, session } = useAuth();
+  /** Gates the "QR-kode"/"2hire-profil" section below — 2hire-board device internals, not something a regular admin manages. */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
   const state = location.state as { vehicle?: Vehicle } | null;
   const vehicle = state?.vehicle ?? null;
 
@@ -69,6 +87,20 @@ export function HandleVehiclePage() {
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [drivmiddel, setDrivmiddel] = useState<string>("Benzin");
+  /** vehicle_profiles.iot_id/twohire_profile — FLEETii-admin-only editable fields, see the section near the bottom of the form below. */
+  const [iotId, setIotId] = useState("");
+  /** The raw label as currently stored in vehicle_profiles.twohire_profile, fetched once on load — used only as a fallback in handleSave (see profileLabel there) when the picker below couldn't resolve a selection back to a live profile, so an untouched or unmatched value round-trips unchanged rather than being silently cleared. */
+  const [twohireProfileOriginal, setTwohireProfileOriginal] = useState("");
+  /** "2hire-profil" picker state — mirrors VehicleCreatePage.tsx's own "Registrér køretøj i 2hire" picker (see src/lib/twoHireProfiles.ts), but purely to correct/update this already-registered vehicle's OWN stored label; picking a profile here has no live 2hire effect. */
+  const [selectedProfileId, setSelectedProfileId] = useState("");
+  const [profiles, setProfiles] = useState<TwoHireBoardProfile[]>([]);
+  const [profilesLoading, setProfilesLoading] = useState(true);
+  const [profilesError, setProfilesError] = useState<string | null>(null);
+  /** Whether the picker is narrowed to profiles matching this vehicle's own brand/model/model_year (see profileMatchesVehicle) — off by default, same reasoning as VehicleCreatePage.tsx's own filter toggle. */
+  const [filterProfilesByVehicle, setFilterProfilesByVehicle] = useState(false);
+  /** Whether the "i" popup showing the selected profile's raw JSON is open. */
+  const [showProfileJson, setShowProfileJson] = useState(false);
+  const profileJsonRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
@@ -102,7 +134,7 @@ export function HandleVehiclePage() {
 
     void supabase
       .from("vehicle_profiles")
-      .select("number_plate, vehicle_ident, brand, model, model_year, department_id, costumer_id, drivmiddel")
+      .select("number_plate, vehicle_ident, brand, model, model_year, department_id, costumer_id, drivmiddel, iot_id, twohire_profile")
       .eq("vehicle_id", vehicle.vehicleId)
       .maybeSingle<VehicleProfileRow>()
       .then(({ data, error }) => {
@@ -120,6 +152,8 @@ export function HandleVehiclePage() {
         setHomeDepartmentId(data?.department_id ?? null);
         setVehicleCostumerId(data?.costumer_id ?? null);
         setDrivmiddel(data?.drivmiddel ?? "Benzin");
+        setIotId(data?.iot_id ?? "");
+        setTwohireProfileOriginal(data?.twohire_profile ?? "");
         setLoading(false);
       });
 
@@ -170,6 +204,62 @@ export function HandleVehiclePage() {
     };
   }, [vehicle, vehicleCostumerId]);
 
+  /** Loads 2hire's own board profiles for the picker below — same endpoint/shape as VehicleCreatePage.tsx's own effect, scoped to THIS vehicle's own costumer (vehicleCostumerId) rather than the viewer's, and gated client-side on isFleetiiAdmin since the section is hidden entirely for a regular admin. */
+  useEffect(() => {
+    if (!isFleetiiAdmin || !vehicleCostumerId) return;
+
+    let cancelled = false;
+    setProfilesLoading(true);
+    setProfilesError(null);
+    void fetch(`/.netlify/functions/2hire-board-profiles?costumerId=${encodeURIComponent(vehicleCostumerId)}`, {
+      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+    })
+      .then(async (response) => {
+        const result = (await response.json()) as { profiles?: TwoHireBoardProfile[]; error?: string };
+        if (cancelled) return;
+        if (!response.ok) {
+          setProfilesError(result.error ?? "Kunne ikke hente 2hire-profiler.");
+          setProfilesLoading(false);
+          return;
+        }
+        setProfiles(result.profiles ?? []);
+        setProfilesLoading(false);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        setProfilesError("Kunne ikke kontakte serveren. Prøv igen senere.");
+        setProfilesLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin, vehicleCostumerId, session]);
+
+  /** Once profiles have loaded, tries to pre-select whichever one matches the already-stored twohireProfileOriginal label, so opening the form shows the vehicle's actual current profile pre-picked rather than blank. Only runs once (selectedProfileId still empty) — a real manual re-selection afterward is left alone. No match (label never came from a live profile, or the catalog has changed) just leaves the picker blank rather than guessing. */
+  useEffect(() => {
+    if (profilesLoading || profilesError || selectedProfileId || !twohireProfileOriginal) return;
+    const match = profiles.find((profile) => boardProfileLabel(profile) === twohireProfileOriginal);
+    if (match) {
+      setSelectedProfileId(boardProfileId(match));
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [profiles, profilesLoading, profilesError, twohireProfileOriginal]);
+
+  /** Closes the profile-JSON popup on an outside click — same pattern as VehicleCreatePage.tsx's own. */
+  useEffect(() => {
+    if (!showProfileJson) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (profileJsonRef.current && !profileJsonRef.current.contains(event.target as Node)) {
+        setShowProfileJson(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showProfileJson]);
+
   // A costumer with only one department has no real choice to make for
   // either Afdeling(er) or Hjemmeafdeling — self-heal that sole department
   // into both (same reasoning as UserDetailsPage.tsx's own single-department
@@ -214,6 +304,12 @@ export function HandleVehiclePage() {
     model.trim().length > 0 &&
     year.trim().length > 0 &&
     Boolean(homeDepartmentId);
+
+  const visibleProfiles = filterProfilesByVehicle
+    ? profiles.filter((profile) => profileMatchesVehicle(profile, { brand: make, model, model_year: year }))
+    : profiles;
+  /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile. */
+  const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
 
   /** The one department checked "Tilladt" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
   const soleSelectedDepartment =
@@ -274,11 +370,29 @@ export function HandleVehiclePage() {
     setIsSaving(true);
     setSaveError(null);
 
-    const trimmedPlate = plate.trim();
+    const trimmedPlate = normalizeNumberSpacing(plate);
     const trimmedVehicleIdent = vehicleIdent.trim();
     const trimmedMake = make.trim();
     const trimmedModel = model.trim();
     const trimmedYear = year.trim();
+    // Round-trips unchanged for a regular admin (the fields are loaded
+    // regardless of role, just not shown/editable unless isFleetiiAdmin —
+    // see the section near the bottom of the form below), so it's safe to
+    // always include these two rather than branching the update payload.
+    const trimmedIotId = iotId.trim();
+    // Resolves the picker's selection back to a display label — picking a
+    // real fetched profile or the fixed simulator id (see
+    // TWOHIRE_SIMULATOR_PROFILE_ID) takes priority; otherwise falls back to
+    // whatever was already stored (twohireProfileOriginal) so an untouched
+    // or unmatched picker leaves the existing record alone rather than
+    // clearing it. This means the picker currently can't be used to
+    // explicitly CLEAR an already-set profile — only to replace it with a
+    // different one.
+    const profileLabel = selectedProfile
+      ? boardProfileLabel(selectedProfile)
+      : selectedProfileId === TWOHIRE_SIMULATOR_PROFILE_ID
+        ? "Testprofil (2hboard simulator)"
+        : twohireProfileOriginal;
 
     // .select() so a row actually being updated can be confirmed — RLS
     // (vehicle_profiles_update_policy.sql) silently returns 0 rows rather
@@ -297,6 +411,8 @@ export function HandleVehiclePage() {
         drivmiddel,
         department_id: homeDepartmentId,
         costumer_id: vehicleCostumerId,
+        iot_id: trimmedIotId || null,
+        twohire_profile: profileLabel || null,
       })
       .eq("vehicle_id", vehicle.vehicleId)
       .select("vehicle_id");
@@ -573,6 +689,97 @@ export function HandleVehiclePage() {
                         </div>
                       </div>
                     </div>
+                    {/* FLEETii-admin-only — 2hire-board device internals, not fleet-management info a regular admin manages. Same picker as VehicleCreatePage.tsx's own "Registrér køretøj i 2hire" QR-kode/2hire-profil section (incl. the same QrScanButton and live 2hire-board-profiles fetch), but purely to correct OUR OWN already-stored twohire_profile label — saving here never calls 2hire itself (see vehicle_profiles_add_twohire_profile.sql), it doesn't re-associate anything with 2hire. */}
+                    {isFleetiiAdmin && (
+                      <>
+                        <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
+                          <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">QR-kode:</label>
+                          <div className="flex items-center gap-1.5">
+                            <input
+                              type="text"
+                              value={iotId}
+                              onChange={(e) => setIotId(e.target.value)}
+                              className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            />
+                            <QrScanButton onScan={setIotId} />
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
+                          <div className="flex items-center justify-between gap-2 border-r border-brand-100 pr-1">
+                            <label className="whitespace-nowrap font-medium">2hire-profil:</label>
+                            <div className="flex items-center gap-1">
+                              <div className="relative" ref={profileJsonRef}>
+                                <button
+                                  type="button"
+                                  onClick={() => setShowProfileJson((prev) => !prev)}
+                                  aria-label="Vis valgt profil som JSON"
+                                  className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
+                                >
+                                  i
+                                </button>
+                                <InlinePopup
+                                  visible={showProfileJson}
+                                  align="right"
+                                  message={
+                                    <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                                      {selectedProfile
+                                        ? JSON.stringify(selectedProfile, null, 2)
+                                        : selectedProfileId
+                                          ? `Ingen profildata fundet for id: ${selectedProfileId}`
+                                          : "Ingen profil valgt."}
+                                    </pre>
+                                  }
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={() => setFilterProfilesByVehicle((prev) => !prev)}
+                                aria-label={filterProfilesByVehicle ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
+                                title={filterProfilesByVehicle ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
+                                className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
+                                  filterProfilesByVehicle
+                                    ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                                    : "border-brand-300 text-brand-600 hover:bg-brand-50"
+                                }`}
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                                  <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
+                                </svg>
+                              </button>
+                            </div>
+                          </div>
+                          {profilesLoading ? (
+                            <span className="text-sm text-brand-500">Indlæser…</span>
+                          ) : profilesError ? (
+                            <span className="text-sm text-red-600">{profilesError}</span>
+                          ) : visibleProfiles.length === 0 ? (
+                            <select
+                              value={selectedProfileId}
+                              onChange={(e) => setSelectedProfileId(e.target.value)}
+                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            >
+                              <option value="">Ingen profil matcher køretøjet — behold gemt værdi</option>
+                              <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>Testprofil (2hboard simulator)</option>
+                            </select>
+                          ) : (
+                            <select
+                              value={selectedProfileId}
+                              onChange={(e) => setSelectedProfileId(e.target.value)}
+                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            >
+                              <option value="">
+                                {twohireProfileOriginal ? `Vælg profil… (gemt: ${twohireProfileOriginal})` : "Vælg profil…"}
+                              </option>
+                              {visibleProfiles.map((profile) => (
+                                <option key={boardProfileId(profile)} value={boardProfileId(profile)}>
+                                  {boardProfileLabel(profile)}
+                                </option>
+                              ))}
+                            </select>
+                          )}
+                        </div>
+                      </>
+                    )}
                   </div>
                 </div>
               )}

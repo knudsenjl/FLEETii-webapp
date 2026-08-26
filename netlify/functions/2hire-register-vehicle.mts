@@ -6,9 +6,12 @@
 // vehicle in 2hire, then inserts the resulting vehicle into our own DB:
 //   1. registerVehicle({qrCode, profileId}) -> real 2hire vehicleId
 //   2. vehicle_profiles insert (vehicle_ident/number_plate/brand/model/
-//      model_year/costumer_id/department_id snapshotted from the order —
-//      iot_id left null, since nothing outside TwoHireTestPage.tsx's
-//      e2e-simulator-only calls ever reads it for a real vehicle)
+//      model_year/costumer_id/department_id snapshotted from the order,
+//      plus iot_id (the QR code itself) and twohire_profile (the profile's
+//      human-readable label, as picked in the UI — see
+//      vehicle_profiles_add_twohire_profile.sql) — both FLEETii-admin-only
+//      read-only info on VehicleDetailsPage.tsx, editable on
+//      HandleVehiclePage.tsx)
 //   3. vehicle_departments insert (if the order has a department_id)
 //   4. costumer_orders update: vehicle_id + vehicle_registered +
 //      iot_device_associated all set together — 2hire's actual API has no
@@ -33,7 +36,7 @@ import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { registerVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
-type RegisterVehicleOrderBody = { orderId?: string; qrCode?: string; profileId?: string };
+type RegisterVehicleOrderBody = { orderId?: string; qrCode?: string; profileId?: string; profileLabel?: string | null };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -64,6 +67,7 @@ export default async (req: Request) => {
   const orderId = body.orderId?.trim();
   const qrCode = body.qrCode?.trim();
   const profileId = body.profileId?.trim();
+  const profileLabel = body.profileLabel?.trim() || null;
   if (!orderId || !qrCode || !profileId) {
     return new Response(JSON.stringify({ error: "orderId, qrCode og profileId er påkrævet." }), { status: 400 });
   }
@@ -131,6 +135,8 @@ export default async (req: Request) => {
     parking: order.parking,
     costumer_id: order.costumer_id,
     department_id: order.department_id,
+    iot_id: qrCode,
+    twohire_profile: profileLabel,
   });
   if (profileError) {
     console.error("[2hire-register-vehicle] vehicle_profiles upsert failed:", profileError);
