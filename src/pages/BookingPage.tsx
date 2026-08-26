@@ -6,6 +6,8 @@ import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import {
   BOOKING_ID_COLUMN,
   BOOKINGS_SELECT_COLUMNS,
+  DEPARTMENT_COLUMN,
+  USER_ID_COLUMN,
   formatBookingPeriod,
   formatVehicleIdentLabel,
   formatVehicleLabel,
@@ -184,7 +186,7 @@ export function BookingPage() {
   /** Finds the viewer's own currently-active booking, or failing that their soonest upcoming one — see this page's own doc comment for why (no bookingId to link from, unlike BookingDetailsPage.tsx). Same query BookingsPage.tsx's "Næste reservation" row uses (end >= now OR end is null, ordered by start ascending), just limited to the single first result and scoped to this viewer only (no admin cross-department branch — this page is reached only as role "user"'s landing page). */
   useEffect(() => {
     const userId = session?.user.id;
-    if (!userId) {
+    if (!userId || !afdelingId) {
       setBookingLoading(false);
       return;
     }
@@ -198,6 +200,20 @@ export function BookingPage() {
       // every open-ended booking, since NULL >= x is NULL/falsy in Postgres
       // (same reasoning as BookingsPage.tsx's identical query).
       .or(`end.gte.${nowIsoString()},end.is.null`)
+      // Scope to the viewer's OWN bookings only, same as BookingsPage.tsx's
+      // identical query — without this, RLS alone decides which rows are
+      // visible (department-wide, not just this user's), so the "earliest
+      // upcoming" row picked here could be a DIFFERENT employee's booking
+      // rather than the viewer's own.
+      .eq(USER_ID_COLUMN, userId)
+      // ALSO scope to the viewer's CURRENT department, matching
+      // BookingsPage.tsx's departmentBookings filter (activeBookings.filter
+      // by afdelingId) — a user can have old bookings still on record under
+      // a department they've since moved on from (e.g. after a transfer);
+      // without this, the earliest-starting one of those could outrank a
+      // genuinely current booking in the user's actual department, since
+      // ordering is by start date alone.
+      .eq(DEPARTMENT_COLUMN, afdelingId)
       .order("start", { ascending: true })
       .limit(1)
       .returns<BookingRow[]>()
@@ -210,7 +226,7 @@ export function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user.id]);
+  }, [session?.user.id, afdelingId]);
 
   useEffect(() => {
     if (!booking && !bookingLoading) {
