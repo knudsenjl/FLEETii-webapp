@@ -11,6 +11,7 @@ import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
+import { stripNumberSpacing } from "../lib/textNormalization";
 
 /** A row from the `user_profiles` table. When reached with one pre-filled via router state (clicking a row on DepartmentPage), the form edits it (see UserDetailsPage's own doc comment below for how). */
 type ProfileRow = {
@@ -366,13 +367,19 @@ export function UserDetailsPage() {
   }, [email, user?.user_id]);
 
   const emailFormatInvalid = email.trim().length > 0 && !EMAIL_PATTERN.test(email.trim());
-  const phoneFormatInvalid = phone.trim().length > 0 && !PHONE_PATTERN.test(phone.trim());
+  // PHONE_PATTERN is digits-only (see its own comment) — tested against the
+  // whitespace-STRIPPED value, not just trimmed, so a phone typed with
+  // spaces ("70 60 86 89") still validates correctly. The saved value
+  // itself (below) keeps its single-space form (see normalizeNumberSpacing
+  // server-side in create-user.mts/update-user.mts) — only the validity
+  // check needs the fully-stripped one.
+  const phoneFormatInvalid = phone.trim().length > 0 && !PHONE_PATTERN.test(stripNumberSpacing(phone));
 
   const canSubmit =
     fullName.trim().length > 0 &&
     EMAIL_PATTERN.test(email.trim()) &&
     emailExists === false &&
-    PHONE_PATTERN.test(phone.trim()) &&
+    PHONE_PATTERN.test(stripNumberSpacing(phone)) &&
     department.trim().length > 0 &&
     role.trim().length > 0 &&
     // A brand-new user needs an explicit Kunde pick when created by a

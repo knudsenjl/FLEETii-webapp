@@ -8,7 +8,7 @@
 // of doing all writes server-side — so requireAdmin() plus the costumer
 // check below is this function's actual authorization boundary.
 import { createClient } from "@supabase/supabase-js";
-import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 
 type UpdateUserBody = {
@@ -151,7 +151,7 @@ export default async (req: Request) => {
     .update({
       email,
       full_name: body.full_name ?? null,
-      phone: body.phone ?? null,
+      phone: asNormalizedNumberString(body.phone) || null,
       user_ident: asTrimmedString(body.user_ident) || null,
       department_id: requestedDepartmentId,
       // The requested department's own costumer_id is authoritative — for a

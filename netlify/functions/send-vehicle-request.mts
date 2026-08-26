@@ -18,7 +18,7 @@
 // create-user.mts's welcome email. MAIL_RECIEVER is this function's own
 // recipient (FLEETii staff) — unrelated to who create-user.mts emails.
 import { createClient } from "@supabase/supabase-js";
-import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
@@ -38,7 +38,7 @@ type SendVehicleRequestBody = {
   /** Optional — not always known (e.g. a genuinely new vehicle), free-text same as the other fields. */
   fuelLevel?: string | null;
   mileage?: string | null;
-  /** One of vehicle_profiles.drivmiddel's five values (see NewVehiclePage.tsx's <select>) — falls back to the column's own "Benzin" default (see costumer_orders_add_drivmiddel.sql) if somehow missing, same as an omitted insert column would. */
+  /** One of vehicle_profiles.drivmiddel's allowed values (see NewVehiclePage.tsx's <select>) — falls back to the column's own "Benzin" default (see costumer_orders_add_drivmiddel.sql) if somehow missing, same as an omitted insert column would. */
   drivmiddel?: string | null;
   /** Whether a NEW FLEETii device needs to be installed — false means the vehicle already has one, identified by fleetiiDeviceId instead (see NewVehiclePage.tsx's own doc comment). Defaults true if omitted, matching the client's own default. */
   needsFleetiiDevice?: boolean;
@@ -155,7 +155,7 @@ export default async (req: Request) => {
 
   const vehicleIdent = asTrimmedString(body.vehicleIdent);
   const parking = asTrimmedString(body.parking);
-  const nummerplade = asTrimmedString(body.nummerplade);
+  const nummerplade = asNormalizedNumberString(body.nummerplade);
   const brand = asTrimmedString(body.brand);
   const maerke = asTrimmedString(body.maerke);
   const aargang = asTrimmedString(body.aargang);
@@ -164,7 +164,7 @@ export default async (req: Request) => {
   const drivmiddel = asTrimmedString(body.drivmiddel) || "Benzin";
   const kontaktperson = asTrimmedString(body.kontaktperson);
   const kontaktemail = asTrimmedString(body.kontaktemail);
-  const kontaktnummer = asTrimmedString(body.kontaktnummer);
+  const kontaktnummer = asNormalizedNumberString(body.kontaktnummer);
   if (!nummerplade || !kontaktperson || !kontaktemail || !kontaktnummer) {
     return new Response(
       JSON.stringify({

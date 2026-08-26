@@ -6,6 +6,7 @@
 // FLEETii-admin gated, same access level as the rest of CostumerNewPage.tsx
 // (see App.tsx's requireRole="FLEETii admin" on /costumer-new).
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
 
 const CVRAPI_BASE_URL = "https://cvrapi.dk/api";
 
@@ -59,7 +60,12 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const cvr = new URL(req.url).searchParams.get("cvr")?.trim();
+  // Stripped of ALL whitespace (not just trimmed) before validating/sending
+  // on to cvrapi.dk — the admin may have typed/pasted it with spaces (a
+  // normal, readable way to enter a CVR number), but cvrapi.dk's own
+  // search param and the 8-digit check below both need the plain digit
+  // string.
+  const cvr = stripNumberSpacing(new URL(req.url).searchParams.get("cvr") ?? "");
   if (!cvr || !/^\d{8}$/.test(cvr)) {
     return new Response(JSON.stringify({ error: "CVR-nummeret skal være 8 cifre." }), { status: 400 });
   }

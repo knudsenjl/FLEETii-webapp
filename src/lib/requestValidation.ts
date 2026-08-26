@@ -4,6 +4,7 @@
 // though the source is .ts — that's the standard TypeScript/Node16-ESM
 // convention for importing a .ts file's compiled output, and lets the
 // functions be typechecked under tsconfig.functions.json.
+import { normalizeNumberSpacing } from "./textNormalization.js";
 
 /**
  * Returns the trimmed string, or undefined if the value isn't a string at
@@ -14,4 +15,14 @@
  */
 export function asTrimmedString(value: unknown): string | undefined {
   return typeof value === "string" ? value.trim() : undefined;
+}
+
+/**
+ * Like asTrimmedString, but additionally collapses internal whitespace runs
+ * down to a single space (see normalizeNumberSpacing) — for phone numbers,
+ * CVR numbers, and number plates specifically, not general free text.
+ */
+export function asNormalizedNumberString(value: unknown): string | undefined {
+  const trimmed = asTrimmedString(value);
+  return trimmed === undefined ? undefined : normalizeNumberSpacing(trimmed);
 }

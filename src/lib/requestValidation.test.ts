@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { asTrimmedString } from "./requestValidation";
+import { asNormalizedNumberString, asTrimmedString } from "./requestValidation";
 
 describe("asTrimmedString", () => {
   it("trims a valid string", () => {
@@ -25,5 +25,20 @@ describe("asTrimmedString", () => {
 
   it("returns undefined for a boolean instead of throwing", () => {
     expect(asTrimmedString(true)).toBeUndefined();
+  });
+});
+
+describe("asNormalizedNumberString", () => {
+  it("trims and collapses internal whitespace, like normalizeNumberSpacing", () => {
+    expect(asNormalizedNumberString("  12  34   56 78  ")).toBe("12 34 56 78");
+  });
+
+  it("returns undefined for a missing value, same as asTrimmedString", () => {
+    expect(asNormalizedNumberString(undefined)).toBeUndefined();
+    expect(asNormalizedNumberString(null)).toBeUndefined();
+  });
+
+  it("returns undefined for a non-string instead of throwing", () => {
+    expect(asNormalizedNumberString(12345)).toBeUndefined();
   });
 });

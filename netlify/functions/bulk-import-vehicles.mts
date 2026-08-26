@@ -26,7 +26,7 @@
 // race-free-within-one-batch requirement. A failed row is recorded and
 // skipped, not fatal to the batch.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
@@ -142,7 +142,7 @@ export default async (req: Request) => {
   // same pre-fill NewVehiclePage.tsx does for a single request.
   const contactperson = asTrimmedString(body.contactperson) || asTrimmedString(caller?.full_name ?? undefined) || null;
   const contactemail = asTrimmedString(body.contactemail) || asTrimmedString(caller?.email ?? undefined) || null;
-  const contactnumber = asTrimmedString(body.contactnumber) || asTrimmedString(caller?.phone ?? undefined) || null;
+  const contactnumber = asNormalizedNumberString(body.contactnumber) || asNormalizedNumberString(caller?.phone ?? undefined) || null;
   if (!contactperson || !contactemail || !contactnumber) {
     return new Response(
       JSON.stringify({ error: "Kontaktperson, kontakt e-mail og kontaktnummer mangler (og kunne ikke udledes fra din egen profil)." }),
@@ -182,7 +182,7 @@ async function importVehicleRow(
     departmentCache: Map<string, string>;
   },
 ): Promise<Omit<RowResult, "row">> {
-  const numberPlate = asTrimmedString(row.Nummerplade);
+  const numberPlate = asNormalizedNumberString(row.Nummerplade);
   if (!numberPlate) {
     return { success: false, error: "Nummerplade mangler." };
   }

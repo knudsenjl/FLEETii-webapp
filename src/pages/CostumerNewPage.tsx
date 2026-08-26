@@ -7,6 +7,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
+import { normalizeNumberSpacing, stripNumberSpacing } from "../lib/textNormalization";
 
 /** The freshly-inserted costumer row, as returned by handleCreate's own .select(). Only the fields this page itself needs. */
 type NewCostumer = {
@@ -104,7 +105,7 @@ export function CostumerNewPage() {
     setCvrLookupError(null);
 
     try {
-      const response = await fetch(`/.netlify/functions/cvr-lookup?cvr=${encodeURIComponent(cvr.trim())}`, {
+      const response = await fetch(`/.netlify/functions/cvr-lookup?cvr=${encodeURIComponent(stripNumberSpacing(cvr))}`, {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
       });
       const result = (await response.json()) as {
@@ -142,12 +143,12 @@ export function CostumerNewPage() {
       .from("costumers")
       .insert({
         name: name.trim(),
-        cvr: cvr.trim() || null,
+        cvr: normalizeNumberSpacing(cvr) || null,
         address_street: street.trim() || null,
         address_postal_city: postalCity.trim() || null,
         address_country: country.trim() || null,
         contact_person: contactPerson.trim() || null,
-        phone: phone.trim() || null,
+        phone: normalizeNumberSpacing(phone) || null,
         email: email.trim() || null,
       })
       .select("costumer_id, name, cvr")
@@ -370,7 +371,7 @@ export function CostumerNewPage() {
                         <button
                           type="button"
                           onClick={() => void handleCvrLookup()}
-                          disabled={cvrLookupLoading || !/^\d{8}$/.test(cvr.trim())}
+                          disabled={cvrLookupLoading || !/^\d{8}$/.test(stripNumberSpacing(cvr))}
                           title="Slå op i CVR-registret"
                           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
                         >
