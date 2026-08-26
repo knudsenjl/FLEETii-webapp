@@ -1,6 +1,6 @@
 // "Administration af kunder" — one of the two FLEETii-admin-only pages split
 // out of what used to be a single FleetiiAdministrationPage.tsx ("/fleetii-admin"
-// — see AdminFrontpage.tsx's "FLEETii admin: Administration af kunder" button,
+// — see AdminFrontpage.tsx's "Administration af kunder" button,
 // the first of its two FLEETii-admin-only buttons). Lists every costumer;
 // clicking one opens CostumerDetailsPage. The sibling "administration af
 // installationer" half now lives on its own page — see
