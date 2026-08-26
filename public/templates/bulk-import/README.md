@@ -29,7 +29,7 @@ Handled by `netlify/functions/bulk-import-vehicles.mts`.
 | `Brand` | No | |
 | `Mærke` | No | |
 | `Årgang` | No | |
-| `Drivmiddel` | No | One of `Benzin` (default), `Diesel`, `El`, `Hybrid`, `Brint` — nothing else. |
+| `Drivmiddel` | No | One of `Benzin` (default), `Diesel`, `El`, `Hybrid`, `Hybrid/Benzin`, `Hybrid/Diesel`, `Brint` — nothing else. |
 | `P-plads` | No | |
 | `Kilometerstand` | No | |
 | `Drivmiddelniveau` | No | Fuel/battery level, if known. |
