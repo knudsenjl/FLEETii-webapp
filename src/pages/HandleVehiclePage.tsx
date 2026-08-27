@@ -14,6 +14,7 @@ import {
   boardProfileId,
   boardProfileLabel,
   profileMatchesVehicle,
+  sortBoardProfilesByLabel,
   TWOHIRE_SIMULATOR_PROFILE_ID,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
@@ -305,9 +306,11 @@ export function HandleVehiclePage() {
     year.trim().length > 0 &&
     Boolean(homeDepartmentId);
 
-  const visibleProfiles = filterProfilesByVehicle
-    ? profiles.filter((profile) => profileMatchesVehicle(profile, { brand: make, model, model_year: year }))
-    : profiles;
+  const visibleProfiles = sortBoardProfilesByLabel(
+    filterProfilesByVehicle
+      ? profiles.filter((profile) => profileMatchesVehicle(profile, { brand: make, model, model_year: year }))
+      : profiles,
+  );
   /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile. */
   const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
 
@@ -689,20 +692,20 @@ export function HandleVehiclePage() {
                         </div>
                       </div>
                     </div>
-                    {/* FLEETii-admin-only — 2hire-board device internals, not fleet-management info a regular admin manages. Same picker as VehicleCreatePage.tsx's own "Registrér køretøj i 2hire" QR-kode/2hire-profil section (incl. the same QrScanButton and live 2hire-board-profiles fetch), but purely to correct OUR OWN already-stored twohire_profile label — saving here never calls 2hire itself (see vehicle_profiles_add_twohire_profile.sql), it doesn't re-associate anything with 2hire. */}
+                    {/* FLEETii-admin-only — 2hire-board device internals, not fleet-management info a regular admin manages. Same box/picker as VehicleCreatePage.tsx's own "Registrér køretøj i 2hire" QR-kode/2hire-profil section (incl. the same QrScanButton and live 2hire-board-profiles fetch), but purely to correct OUR OWN already-stored twohire_profile label — saving via "Gem ændringer" never calls 2hire itself (see vehicle_profiles_add_twohire_profile.sql), it doesn't re-associate anything with 2hire. The "Registrér køretøj i 2hire" button below is a deliberate placeholder, not wired to any action yet — a REAL re-registration would call 2hire's registerVehicle again, which returns a brand-new vehicleId distinct from this vehicle's existing one (vehicle_profiles.vehicle_id IS 2hire's own real vehicleId, used everywhere — bookings, lock/unlock, webhook signals — and must never be regenerated independently of an actual 2hire registration), so what should happen to the vehicle's identity on a real re-registration needs resolving with 2hire first before this can be implemented. */}
                     {isFleetiiAdmin && (
-                      <>
+                      <div className="rounded-none border border-brand-100 bg-brand-50/40">
                         <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
-                          <label className="whitespace-nowrap border-r border-brand-100 pr-1 font-medium">QR-kode:</label>
-                          <div className="flex items-center gap-1.5">
-                            <input
-                              type="text"
-                              value={iotId}
-                              onChange={(e) => setIotId(e.target.value)}
-                              className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                            />
+                          <span className="flex items-center justify-between gap-2 border-r border-brand-100 pr-1">
+                            <label className="whitespace-nowrap font-medium">QR-kode:</label>
                             <QrScanButton onScan={setIotId} />
-                          </div>
+                          </span>
+                          <input
+                            type="text"
+                            value={iotId}
+                            onChange={(e) => setIotId(e.target.value)}
+                            className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          />
                         </div>
                         <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                           <div className="flex items-center justify-between gap-2 border-r border-brand-100 pr-1">
@@ -712,7 +715,7 @@ export function HandleVehiclePage() {
                                 <button
                                   type="button"
                                   onClick={() => setShowProfileJson((prev) => !prev)}
-                                  aria-label="Vis valgt profil som JSON"
+                                  aria-label="Vis valgt profil, eller hele profil-listen, som JSON"
                                   className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
                                 >
                                   i
@@ -726,7 +729,10 @@ export function HandleVehiclePage() {
                                         ? JSON.stringify(selectedProfile, null, 2)
                                         : selectedProfileId
                                           ? `Ingen profildata fundet for id: ${selectedProfileId}`
-                                          : "Ingen profil valgt."}
+                                          : profiles.length > 0
+                                            ? // No profile picked yet — dumps 2hire's ENTIRE raw fetched list instead (not just visibleProfiles, which may already be narrowed by the filter toggle), same reasoning as VehicleCreatePage.tsx's own identical popup.
+                                              JSON.stringify(profiles, null, 2)
+                                            : "Ingen profiler indlæst."}
                                     </pre>
                                   }
                                 />
@@ -756,7 +762,7 @@ export function HandleVehiclePage() {
                             <select
                               value={selectedProfileId}
                               onChange={(e) => setSelectedProfileId(e.target.value)}
-                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                              className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                             >
                               <option value="">Ingen profil matcher køretøjet — behold gemt værdi</option>
                               <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>Testprofil (2hboard simulator)</option>
@@ -765,7 +771,7 @@ export function HandleVehiclePage() {
                             <select
                               value={selectedProfileId}
                               onChange={(e) => setSelectedProfileId(e.target.value)}
-                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                              className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                             >
                               <option value="">
                                 {twohireProfileOriginal ? `Vælg profil… (gemt: ${twohireProfileOriginal})` : "Vælg profil…"}
@@ -778,7 +784,17 @@ export function HandleVehiclePage() {
                             </select>
                           )}
                         </div>
-                      </>
+                        <div className="px-1 py-0.5">
+                          <button
+                            type="button"
+                            disabled
+                            title="Endnu ikke implementeret — kræver afklaring med 2hire af hvordan køretøjets vehicle_id håndteres ved en reel gen-registrering."
+                            className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            Registrér køretøj i 2hire
+                          </button>
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
