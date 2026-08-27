@@ -750,6 +750,14 @@ export function VehicleCreatePage() {
                                 <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
                               </svg>
                             </button>
+                            {narrowedProfiles.length > 1 && (
+                              <span
+                                title={`${narrowedProfiles.length} matchende profiler`}
+                                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[0.65rem] font-semibold text-white"
+                              >
+                                {narrowedProfiles.length}
+                              </span>
+                            )}
                           </div>
                         </div>
                         {profilesLoading ? (
