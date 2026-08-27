@@ -17,7 +17,7 @@ describe("boardProfileId", () => {
 
 describe("boardProfileLabel", () => {
   it("reads the confirmed real 'title' field", () => {
-    expect(boardProfileLabel({ title: "Fiat 500 2019-2020" })).toBe("Fiat 500 2019-2020");
+    expect(boardProfileLabel({ title: "Mercedes-Benz_GLE_W167-ImmoBreakout" })).toBe("Mercedes-Benz_GLE_W167-ImmoBreakout");
   });
 
   it("falls back to 'name' when 'title' is absent", () => {
@@ -30,6 +30,22 @@ describe("boardProfileLabel", () => {
 
   it("falls back to the raw JSON as a last resort", () => {
     expect(boardProfileLabel({ foo: "bar" })).toBe(JSON.stringify({ foo: "bar" }));
+  });
+
+  it("appends the year range when modelYearRange is present", () => {
+    expect(boardProfileLabel({ title: "Mercedes-Benz_GLE_W167-ImmoBreakout", modelYearRange: [2011, 2019] })).toBe(
+      "Mercedes-Benz_GLE_W167-ImmoBreakout (2011-2019)",
+    );
+  });
+
+  it("appends the year range even when falling back to the id", () => {
+    expect(boardProfileLabel({ id: "abc-123", modelYearRange: [2018, 2022] })).toBe("abc-123 (2018-2022)");
+  });
+
+  it("does not append anything when modelYearRange is absent/malformed", () => {
+    expect(boardProfileLabel({ title: "Golf" })).toBe("Golf");
+    expect(boardProfileLabel({ title: "Golf", modelYearRange: [2020] })).toBe("Golf");
+    expect(boardProfileLabel({ title: "Golf", modelYearRange: null })).toBe("Golf");
   });
 });
 
