@@ -2,7 +2,7 @@
 // login). Pure navigation hub: no data fetching (except the one on-demand
 // departments fetch below), just links to every other admin-only section of
 // the app.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
@@ -15,6 +15,24 @@ export function AdminFrontpage() {
   const { profile, costumerId, costumerName } = useAuth();
   const [departmentsLoading, setDepartmentsLoading] = useState(false);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
+  /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the red count badge on the "Administration af installationer" button below. FLEETii-admin only (same gating as that button itself), fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
+  const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (profile?.role !== "FLEETii admin") return;
+
+    let cancelled = false;
+    void supabase
+      .from("costumer_orders")
+      .select("order_id", { count: "exact", head: true })
+      .then(({ count }) => {
+        if (!cancelled) setPendingInstallationsCount(count ?? 0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.role]);
 
   /** Fetches this admin's own costumer's departments (RLS already scopes departments' SELECT to any authenticated user, see departments_select_policy.sql — the costumer_id filter here is just "which ones", not a permission check) and hands them to EditDepartmentsPage.tsx via router state, same shape DepartmentDetailsPage.tsx passes. */
   const handleOpenDepartments = async () => {
@@ -70,9 +88,14 @@ export function AdminFrontpage() {
                   <button
                     type="button"
                     onClick={() => navigate("/fleetii-admin-installations")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Administration af installationer
+                    {Boolean(pendingInstallationsCount) && (
+                      <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
+                        {pendingInstallationsCount}
+                      </span>
+                    )}
                   </button>
                 </div>
               )}
