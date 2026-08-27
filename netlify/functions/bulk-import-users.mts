@@ -19,7 +19,7 @@
 // matching 2hire-register-vehicle.mts's own "report per-row, don't abort"
 // precedent for a similarly non-transactional multi-step write.
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
@@ -200,7 +200,7 @@ async function importUserRow(
     user_id: created.user.id,
     email,
     full_name: asTrimmedString(row.Navn) || null,
-    phone: asTrimmedString(row.Telefon) || null,
+    phone: asNormalizedNumberString(row.Telefon) || null,
     user_ident: asTrimmedString(row["Bruger-ID"]) || null,
     department_id: departmentId,
     costumer_id: ctx.costumerId,

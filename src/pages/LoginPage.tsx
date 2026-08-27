@@ -262,13 +262,14 @@ export function LoginPage() {
                 <label className="flex flex-col gap-1.5 text-sm font-medium text-brand-700">
                   Brugernavn / e-mail
                   <div className="relative">
+                    {/* text-[16px] (an absolute value, not a rem-based text-* class) rather than the label's own text-sm — iOS Safari force-zooms the whole tab in when a focused field's computed font-size is under 16px, and html's font-size:87.5% shrinks every rem-based size below that threshold (see BookingPage.tsx's own fix for the exact symptom this avoids). Only genuinely-focusable text fields on pages a role-"user" Bruger can reach on their phone need this — see SetPasswordPage.tsx/ReservationPage.tsx's own inputs for the other spots. Admin-only desktop-oriented forms deliberately don't carry this, so their fields stay visually consistent with this app's normal (smaller) text sizing instead. */}
                     <input
                       type="text"
                       autoComplete="username"
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="dig@virksomhed.dk"
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 pr-9 text-base text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 pr-9 text-[16px] text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
                     />
                     {username && (
                       <button
@@ -294,7 +295,7 @@ export function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 text-base text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
+                    className="rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 text-[16px] text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
                   />
                 </label>
 

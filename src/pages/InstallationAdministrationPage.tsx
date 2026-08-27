@@ -1,7 +1,7 @@
 // "Administration af installationer" — the other of the two FLEETii-admin-only
 // pages split out of what used to be a single FleetiiAdministrationPage.tsx
-// ("/fleetii-admin" — see AdminFrontpage.tsx's "FLEETii admin: Administration
-// af installationer" button, the second of its two FLEETii-admin-only
+// ("/fleetii-admin" — see AdminFrontpage.tsx's "Administration af
+// installationer" button, the second of its two FLEETii-admin-only
 // buttons). Lists every costumer_orders row; clicking one opens
 // VehicleCreatePage.tsx ("Opret" orders) or VehicleDeletePage.tsx ("Nedlæg"
 // orders). The sibling "administration af kunder" half now lives on its own

@@ -53,8 +53,8 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
  * comment), admin/FLEETii admin land on "/admin". A "FLEETii admin" role
  * lands on "/admin" too, same as a regular admin (it's a superset of "admin"
  * — see ProtectedRoute's requireAdmin check) — AdminFrontpage.tsx shows them
- * two extra buttons ("FLEETii admin: Administration af kunder"/
- * "...installationer") onward to "/fleetii-admin"/
+ * two extra buttons ("Administration af kunder"/"...installationer") onward
+ * to "/fleetii-admin"/
  * "/fleetii-admin-installations" when they actually need it, rather than
  * defaulting there on every login.
  * Renders LoginPage while loading or once it's confirmed there's no session.

@@ -138,28 +138,6 @@
   }
 }
 
-/* iOS Safari force-zooms the whole page in when a form field's computed
-   font-size is under 16px at the moment it's focused (e.g. logging in on
-   the Login page), and that zoomed-in state then carries over to whatever
-   page you land on right after (e.g. BookingPage) since it's the same
-   Safari tab/scale, not a fresh load — matching the reported "have to
-   pinch to fit after logging in on iPhone" symptom. html's font-size:87.5%
-   above means every rem-based Tailwind text-* size used on an <input>
-   (e.g. text-base, nominally 16px) is actually ~14px here, under that
-   threshold. Forces every real text field to a true, non-rem 16px so
-   focusing one never triggers the zoom, regardless of whatever text-*
-   utility class it's also given. Kept UNLAYERED, same reasoning as the
-   Leaflet tooltip override below: Tailwind's own text-* utility classes
-   live in the highest-priority "utilities" cascade layer, so a rule inside
-   @layer base could never win against them regardless of specificity or
-   source order. checkbox/radio/range excluded — no text to zoom into, and
-   they shouldn't be force-resized. */
-input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
-select,
-textarea {
-  font-size: 16px;
-}
-
 /* FleetManagementPage's permanent vehicle-label tooltips (see
    LeafletMap.tsx's permanentTooltips prop — added so the label is reachable
    without hover, which doesn't exist on iPhone/iPad). Shrinks Leaflet's

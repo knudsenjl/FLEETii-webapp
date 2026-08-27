@@ -20,7 +20,7 @@
 // precisely because writes are meant to only ever happen here). Reached
 // from UserDetailsPage.tsx.
 import { createClient } from "@supabase/supabase-js";
-import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import {
@@ -161,7 +161,7 @@ export default async (req: Request) => {
     user_id: created.user.id,
     email,
     full_name: body.full_name ?? null,
-    phone: body.phone ?? null,
+    phone: asNormalizedNumberString(body.phone) || null,
     user_ident: asTrimmedString(body.user_ident) || null,
     department_id: requestedDepartmentId,
     // The requested department's own costumer_id is authoritative (matters

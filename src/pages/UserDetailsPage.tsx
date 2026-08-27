@@ -366,6 +366,11 @@ export function UserDetailsPage() {
   }, [email, user?.user_id]);
 
   const emailFormatInvalid = email.trim().length > 0 && !EMAIL_PATTERN.test(email.trim());
+  // PHONE_PATTERN validates spaces/dashes/parens as part of the format
+  // itself (see its own comment) — tested against the trimmed value, not
+  // the whitespace-stripped one. The saved value itself keeps its
+  // single-space form (see normalizeNumberSpacing server-side in
+  // create-user.mts/update-user.mts).
   const phoneFormatInvalid = phone.trim().length > 0 && !PHONE_PATTERN.test(phone.trim());
 
   const canSubmit =

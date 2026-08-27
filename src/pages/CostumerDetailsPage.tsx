@@ -7,6 +7,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
+import { normalizeNumberSpacing } from "../lib/textNormalization";
 
 /** The costumer row, as passed in via router state from CostumerAdministrationPage. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
@@ -223,12 +224,12 @@ export function CostumerDetailsPage() {
       .from("costumers")
       .update({
         name: editName.trim(),
-        cvr: editCvr.trim() || null,
+        cvr: normalizeNumberSpacing(editCvr) || null,
         address_street: editStreet.trim() || null,
         address_postal_city: editPostalCity.trim() || null,
         address_country: editCountry.trim() || null,
         contact_person: editContactPerson.trim() || null,
-        phone: editPhone.trim() || null,
+        phone: normalizeNumberSpacing(editPhone) || null,
         email: editEmail.trim() || null,
         // Only written when genuinely typed — a blank field here means
         // "leave whatever's already there alone", not "clear it".

@@ -27,8 +27,8 @@ export const DEPARTMENT_COLUMN = "department_id";
 /** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email, user_ident) via the user_id FK (PostgREST resolves it automatically) so callers get display-ready email/Bruger-ID alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
 export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email, user_ident), ${DEPARTMENT_COLUMN}`;
 
-/** The five propellant values vehicle_profiles.drivmiddel (and costumer_orders.drivmiddel) allow, per their shared CHECK constraint — see supabase/applied/vehicle_profiles_add_drivmiddel.sql / costumer_orders_add_drivmiddel.sql. Kept as a plain array (not an enum type) so every "Drivmiddel:" <select> (HandleVehiclePage.tsx, VehicleCreatePage.tsx) always matches the DB's own constraint from one shared source. */
-export const DRIVMIDDEL_OPTIONS = ["Benzin", "Diesel", "El", "Hybrid", "Brint"] as const;
+/** The propellant values vehicle_profiles.drivmiddel (and costumer_orders.drivmiddel) allow, per their shared CHECK constraint — see supabase/applied/vehicle_profiles_add_drivmiddel.sql / costumer_orders_add_drivmiddel.sql (plus vehicle_profiles_costumer_orders_drivmiddel_add_hybrid_variants.sql for the two Hybrid/* additions). Kept as a plain array (not an enum type) so every "Drivmiddel:" <select> (HandleVehiclePage.tsx, VehicleCreatePage.tsx) always matches the DB's own constraint from one shared source. */
+export const DRIVMIDDEL_OPTIONS = ["Benzin", "Diesel", "El", "Hybrid", "Hybrid/Benzin", "Hybrid/Diesel", "Brint"] as const;
 
 export type DisplayVehicle = Vehicle2Hire & {
   vehicle: string;

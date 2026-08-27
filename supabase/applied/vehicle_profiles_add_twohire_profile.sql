@@ -1,0 +1,18 @@
+-- Adds "2hire-profil" to vehicle_profiles — the human-readable label of the
+-- 2hire vehicle-configuration profile picked at registration time (see
+-- 2hire-board-profiles.mts/VehicleCreatePage.tsx's own boardProfileLabel),
+-- not the profile's own id: the id alone wouldn't be directly displayable
+-- later on VehicleDetailsPage.tsx/HandleVehiclePage.tsx without a live
+-- 2hire lookup. Spelled "twohire_" (not "2hire_", which isn't a valid
+-- leading identifier character) — same convention as costumers'
+-- twohire_client_id/twohire_client_secret. FLEETii-admin-only to view/edit
+-- in the app; no RLS change needed here since vehicle_profiles' existing
+-- SELECT/UPDATE policies already cover this column, same as every other
+-- one on the table.
+--
+-- vehicle_profiles.iot_id already existed before this migration (added
+-- long before "2hire-profil" was ever tracked) but was never actually
+-- populated by 2hire-register-vehicle.mts's own vehicle_profiles upsert —
+-- that gap is fixed in the same code change this migration ships with, not
+-- here (no schema change needed for iot_id itself).
+alter table public.vehicle_profiles add column twohire_profile text;

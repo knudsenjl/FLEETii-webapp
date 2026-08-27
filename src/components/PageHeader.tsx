@@ -51,7 +51,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -166,6 +166,29 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
               </svg>
             </button>
           )}
+          {/* Explicit reload — body is position:fixed (see index.css), so the
+              actual page/document never scrolls and iOS's native
+              pull-to-refresh has no scroll surface to hook onto here;
+              confirmed this app-shell layout is genuinely incompatible with
+              that gesture, not just an overscroll-behavior setting (see
+              f1abec8's own commit message). A real window.location.reload(),
+              one tap, works regardless of platform. Always shown (logged in
+              or not), same as when this was first added — removed for a
+              stretch, reinstated here right after Log ud. */}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            aria-label="Genindlæs siden"
+            title="Genindlæs siden"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
+              <path d="M3 12a9 9 0 0 1 15.3-6.4L21 8" />
+              <path d="M21 3v5h-5" />
+              <path d="M21 12a9 9 0 0 1-15.3 6.4L3 16" />
+              <path d="M3 21v-5h5" />
+            </svg>
+          </button>
           {isFullyAuthenticated && (
             <div className="relative">
               <button
