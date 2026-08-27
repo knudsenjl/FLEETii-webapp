@@ -14,6 +14,7 @@ import {
   boardProfileId,
   boardProfileLabel,
   profileMatchesVehicle,
+  sortBoardProfilesByLabel,
   TWOHIRE_SIMULATOR_PROFILE_ID,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
@@ -218,14 +219,18 @@ export function VehicleCreatePage() {
   const [profilesError, setProfilesError] = useState<string | null>(null);
   const [isRegistering, setIsRegistering] = useState(false);
   const [registerError, setRegisterError] = useState<string | null>(null);
+  /** "Slet" state (see handleDelete below) — a separate loading/error pair from isRegistering/registerError since the two actions are mutually exclusive (Slet is only ever shown alongside whichever of the register-button/registered-badge is currently rendered) but visually distinct outcomes. */
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   /** Whether the "2hire-profil" picker below is narrowed to profiles matching this order's own brand/model/model_year (see profileMatchesVehicle) — off by default: today's only environment (2hire's test/simulator adaptor) has exactly one profile, which never matches a real vehicle's brand/model, so defaulting to filtered would hide the only usable option on every single registration right now. Toggle it on once real production credentials expose an actual make/model catalog worth narrowing. */
   const [filterProfilesByOrder, setFilterProfilesByOrder] = useState(false);
-  const visibleProfiles =
+  const visibleProfiles = sortBoardProfilesByLabel(
     filterProfilesByOrder && order
       ? profiles.filter((profile) =>
           profileMatchesVehicle(profile, { brand: brandInput, model: modelInput, model_year: modelYearInput }),
         )
-      : profiles;
+      : profiles,
+  );
   /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile (e.g. TWOHIRE_SIMULATOR_PROFILE_ID auto-selected below when the real API response happens not to include it). */
   const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
 
@@ -452,6 +457,61 @@ export function VehicleCreatePage() {
     navigate("/fleetii-admin-installations", { replace: true });
   };
 
+  /**
+   * "Slet" — cancels this order. What that actually means depends on
+   * whether QR-kode/2hire-profil have already been registered
+   * (vehicleRegistered, with a real registeredVehicleId): if so, there's a
+   * real vehicle_profiles row and possibly a real 2hire registration now, so
+   * this does exactly what VehicleDeletePage.tsx's own terminal "Slet
+   * køretøj i FLEETii og 2hire" button does — deregisters from 2hire
+   * (best-effort) and deletes the vehicle from our own DB via
+   * delete-vehicle.mts, which also cleans up this order's own
+   * costumer_orders row (the case this normally leaves for — see
+   * handleRegisterVehicle's own cleanup-delete above, which can fail and
+   * strand the order row here alongside an already-registered vehicle).
+   * Otherwise nothing was ever created outside costumer_orders itself, so
+   * deleting just removes this pending order row directly.
+   */
+  const handleDelete = async () => {
+    setIsDeleting(true);
+    setDeleteError(null);
+
+    if (vehicleRegistered && registeredVehicleId) {
+      try {
+        const response = await fetch("/.netlify/functions/delete-vehicle", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+          },
+          body: JSON.stringify({ vehicleId: registeredVehicleId, orderId: order.order_id }),
+        });
+
+        const result = (await response.json()) as { ok?: boolean; error?: string };
+        if (!response.ok) {
+          setDeleteError(result.error ?? "Kunne ikke slette køretøjet.");
+          setIsDeleting(false);
+          return;
+        }
+      } catch {
+        setDeleteError("Kunne ikke kontakte serveren. Prøv igen senere.");
+        setIsDeleting(false);
+        return;
+      }
+
+      await refreshVehicles();
+    } else {
+      const { error: orderDeleteError } = await supabase.from("costumer_orders").delete().eq("order_id", order.order_id);
+      if (orderDeleteError) {
+        setDeleteError(orderDeleteError.message);
+        setIsDeleting(false);
+        return;
+      }
+    }
+
+    navigate("/fleetii-admin-installations", { replace: true });
+  };
+
   const rows: [string, string][] = [
     ["Kunde:", order.costumerName ?? "—"],
     ["Afdeling:", order.departmentName ?? "—"],
@@ -466,13 +526,13 @@ export function VehicleCreatePage() {
     ["Mærke:", order.model ?? "—"],
     ["Årgang:", order.model_year ?? "—"],
     ["Drivmiddel:", drivmiddelInput],
+    ["Kontaktperson:", order.contactperson],
+    ["Kontakt e-mail:", order.contactemail ?? "—"],
+    ["Kontakt tlf.:", order.contactnumber],
     [
       "FLEETii device:",
       order.needs_fleetii_device ? "Nyt device skal installeres" : `Eksisterende device (id: ${order.fleetii_device_id})`,
     ],
-    ["Kontaktperson:", order.contactperson],
-    ["Kontakt e-mail:", order.contactemail ?? "—"],
-    ["Kontakt tlf.:", order.contactnumber],
     ...(registeredVehicleId ? ([["2hire vehicle-id:", registeredVehicleId]] as [string, string][]) : []),
   ];
 
@@ -623,111 +683,135 @@ export function VehicleCreatePage() {
             {orderFieldSaveError && <p className="text-sm text-red-600">{orderFieldSaveError}</p>}
 
             <div className="flex flex-col gap-3">
+              {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
               {vehicleRegistered ? (
-                <span className="flex w-full items-center justify-center rounded-lg bg-green-600 px-2 py-1.5 text-center text-sm font-semibold text-white">
-                  ✓ Køretøj registreret i 2hire
-                </span>
-              ) : (
-                <div className="flex flex-col gap-2 rounded-2xl border border-brand-100 bg-brand-50/40 p-3">
-                  <div className="flex flex-col gap-0.5">
-                    <div className="grid grid-cols-2 items-center gap-2">
-                      <span className="flex items-center justify-between gap-2">
-                        <label className="text-sm font-medium text-brand-700">QR-kode:</label>
-                        <QrScanButton onScan={setQrCode} />
-                      </span>
-                      <input
-                        type="text"
-                        value={qrCode}
-                        onChange={(e) => setQrCode(e.target.value)}
-                        placeholder="fra det fysiske 2hire-device"
-                        className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <label className="text-sm font-medium text-brand-700">2hire-profil:</label>
-                        <div className="flex items-center gap-1">
-                          <div className="relative" ref={profileJsonRef}>
-                            <button
-                              type="button"
-                              onClick={() => setShowProfileJson((prev) => !prev)}
-                              aria-label="Vis valgt profil som JSON"
-                              className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
-                            >
-                              i
-                            </button>
-                            <InlinePopup
-                              visible={showProfileJson}
-                              align="right"
-                              message={
-                                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
-                                  {selectedProfile
-                                    ? JSON.stringify(selectedProfile, null, 2)
-                                    : selectedProfileId
-                                      ? `Ingen profildata fundet for id: ${selectedProfileId}`
-                                      : "Ingen profil valgt."}
-                                </pre>
-                              }
-                            />
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilterProfilesByOrder((prev) => !prev);
-                              setSelectedProfileId("");
-                            }}
-                            aria-label={filterProfilesByOrder ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
-                            title={filterProfilesByOrder ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
-                            className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                              filterProfilesByOrder
-                                ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                                : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                            }`}
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                              <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                            </svg>
-                          </button>
-                        </div>
-                      </div>
-                      {profilesLoading ? (
-                        <span className="text-sm text-brand-500">Indlæser…</span>
-                      ) : profilesError ? (
-                        <span className="text-sm text-red-600">{profilesError}</span>
-                      ) : visibleProfiles.length === 0 ? (
-                        <select
-                          value={selectedProfileId}
-                          onChange={(e) => setSelectedProfileId(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        >
-                          <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>
-                            Testprofil (2hboard simulator) — ingen profil matcher køretøjet
-                          </option>
-                        </select>
-                      ) : (
-                        <select
-                          value={selectedProfileId}
-                          onChange={(e) => setSelectedProfileId(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        >
-                          <option value="">Vælg profil…</option>
-                          {visibleProfiles.map((profile) => (
-                            <option key={boardProfileId(profile)} value={boardProfileId(profile)}>
-                              {boardProfileLabel(profile)}
-                            </option>
-                          ))}
-                        </select>
-                      )}
-                    </div>
-                  </div>
-                  {registerError && <p className="text-sm text-red-600">{registerError}</p>}
+                <div className="flex flex-row gap-3">
                   <button
                     type="button"
-                    disabled={!qrCode.trim() || !selectedProfileId || isRegistering}
-                    onClick={() => void handleRegisterVehicle()}
-                    className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    onClick={() => void handleDelete()}
+                    disabled={isDeleting}
+                    className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    {isRegistering ? "Registrerer…" : "Registrér køretøj i 2hire"}
+                    {isDeleting ? "Sletter…" : "Slet"}
+                  </button>
+                  <span className="flex flex-1 items-center justify-center rounded-lg bg-green-600 px-2 py-1.5 text-center text-sm font-semibold text-white">
+                    ✓ Køretøj registreret i 2hire
+                  </span>
+                </div>
+              ) : (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-col gap-2 rounded-2xl border border-brand-100 bg-brand-50/40 p-3">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="grid grid-cols-2 items-center gap-2">
+                        <span className="flex items-center justify-between gap-2">
+                          <label className="text-sm font-medium text-brand-700">QR-kode:</label>
+                          <QrScanButton onScan={setQrCode} />
+                        </span>
+                        <input
+                          type="text"
+                          value={qrCode}
+                          onChange={(e) => setQrCode(e.target.value)}
+                          placeholder="fra det fysiske 2hire-device"
+                          className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 items-center gap-2">
+                        <div className="flex items-center justify-between gap-2">
+                          <label className="text-sm font-medium text-brand-700">2hire-profil:</label>
+                          <div className="flex items-center gap-1">
+                            <div className="relative" ref={profileJsonRef}>
+                              <button
+                                type="button"
+                                onClick={() => setShowProfileJson((prev) => !prev)}
+                                aria-label="Vis valgt profil, eller hele profil-listen, som JSON"
+                                className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 font-serif text-[0.7rem] font-bold italic leading-none text-brand-600 transition hover:bg-brand-50"
+                              >
+                                i
+                              </button>
+                              <InlinePopup
+                                visible={showProfileJson}
+                                align="right"
+                                message={
+                                  <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                                    {selectedProfile
+                                      ? JSON.stringify(selectedProfile, null, 2)
+                                      : selectedProfileId
+                                        ? `Ingen profildata fundet for id: ${selectedProfileId}`
+                                        : profiles.length > 0
+                                          ? // No profile picked yet — dumps 2hire's ENTIRE raw fetched list instead (not just visibleProfiles, which may already be narrowed by the filter toggle), so the actual field shapes/values 2hire returns are inspectable without needing DevTools — this is what profileMatchesVehicle's makerName/modelName/modelYearRange matching logic above is keyed on, so it's the fastest way to diagnose why the filter isn't narrowing things down as expected.
+                                            JSON.stringify(profiles, null, 2)
+                                          : "Ingen profiler indlæst."}
+                                  </pre>
+                                }
+                              />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFilterProfilesByOrder((prev) => !prev);
+                                setSelectedProfileId("");
+                              }}
+                              aria-label={filterProfilesByOrder ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
+                              title={filterProfilesByOrder ? "Vis alle 2hire-profiler" : "Filtrér efter køretøjets mærke/model/årgang"}
+                              className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
+                                filterProfilesByOrder
+                                  ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                                  : "border-brand-300 text-brand-600 hover:bg-brand-50"
+                              }`}
+                            >
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                                <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                        {profilesLoading ? (
+                          <span className="text-sm text-brand-500">Indlæser…</span>
+                        ) : profilesError ? (
+                          <span className="text-sm text-red-600">{profilesError}</span>
+                        ) : visibleProfiles.length === 0 ? (
+                          <select
+                            value={selectedProfileId}
+                            onChange={(e) => setSelectedProfileId(e.target.value)}
+                            className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          >
+                            <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>
+                              Testprofil (2hboard simulator) — ingen profil matcher køretøjet
+                            </option>
+                          </select>
+                        ) : (
+                          <select
+                            value={selectedProfileId}
+                            onChange={(e) => setSelectedProfileId(e.target.value)}
+                            className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          >
+                            <option value="">Vælg profil…</option>
+                            {visibleProfiles.map((profile) => (
+                              <option key={boardProfileId(profile)} value={boardProfileId(profile)}>
+                                {boardProfileLabel(profile)}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+                      </div>
+                    </div>
+                    {registerError && <p className="text-sm text-red-600">{registerError}</p>}
+                    <button
+                      type="button"
+                      disabled={!qrCode.trim() || !selectedProfileId || isRegistering || isDeleting}
+                      onClick={() => void handleRegisterVehicle()}
+                      className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {isRegistering ? "Registrerer…" : "Registrér køretøj i 2hire"}
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete()}
+                    disabled={isDeleting || isRegistering}
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {isDeleting ? "Sletter…" : "Slet"}
                   </button>
                 </div>
               )}
