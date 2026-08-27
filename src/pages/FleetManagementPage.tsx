@@ -212,9 +212,14 @@ export function FleetManagementPage() {
     }
   }, [afdelingId, departmentOptions, isFleetiiAdmin]);
 
-  /** FLEETii-admin-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Same pattern as VehiclesPage.tsx's own identical effect. */
+  /** FLEETii-admin-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Same pattern as VehiclesPage.tsx's own identical effect, INCLUDING skipping its own first run (see costumerSyncSkippedFirstRun below) — this one would otherwise clobber savedSnapshot's own restored Kunde filter (a browser-back from VehicleDetailsPage) back to the viewer's own costumerId — usually null, meaning "Alle" — the moment this page remounts, defeating the whole point of restoring it. The initial useState above already seeds the correct value either way, so skipping the first run changes nothing for a plain, snapshot-less visit. */
+  const costumerSyncSkippedFirstRun = useRef(false);
   useEffect(() => {
     if (!isFleetiiAdmin) return;
+    if (!costumerSyncSkippedFirstRun.current) {
+      costumerSyncSkippedFirstRun.current = true;
+      return;
+    }
     setFilterCostumerId(costumerId ?? "");
   }, [isFleetiiAdmin, costumerId]);
 

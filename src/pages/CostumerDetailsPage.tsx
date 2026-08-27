@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
@@ -35,7 +36,7 @@ type Costumer = {
  * App.tsx). Reads an existing costumer when reached with one pre-filled via
  * router state (CostumerAdministrationPage's row click, which skips a
  * round-trip); a direct URL/refresh/bookmark (no router state) falls back
- * to fetching it by id instead, redirecting to "/fleetii-admin" if it can't
+ * to fetching it by id instead, redirecting to "/costumers" if it can't
  * be found. "Rediger kunde" switches it into an editable form in place
  * (in-place rather than a separate page like VehicleDetailsPage/
  * HandleVehiclePage, since costumers only have a handful of editable
@@ -137,6 +138,8 @@ export function CostumerDetailsPage() {
   // unlike archiving a user (data survives) or deactivating a costumer
   // (reversible), so a plain Ja/Fortryd dialog isn't enough friction.
   const [purgeConfirmText, setPurgeConfirmText] = useState("");
+  /** Whether the RAPPORTER button's "not implemented yet" InlinePopup is open — a plain click-to-toggle rather than a `title` tooltip, since hover has no equivalent on iOS/touch (see this project's own outline-button/InlinePopup conventions elsewhere, e.g. NewVehiclePage.tsx's "?" info popovers). */
+  const [showRapporterInfo, setShowRapporterInfo] = useState(false);
 
   const canSubmitEdit =
     editName.trim().length > 0 &&
@@ -195,7 +198,7 @@ export function CostumerDetailsPage() {
   // pattern.
   useEffect(() => {
     if (costumerId && !costumer && !costumerLoading) {
-      navigate("/fleetii-admin", { replace: true });
+      navigate("/costumers", { replace: true });
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
 
@@ -274,7 +277,7 @@ export function CostumerDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/fleetii-admin");
+    navigate("/costumers");
   };
 
   /**
@@ -319,7 +322,7 @@ export function CostumerDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/fleetii-admin", { replace: true });
+    navigate("/costumers", { replace: true });
   };
 
   /** Blocks login for every user under this costumer (see costumers_add_deactivated_at.sql — is_admin()/current_department_id()/current_costumer_id() also stop resolving for them, and AuthContext/LoginPage force a sign-out/refuse sign-in client-side). Reversible via handleReactivate. Plain client-side update — costumers_update_fleetii_admin already covers any column, no new RLS policy needed. */
@@ -620,32 +623,54 @@ export function CostumerDetailsPage() {
                   )}
                 </div>
 
+                <hr className="border-brand-200" />
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/department-details", {
+                        state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                      })
+                    }
+                    className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    AFDELINGER
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/fleet-table", {
+                        state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                      })
+                    }
+                    className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    KØRETØJER
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/department", {
+                        state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                      })
+                    }
+                    className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    BRUGERE
+                  </button>
+                  <div className="relative aspect-square">
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate("/fleet-table", {
-                          state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                        })
-                      }
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                      onClick={() => setShowRapporterInfo((prev) => !prev)}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
                     >
-                      Administration af køretøjer
+                      RAPPORTER
                     </button>
-                  </div>
-                  <div className="relative">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate("/department-details", {
-                          state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                        })
-                      }
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                    >
-                      Administration af afdelinger
-                    </button>
+                    {showRapporterInfo && (
+                      <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
+                    )}
+                    <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                   </div>
                 </div>
               </>

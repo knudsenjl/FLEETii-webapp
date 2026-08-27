@@ -1,11 +1,10 @@
-// "Administration af installationer" — the other of the two FLEETii-admin-only
-// pages split out of what used to be a single FleetiiAdministrationPage.tsx
-// ("/fleetii-admin" — see AdminFrontpage.tsx's "Administration af
-// installationer" button, the second of its two FLEETii-admin-only
-// buttons). Lists every costumer_orders row; clicking one opens
-// VehicleCreatePage.tsx ("Opret" orders) or VehicleDeletePage.tsx ("Nedlæg"
-// orders). The sibling "administration af kunder" half now lives on its own
-// page — see CostumerAdministrationPage.tsx.
+// "Administration af installationer" ("/fleetii-admin-installations") —
+// reached via AdminFrontpage.tsx's own "INSTALLATIONER" button (below the
+// divider, alongside the embedded costumers table). Lists every
+// costumer_orders row; clicking one opens VehicleCreatePage.tsx ("Opret"
+// orders) or VehicleDeletePage.tsx ("Nedlæg" orders). The sibling
+// "administration af kunder" half lives on its own page — see
+// CostumerAdministrationPage.tsx ("/costumers").
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";

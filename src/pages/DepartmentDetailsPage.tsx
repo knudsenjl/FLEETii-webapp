@@ -16,7 +16,7 @@ type Department = { department_id: string; name: string | null; address: string 
  * costumerName passed via router state — this page has no direct-URL
  * fallback, since there's no meaningful way to reach it without already
  * knowing which costumer; missing state redirects back to
- * "/fleetii-admin"). Department management itself (create/select/delete)
+ * "/costumers"). Department management itself (create/select/delete)
  * moved here wholesale from CostumerDetailsPage, which used to host it
  * inline in its own "Rediger kunde" edit form.
  */
@@ -65,7 +65,7 @@ export function DepartmentDetailsPage() {
   // CostumerDetailsPage there's no :costumerId route param to fall back on).
   useEffect(() => {
     if (!costumerId) {
-      navigate("/fleetii-admin", { replace: true });
+      navigate("/costumers", { replace: true });
       return;
     }
     void loadDepartments(costumerId);

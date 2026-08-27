@@ -40,32 +40,54 @@ type ProfileQueryRow = {
 
 /**
  * Admin "user management" page ("/department"): every user in the admin's
- * own department (or, for a FLEETii admin, any department — see
- * supabase/applied/user_profiles_select_allow_fleetii_admin.sql) — click a
- * row to open it in UserDetailsPage, which handles editing (via
- * update-user.mts, including that user's Rettigheder overrides) and
- * blocking/unblocking access (via delete-user.mts/unblock-user.mts) from
- * there, plus a link to create a new user. Blocked users stay listed here
- * rather than disappearing (a red "Blokeret" badge appears next to their
- * Rolle, same style as CostumerAdministrationPage's own "Adgang blokeret"
- * marker for a deactivated costumer), since blocking is reversible and they
- * need to stay reachable to unblock.
+ * own department, or — for a FLEETii admin — every user in the single
+ * costumer they navigated in for (costumerId/costumerName passed via router
+ * state from CostumerDetailsPage's own "BRUGERE" button, same "filtering by
+ * navigation" pattern as VehiclesPage.tsx's own "Administration af
+ * køretøjer": there's no in-page way to switch to a DIFFERENT costumer or
+ * to "every costumer" here, and reaching this page without that router
+ * state — e.g. a direct URL/refresh — redirects back to "/admin" below). A
+ * regular admin's own users are always within their own single costumer
+ * already (see user_profiles_select_admin_own_department), so none of this
+ * applies to them. Click a row to open it in UserDetailsPage, which handles
+ * editing (via update-user.mts, including that user's Rettigheder
+ * overrides) and blocking/unblocking access (via delete-user.mts/
+ * unblock-user.mts) from there, plus a link to create a new user. Blocked
+ * users stay listed here rather than disappearing (a red "Blokeret" badge
+ * appears next to their Rolle, same style as CostumerAdministrationPage's
+ * own "Adgang blokeret" marker for a deactivated costumer), since blocking
+ * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { afdeling, afdelingId, profile } = useAuth();
+  const { afdeling, afdelingId, costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const emailWarning = (location.state as { emailWarning?: boolean } | null)?.emailWarning ?? false;
+  const state = location.state as { costumerId?: string; costumerName?: string; emailWarning?: boolean } | null;
+  const emailWarning = state?.emailWarning ?? false;
   /** Whether afdelingId's department shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — see useIdentSettings' own doc comment. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears (a user's identity is core information), only its value source swaps. */
   const { useUserIdent } = useIdentSettings(afdelingId);
   /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
   const columnCount = 4;
+
+  /** A FLEETii admin has no costumer of their own — for them, targetCostumerId only ever comes from router state (CostumerDetailsPage's own "BRUGERE" button), never a fallback of any kind (see this component's own doc comment). */
+  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const targetCostumerId = state?.costumerId ?? costumerId;
+  const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
+
+  /** Redirects back to "/admin" if a FLEETii admin reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback to show instead. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
+  useEffect(() => {
+    if (isFleetiiAdmin && !targetCostumerId) {
+      navigate("/admin", { replace: true });
+    }
+  }, [isFleetiiAdmin, targetCostumerId, navigate]);
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isFleetiiAdmin && !targetCostumerId) return;
+
     async function loadUsers() {
       setLoading(true);
       setError(null);
@@ -75,13 +97,22 @@ export function DepartmentPage() {
       // many-to-many user_profiles<->departments relationship via
       // user_departments, so a bare "departments(...)" is now ambiguous
       // (PGRST201) and fails outright — this pins it to the direct FK.
-      const { data, error: fetchError } = await supabase
+      let query = supabase
         .from("user_profiles")
         .select(
           "user_id, email, full_name, phone, user_ident, department_id, costumer_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
         )
-        .order("full_name", { ascending: true })
-        .returns<ProfileQueryRow[]>();
+        .order("full_name", { ascending: true });
+      // RLS (user_profiles_select_allow_fleetii_admin) already lets a
+      // FLEETii admin see every user platform-wide — this narrows the
+      // actual QUERY to just the target costumer instead of fetching
+      // everyone and filtering client-side, now that there's no in-page
+      // "every costumer" mode left to justify pulling the whole table.
+      if (isFleetiiAdmin && targetCostumerId) {
+        query = query.eq("costumer_id", targetCostumerId);
+      }
+
+      const { data, error: fetchError } = await query.returns<ProfileQueryRow[]>();
 
       if (fetchError) {
         setError(fetchError.message);
@@ -103,23 +134,20 @@ export function DepartmentPage() {
     // containing anything relevant the moment afdelingId changes; an empty
     // dependency array left this page showing a stale (or empty, since none
     // of the old rows match the new department_id) table until a hard
-    // refresh.
-  }, [afdelingId]);
+    // refresh. Also re-fetches if targetCostumerId itself changes (a
+    // FLEETii admin navigating here for a different costumer without a
+    // full remount, e.g. via browser back/forward).
+  }, [afdelingId, isFleetiiAdmin, targetCostumerId]);
 
-  /** A FLEETii admin has no costumer of their own — for them alone this page spans every costumer platform-wide (see loadUsers' own comment above), which is exactly why they alone get the Kunde filter below (a regular admin's users are always within their own single costumer already). */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
   const departmentUsers = isFleetiiAdmin ? users : users.filter((u) => u.department_id === afdelingId);
 
   /** Same popup-filter pattern as VehiclesPage's fleet-table filter: a funnel button toggles an InlinePopup of dropdown selects, each populated from the actual rows in view (not free-text search) so every option is guaranteed to match something. */
   const [filterOpen, setFilterOpen] = useState(false);
-  const [filterCostumerId, setFilterCostumerId] = useState("");
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
   const [filterAfdeling, setFilterAfdeling] = useState("");
   const [filterRolle, setFilterRolle] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
-  /** Kunde dropdown's own option list (costumer_id/name) — FLEETii-admin only, loaded separately since ProfileRow only carries a bare costumer_id, not its name. Same fetch-once pattern as VehiclesPage's own costumerOptions. */
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -134,39 +162,20 @@ export function DepartmentPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterOpen]);
 
-  useEffect(() => {
-    if (!isFleetiiAdmin) return;
-
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name")
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isFleetiiAdmin]);
-
   /** Mirrors the Bruger column's own display logic (useUserIdent toggle) so the filter's dropdown values and matching always agree with what's actually shown in the table. */
   const brugerValue = (user: ProfileRow) => (useUserIdent ? user.user_ident || user.email : user.email) ?? "—";
   /**
-   * The filter fields form a hierarchy — Kunde > Afdeling > Rolle > Bruger/Navn — where each
-   * field's own option list is scoped down by whatever is picked ABOVE it (so picking a Kunde
-   * narrows Afdeling's options, picking an Afdeling then narrows Rolle's, etc.), never by a
-   * field at its own level or below. Bruger and Navn sit at the same bottom rung (both identify
-   * one specific user), so they share the same scope rather than narrowing each other.
+   * The filter fields form a hierarchy — Afdeling > Rolle > Bruger/Navn — where each
+   * field's own option list is scoped down by whatever is picked ABOVE it (so picking an
+   * Afdeling narrows Rolle's options, etc.), never by a field at its own level or below.
+   * Bruger and Navn sit at the same bottom rung (both identify one specific user), so they
+   * share the same scope rather than narrowing each other.
    */
-  const kundeScopedUsers = filterCostumerId ? departmentUsers.filter((u) => u.costumer_id === filterCostumerId) : departmentUsers;
-  const afdelingScopedUsers = filterAfdeling ? kundeScopedUsers.filter((u) => u.department_id === filterAfdeling) : kundeScopedUsers;
+  const afdelingScopedUsers = filterAfdeling ? departmentUsers.filter((u) => u.department_id === filterAfdeling) : departmentUsers;
   const rolleScopedUsers = filterRolle ? afdelingScopedUsers.filter((u) => u.role === filterRolle) : afdelingScopedUsers;
   /** Deduped by department_id (the filter's actual match key) while keeping department_name for the option label — a Map collapses repeats from users sharing the same department. */
   const afdelingOptions = Array.from(
-    new Map(kundeScopedUsers.map((u) => [u.department_id, u.department_name] as const)).entries(),
+    new Map(departmentUsers.map((u) => [u.department_id, u.department_name] as const)).entries(),
   )
     .filter((entry): entry is [string, string] => entry[0] !== null && entry[1] !== null)
     .sort((a, b) => a[1].localeCompare(b[1]));
@@ -176,13 +185,12 @@ export function DepartmentPage() {
 
   const filteredUsers = departmentUsers.filter(
     (u) =>
-      (!filterCostumerId || u.costumer_id === filterCostumerId) &&
       (!filterBruger || brugerValue(u) === filterBruger) &&
       (!filterNavn || (u.full_name ?? "—") === filterNavn) &&
       (!filterAfdeling || u.department_id === filterAfdeling) &&
       (!filterRolle || u.role === filterRolle),
   );
-  const hasActiveFilter = Boolean(filterCostumerId || filterBruger || filterNavn || filterAfdeling || filterRolle);
+  const hasActiveFilter = Boolean(filterBruger || filterNavn || filterAfdeling || filterRolle);
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -204,7 +212,7 @@ export function DepartmentPage() {
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">
-                  Brugeradministration: {afdeling ?? (isFleetiiAdmin ? "Alle" : "—")}
+                  Brugeradministration: {isFleetiiAdmin ? (targetCostumerName ?? "—") : (afdeling ?? "—")}
                 </h2>
                 <div className="relative" ref={filterRef}>
                   <button
@@ -227,32 +235,6 @@ export function DepartmentPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge brugere på disse kriterier:</p>
-                        {isFleetiiAdmin && (
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Kunde
-                            <select
-                              value={filterCostumerId}
-                              onChange={(e) => {
-                                // Changing an upstream field invalidates every field below it in
-                                // the Kunde > Afdeling > Rolle > Bruger/Navn hierarchy, so all of
-                                // them reset rather than risking a stale, now-impossible combination.
-                                setFilterCostumerId(e.target.value);
-                                setFilterAfdeling("");
-                                setFilterRolle("");
-                                setFilterBruger("");
-                                setFilterNavn("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {costumerOptions.map((costumer) => (
-                                <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                                  {costumer.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Afdeling
                           <select
@@ -302,15 +284,14 @@ export function DepartmentPage() {
                               if (!value) return;
                               // Bruger/Navn each identify one specific user, so — unlike the
                               // upstream fields — picking one flows UP the hierarchy instead of
-                              // down: it fills in Kunde/Afdeling/Rolle (and the other of
-                              // Bruger/Navn) from that user's own actual values, even if those
-                              // were still "Alle" beforehand. Matched against the full
-                              // departmentUsers list (not the already-scoped option source) since
-                              // Bruger/Navn values (email/user_ident) are unique per user, so the
-                              // match is unambiguous regardless of the current scope.
+                              // down: it fills in Afdeling/Rolle (and the other of Bruger/Navn)
+                              // from that user's own actual values, even if those were still
+                              // "Alle" beforehand. Matched against the full departmentUsers list
+                              // (not the already-scoped option source) since Bruger/Navn values
+                              // (email/user_ident) are unique per user, so the match is
+                              // unambiguous regardless of the current scope.
                               const match = departmentUsers.find((u) => brugerValue(u) === value);
                               if (match) {
-                                setFilterCostumerId(match.costumer_id ?? "");
                                 setFilterAfdeling(match.department_id ?? "");
                                 setFilterRolle(match.role);
                                 setFilterNavn(match.full_name ?? "—");
@@ -339,7 +320,6 @@ export function DepartmentPage() {
                               // first matching user — an accepted approximation for this edge case.
                               const match = departmentUsers.find((u) => (u.full_name ?? "—") === value);
                               if (match) {
-                                setFilterCostumerId(match.costumer_id ?? "");
                                 setFilterAfdeling(match.department_id ?? "");
                                 setFilterRolle(match.role);
                                 setFilterBruger(brugerValue(match));
@@ -359,7 +339,6 @@ export function DepartmentPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              setFilterCostumerId("");
                               setFilterBruger("");
                               setFilterNavn("");
                               setFilterAfdeling("");
@@ -465,7 +444,9 @@ export function DepartmentPage() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate("/user-details")}
+                  onClick={() =>
+                    navigate("/user-details", { state: { costumerId: targetCostumerId, costumerName: targetCostumerName } })
+                  }
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Opret ny bruger
