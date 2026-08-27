@@ -9,7 +9,7 @@ import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
-/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so two extra buttons (visible only to that role) link onward to the FLEETii-admin-only costumer/installation lists — "FLEETii admin: Administration af kunder" (CostumerAdministrationPage.tsx, "/fleetii-admin") and "FLEETii admin: Administration af installationer" (InstallationAdministrationPage.tsx, "/fleetii-admin-installations") — always first and second on the page, ahead of every other button here. Conversely, "Administration af afdelinger" (visible only to a regular "admin") fetches that admin's own costumer's departments and jumps straight to EditDepartmentsPage.tsx — a FLEETii admin already has a fuller path to the same page via CostumerDetailsPage/DepartmentDetailsPage. */
+/** Admin dashboard: a list of buttons linking to reservation, fleet, and user-management pages. Admin-only (see ProtectedRoute requireAdmin in App.tsx). A "FLEETii admin" also lands here after login now (same as a regular admin — see App.tsx's RootRoute), so two extra buttons (visible only to that role) link onward to the FLEETii-admin-only costumer/installation lists — both interleaved into the same single button list rather than set apart in their own block: "Administration af kunder" (CostumerAdministrationPage.tsx, "/fleetii-admin") sits right after "Flådestyring", and "Administration af installationer" (InstallationAdministrationPage.tsx, "/fleetii-admin-installations") is deliberately LAST — after every other button, including "Administration af afdelinger". Conversely, "Administration af afdelinger" (visible only to a regular "admin") fetches that admin's own costumer's departments and jumps straight to EditDepartmentsPage.tsx — a FLEETii admin already has a fuller path to the same page via CostumerDetailsPage/DepartmentDetailsPage. */
 export function AdminFrontpage() {
   const navigate = useNavigate();
   const { profile, costumerId, costumerName } = useAuth();
@@ -76,30 +76,6 @@ export function AdminFrontpage() {
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">Administration</h2>
 
-              {profile?.role === "FLEETii admin" && (
-                <div className="flex flex-col gap-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/fleetii-admin")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    Administration af kunder
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => navigate("/fleetii-admin-installations")}
-                    className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    Administration af installationer
-                    {Boolean(pendingInstallationsCount) && (
-                      <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
-                        {pendingInstallationsCount}
-                      </span>
-                    )}
-                  </button>
-                </div>
-              )}
-
               <div className="flex flex-col gap-3">
                 <button
                   type="button"
@@ -122,6 +98,15 @@ export function AdminFrontpage() {
                 >
                   Flådestyring
                 </button>
+                {profile?.role === "FLEETii admin" && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleetii-admin")}
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Administration af kunder
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => navigate("/fleet-table")}
@@ -147,6 +132,20 @@ export function AdminFrontpage() {
                   </button>
                 )}
                 {departmentsError && <p className="text-sm text-red-600">{departmentsError}</p>}
+                {profile?.role === "FLEETii admin" && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleetii-admin-installations")}
+                    className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Administration af installationer
+                    {Boolean(pendingInstallationsCount) && (
+                      <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
+                        {pendingInstallationsCount}
+                      </span>
+                    )}
+                  </button>
+                )}
               </div>
             </div>
           </section>
