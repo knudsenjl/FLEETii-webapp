@@ -249,12 +249,12 @@ export function CostumerNewPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/fleetii-admin", { replace: true });
+    navigate("/costumers", { replace: true });
   };
 
   const handleConfirm = async () => {
     if (pendingAction === "closeCreate") {
-      navigate("/fleetii-admin");
+      navigate("/costumers");
       return;
     }
     if (pendingAction === "register") {
@@ -294,7 +294,7 @@ export function CostumerNewPage() {
                 <p className="text-sm text-brand-800">Den nye kunde er nu registreret i 2hire, og klar til brug.</p>
                 <button
                   type="button"
-                  onClick={() => navigate("/fleetii-admin")}
+                  onClick={() => navigate("/costumers")}
                   className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Til kundeliste

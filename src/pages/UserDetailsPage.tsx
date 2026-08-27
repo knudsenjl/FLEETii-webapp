@@ -29,7 +29,7 @@ type ProfileRow = {
   deleted_at: string | null;
 };
 
-/** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the target costumer (see targetCostumerId below: the edited user's own costumer when editing, the Kunde filter when a FLEETii admin is creating a new user, or otherwise the viewing admin's own costumer). */
+/** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the target costumer (see targetCostumerId below: the edited user's own costumer when editing, router state's costumerId when a FLEETii admin is creating a new user, or otherwise the viewing admin's own costumer). */
 type DepartmentOption = { department_id: string; name: string };
 
 /**
@@ -67,9 +67,14 @@ type DepartmentOption = { department_id: string; name: string };
  * department, thanks to that self-heal) is inserted for the new user_id.
  *
  * A FLEETii admin has no costumerId of their own, so creating a brand-new
- * user (never editing an existing one — see targetCostumerId) shows an
- * extra, required "Kunde" picker first; nothing else on the page (the
- * Afdeling(er)/Hjemmeafdeling options) can load until one's chosen.
+ * user (never editing an existing one — see targetCostumerId) requires
+ * costumerId/costumerName arriving via router state (DepartmentPage's own
+ * "Opret ny bruger" button — "filtering by navigation" same as
+ * VehiclesPage.tsx/DepartmentPage.tsx): a read-only "Kunde" row shows which
+ * one, and reaching the create form without it (e.g. a direct URL/refresh)
+ * redirects to "/admin" instead. Nothing else on the page (the
+ * Afdeling(er)/Hjemmeafdeling options) can load until targetCostumerId is
+ * resolved.
  *
  * Reachable at plain "/user-details" (create — no user, matches App.tsx's
  * route with no :userId) or "/user-details/:userId" (edit). Normally reached
@@ -85,7 +90,8 @@ export function UserDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
-  const stateUser = (location.state as { user?: ProfileRow } | null)?.user ?? null;
+  const navState = location.state as { user?: ProfileRow; costumerId?: string; costumerName?: string } | null;
+  const stateUser = navState?.user ?? null;
   const [fetchedUser, setFetchedUser] = useState<ProfileRow | null>(null);
   /** Starts true whenever a fetch-by-id will actually run (userId present, no stateUser) — NOT just false-by-default. The redirect-on-missing-user effect below and this page's own fetch effect both run in the SAME passive-effects pass on mount; if this started false, the redirect effect would see the pre-fetch "not loading, no user" state and bounce to /department before the fetch's setUserLoading(true) had any chance to take effect for that pass. Every existing caller (DepartmentPage) masked this by always passing router state, so `user` was already truthy and the redirect's `!user` check short-circuited — this only surfaces for a caller that navigates here by id alone (e.g. BookingDetailsPage's "Bruger" link, or a raw bookmark/refresh). */
   const [userLoading, setUserLoading] = useState(() => Boolean(userId) && !stateUser);
@@ -200,36 +206,24 @@ export function UserDetailsPage() {
   const [grantsLoading, setGrantsLoading] = useState(true);
   const [grantsError, setGrantsError] = useState<string | null>(null);
 
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, the Kunde picker below is what actually picks the target costumer instead. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret ny bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
-  const [filterCostumerId, setFilterCostumerId] = useState("");
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
-  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), the Kunde filter when a FLEETii admin is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
-  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isFleetiiAdmin ? filterCostumerId || null : costumerId;
+  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), router state's costumerId when a FLEETii admin is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
+  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isFleetiiAdmin ? (navState?.costumerId ?? null) : costumerId;
+  const targetCostumerName = user ? null : isFleetiiAdmin ? (navState?.costumerName ?? null) : null;
 
-  /** Loads every costumer for the "Ny bruger" Kunde picker — FLEETii admin, create mode only. */
+  /** Redirects back to "/admin" if a FLEETii admin reaches the CREATE form (no :userId — editing an existing user always has its own costumer_id, see targetCostumerId above) without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this form has no "pick a costumer here" fallback left (see this component's own doc comment). A regular admin always has their own costumerId regardless, and editing an existing user always resolves targetCostumerId from that user's own record, so this never fires for either of those cases. */
   useEffect(() => {
-    if (user || !isFleetiiAdmin) return;
-
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name", { ascending: true })
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [user, isFleetiiAdmin]);
+    if (!userId && isFleetiiAdmin && !navState?.costumerId) {
+      navigate("/admin", { replace: true });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, isFleetiiAdmin, navState?.costumerId]);
 
   // Scoped to targetCostumerId, NOT the viewing admin's own costumerId —
   // otherwise a FLEETii admin editing a user in some other costumer (or
-  // creating one for a costumer picked via the Kunde filter above) would see
-  // either the wrong departments or none at all.
+  // creating one for the costumer they navigated in for, see targetCostumerId
+  // above) would see either the wrong departments or none at all.
   useEffect(() => {
     if (!targetCostumerId) {
       setDepartmentOptions([]);
@@ -380,11 +374,14 @@ export function UserDetailsPage() {
     PHONE_PATTERN.test(phone.trim()) &&
     department.trim().length > 0 &&
     role.trim().length > 0 &&
-    // A brand-new user needs an explicit Kunde pick when created by a
-    // FLEETii admin — there's no viewer-own costumer to fall back to, and
-    // "no costumer chosen" must block submission rather than silently
-    // creating the user with no departmentOptions at all.
-    (user || !isFleetiiAdmin || Boolean(filterCostumerId));
+    // A brand-new user created by a FLEETii admin needs a real
+    // targetCostumerId (from router state — see this component's own doc
+    // comment) — there's no viewer-own costumer to fall back to, and
+    // missing one must block submission rather than silently creating the
+    // user with no departmentOptions at all. In practice the redirect
+    // effect above already sends them to "/admin" before this would ever
+    // matter, but this stays as a defensive belt-and-braces check.
+    (user || !isFleetiiAdmin || Boolean(targetCostumerId));
 
   const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
   /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a FLEETii admin editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
@@ -695,30 +692,17 @@ export function UserDetailsPage() {
                     box's edge (same fix as RettighederSettings.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                   {!user && isFleetiiAdmin && (
-                    // FLEETii-admin-only "Ny bruger" Kunde picker — a
-                    // FLEETii admin has no costumerId of their own, so
-                    // there's no meaningful default here (unlike
-                    // VehiclesPage's "Alle" filter): departmentOptions stays
-                    // empty and canSubmit stays false until a costumer is
-                    // explicitly chosen.
+                    // FLEETii-admin-only "Ny bruger" Kunde row — read-only
+                    // display, not a picker: targetCostumerId already came
+                    // from router state (DepartmentPage's own "Opret ny
+                    // bruger" button), "filtering by navigation" same as
+                    // VehiclesPage.tsx/DepartmentPage.tsx, so there's
+                    // nothing left to choose here, just to confirm.
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Kunde: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
-                      <select
-                        required
-                        aria-required="true"
-                        value={filterCostumerId}
-                        onChange={(e) => setFilterCostumerId(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      >
-                        <option value="" className="bg-brand-100">Vælg kunde:</option>
-                        {costumerOptions.map((costumer) => (
-                          <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                            {costumer.name}
-                          </option>
-                        ))}
-                      </select>
+                      <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
+                      <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
+                        {targetCostumerName ?? "—"}
+                      </span>
                     </div>
                   )}
                   {useUserIdent && (

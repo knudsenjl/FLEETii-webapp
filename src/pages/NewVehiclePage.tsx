@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
+import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
@@ -21,13 +22,25 @@ type DepartmentOption = { department_id: string; name: string };
  * Netlify Function (which itself requires the caller to be a logged-in
  * admin — see netlify/functions/_shared/serverAuth.ts), who create the
  * vehicle and arrange device installation manually.
+ *
+ * A FLEETii admin has no costumer/department of their own — for them,
+ * selectedCostumerId comes strictly from router state (VehiclesPage.tsx's
+ * own "Registrer nyt køretøj" button — the only real entry point onto this
+ * page — "filtering by navigation" same as VehiclesPage.tsx/
+ * DepartmentPage.tsx/UserDetailsPage.tsx's own "Ny bruger" form), shown as a
+ * read-only "Kunde" row rather than a picker; reaching this page without it
+ * (e.g. a direct URL/refresh) redirects to "/admin". Afdeling stays a real
+ * picker underneath that fixed Kunde, since which department within the
+ * costumer this request is for is still a genuine choice.
  */
 export function NewVehiclePage() {
   const { afdeling, afdelingId, session, profile } = useAuth();
-  /** A FLEETii admin has no costumer/department of their own (platform-wide role) — for them alone, the Kunde/Afdeling rows below pick which costumer/department this request is for, required since there's no viewer-own default to fall back to (same convention as UserDetailsPage.tsx's "Ny bruger" Kunde picker). */
+  const navigate = useNavigate();
+  const location = useLocation();
+  const state = location.state as { costumerId?: string; costumerName?: string } | null;
+  /** A FLEETii admin has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from router state rather than a picker. */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
-  const [selectedCostumerId, setSelectedCostumerId] = useState("");
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  const selectedCostumerId = isFleetiiAdmin ? (state?.costumerId ?? "") : "";
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   /** Whichever department's "Køretøj-ID:" gate applies — the FLEETii admin's own pick when relevant, otherwise the viewing admin's own fixed afdelingId (unchanged from before this page had a picker at all). */
@@ -35,26 +48,14 @@ export function NewVehiclePage() {
   /** Whether identGateDepartmentId's department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identGateDepartmentId);
 
-  /** Loads every costumer for the Kunde picker — FLEETii admin only, mirrors UserDetailsPage.tsx's identical effect. */
+  /** Redirects back to "/admin" if a FLEETii admin reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — see this component's own doc comment. A regular admin always has their own costumerId/afdelingId regardless, so this never fires for them. */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (isFleetiiAdmin && !selectedCostumerId) {
+      navigate("/admin", { replace: true });
+    }
+  }, [isFleetiiAdmin, selectedCostumerId, navigate]);
 
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name", { ascending: true })
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isFleetiiAdmin]);
-
-  /** Loads the departments under the picked Kunde — FLEETii admin only, mirrors UserDetailsPage.tsx's identical effect. Also clears any previously selected department that belonged to a different costumer. */
+  /** Loads the departments under the target Kunde — FLEETii admin only, mirrors UserDetailsPage.tsx's identical effect. */
   useEffect(() => {
     if (!isFleetiiAdmin) return;
     setSelectedDepartmentId("");
@@ -296,25 +297,12 @@ export function NewVehiclePage() {
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                   {isFleetiiAdmin ? (
                     <>
-                      {/* FLEETii-admin-only Kunde/Afdeling picker — a FLEETii admin has no costumer/department of their own, so unlike the regular-admin read-only row below, both are required selects (see canSend/handleSend above). */}
+                      {/* FLEETii-admin-only Kunde (read-only, from router state — see this component's own doc comment) / Afdeling (a real required select — see canSend/handleSend above) rows. */}
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">
-                          Kunde: <span className="ml-0.5 text-red-600">*</span>
-                        </label>
-                        <select
-                          required
-                          aria-required="true"
-                          value={selectedCostumerId}
-                          onChange={(e) => setSelectedCostumerId(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                        >
-                          <option value="" className="bg-brand-100">Vælg kunde:</option>
-                          {costumerOptions.map((costumer) => (
-                            <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                              {costumer.name}
-                            </option>
-                          ))}
-                        </select>
+                        <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
+                        <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
+                          {state?.costumerName ?? "—"}
+                        </span>
                       </div>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">

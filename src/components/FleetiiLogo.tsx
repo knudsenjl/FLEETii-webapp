@@ -11,7 +11,7 @@ interface FleetiiLogoProps {
   linkToHome?: boolean;
 }
 
-/** The role-appropriate home route for a given `user_profiles.role` — matches RootRoute's (App.tsx) handling of the same roles: "FLEETii admin" now lands on "/admin" too, same as a regular admin (AdminFrontpage.tsx's own "FLEETii admin: Administration af kunder"/"...installationer" buttons link onward to "/fleetii-admin"/"/fleetii-admin-installations" from there); role "user" lands on "/booking" (see BookingPage.tsx). Keep this in sync with RootRoute by hand — they're deliberately not sharing a single source since one runs inside a component (needs useAuth()) and the other doesn't. */
+/** The role-appropriate home route for a given `user_profiles.role` — matches RootRoute's (App.tsx) handling of the same roles: "FLEETii admin" now lands on "/admin" too, same as a regular admin (AdminFrontpage.tsx shows them a costumers table and "INSTALLATIONER" button directly, below a divider); role "user" lands on "/booking" (see BookingPage.tsx). Keep this in sync with RootRoute by hand — they're deliberately not sharing a single source since one runs inside a component (needs useAuth()) and the other doesn't. */
 function homePathForRole(role?: string | null): string {
   if (role === "admin" || role === "FLEETii admin") return "/admin";
   return "/booking";

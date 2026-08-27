@@ -23,6 +23,12 @@ type DepartmentOption = { department_id: string; name: string };
  * viewer's own costumerId) or from CostumerDetailsPage's "Administration af
  * køretøjer" button (FLEETii admin — costumerId/costumerName passed via
  * router state, since a FLEETii admin has no costumerId of their own).
+ * "Filtering by navigation": there's no in-page way for a FLEETii admin to
+ * switch to a DIFFERENT costumer or to "every costumer" here — the only way
+ * onto this page for that role is via CostumerDetailsPage's own button,
+ * which fixes the scope for the whole visit; missing that router state
+ * (e.g. a direct URL/refresh) redirects back to "/admin" below rather than
+ * falling back to "every costumer, platform-wide" the way this page used to.
  * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
  * a vehicle both live there too), or create a new one via NewVehiclePage.
  */
@@ -31,36 +37,19 @@ export function VehiclesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them alone, the Kunde filter below is what actually picks targetCostumerId, rather than requiring every visit to arrive via CostumerDetailsPage's router state. */
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state (CostumerDetailsPage's own button), never a fallback of any kind. */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
 
   const state = location.state as { costumerId?: string; costumerName?: string } | null;
-  /** FLEETii-admin-only "Kunde" filter — seeded from router state (CostumerDetailsPage's own "Administration af køretøjer" button) first, then the admin's own costumerId if their account happens to carry one (some FLEETii admin accounts do, for internal test purposes — see user_profiles_select_allow_fleetii_admin.sql's own comment), otherwise "" ("Alle" — every costumer). Lets a FLEETii admin pick a different costumer directly from this page instead of needing to go through CostumerDetailsPage every time, while still defaulting to something meaningful rather than blank when possible. */
-  const [filterCostumerId, setFilterCostumerId] = useState(state?.costumerId ?? costumerId ?? "");
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
-  const targetCostumerId = isFleetiiAdmin ? filterCostumerId || null : (state?.costumerId ?? costumerId);
-  const targetCostumerName = isFleetiiAdmin
-    ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? state?.costumerName ?? null)
-    : null;
+  const targetCostumerId = state?.costumerId ?? costumerId;
+  const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
 
-  /** Loads every costumer for the Kunde filter dropdown — FLEETii admin only, since a regular admin is always scoped to their own single costumer. */
+  /** Redirects back to "/admin" if a FLEETii admin reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page no longer has any "every costumer" fallback to show instead (see this component's own doc comment). A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
-
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name")
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isFleetiiAdmin]);
+    if (isFleetiiAdmin && !targetCostumerId) {
+      navigate("/admin", { replace: true });
+    }
+  }, [isFleetiiAdmin, targetCostumerId, navigate]);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
@@ -96,7 +85,7 @@ export function VehiclesPage() {
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
-  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. For a FLEETii admin with "Alle" selected (targetCostumerId null), loads EVERY department across every costumer instead of none — "Alle" means "all vehicles in all departments in all costumers", the same "no scoping at all" meaning "Alle" already has on the other filters (departments' own SELECT RLS is unrestricted — departments_select_authenticated: qual = true — so this is a real cross-costumer query, not blocked by RLS). For a regular admin, targetCostumerId is always their own costumerId in practice, so the null branch below never actually applies to them. */
+  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. targetCostumerId is only ever null for a split second on a FLEETii admin's very first render before the redirect effect above navigates away (see this component's own doc comment) — the unfiltered fallback query below exists only to cover that brief window, not as a real "every costumer" mode; a regular admin's targetCostumerId is always their own costumerId in practice. */
   useEffect(() => {
     if (!targetCostumerId && !isFleetiiAdmin) {
       setDepartmentOptions([]);
@@ -189,11 +178,6 @@ export function VehiclesPage() {
     }
   }, [afdelingId, departmentOptions, isFleetiiAdmin]);
 
-  /** FLEETii-admin-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Only depends on costumerId (not filterCostumerId itself), so a manual in-page Kunde pick is left alone until the active costumer itself actually changes via "Skift afdeling" — costumerId never changes any other way. Includes the "Alle" case: switching back to it sets costumerId to null, which resets filterCostumerId to "" here too. */
-  useEffect(() => {
-    if (!isFleetiiAdmin) return;
-    setFilterCostumerId(costumerId ?? "");
-  }, [isFleetiiAdmin, costumerId]);
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -223,7 +207,7 @@ export function VehiclesPage() {
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate || filterStatus || filterDepartment || filterCostumerId
+                      filterPlate || filterStatus || filterDepartment
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -238,26 +222,6 @@ export function VehiclesPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                        {isFleetiiAdmin && (
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Kunde
-                            <select
-                              value={filterCostumerId}
-                              onChange={(e) => {
-                                setFilterCostumerId(e.target.value);
-                                setFilterDepartment("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {costumerOptions.map((costumer) => (
-                                <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                                  {costumer.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Afdeling
                           <select
@@ -300,14 +264,13 @@ export function VehiclesPage() {
                             <option value="Offline">Offline</option>
                           </select>
                         </label>
-                        {(filterPlate || filterStatus || filterDepartment || filterCostumerId) && (
+                        {(filterPlate || filterStatus || filterDepartment) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFilterPlate("");
                               setFilterStatus("");
                               setFilterDepartment("");
-                              setFilterCostumerId("");
                             }}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
                           >
@@ -334,9 +297,9 @@ export function VehiclesPage() {
                     {filteredVehicles.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {!targetCostumerId && !isFleetiiAdmin
+                          {!targetCostumerId
                             ? "Ingen kunde valgt."
-                            : filterPlate || filterStatus || filterDepartment || filterCostumerId
+                            : filterPlate || filterStatus || filterDepartment
                               ? "Ingen køretøjer matcher filteret."
                               : "Ingen køretøjer fundet."}
                         </td>
@@ -393,7 +356,9 @@ export function VehiclesPage() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() => navigate("/new-vehicle")}
+                  onClick={() =>
+                    navigate("/new-vehicle", { state: { costumerId: targetCostumerId, costumerName: targetCostumerName } })
+                  }
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Registrer nyt køretøj

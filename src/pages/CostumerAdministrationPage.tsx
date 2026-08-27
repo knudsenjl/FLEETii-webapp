@@ -1,10 +1,11 @@
-// "Administration af kunder" — one of the two FLEETii-admin-only pages split
-// out of what used to be a single FleetiiAdministrationPage.tsx ("/fleetii-admin"
-// — see AdminFrontpage.tsx's "Administration af kunder" button,
-// the first of its two FLEETii-admin-only buttons). Lists every costumer;
-// clicking one opens CostumerDetailsPage. The sibling "administration af
-// installationer" half now lives on its own page — see
-// InstallationAdministrationPage.tsx.
+// "Administration af kunder" ("/costumers") — full-page version of the same
+// costumer table AdminFrontpage.tsx now embeds directly (below a divider,
+// "Kunde" as its own column header), reached instead from the various
+// "back to the list" navigations elsewhere (CostumerNewPage.tsx,
+// CostumerDetailsPage.tsx, DepartmentDetailsPage.tsx) rather than a direct
+// button on AdminFrontpage.tsx itself. Lists every costumer; clicking one
+// opens CostumerDetailsPage. The sibling "administration af installationer"
+// half lives on its own page — see InstallationAdministrationPage.tsx.
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
