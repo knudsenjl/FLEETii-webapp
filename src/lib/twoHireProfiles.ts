@@ -16,12 +16,12 @@ export function boardProfileId(profile: TwoHireBoardProfile): string {
   return typeof raw === "string" ? raw : "";
 }
 
-/** Human-readable label for a profile — "title" is the confirmed real field (e.g. "Fiat 500 2019-2020"); "name"/"profileName" kept as defensive fallbacks, then the id, then the raw JSON as a last resort so a picker never shows a blank option. This is also the exact string persisted as vehicle_profiles.twohire_profile (see vehicle_profiles_add_twohire_profile.sql) — the profile's id alone wouldn't be directly displayable later without another live 2hire lookup. */
+/** Human-readable label for a profile — "title" is the confirmed real field (e.g. "Mercedes-Benz_GLE_W167-ImmoBreakout", per a real production catalog dump 2026-08-27 — it does NOT already include the year range); "name"/"profileName" kept as defensive fallbacks, then the id, then the raw JSON as a last resort so a picker never shows a blank option. Appends " (startYear-endYear)" whenever modelYearRange is present — the base title alone often can't distinguish between several otherwise-identical candidates that only differ by year (e.g. four separate "Clio (Breakout)"-ish profiles spanning different year ranges), both in the picker's own option list and in the persisted vehicle_profiles.twohire_profile value (see vehicle_profiles_add_twohire_profile.sql) it later shows up as on VehicleDetailsPage.tsx/HandleVehiclePage.tsx — the profile's id alone wouldn't be directly displayable later without another live 2hire lookup. */
 export function boardProfileLabel(profile: TwoHireBoardProfile): string {
   const raw = profile.title ?? profile.name ?? profile.profileName;
-  if (typeof raw === "string" && raw.length > 0) return raw;
-  const id = boardProfileId(profile);
-  return id || JSON.stringify(profile);
+  const base = typeof raw === "string" && raw.length > 0 ? raw : boardProfileId(profile) || JSON.stringify(profile);
+  const yearRange = profileYearRange(profile);
+  return yearRange ? `${base} (${yearRange[0]}-${yearRange[1]})` : base;
 }
 
 /** Strips 2hire's own bracketed "(...)" annotations from a maker/model name — e.g. "(Breakout)", "(GPS)", "(44L)"/"(58L)" — describing the physical device/board variant or a size option, never the vehicle's actual make/model, and never something this app's own free-text brand/model fields would contain. Left as plain text (not yet lowercased/tokenized) so callers can still see the un-annotated name if they need to. */
