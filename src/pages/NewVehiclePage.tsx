@@ -98,8 +98,8 @@ export function NewVehiclePage() {
   /** Fuel level/mileage at the time of the request — optional (not always known, e.g. a genuinely new vehicle), free-text same as the other fields here (see costumer_orders_add_fuel_level_and_mileage.sql). */
   const [fuelLevel, setFuelLevel] = useState("");
   const [mileage, setMileage] = useState("");
-  /** costumer_orders.drivmiddel — always a real value (a <select>, no "not filled in yet" state), defaults to "Benzin" matching the column's own default. */
-  const [drivmiddel, setDrivmiddel] = useState("Benzin");
+  /** costumer_orders.drivmiddel — left blank until explicitly chosen (or filled by the MotorAPI lookup below); an empty submission falls back to the column's own "Benzin" default server-side (see send-vehicle-request.mts), so leaving it unset here doesn't lose that default, it just avoids silently pre-selecting it for every request. */
+  const [drivmiddel, setDrivmiddel] = useState("");
   /** Whether a NEW FLEETii device needs to be installed — unticked when the vehicle already has one (an existing IoT device moved from elsewhere, or pre-installed), in which case fleetiiDeviceId identifies it instead. */
   const [needsFleetiiDevice, setNeedsFleetiiDevice] = useState(true);
   const [fleetiiDeviceId, setFleetiiDeviceId] = useState("");
@@ -193,16 +193,17 @@ export function NewVehiclePage() {
   };
 
   const emailFormatInvalid = kontaktemail.trim().length > 0 && !EMAIL_PATTERN.test(kontaktemail.trim());
-  // PHONE_PATTERN is digits-only — tested against the whitespace-STRIPPED
-  // value, not just trimmed, so a phone typed with spaces still validates.
-  const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(stripNumberSpacing(kontaktnummer));
+  // PHONE_PATTERN validates spaces/dashes/parens as part of the format
+  // itself (see its own comment) — tested against the trimmed value, not
+  // the whitespace-stripped one.
+  const phoneFormatInvalid = kontaktnummer.trim().length > 0 && !PHONE_PATTERN.test(kontaktnummer.trim());
 
   const canSend =
     nummerplade.trim().length > 0 &&
     (needsFleetiiDevice || fleetiiDeviceId.trim().length > 0) &&
     kontaktperson.trim().length > 0 &&
     EMAIL_PATTERN.test(kontaktemail.trim()) &&
-    PHONE_PATTERN.test(stripNumberSpacing(kontaktnummer)) &&
+    PHONE_PATTERN.test(kontaktnummer.trim()) &&
     // A FLEETii admin has no viewer-own costumer/department to fall back to
     // — both picks are required before the request means anything (see the
     // Kunde/Afdeling rows below).
@@ -454,6 +455,7 @@ export function NewVehiclePage() {
                       onChange={(e) => setDrivmiddel(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     >
+                      <option value="">Vælg drivmiddel</option>
                       {DRIVMIDDEL_OPTIONS.map((option) => (
                         <option key={option} value={option}>
                           {option}
@@ -470,6 +472,9 @@ export function NewVehiclePage() {
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
                   </div>
+                  <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
+                  <RequiredFieldRow label="Kontakt e-mail:" value={kontaktemail} onChange={setKontaktemail} type="email" />
+                  <RequiredFieldRow label="Kontakt tlf.:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <div className="relative flex items-center justify-between gap-2">
                       <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
@@ -534,9 +539,6 @@ export function NewVehiclePage() {
                       />
                     </div>
                   )}
-                  <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
-                  <RequiredFieldRow label="Kontakt e-mail:" value={kontaktemail} onChange={setKontaktemail} type="email" />
-                  <RequiredFieldRow label="Kontakt tlf.:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
                 </div>
               </div>
 
