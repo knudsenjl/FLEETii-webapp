@@ -13,8 +13,8 @@ import { normalizeNumberSpacing } from "../lib/textNormalization";
 import {
   boardProfileId,
   boardProfileLabel,
-  profileMatchesVehicle,
-  sortBoardProfilesByLabel,
+  narrowProfilesForVehicle,
+  sortBoardProfiles,
   TWOHIRE_SIMULATOR_PROFILE_ID,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
@@ -97,7 +97,7 @@ export function HandleVehiclePage() {
   const [profiles, setProfiles] = useState<TwoHireBoardProfile[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(true);
   const [profilesError, setProfilesError] = useState<string | null>(null);
-  /** Whether the picker is narrowed to profiles matching this vehicle's own brand/model/model_year (see profileMatchesVehicle) — off by default, same reasoning as VehicleCreatePage.tsx's own filter toggle. */
+  /** Whether the picker's VISIBLE OPTIONS are narrowed to the maker -> model -> year hierarchy (see narrowProfilesForVehicle) rather than the full catalog — off by default, same reasoning as VehicleCreatePage.tsx's own filter toggle: a fresh visit always shows everything sorted first, while the auto-select effect above still pre-selects an unambiguous match either way. */
   const [filterProfilesByVehicle, setFilterProfilesByVehicle] = useState(false);
   /** Whether the "i" popup showing the selected profile's raw JSON is open. */
   const [showProfileJson, setShowProfileJson] = useState(false);
@@ -237,16 +237,6 @@ export function HandleVehiclePage() {
     };
   }, [isFleetiiAdmin, vehicleCostumerId, session]);
 
-  /** Once profiles have loaded, tries to pre-select whichever one matches the already-stored twohireProfileOriginal label, so opening the form shows the vehicle's actual current profile pre-picked rather than blank. Only runs once (selectedProfileId still empty) — a real manual re-selection afterward is left alone. No match (label never came from a live profile, or the catalog has changed) just leaves the picker blank rather than guessing. */
-  useEffect(() => {
-    if (profilesLoading || profilesError || selectedProfileId || !twohireProfileOriginal) return;
-    const match = profiles.find((profile) => boardProfileLabel(profile) === twohireProfileOriginal);
-    if (match) {
-      setSelectedProfileId(boardProfileId(match));
-    }
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [profiles, profilesLoading, profilesError, twohireProfileOriginal]);
-
   /** Closes the profile-JSON popup on an outside click — same pattern as VehicleCreatePage.tsx's own. */
   useEffect(() => {
     if (!showProfileJson) return;
@@ -286,6 +276,25 @@ export function HandleVehiclePage() {
     setHomeDepartmentId((prev) => (prev === onlyId ? prev : onlyId));
   }, [selectedDepartmentIds]);
 
+  /** The maker -> model -> year hierarchy narrowing of `profiles` down to this vehicle's own current make/model/year (see narrowProfilesForVehicle) — each level only actually narrows if doing so leaves at least one candidate, so this is virtually never empty once profiles have loaded. Computed here, before the `!vehicle` guard below, since the auto-select effect right after this needs it and hooks can't follow an early return — visibleProfiles/selectedProfile further down (after the guard) reuse this same value rather than recomputing it. */
+  const narrowedProfiles = narrowProfilesForVehicle(profiles, { brand: make, model, model_year: year });
+
+  /** Once profiles have loaded, picks a default selection with two levels of priority: first, whichever profile matches the already-stored twohireProfileOriginal label (the vehicle's actual known-correct pairing, if the catalog still contains it) — opening the form then shows that pre-picked rather than blank. Failing that, falls back to narrowedProfiles when it pins down exactly one unambiguous candidate for this vehicle's own make/model/year. Only runs once (selectedProfileId still empty) — a real manual re-selection afterward is left alone. Neither check finding anything just leaves the picker blank rather than guessing. Combined into one effect (rather than two independent ones each guarded by `!selectedProfileId`) specifically to avoid a race — two separate setSelectedProfileId calls reacting to the same profiles-loaded render could otherwise both fire off the same stale "nothing selected yet" closure. */
+  useEffect(() => {
+    if (profilesLoading || profilesError || selectedProfileId) return;
+    const storedMatch = twohireProfileOriginal
+      ? profiles.find((profile) => boardProfileLabel(profile) === twohireProfileOriginal)
+      : undefined;
+    if (storedMatch) {
+      setSelectedProfileId(boardProfileId(storedMatch));
+      return;
+    }
+    if (narrowedProfiles.length === 1) {
+      setSelectedProfileId(boardProfileId(narrowedProfiles[0]));
+    }
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [profiles, profilesLoading, profilesError, twohireProfileOriginal, narrowedProfiles.length, selectedProfileId]);
+
   if (!vehicle) {
     return null;
   }
@@ -306,11 +315,8 @@ export function HandleVehiclePage() {
     year.trim().length > 0 &&
     Boolean(homeDepartmentId);
 
-  const visibleProfiles = sortBoardProfilesByLabel(
-    filterProfilesByVehicle
-      ? profiles.filter((profile) => profileMatchesVehicle(profile, { brand: make, model, model_year: year }))
-      : profiles,
-  );
+  /** narrowedProfiles is computed earlier (before the `!vehicle` guard above, for the auto-select effect) — reused here rather than recomputed for the actual VISIBLE OPTIONS list, toggled by filterProfilesByVehicle. */
+  const visibleProfiles = sortBoardProfiles(filterProfilesByVehicle ? narrowedProfiles : profiles);
   /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile. */
   const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
 

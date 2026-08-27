@@ -13,8 +13,8 @@ import { motorApiDrivmiddel, motorApiVehicleField } from "../lib/motorApi";
 import {
   boardProfileId,
   boardProfileLabel,
-  profileMatchesVehicle,
-  sortBoardProfilesByLabel,
+  narrowProfilesForVehicle,
+  sortBoardProfiles,
   TWOHIRE_SIMULATOR_PROFILE_ID,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
@@ -222,30 +222,30 @@ export function VehicleCreatePage() {
   /** "Slet" state (see handleDelete below) — a separate loading/error pair from isRegistering/registerError since the two actions are mutually exclusive (Slet is only ever shown alongside whichever of the register-button/registered-badge is currently rendered) but visually distinct outcomes. */
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
-  /** Whether the "2hire-profil" picker below is narrowed to profiles matching this order's own brand/model/model_year (see profileMatchesVehicle) — off by default: today's only environment (2hire's test/simulator adaptor) has exactly one profile, which never matches a real vehicle's brand/model, so defaulting to filtered would hide the only usable option on every single registration right now. Toggle it on once real production credentials expose an actual make/model catalog worth narrowing. */
+  /** The maker -> model -> year hierarchy narrowing of `profiles` down to this order's own brand/model/model_year (see narrowProfilesForVehicle) — each level only actually narrows if doing so leaves at least one candidate, so this is virtually never empty once profiles have loaded. Always computed (not gated behind filterProfilesByOrder below) since it also drives the auto-select effect regardless of whether the admin has the narrowed view toggled on. */
+  const narrowedProfiles = narrowProfilesForVehicle(profiles, {
+    brand: brandInput,
+    model: modelInput,
+    model_year: modelYearInput,
+  });
+  /** Whether the "2hire-profil" picker's VISIBLE OPTIONS are narrowed to narrowedProfiles rather than the full catalog — off by default, so a fresh visit always shows everything sorted first (see sortBoardProfiles below); the auto-select effect below still pre-selects an unambiguous match either way. */
   const [filterProfilesByOrder, setFilterProfilesByOrder] = useState(false);
-  const visibleProfiles = sortBoardProfilesByLabel(
-    filterProfilesByOrder && order
-      ? profiles.filter((profile) =>
-          profileMatchesVehicle(profile, { brand: brandInput, model: modelInput, model_year: modelYearInput }),
-        )
-      : profiles,
-  );
+  const visibleProfiles = sortBoardProfiles(filterProfilesByOrder && order ? narrowedProfiles : profiles);
   /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile (e.g. TWOHIRE_SIMULATOR_PROFILE_ID auto-selected below when the real API response happens not to include it). */
   const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
 
-  /** Auto-selects a profile whenever there's exactly one (or zero) to pick from, so the admin isn't left clicking a single-option dropdown or an empty one: zero visible profiles falls back to the fixed simulator profile (see TWOHIRE_SIMULATOR_PROFILE_ID's own doc comment — otherwise every registration under today's test/simulator 2hire environment would require manually toggling the filter off and picking the one simulator entry by hand); exactly one visible profile (filtered down to a single match, or the catalog itself only has one) is selected outright; two or more leaves selection blank for the admin to actually choose. Only fires once profiles have actually loaded (not while loading/erroring), and only reacts to the *count* changing (not every re-render — visibleProfiles is a fresh array each render), so a real manual selection among 2+ options is left alone as long as the visible list's size doesn't change. */
+  /** Auto-selects a profile once narrowedProfiles pins down exactly one unambiguous match for this order's own brand/model/model_year — regardless of whether the narrowed view is actually toggled on, so the admin gets a sensible default the moment their vehicle's own fields uniquely identify a profile. Zero profiles loaded at all falls back to the fixed simulator profile (see TWOHIRE_SIMULATOR_PROFILE_ID's own doc comment); two or more candidates leaves the selection blank for the admin to actually choose from the narrowed/full list. Only fires once profiles have actually loaded (not while loading/erroring), and only reacts to the *count* changing (not every re-render — narrowedProfiles is a fresh array each render), so a real manual selection among 2+ options is left alone as long as the candidate count doesn't change. */
   useEffect(() => {
     if (profilesLoading || profilesError) return;
-    if (visibleProfiles.length === 0) {
+    if (profiles.length === 0) {
       setSelectedProfileId(TWOHIRE_SIMULATOR_PROFILE_ID);
-    } else if (visibleProfiles.length === 1) {
-      setSelectedProfileId(boardProfileId(visibleProfiles[0]));
+    } else if (narrowedProfiles.length === 1) {
+      setSelectedProfileId(boardProfileId(narrowedProfiles[0]));
     } else {
       setSelectedProfileId("");
     }
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [visibleProfiles.length, profilesLoading, profilesError]);
+  }, [narrowedProfiles.length, profiles.length, profilesLoading, profilesError]);
 
   /** Whether the "i" popup showing the selected profile's raw JSON (next to the filter button) is open — a plain click-to-toggle, not a timed notice, since this is content meant to be read/copied. */
   const [showProfileJson, setShowProfileJson] = useState(false);
@@ -738,7 +738,7 @@ export function VehicleCreatePage() {
                                       : selectedProfileId
                                         ? `Ingen profildata fundet for id: ${selectedProfileId}`
                                         : profiles.length > 0
-                                          ? // No profile picked yet — dumps 2hire's ENTIRE raw fetched list instead (not just visibleProfiles, which may already be narrowed by the filter toggle), so the actual field shapes/values 2hire returns are inspectable without needing DevTools — this is what profileMatchesVehicle's makerName/modelName/modelYearRange matching logic above is keyed on, so it's the fastest way to diagnose why the filter isn't narrowing things down as expected.
+                                          ? // No profile picked yet — dumps 2hire's ENTIRE raw fetched list instead (not just visibleProfiles, which may already be narrowed), so the actual field shapes/values 2hire returns are inspectable without needing DevTools — this is what narrowProfilesForVehicle's makerName/modelName/modelYearRange matching logic (src/lib/twoHireProfiles.ts) is keyed on, so it's the fastest way to diagnose why the narrowing isn't behaving as expected.
                                             JSON.stringify(profiles, null, 2)
                                           : "Ingen profiler indlæst."}
                                   </pre>
