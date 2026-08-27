@@ -753,7 +753,7 @@ export function VehicleCreatePage() {
                             {visibleProfiles.length > 1 && (
                               <span
                                 title={`${visibleProfiles.length} profiler i listen`}
-                                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-red-600 px-1 text-[0.65rem] font-semibold text-white"
+                                className="flex h-5 min-w-5 items-center justify-center rounded-full bg-accent-600 px-1 text-[0.65rem] font-semibold text-white"
                               >
                                 {visibleProfiles.length}
                               </span>
