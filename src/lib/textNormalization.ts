@@ -22,13 +22,14 @@ export function normalizeNumberSpacing(value: string): string {
 /**
  * Removes ALL whitespace (leading, trailing, and internal) — so
  * "  12 34 56 78 " or " AB 12 345" becomes "12345678" / "AB12345". Use this
- * — not normalizeNumberSpacing — at the two OTHER boundaries where a
- * spaced-out value like normalizeNumberSpacing produces isn't good enough:
- * passed on to an external service (cvrapi.dk, MotorAPI both expect the
- * plain digit/plate string, not a formatted one) or format-validated (e.g.
- * PHONE_PATTERN's digit-count check, an 8-digit CVR check) — never at the
- * point of saving/displaying a value, where normalizeNumberSpacing's
- * single-space form is what's actually wanted.
+ * — not normalizeNumberSpacing — when a value is passed on to an external
+ * service that expects the plain digit/plate string, not a formatted one
+ * (cvrapi.dk, MotorAPI) or format-validated against a fixed digit count
+ * (e.g. an 8-digit CVR check) — never at the point of saving/displaying a
+ * value, where normalizeNumberSpacing's single-space form is what's
+ * actually wanted. NOT used for PHONE_PATTERN (see its own comment) — that
+ * pattern validates spaces/dashes/parens as part of the format itself, so
+ * it's tested against a merely-trimmed value instead.
  */
 export function stripNumberSpacing(value: string): string {
   return value.replace(/\s+/g, "");

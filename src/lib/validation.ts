@@ -6,5 +6,17 @@
 /** Matches "something@something.something" — good enough to catch typos, not full RFC 5322 validation. */
 export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Matches an optional leading "+" followed by at least 8 digits — no `\s` in the character class (a whitespace-only string like "        " would otherwise satisfy the old `[0-9\s]{8,}`, since spaces alone counted toward the 8-character minimum). Callers must test this against a whitespace-STRIPPED value (see stripNumberSpacing), not a merely-trimmed one — the field itself is still free to be typed/pasted with spaces ("70 60 86 89" for a Danish number, "+45 70 60 86 89" international), that's fine and expected; this pattern only ever sees the cleaned-up form. */
-export const PHONE_PATTERN = /^\+?[0-9]{8,}$/;
+/**
+ * Loosely matches common international phone-number notations — just an
+ * "is this shaped like a phone number" check, no per-country validity (no
+ * libphonenumber-style numbering-plan verification): an optional leading
+ * "+" + 1-3 digit country code, then one or more digit groups (each
+ * optionally wrapped in parentheses, e.g. an area code) separated by spaces
+ * and/or dashes, with at least 8 digits somewhere in the whole thing. Covers
+ * "70608689", "+45 70 60 86 89", "(143) 234 453 22", "123-456-78",
+ * "+1 (999) 123-4567", etc. Callers must test this against a merely-
+ * TRIMMED value, not a whitespace-STRIPPED one (see stripNumberSpacing) —
+ * unlike the old digits-only version, the spaces/dashes here are part of
+ * what's being validated, not noise to discard first.
+ */
+export const PHONE_PATTERN = /^(?=(?:\D*\d){8,})(?:\+\d{1,3}[\s-]*)?(?:\(\d+\)|\d+)(?:[\s-]+(?:\(\d+\)|\d+))*$/;
