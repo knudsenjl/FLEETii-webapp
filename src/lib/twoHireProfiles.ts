@@ -62,3 +62,8 @@ export function profileMatchesVehicle(profile: TwoHireBoardProfile, vehicle: { b
 
   return makerMatches && modelMatches && yearMatches;
 }
+
+/** Sorts profiles alphabetically by their own boardProfileLabel (Danish collation) — 2hire's own API returns them in no particular order, and an unsorted <select> is hard to scan. Returns a new array (doesn't mutate the input), so callers can call this directly on a `profiles`/`visibleProfiles` value without worrying about in-place effects on state. */
+export function sortBoardProfilesByLabel(profiles: TwoHireBoardProfile[]): TwoHireBoardProfile[] {
+  return [...profiles].sort((a, b) => boardProfileLabel(a).localeCompare(boardProfileLabel(b), "da"));
+}
