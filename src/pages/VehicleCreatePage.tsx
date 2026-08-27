@@ -15,7 +15,6 @@ import {
   boardProfileLabel,
   narrowProfilesForVehicle,
   sortBoardProfiles,
-  TWOHIRE_SIMULATOR_PROFILE_ID,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
 import { stripNumberSpacing } from "../lib/textNormalization";
@@ -228,24 +227,18 @@ export function VehicleCreatePage() {
     model: modelInput,
     model_year: modelYearInput,
   });
-  /** Whether the "2hire-profil" picker's VISIBLE OPTIONS are narrowed to narrowedProfiles rather than the full catalog — off by default, so a fresh visit always shows everything sorted first (see sortBoardProfiles below); the auto-select effect below still pre-selects an unambiguous match either way. */
-  const [filterProfilesByOrder, setFilterProfilesByOrder] = useState(false);
+  /** Whether the "2hire-profil" picker's VISIBLE OPTIONS are narrowed to narrowedProfiles rather than the full catalog — on by default (see sortBoardProfiles below for the full list's own sort order); the auto-select effect below still pre-selects an unambiguous match either way. */
+  const [filterProfilesByOrder, setFilterProfilesByOrder] = useState(true);
   const visibleProfiles = sortBoardProfiles(filterProfilesByOrder && order ? narrowedProfiles : profiles);
-  /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile (e.g. TWOHIRE_SIMULATOR_PROFILE_ID auto-selected below when the real API response happens not to include it). */
+  /** The full profile object behind selectedProfileId (for the "i" JSON popup below) — null if nothing's selected, or if the id doesn't match any fetched profile. */
   const selectedProfile = profiles.find((profile) => boardProfileId(profile) === selectedProfileId) ?? null;
 
-  /** Auto-selects a profile once narrowedProfiles pins down exactly one unambiguous match for this order's own brand/model/model_year — regardless of whether the narrowed view is actually toggled on, so the admin gets a sensible default the moment their vehicle's own fields uniquely identify a profile. Zero profiles loaded at all falls back to the fixed simulator profile (see TWOHIRE_SIMULATOR_PROFILE_ID's own doc comment); two or more candidates leaves the selection blank for the admin to actually choose from the narrowed/full list. Only fires once profiles have actually loaded (not while loading/erroring), and only reacts to the *count* changing (not every re-render — narrowedProfiles is a fresh array each render), so a real manual selection among 2+ options is left alone as long as the candidate count doesn't change. */
+  /** Auto-selects a profile once narrowedProfiles pins down exactly one unambiguous match for this order's own brand/model/model_year — regardless of whether the narrowed view is actually toggled on, so the admin gets a sensible default the moment their vehicle's own fields uniquely identify a profile. Zero candidates (nothing fetched at all, or narrowing genuinely found nothing) or two-or-more candidates both leave the selection blank — a "no match" state is shown as plain text below rather than silently pre-selecting anything (previously fell back to the fixed 2hire test/simulator profile, a leftover from when this page's only usable environment WAS the test adaptor — now a real production catalog exists, silently picking that id would be actively wrong there). Only fires once profiles have actually loaded (not while loading/erroring), and only reacts to the *count* changing (not every re-render — narrowedProfiles is a fresh array each render), so a real manual selection among 2+ options is left alone as long as the candidate count doesn't change. */
   useEffect(() => {
     if (profilesLoading || profilesError) return;
-    if (profiles.length === 0) {
-      setSelectedProfileId(TWOHIRE_SIMULATOR_PROFILE_ID);
-    } else if (narrowedProfiles.length === 1) {
-      setSelectedProfileId(boardProfileId(narrowedProfiles[0]));
-    } else {
-      setSelectedProfileId("");
-    }
+    setSelectedProfileId(narrowedProfiles.length === 1 ? boardProfileId(narrowedProfiles[0]) : "");
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [narrowedProfiles.length, profiles.length, profilesLoading, profilesError]);
+  }, [narrowedProfiles.length, profilesLoading, profilesError]);
 
   /** Whether the "i" popup showing the selected profile's raw JSON (next to the filter button) is open — a plain click-to-toggle, not a timed notice, since this is content meant to be read/copied. */
   const [showProfileJson, setShowProfileJson] = useState(false);
@@ -406,14 +399,8 @@ export function VehicleCreatePage() {
     // 2hire-register-vehicle.mts) — the profile id alone wouldn't be
     // directly displayable later on VehicleDetailsPage.tsx/HandleVehiclePage.tsx
     // without a live 2hire lookup, so the label this admin actually SAW when
-    // picking it is what gets stored. selectedProfile is null when the
-    // fixed simulator fallback is selected (TWOHIRE_SIMULATOR_PROFILE_ID
-    // isn't a real fetched profile) — matches that option's own visible text.
-    const profileLabel = selectedProfile
-      ? boardProfileLabel(selectedProfile)
-      : selectedProfileId === TWOHIRE_SIMULATOR_PROFILE_ID
-        ? "Testprofil (2hboard simulator)"
-        : null;
+    // picking it is what gets stored.
+    const profileLabel = selectedProfile ? boardProfileLabel(selectedProfile) : null;
 
     try {
       const response = await fetch("/.netlify/functions/2hire-register-vehicle", {
@@ -770,15 +757,7 @@ export function VehicleCreatePage() {
                         ) : profilesError ? (
                           <span className="text-sm text-red-600">{profilesError}</span>
                         ) : visibleProfiles.length === 0 ? (
-                          <select
-                            value={selectedProfileId}
-                            onChange={(e) => setSelectedProfileId(e.target.value)}
-                            className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                          >
-                            <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>
-                              Testprofil (2hboard simulator) — ingen profil matcher køretøjet
-                            </option>
-                          </select>
+                          <span className="text-sm font-medium text-red-600">Ingen profil matcher køretøjet</span>
                         ) : (
                           <select
                             value={selectedProfileId}

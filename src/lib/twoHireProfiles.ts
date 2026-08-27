@@ -10,9 +10,6 @@
 /** One of 2hire's own vehicle-configuration profiles — confirmed real shape { id, title, description, makerName, modelName, modelYearRange } (developer.2hire.io/reference/getpublicprofilelist-1's own example response, cross-checked against a real production catalog dump 2026-08-27); still loosely typed since only id/title/makerName/modelName/modelYearRange are actually used here. */
 export type TwoHireBoardProfile = Record<string, unknown>;
 
-/** 2hire's fixed profile id for any simulated device — per 2hire's own "Guide to test..." documentation: "In order to configure simulators, the profile id 51ba5b28-28da-435a-b42e-a3931288470c need to be used." Used as the automatic fallback selection whenever no real profile is available to pick from. */
-export const TWOHIRE_SIMULATOR_PROFILE_ID = "51ba5b28-28da-435a-b42e-a3931288470c";
-
 /** id extraction for a profile — "id" is the confirmed real field; "profileId" kept as a defensive fallback. Falls back to an empty string (which a picker then can't submit, rather than silently using a wrong value) if neither is present. */
 export function boardProfileId(profile: TwoHireBoardProfile): string {
   const raw = profile.id ?? profile.profileId;
