@@ -15,7 +15,6 @@ import {
   boardProfileLabel,
   narrowProfilesForVehicle,
   sortBoardProfiles,
-  TWOHIRE_SIMULATOR_PROFILE_ID,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
 
@@ -97,8 +96,8 @@ export function HandleVehiclePage() {
   const [profiles, setProfiles] = useState<TwoHireBoardProfile[]>([]);
   const [profilesLoading, setProfilesLoading] = useState(true);
   const [profilesError, setProfilesError] = useState<string | null>(null);
-  /** Whether the picker's VISIBLE OPTIONS are narrowed to the maker -> model -> year hierarchy (see narrowProfilesForVehicle) rather than the full catalog — off by default, same reasoning as VehicleCreatePage.tsx's own filter toggle: a fresh visit always shows everything sorted first, while the auto-select effect above still pre-selects an unambiguous match either way. */
-  const [filterProfilesByVehicle, setFilterProfilesByVehicle] = useState(false);
+  /** Whether the picker's VISIBLE OPTIONS are narrowed to the maker -> model -> year hierarchy (see narrowProfilesForVehicle) rather than the full catalog — on by default, same as VehicleCreatePage.tsx's own filter toggle; the auto-select effect above still pre-selects an unambiguous match either way. */
+  const [filterProfilesByVehicle, setFilterProfilesByVehicle] = useState(true);
   /** Whether the "i" popup showing the selected profile's raw JSON is open. */
   const [showProfileJson, setShowProfileJson] = useState(false);
   const profileJsonRef = useRef<HTMLDivElement>(null);
@@ -390,18 +389,13 @@ export function HandleVehiclePage() {
     // always include these two rather than branching the update payload.
     const trimmedIotId = iotId.trim();
     // Resolves the picker's selection back to a display label — picking a
-    // real fetched profile or the fixed simulator id (see
-    // TWOHIRE_SIMULATOR_PROFILE_ID) takes priority; otherwise falls back to
-    // whatever was already stored (twohireProfileOriginal) so an untouched
-    // or unmatched picker leaves the existing record alone rather than
+    // real fetched profile takes priority; otherwise falls back to whatever
+    // was already stored (twohireProfileOriginal) so an untouched or
+    // unmatched picker leaves the existing record alone rather than
     // clearing it. This means the picker currently can't be used to
     // explicitly CLEAR an already-set profile — only to replace it with a
     // different one.
-    const profileLabel = selectedProfile
-      ? boardProfileLabel(selectedProfile)
-      : selectedProfileId === TWOHIRE_SIMULATOR_PROFILE_ID
-        ? "Testprofil (2hboard simulator)"
-        : twohireProfileOriginal;
+    const profileLabel = selectedProfile ? boardProfileLabel(selectedProfile) : twohireProfileOriginal;
 
     // .select() so a row actually being updated can be confirmed — RLS
     // (vehicle_profiles_update_policy.sql) silently returns 0 rows rather
@@ -765,14 +759,9 @@ export function HandleVehiclePage() {
                           ) : profilesError ? (
                             <span className="text-sm text-red-600">{profilesError}</span>
                           ) : visibleProfiles.length === 0 ? (
-                            <select
-                              value={selectedProfileId}
-                              onChange={(e) => setSelectedProfileId(e.target.value)}
-                              className="rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                            >
-                              <option value="">Ingen profil matcher køretøjet — behold gemt værdi</option>
-                              <option value={TWOHIRE_SIMULATOR_PROFILE_ID}>Testprofil (2hboard simulator)</option>
-                            </select>
+                            <span className="text-sm font-medium text-red-600">
+                              Ingen profil matcher køretøjet — behold gemt værdi
+                            </span>
                           ) : (
                             <select
                               value={selectedProfileId}
