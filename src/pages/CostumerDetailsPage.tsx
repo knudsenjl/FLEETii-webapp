@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { CountBadge } from "../components/CountBadge";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
@@ -140,6 +141,10 @@ export function CostumerDetailsPage() {
   const [purgeConfirmText, setPurgeConfirmText] = useState("");
   /** Whether the RAPPORTER button's "not implemented yet" InlinePopup is open — a plain click-to-toggle rather than a `title` tooltip, since hover has no equivalent on iOS/touch (see this project's own outline-button/InlinePopup conventions elsewhere, e.g. NewVehiclePage.tsx's "?" info popovers). */
   const [showRapporterInfo, setShowRapporterInfo] = useState(false);
+  /** Row counts for the AFDELINGER/KØRETØJER/BRUGERE buttons' own tables, scoped to this costumer — drives each button's green corner CountBadge. null until loaded (no badge yet). */
+  const [departmentsCount, setDepartmentsCount] = useState<number | null>(null);
+  const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
+  const [usersCount, setUsersCount] = useState<number | null>(null);
 
   const canSubmitEdit =
     editName.trim().length > 0 &&
@@ -201,6 +206,39 @@ export function CostumerDetailsPage() {
       navigate("/costumers", { replace: true });
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
+
+  // Row counts for the AFDELINGER/KØRETØJER/BRUGERE grid buttons below.
+  useEffect(() => {
+    const targetCostumerId = costumer?.costumer_id;
+    if (!targetCostumerId) return;
+
+    let cancelled = false;
+    void supabase
+      .from("departments")
+      .select("department_id", { count: "exact", head: true })
+      .eq("costumer_id", targetCostumerId)
+      .then(({ count }) => {
+        if (!cancelled) setDepartmentsCount(count ?? 0);
+      });
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id", { count: "exact", head: true })
+      .eq("costumer_id", targetCostumerId)
+      .then(({ count }) => {
+        if (!cancelled) setVehiclesCount(count ?? 0);
+      });
+    void supabase
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("costumer_id", targetCostumerId)
+      .then(({ count }) => {
+        if (!cancelled) setUsersCount(count ?? 0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [costumer?.costumer_id]);
 
   /**
    * Saves the edit form. If the 2hire client ID/secret fields were actually
@@ -372,6 +410,12 @@ export function CostumerDetailsPage() {
     setPendingAction(null);
   };
 
+  /** KØRETØJER/BRUGERE's own handler — navigates straight to `destination` UNLOCKED (costumerId/costumerName only, no departmentId), matching what those buttons' own count badges already promised: every vehicle/user across the whole costumer, not just one department's worth. VehiclesPage/DepartmentPage both support this unlocked, whole-costumer mode (with their own in-page Afdeling filter) precisely for this button — see their own doc comments. Used to fetch this costumer's departments first and fall back to DepartmentDetailsPage as a picker whenever there wasn't exactly one department; removed 2026-08-28 at the user's request, since landing on a whole different page just to pick one felt like the wrong destination for a button whose badge already showed the full count. */
+  const goToVehiclesOrUsers = (destination: "/fleet-table" | "/department") => {
+    if (!costumer) return;
+    navigate(destination, { state: { costumerId: costumer.costumer_id, costumerName: costumer.name } });
+  };
+
   const handleConfirm = async () => {
     if (pendingAction === "update") {
       await handleUpdate();
@@ -416,11 +460,14 @@ export function CostumerDetailsPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">{isEditing ? "Rediger kunde" : "Kundedetaljer"}</h2>
+            <h2 className="text-xl font-semibold text-brand-800">
+              {isEditing ? "Rediger kundedata" : "Kundedata"} - {costumer.name ?? "—"}
+            </h2>
 
             {isEditing ? (
               <>
-                <div className="overflow-hidden rounded-2xl border border-brand-100">
+                {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
@@ -511,15 +558,12 @@ export function CostumerDetailsPage() {
               </>
             ) : (
               <>
-                <div className="overflow-hidden rounded-2xl border border-brand-100">
+                {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
                       <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Navn:</label>
-                      <span className="text-sm text-brand-800">{costumer.name ?? "—"}</span>
                     </div>
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
@@ -625,45 +669,46 @@ export function CostumerDetailsPage() {
 
                 <hr className="border-brand-200" />
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate("/department-details", {
-                        state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                      })
-                    }
-                    className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    AFDELINGER
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate("/fleet-table", {
-                        state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                      })
-                    }
-                    className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    KØRETØJER
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate("/department", {
-                        state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                      })
-                    }
-                    className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    BRUGERE
-                  </button>
-                  <div className="relative aspect-square">
+                <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                  <div className="relative aspect-square w-28">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate("/department-details", {
+                          state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
+                        })
+                      }
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      AFDELINGER
+                    </button>
+                    <CountBadge count={departmentsCount} />
+                  </div>
+                  <div className="relative aspect-square w-28">
+                    <button
+                      type="button"
+                      onClick={() => goToVehiclesOrUsers("/fleet-table")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      KØRETØJER
+                    </button>
+                    <CountBadge count={vehiclesCount} />
+                  </div>
+                  <div className="relative aspect-square w-28">
+                    <button
+                      type="button"
+                      onClick={() => goToVehiclesOrUsers("/department")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      BRUGERE
+                    </button>
+                    <CountBadge count={usersCount} />
+                  </div>
+                  <div className="relative aspect-square w-28">
                     <button
                       type="button"
                       onClick={() => setShowRapporterInfo((prev) => !prev)}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
                     >
                       RAPPORTER
                     </button>

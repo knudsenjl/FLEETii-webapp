@@ -96,9 +96,8 @@ export function NewVehiclePage() {
   const [brand, setBrand] = useState("");
   const [maerke, setMaerke] = useState("");
   const [aargang, setAargang] = useState("");
-  /** Fuel level/mileage at the time of the request — optional (not always known, e.g. a genuinely new vehicle), free-text same as the other fields here (see costumer_orders_add_fuel_level_and_mileage.sql). */
+  /** Fuel level at the time of the request — optional (not always known, e.g. a genuinely new vehicle), free-text same as the other fields here (see costumer_orders_add_fuel_level_and_mileage.sql). */
   const [fuelLevel, setFuelLevel] = useState("");
-  const [mileage, setMileage] = useState("");
   /** costumer_orders.drivmiddel — left blank until explicitly chosen (or filled by the MotorAPI lookup below); an empty submission falls back to the column's own "Benzin" default server-side (see send-vehicle-request.mts), so leaving it unset here doesn't lose that default, it just avoids silently pre-selecting it for every request. */
   const [drivmiddel, setDrivmiddel] = useState("");
   /** Whether a NEW FLEETii device needs to be installed — unticked when the vehicle already has one (an existing IoT device moved from elsewhere, or pre-installed), in which case fleetiiDeviceId identifies it instead. */
@@ -241,7 +240,6 @@ export function NewVehiclePage() {
           maerke,
           aargang,
           fuelLevel,
-          mileage,
           drivmiddel,
           needsFleetiiDevice,
           fleetiiDeviceId: needsFleetiiDevice ? null : fleetiiDeviceId,
@@ -424,15 +422,6 @@ export function NewVehiclePage() {
                       type="text"
                       value={aargang}
                       onChange={(e) => setAargang(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
-                    <input
-                      type="text"
-                      value={mileage}
-                      onChange={(e) => setMileage(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
                   </div>

@@ -158,7 +158,8 @@ export function TwoHireTestPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">2hire test side</h2>
 
-              <div className="overflow-hidden rounded-2xl border border-brand-100">
+              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
+              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                     <label className="flex items-center justify-between text-sm font-medium text-brand-700">

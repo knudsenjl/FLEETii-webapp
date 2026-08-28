@@ -602,7 +602,8 @@ export function ReservationPage() {
                 {editing ? "Rediger reservation" : "Opret reservation"}
               </h2>
 
-              <div className="overflow-hidden rounded-2xl border border-brand-100">
+              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
+              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
                   {isFleetiiAdmin && (
                     // FLEETii-admin-only — a FLEETii admin has no department

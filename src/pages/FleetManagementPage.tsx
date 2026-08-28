@@ -419,7 +419,22 @@ export function FleetManagementPage() {
 
               <button
                 type="button"
-                onClick={() => navigate("/fleet-table")}
+                onClick={() =>
+                  navigate("/fleet-table", {
+                    state: {
+                      costumerId: targetCostumerId,
+                      costumerName: targetCostumerName,
+                      // VehiclesPage now always requires a single department to
+                      // lock to (see its own doc comment on "filtering by
+                      // navigation") — only set when this map's own Afdeling
+                      // filter has one picked, same as filterDepartment itself.
+                      // Left unset ("Alle") just redirects to "/admin" there,
+                      // same as reaching it any other way without one.
+                      departmentId: filterDepartment || undefined,
+                      departmentName: departmentOptions.find((d) => d.department_id === filterDepartment)?.name,
+                    },
+                  })
+                }
                 className="mt-4 w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
               >
                 Administration af køretøjer

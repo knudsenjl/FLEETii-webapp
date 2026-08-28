@@ -11,40 +11,56 @@ import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 
 type Vehicle = DisplayVehicle;
 
-/** A department belonging to the costumer this page is scoped to — populates the Afdeling filter and determines which vehicles (by departmentIds membership) are in scope. */
+/** A department belonging to the costumer this page is scoped to — populates the Afdeling filter (unlocked mode only, see this component's own doc comment) and determines which vehicles (by departmentIds membership) are in scope for the whole costumer. */
 type DepartmentOption = { department_id: string; name: string };
 
 /**
- * Admin "Administration af køretøjer" page ("/fleet-table"): lists every
- * vehicle belonging to the target costumer (every vehicle whose
- * departmentIds intersects that costumer's own departments, not just the
- * viewer's own active one), filterable down to a single Afdeling. Reached
- * either from the regular admin flow (no router state — scoped to the
- * viewer's own costumerId) or from CostumerDetailsPage's "Administration af
- * køretøjer" button (FLEETii admin — costumerId/costumerName passed via
- * router state, since a FLEETii admin has no costumerId of their own).
- * "Filtering by navigation": there's no in-page way for a FLEETii admin to
- * switch to a DIFFERENT costumer or to "every costumer" here — the only way
- * onto this page for that role is via CostumerDetailsPage's own button,
- * which fixes the scope for the whole visit; missing that router state
- * (e.g. a direct URL/refresh) redirects back to "/admin" below rather than
- * falling back to "every costumer, platform-wide" the way this page used to.
- * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
- * a vehicle both live there too), or create a new one via NewVehiclePage.
+ * Admin "Administration af køretøjer" page ("/fleet-table"): two modes,
+ * both scoped to a target costumer (costumerId/costumerName via router
+ * state, or the viewer's own costumerId for a regular admin).
+ *
+ * LOCKED (departmentId also given — DepartmentDetailsPage's own KØRETØJER
+ * button, a department row already selected there): lists just that ONE
+ * department's vehicles, no in-page way to widen back out — "filtering by
+ * navigation", same pattern this app already uses for costumerId scoping
+ * elsewhere. To see a different department's vehicles, go back and select a
+ * different row on DepartmentDetailsPage.
+ *
+ * UNLOCKED (no departmentId — AdminFrontpage/CostumerDetailsPage's own
+ * KØRETØJER button, straight there): lists every vehicle across the WHOLE
+ * target costumer (matching what that button's own count badge already
+ * showed), with an in-page Afdeling filter to narrow it back down —
+ * CostumerDetailsPage's own KØRETØJER used to fall back to
+ * DepartmentDetailsPage as a picker whenever the costumer had 0 or 2+
+ * departments; this replaced that (2026-08-28, at the user's request) since
+ * landing on a whole different page just to pick one felt like the wrong
+ * destination for a button whose badge already promised "every vehicle
+ * here".
+ *
+ * Reaching this page with neither a costumerId a FLEETii admin could resolve
+ * nor one of their own (a regular admin always has one) redirects back to
+ * "/admin" below. Clicking a row navigates straight to VehicleDetailsPage
+ * (editing/deleting a vehicle both live there too), or create a new one via
+ * NewVehiclePage.
  */
 export function VehiclesPage() {
-  const { afdelingId, costumerId, profile } = useAuth();
+  const { costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state (CostumerDetailsPage's own button), never a fallback of any kind. */
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state. */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
 
-  const state = location.state as { costumerId?: string; costumerName?: string } | null;
+  const state = location.state as
+    | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
+    | null;
   const targetCostumerId = state?.costumerId ?? costumerId;
   const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
+  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
+  const targetDepartmentId = state?.departmentId ?? null;
+  const targetDepartmentName = state?.departmentName ?? null;
 
-  /** Redirects back to "/admin" if a FLEETii admin reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page no longer has any "every costumer" fallback to show instead (see this component's own doc comment). A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
+  /** Redirects back to "/admin" if a FLEETii admin reaches this page without even a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
   useEffect(() => {
     if (isFleetiiAdmin && !targetCostumerId) {
       navigate("/admin", { replace: true });
@@ -52,6 +68,7 @@ export function VehiclesPage() {
   }, [isFleetiiAdmin, targetCostumerId, navigate]);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  /** UNLOCKED mode only (see this component's own doc comment) — the target costumer's own departments, both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   /** Which of the listed vehicles are currently locked (vehicle_signals.locked — see useVehicleLockState's own doc comment for why it's virtual, not a real 2hire signal), keyed by vehicleId, for the Lås column below. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
@@ -61,6 +78,7 @@ export function VehiclesPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  /** UNLOCKED mode only — narrows the whole-costumer vehicle list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
   const [filterDepartment, setFilterDepartment] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -82,19 +100,26 @@ export function VehiclesPage() {
     (v) =>
       (!filterPlate || v.plate === filterPlate) &&
       (!filterStatus || v.status === filterStatus) &&
+      // filterDepartment only ever has a value in UNLOCKED mode (the
+      // dropdown that sets it isn't rendered otherwise) — in LOCKED mode
+      // `vehicles` itself is already scoped to targetDepartmentId below, so
+      // this check is always vacuously true there.
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
-  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. targetCostumerId is only ever null for a split second on a FLEETii admin's very first render before the redirect effect above navigates away (see this component's own doc comment) — the unfiltered fallback query below exists only to cover that brief window, not as a real "every costumer" mode; a regular admin's targetCostumerId is always their own costumerId in practice. */
+  /** UNLOCKED mode only — loads the target costumer's own departments, both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Skipped entirely in LOCKED mode (targetDepartmentId set), which doesn't need the whole costumer's department list at all. */
   useEffect(() => {
-    if (!targetCostumerId && !isFleetiiAdmin) {
+    if (targetDepartmentId || !targetCostumerId) {
       setDepartmentOptions([]);
       return;
     }
 
     let cancelled = false;
-    const query = supabase.from("departments").select("department_id, name").order("name");
-    void (targetCostumerId ? query.eq("costumer_id", targetCostumerId) : query)
+    void supabase
+      .from("departments")
+      .select("department_id, name")
+      .eq("costumer_id", targetCostumerId)
+      .order("name")
       .returns<DepartmentOption[]>()
       .then(({ data }) => {
         if (!cancelled) setDepartmentOptions(data ?? []);
@@ -103,9 +128,20 @@ export function VehiclesPage() {
     return () => {
       cancelled = true;
     };
-  }, [targetCostumerId, isFleetiiAdmin]);
+  }, [targetCostumerId, targetDepartmentId]);
 
+  /** LOCKED mode: scopes vehicles straight to targetDepartmentId's own membership (vehicle_departments, via departmentIds — see liveVehicleDataSource.ts). UNLOCKED mode: every vehicle whose departmentIds intersects ANY of the target costumer's own departments (departmentOptions above) — the whole-costumer set the KØRETØJER button's own count badge already promised, further narrowed by filterDepartment above if picked. */
   useEffect(() => {
+    if (targetDepartmentId) {
+      setVehicles(
+        twoHireVehicles
+          .filter((v) => v.departmentIds.includes(targetDepartmentId))
+          .map(toDisplayVehicle)
+          .sort((a, b) => a.plate.localeCompare(b.plate)),
+      );
+      return;
+    }
+
     const costumerDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
     setVehicles(
       twoHireVehicles
@@ -113,7 +149,7 @@ export function VehiclesPage() {
         .map(toDisplayVehicle)
         .sort((a, b) => a.plate.localeCompare(b.plate)),
     );
-  }, [twoHireVehicles, departmentOptions]);
+  }, [twoHireVehicles, targetDepartmentId, departmentOptions]);
 
   /** Bulk-loads the Lås column's lock state for every listed vehicle in one query, rather than one useVehicleLockState per row. */
   useEffect(() => {
@@ -169,16 +205,6 @@ export function VehiclesPage() {
     };
   }, [vehicles]);
 
-  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. A regular admin's afdelingId is always set and always present in departmentOptions (their own single costumer), so this always fires for them. A FLEETii admin's afdelingId becomes null the moment they switch back to "Alle" (PageHeader's own pseudo-entry) — the else branch resets filterDepartment to "" (Alle) to follow that back down, rather than leaving a stale department pick from before the switch. */
-  useEffect(() => {
-    if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
-      setFilterDepartment(afdelingId);
-    } else if (isFleetiiAdmin) {
-      setFilterDepartment("");
-    }
-  }, [afdelingId, departmentOptions, isFleetiiAdmin]);
-
-
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
       <div
@@ -199,7 +225,8 @@ export function VehiclesPage() {
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">
-                  Administration af køretøjer{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
+                  Køretøjer{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
+                  {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
                 </h2>
                 <div className="relative" ref={filterRef}>
                   <button
@@ -222,21 +249,24 @@ export function VehiclesPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Afdeling
-                          <select
-                            value={filterDepartment}
-                            onChange={(e) => setFilterDepartment(e.target.value)}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {departmentOptions.map((department) => (
-                              <option key={department.department_id} value={department.department_id}>
-                                {department.name}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        {/* LOCKED mode (targetDepartmentId set) hides this entirely — nothing to widen back out to from in-page, see this component's own doc comment. */}
+                        {!targetDepartmentId && (
+                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                            Afdeling
+                            <select
+                              value={filterDepartment}
+                              onChange={(e) => setFilterDepartment(e.target.value)}
+                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            >
+                              <option value="">Alle</option>
+                              {departmentOptions.map((department) => (
+                                <option key={department.department_id} value={department.department_id}>
+                                  {department.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Køretøj
                           <select

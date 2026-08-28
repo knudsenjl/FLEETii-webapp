@@ -302,7 +302,8 @@ export function CostumerNewPage() {
               </>
             ) : step === "register" ? (
               <>
-                <div className="overflow-hidden rounded-2xl border border-brand-100">
+                {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
                     {/* Matches the 2hire inputs' own border/padding (just transparent) below so this static text lines up with theirs instead of sitting flush left. */}
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
@@ -353,7 +354,7 @@ export function CostumerNewPage() {
               </>
             ) : (
               <>
-                <div className="overflow-hidden rounded-2xl border border-brand-100">
+                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">

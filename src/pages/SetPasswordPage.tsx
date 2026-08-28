@@ -101,7 +101,7 @@ export function SetPasswordPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-sm overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-xl shadow-brand-900/5"
+        className="w-full max-w-sm shrink-0 overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-xl shadow-brand-900/5"
       >
         <form onSubmit={(e) => void handleSubmit(e)} className="flex flex-col gap-4 p-6 sm:p-8">
           <h2 className="text-lg font-semibold text-brand-900">Vælg en adgangskode</h2>
