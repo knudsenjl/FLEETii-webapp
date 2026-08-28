@@ -179,13 +179,15 @@ export function AdminFrontpage() {
                 >
                   Reservationer
                 </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/fleet-map")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
-                  Flådestyring
-                </button>
+                {profile?.role !== "admin" && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleet-map")}
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Flådestyring
+                  </button>
+                )}
               </div>
 
               {profile?.role === "admin" && (
@@ -237,6 +239,13 @@ export function AdminFrontpage() {
                         )}
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/fleet-map")}
+                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                      >
+                        Flådestyring
+                      </button>
                     </div>
                   </div>
                 </>
@@ -259,6 +268,8 @@ export function AdminFrontpage() {
                         </span>
                       )}
                     </button>
+
+                    <hr className="border-brand-200" />
 
                     <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
                       <table className="w-full border-collapse text-[0.7rem]">

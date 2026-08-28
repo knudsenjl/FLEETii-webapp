@@ -391,14 +391,14 @@ export function VehiclesPage() {
                   }
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
-                  Registrer nyt køretøj
+                  Opret køretøj
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate("/import-vehicles")}
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
-                  Registrer nye køretøjer fra fil
+                  Opret køretøjer fra fil
                 </button>
               </div>
             </div>

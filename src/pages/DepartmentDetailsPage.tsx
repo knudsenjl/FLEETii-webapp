@@ -482,62 +482,9 @@ export function DepartmentDetailsPage() {
 
             {rowUpdateError && <p className="text-sm text-red-600">{rowUpdateError}</p>}
 
-            {!departmentsLoading && !departmentsError && departments.length > 0 && (
-              <>
-                <hr className="border-brand-200" />
-
-                <h3 className="text-sm font-semibold text-brand-700">
-                  {selectedDepartment ? `Valgt afdeling: ${selectedDepartment.name ?? "—"}` : "Ingen afdeling valgt"}
-                </h3>
-
-                <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate("/fleet-table", {
-                          state: {
-                            costumerId,
-                            costumerName,
-                            departmentId: selectedDepartmentId ?? undefined,
-                            departmentName: selectedDepartment?.name ?? undefined,
-                          },
-                        })
-                      }
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                    >
-                      KØRETØJER
-                    </button>
-                    <CountBadge count={vehiclesCount} />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        navigate("/department", {
-                          state: {
-                            costumerId,
-                            costumerName,
-                            departmentId: selectedDepartmentId ?? undefined,
-                            departmentName: selectedDepartment?.name ?? undefined,
-                          },
-                        })
-                      }
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                    >
-                      BRUGERE
-                    </button>
-                    <CountBadge count={usersCount} />
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Create/delete stays FLEETii-admin-only — same boundary the old two-page split enforced via this page's own former FLEETii-admin-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). */}
+            {/* Create/delete stays FLEETii-admin-only — same boundary the old two-page split enforced via this page's own former FLEETii-admin-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). Moved directly under the table (rather than after the KØRETØJER/BRUGERE/Flådestyring grid) at the user's request 2026-08-28, so creating/deleting departments doesn't require scrolling past the quick-nav grid first — no divider directly above it any more (it now sits right under the table), its own former leading divider moved below it instead, see the grid section's own comment below. */}
             {isFleetiiAdmin && (
               <>
-                <hr className="border-brand-200" />
-
                 {isAddingDepartment && (
                   <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                     <div className="divide-y divide-brand-100 bg-white">
@@ -592,6 +539,76 @@ export function DepartmentDetailsPage() {
                     </button>
                   </div>
                 )}
+              </>
+            )}
+
+            {!departmentsLoading && !departmentsError && departments.length > 0 && (
+              <>
+                {/* Only shown when the Opret/Slet afdeling block above actually rendered (isFleetiiAdmin) — separates that block from this grid; a regular admin never sees that block, so no divider is needed here for them either. */}
+                {isFleetiiAdmin && <hr className="border-brand-200" />}
+
+                <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                  {/* Was a plain <h3> label above the grid — now a row inside it (like Flådestyring below), same width/centering, just a slightly darker background (bg-brand-100 vs the buttons' bg-brand-50) and no hover/click affordance, since it's a status label, not an action. */}
+                  <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
+                    {selectedDepartment ? (selectedDepartment.name ?? "—") : "Ingen afdeling valgt"}
+                  </div>
+                  <div className="relative aspect-square w-28">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate("/fleet-table", {
+                          state: {
+                            costumerId,
+                            costumerName,
+                            departmentId: selectedDepartmentId ?? undefined,
+                            departmentName: selectedDepartment?.name ?? undefined,
+                          },
+                        })
+                      }
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      KØRETØJER
+                    </button>
+                    <CountBadge count={vehiclesCount} />
+                  </div>
+                  <div className="relative aspect-square w-28">
+                    <button
+                      type="button"
+                      onClick={() =>
+                        navigate("/department", {
+                          state: {
+                            costumerId,
+                            costumerName,
+                            departmentId: selectedDepartmentId ?? undefined,
+                            departmentName: selectedDepartment?.name ?? undefined,
+                          },
+                        })
+                      }
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      BRUGERE
+                    </button>
+                    <CountBadge count={usersCount} />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/fleet-map", {
+                        state: {
+                          filters: {
+                            costumerId: costumerId ?? "",
+                            department: selectedDepartmentId ?? "",
+                            plate: "",
+                            status: "",
+                          },
+                        },
+                      })
+                    }
+                    className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Flådestyring
+                  </button>
+                </div>
               </>
             )}
           </section>

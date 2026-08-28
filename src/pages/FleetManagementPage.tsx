@@ -203,8 +203,18 @@ export function FleetManagementPage() {
     return () => clearTimeout(timeout);
   }, [departmentGpsPositions.length]);
 
-  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. Same pattern as VehiclesPage.tsx's own identical effect. */
+  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. Same pattern as VehiclesPage.tsx's own identical effect.
+   *
+   * Guarded by explicitDepartmentFilterRef below whenever an explicit initial department scope arrived via router state (e.g. DepartmentDetailsPage's own "Flådestyring" button, scoped to one specific department that need not be the viewer's own active one) — without it, this effect's own departmentOptions-driven second run (departmentOptions starts empty and populates async, so the meaningful sync happens on THAT later run, not literally the first) would silently override the requested department back to the viewer's own afdelingId the moment departmentOptions finishes loading. The guard clears itself the first time afdelingId actually changes (a real "Skift afdeling"), so the effect resumes following it normally from then on, same as for everyone else. */
+  const explicitDepartmentFilterRef = useRef(Boolean(savedSnapshot?.filters?.department));
+  const prevAfdelingIdRef = useRef(afdelingId);
   useEffect(() => {
+    const afdelingChanged = afdelingId !== prevAfdelingIdRef.current;
+    prevAfdelingIdRef.current = afdelingId;
+    if (explicitDepartmentFilterRef.current) {
+      if (!afdelingChanged) return;
+      explicitDepartmentFilterRef.current = false;
+    }
     if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
       setFilterDepartment(afdelingId);
     } else if (isFleetiiAdmin) {

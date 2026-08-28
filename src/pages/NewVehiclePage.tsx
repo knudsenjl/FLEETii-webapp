@@ -16,7 +16,7 @@ import { supabase } from "../lib/supabase";
 type DepartmentOption = { department_id: string; name: string };
 
 /**
- * Admin "Opret nyt køretøj" page ("/new-vehicle"): rather than creating the
+ * Admin "Opret køretøj" page ("/new-vehicle"): rather than creating the
  * vehicle directly (FLEETii doesn't have a device-provisioning API), this
  * form emails the request to FLEETii staff via the send-vehicle-request
  * Netlify Function (which itself requires the caller to be a logged-in
@@ -25,7 +25,7 @@ type DepartmentOption = { department_id: string; name: string };
  *
  * A FLEETii admin has no costumer/department of their own — for them,
  * selectedCostumerId comes strictly from router state (VehiclesPage.tsx's
- * own "Registrer nyt køretøj" button — the only real entry point onto this
+ * own "Opret køretøj" button — the only real entry point onto this
  * page — "filtering by navigation" same as VehiclesPage.tsx/
  * DepartmentPage.tsx/UserDetailsPage.tsx's own "Ny bruger" form), shown as a
  * read-only "Kunde" row rather than a picker; reaching this page without it
@@ -284,7 +284,7 @@ export function NewVehiclePage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Opret nyt køretøj</h2>
+              <h2 className="text-xl font-semibold text-brand-800">Opret køretøj</h2>
 
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,

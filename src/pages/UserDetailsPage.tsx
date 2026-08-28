@@ -69,7 +69,7 @@ type DepartmentOption = { department_id: string; name: string };
  * A FLEETii admin has no costumerId of their own, so creating a brand-new
  * user (never editing an existing one — see targetCostumerId) requires
  * costumerId/costumerName arriving via router state (DepartmentPage's own
- * "Opret ny bruger" button — "filtering by navigation" same as
+ * "Opret bruger" button — "filtering by navigation" same as
  * VehiclesPage.tsx/DepartmentPage.tsx): a read-only "Kunde" row shows which
  * one, and reaching the create form without it (e.g. a direct URL/refresh)
  * redirects to "/admin" instead. Nothing else on the page (the
@@ -95,7 +95,7 @@ export function UserDetailsPage() {
     | null;
   const stateUser = navState?.user ?? null;
   // The department-locked BRUGERE list this page was reached from (DepartmentPage's
-  // own row click or "Opret ny bruger" button) — carried along purely so every
+  // own row click or "Opret bruger" button) — carried along purely so every
   // "return to the list" navigate("/department", ...) call below lands back on
   // that SAME locked scope, not a bare "/department" with no scope at all (which
   // would just redirect to "/admin" now that DepartmentPage requires one — see its
@@ -227,7 +227,7 @@ export function UserDetailsPage() {
   const [grantsLoading, setGrantsLoading] = useState(true);
   const [grantsError, setGrantsError] = useState<string | null>(null);
 
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret ny bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
   /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), router state's costumerId when a FLEETii admin is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
   const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isFleetiiAdmin ? (navState?.costumerId ?? null) : costumerId;
@@ -702,7 +702,7 @@ export function UserDetailsPage() {
               <h2 className="text-xl font-semibold text-brand-800">
                 {user
                   ? `Opdater bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
-                  : "Opret ny bruger"}
+                  : "Opret bruger"}
               </h2>
 
               <div className="rounded-2xl border border-brand-100">

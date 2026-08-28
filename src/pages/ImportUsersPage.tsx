@@ -1,5 +1,5 @@
 // Bulk user-import page ("/import-users" — reached via DepartmentPage.tsx's
-// "Opret nye brugere fra fil" button). Intro text links out to the format
+// "Opret brugere fra fil" button). Intro text links out to the format
 // templates under public/templates/bulk-import/ (self-hosted static files,
 // same convention as public/manualer/*.html), then two buttons trigger a
 // native file picker (filtered to .json/.csv) and POST the chosen file's
@@ -116,7 +116,7 @@ export function ImportUsersPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Opret nye brugere fra fil</h2>
+            <h2 className="text-xl font-semibold text-brand-800">Opret brugere fra fil</h2>
             <p className="text-sm text-brand-800">
               Her kan du oprette en række brugere på én gang ved at give oplysninger om de nye brugere i en fil,
               enten i{" "}

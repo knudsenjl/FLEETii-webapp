@@ -1,5 +1,5 @@
 // Bulk vehicle-import page ("/import-vehicles" — reached via
-// VehiclesPage.tsx's "Registrer nye køretøjer fra fil" button). Intro text
+// VehiclesPage.tsx's "Opret køretøjer fra fil" button). Intro text
 // links out to the format templates under public/templates/bulk-import/
 // (self-hosted static files, same convention as public/manualer/*.html),
 // then two buttons trigger a native file picker (filtered to .json/.csv)
@@ -115,7 +115,7 @@ export function ImportVehiclesPage() {
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Opret nye køretøjer fra fil</h2>
+            <h2 className="text-xl font-semibold text-brand-800">Opret køretøjer fra fil</h2>
             <p className="text-sm text-brand-800">
               Her kan du oprette en række køretøjer på én gang ved at give oplysninger om de nye køretøjer i en fil,
               enten i{" "}
@@ -148,7 +148,7 @@ export function ImportVehiclesPage() {
               .
             </p>
             <p className="text-sm text-brand-800">
-              Hvert køretøj oprettes som en afventende bestilling, ligesom "Registrer nyt køretøj" — en FLEETii
+              Hvert køretøj oprettes som en afventende bestilling, ligesom "Opret køretøj" — en FLEETii
               administrator skal stadig registrere hvert køretøj enkeltvis, da det kræver speciel konfigurering af
               hvert køretøj.
             </p>
