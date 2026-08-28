@@ -90,8 +90,28 @@ export function UserDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
-  const navState = location.state as { user?: ProfileRow; costumerId?: string; costumerName?: string } | null;
+  const navState = location.state as
+    | { user?: ProfileRow; costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
+    | null;
   const stateUser = navState?.user ?? null;
+  // The department-locked BRUGERE list this page was reached from (DepartmentPage's
+  // own row click or "Opret ny bruger" button) — carried along purely so every
+  // "return to the list" navigate("/department", ...) call below lands back on
+  // that SAME locked scope, not a bare "/department" with no scope at all (which
+  // would just redirect to "/admin" now that DepartmentPage requires one — see its
+  // own doc comment on "filtering by navigation"). Distinct from targetCostumerId
+  // below, which is about scoping the Afdeling(er) picker to the EDITED user's own
+  // costumer, not about where to navigate back to.
+  const returnCostumerId = navState?.costumerId ?? null;
+  const returnCostumerName = navState?.costumerName ?? null;
+  const returnDepartmentId = navState?.departmentId ?? null;
+  const returnDepartmentName = navState?.departmentName ?? null;
+  const returnState = {
+    costumerId: returnCostumerId,
+    costumerName: returnCostumerName,
+    departmentId: returnDepartmentId,
+    departmentName: returnDepartmentName,
+  };
   const [fetchedUser, setFetchedUser] = useState<ProfileRow | null>(null);
   /** Starts true whenever a fetch-by-id will actually run (userId present, no stateUser) — NOT just false-by-default. The redirect-on-missing-user effect below and this page's own fetch effect both run in the SAME passive-effects pass on mount; if this started false, the redirect effect would see the pre-fetch "not loading, no user" state and bounce to /department before the fetch's setUserLoading(true) had any chance to take effect for that pass. Every existing caller (DepartmentPage) masked this by always passing router state, so `user` was already truthy and the redirect's `!user` check short-circuited — this only surfaces for a caller that navigates here by id alone (e.g. BookingDetailsPage's "Bruger" link, or a raw bookmark/refresh). */
   const [userLoading, setUserLoading] = useState(() => Boolean(userId) && !stateUser);
@@ -195,8 +215,9 @@ export function UserDetailsPage() {
   // for the plain "/user-details" create route, which has no userId at all.
   useEffect(() => {
     if (userId && !user && !userLoading) {
-      navigate("/department", { replace: true });
+      navigate("/department", { replace: true, state: returnState });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, user, userLoading, navigate]);
 
   /** This user's own Afdelinger grants (user_departments) — only loaded/relevant when editing an existing user (see the fetch effect below). */
@@ -451,7 +472,7 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department", { replace: true });
+    navigate("/department", { replace: true, state: returnState });
   };
 
   /** Reverses handleDelete via unblock-user.mts — lifts the Auth ban and clears deleted_at, then returns to DepartmentPage. No "last admin" pre-check needed here, unlike handleDelete: restoring access only ever adds admin coverage back, never removes it. */
@@ -485,7 +506,7 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department", { replace: true });
+    navigate("/department", { replace: true, state: returnState });
   };
 
   /** Calls update-user with the form's current values for this user, authenticated with the current session's access token, then persists any pending Rettigheder checkbox changes (staged locally via deferSave — see RettighederSettings' exposed save()). Shows the server's error message (or a generic connection-failure one) inline on failure. */
@@ -568,13 +589,13 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department", { replace: true });
+    navigate("/department", { replace: true, state: returnState });
   };
 
   /** Calls create-user with the form's values, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleConfirm = async () => {
     if (pendingAction === "close") {
-      navigate("/department", { replace: true });
+      navigate("/department", { replace: true, state: returnState });
       return;
     }
 
@@ -641,7 +662,7 @@ export function UserDetailsPage() {
 
       setIsSubmitting(false);
       setPendingAction(null);
-      navigate("/department", { replace: true, state: { emailWarning: result.emailSent === false } });
+      navigate("/department", { replace: true, state: { ...returnState, emailWarning: result.emailSent === false } });
       return;
     } catch {
       setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");

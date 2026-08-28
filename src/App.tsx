@@ -23,7 +23,6 @@ import { InstallationAdministrationPage } from "./pages/InstallationAdministrati
 import { CostumerDetailsPage } from "./pages/CostumerDetailsPage";
 import { CostumerNewPage } from "./pages/CostumerNewPage";
 import { DepartmentDetailsPage } from "./pages/DepartmentDetailsPage";
-import { EditDepartmentsPage } from "./pages/EditDepartmentsPage";
 import { DepartmentPage } from "./pages/DepartmentPage";
 import { FleetManagementPage } from "./pages/FleetManagementPage";
 import { HandleVehiclePage } from "./pages/HandleVehiclePage";
@@ -208,16 +207,8 @@ function App() {
           <Route
             path="/department-details"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
-                <DepartmentDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/edit-departments"
-            element={
               <ProtectedRoute requireAdmin>
-                <EditDepartmentsPage />
+                <DepartmentDetailsPage />
               </ProtectedRoute>
             }
           />

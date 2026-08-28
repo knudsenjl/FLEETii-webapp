@@ -1,0 +1,4985 @@
+[
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "01f1ff36-f5bf-405c-9817-83f37b5ebc0c",
+    "title": "Opel_Combo_D-ImmoBreakout",
+    "description": "Opel_Combo_D-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Combo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2019
+    ],
+    "id": "02e4f123-27b5-439d-a02e-0e07e74b71eb",
+    "title": "Mercedes-Benz_GLA_X156_CDI-ImmoBreakout",
+    "description": "Mercedes-Benz_GLA_X156_CDI-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "GLA (CDI)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "03f03c47-8226-4f73-aa39-aed22601a72a",
+    "title": "Ford_Transit_Custom_MK1-DoorsAndImmoBreakout",
+    "description": "Ford_Transit_Custom_MK1-DoorsAndImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Transit Custom (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "040eb2f3-f063-4ea8-9685-645cef04aaa8",
+    "title": "Volkswagen_Golf_VIII-ImmoBreakout",
+    "description": "Volkswagen_Golf_VIII-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Golf (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2023
+    ],
+    "id": "058ec53a-8909-4aed-a987-0da4f1866543",
+    "title": "Hyundai_Kona_OS-ImmoBreakout",
+    "description": "Hyundai_Kona_OS-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "Kona (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2027
+    ],
+    "id": "0647fc26-f5d6-4056-bd08-c29879b599b9",
+    "title": "Toyota_ProAce_MK3-ImmoBreakout",
+    "description": "Toyota_ProAce_MK3-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "ProAce (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2024
+    ],
+    "id": "064b5f7b-e90b-423b-a770-18ff891cc7e7",
+    "title": "Volkswagen_Transporter_T6-ImmoBreakout",
+    "description": "Volkswagen_Transporter_T6-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Transporter (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2027
+    ],
+    "id": "067b9b47-4ef3-49d6-b71a-dced53e412c4",
+    "title": "Ford_Transit-Connect_MQB-ImmoBreakout",
+    "description": "Ford_Transit-Connect_MQB-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Transit Connect (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "06c54654-7bc8-4d0b-be0e-ebd015981402",
+    "title": "Smart_Fortwo_451-ImmoBreakout",
+    "description": "Smart_Fortwo_451-ImmoBreakout",
+    "makerName": "SMART",
+    "modelName": "Fortwo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2027
+    ],
+    "id": "0728edfb-3dfc-4e48-8981-77f2788a5e12",
+    "title": "Ford_Puma_BX726-ImmoBreakout",
+    "description": "Ford_Puma_BX726-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Puma (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2025,
+      2028
+    ],
+    "id": "07708aab-430b-4cde-a57e-36855495552d",
+    "title": "Kia_Stonic_YB-FL-ImmoBreakout",
+    "description": "Kia_Stonic_YB-FL-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Stonic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "07e7e779-a019-448f-80c4-917e1fa6ae6b",
+    "title": "Toyota_Aygo_MK1-ImmoBreakout",
+    "description": "Toyota_Aygo_MK1-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Aygo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2018
+    ],
+    "id": "08e6322c-3b7c-4ad2-a8bb-78b5eb9b53a4",
+    "title": "Peugeot_Partner_B9-ImmoBreakout",
+    "description": "Peugeot_Partner_B9-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "Partner (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "0940ec3b-d308-4cd6-9d7a-bf41ca9c054f",
+    "title": "Nissan_Navara_D23-ImmoBreakout",
+    "description": "Nissan_Navara_D23-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Navara (80L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2022
+    ],
+    "id": "094b0c43-c752-418b-83b8-aba31e5b7b45",
+    "title": "Peugeot_108_MK2-DoorsAndImmoBreakout",
+    "description": "Peugeot_108_MK2-DoorsAndImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "108 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "09f1f3b0-3539-48d5-8397-76211b34476f",
+    "title": "Volkswagen_Polo_AW-ImmoBreakout",
+    "description": "Volkswagen_Polo_AW-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Polo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2021
+    ],
+    "id": "0a40b3a7-f63e-4392-a624-ae53622e6424",
+    "title": "Skoda_Fabia_NJ-43L-Breakout",
+    "description": "Skoda_Fabia_NJ-43L-Breakout",
+    "makerName": "SKODA",
+    "modelName": "Fabia (43L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "0a542100-6d23-41e3-9a0d-6f104658bee4",
+    "title": "Renault_Master_MK2-ImmoBreakout",
+    "description": "Renault_Master_MK2-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Master (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "0ad6a344-8a24-420f-96fb-225942b8fd77",
+    "title": "Skoda_Karoq_NU7-ImmoBreakout",
+    "description": "Skoda_Karoq_NU7-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Karoq (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2018
+    ],
+    "id": "0b3e53f1-6c6d-4265-9dfb-1f7758c41a75",
+    "title": "Toyota_Verso_MK1-ImmoBreakout",
+    "description": "Toyota_Verso_MK1-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Verso (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2023,
+      2027
+    ],
+    "id": "0e05fef5-203e-45cf-b469-d5360eb1ff20",
+    "title": "Toyota_ProAce-Max_MK1-ImmoBreakout",
+    "description": "Toyota_ProAce-Max_MK1-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "ProAce Max (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2016
+    ],
+    "id": "0e5d5acc-e1f2-4215-9e43-90c33f32dee7",
+    "title": "Volkswagen_Tiguan_5NFL-ImmoBreakout",
+    "description": "Volkswagen_Tiguan_5NFL-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Tiguan (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2027
+    ],
+    "id": "0e723005-e1d0-4ed7-8859-79d4bb4d0397",
+    "title": "Kia_Ceed_CD-ImmoBreakout",
+    "description": "Kia_Ceed_CD-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Ceed (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "0ec0cb9c-62d1-4010-9ac2-d6870d9fb06d",
+    "title": "Audi_Q3_F3-ImmoBreakout",
+    "description": "Audi_Q3_F3-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "Q3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2017
+    ],
+    "id": "0ee23083-9b78-44ae-a72e-9679309c0392",
+    "title": "Jeep_Renegade_BU-PreFacelift-ImmoBreakout",
+    "description": "Jeep_Renegade_BU-PreFacelift-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Renegade (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "0ffb14b4-55cf-4f91-aac7-4e03b00adbfa",
+    "title": "Chevrolet_Aveo_MK2-ImmoBreakout",
+    "description": "Chevrolet_Aveo_MK2-ImmoBreakout",
+    "makerName": "CHEVROLET",
+    "modelName": "Aveo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2022
+    ],
+    "id": "10473456-30a4-4746-8125-f047d7959acd",
+    "title": "Citroen_C4_Spacetourer_Mk2-ImmoBreakout",
+    "description": "Citroen_C4_Spacetourer_Mk2-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C4 Spacetourer (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "117ac61c-2871-4a5c-8f54-8a2dca9f0742",
+    "title": "Kia_Soul_SK3-ImmoBreakout",
+    "description": "Kia_Soul_SK3-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Soul (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "11eb48c9-2630-4ca2-a744-14380eb667b9",
+    "title": "Audi_e-Tron_MK1-ImmoBreakout",
+    "description": "Audi_e-Tron_MK1-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "e-Tron (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2027
+    ],
+    "id": "127448d8-414e-4aba-a24a-c963ee6303b1",
+    "title": "Citroen_Jumpy_MK3-ImmoBreakout",
+    "description": "Citroen_Jumpy_MK3-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "Jumpy (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "13534f27-0715-48c0-a449-b2a23461cae2",
+    "title": "Fiat_Tipo_357_Breakout",
+    "description": "Fiat_Tipo_357_Breakout",
+    "makerName": "FIAT",
+    "modelName": "Tipo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2017
+    ],
+    "id": "136a0c75-09f6-4578-a29c-37467878f12f",
+    "title": "Ford_Mondeo_MK4PF-ImmoBreakout",
+    "description": "Ford_Mondeo_MK4PF-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Mondeo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "13f505fd-d888-4e7e-b075-e20e75b87e6a",
+    "title": "Mercedes-Benz_EQB_X243-ImmoBreakout",
+    "description": "Mercedes-Benz_EQB_X243-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "EQB (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2027
+    ],
+    "id": "14bc3a68-eb0a-48dd-946c-47d5748f0555",
+    "title": "Volkswagen_ID.3_MK1-DoorsActivations",
+    "description": "Volkswagen_ID.3_MK1-DoorsActivations",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "ID.3"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2019
+    ],
+    "id": "15ba44d1-6953-4c6e-ab06-6ed4cb54c590",
+    "title": "Nissan_Juke_F15-ImmoBreakout",
+    "description": "Nissan_Juke_F15-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Juke (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2003,
+      2014
+    ],
+    "id": "16072bb3-8779-4790-92af-0862b6429798",
+    "title": "Mercedes-Benz_Vito_W639-ImmoBreakout",
+    "description": "Mercedes-Benz_Vito_W639-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "Vito (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "168631c2-e97c-43b2-b89c-33edcc348fe7",
+    "title": "Peugeot_Expert_MK2-ImmoBreakout",
+    "description": "Peugeot_Expert_MK2-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "Expert (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2019
+    ],
+    "id": "175abaad-d4bb-4a5a-b104-ec85e8edc586",
+    "title": "Hyundai_i10_IA-ImmoBreakout",
+    "description": "Hyundai_i10_IA-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i10 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "17eb354f-e6bf-4233-9281-afb917a94356",
+    "title": "Nissan_Juke_J16-ImmoBreakout",
+    "description": "Nissan_Juke_J16-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Juke (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2004,
+      2012
+    ],
+    "id": "17ed9c94-ed47-4ca8-8467-89a96ae92f05",
+    "title": "Mercedes-Benz_A-Class_W169-ImmoBreakout",
+    "description": "Mercedes-Benz_A-Class_W169-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "A Class"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "181430dc-25c4-4fae-ad5c-e9ae0871c614",
+    "title": "Nissan_Note_E12-ImmoBreakout",
+    "description": "Nissan_Note_E12-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Note (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2004,
+      2012
+    ],
+    "id": "18a67cae-d202-4b01-85d8-8e333f8840b8",
+    "title": "Volvo_V50_MK1-ImmoBreakout",
+    "description": "Volvo_V50_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "V50 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2026
+    ],
+    "id": "18fe3bb0-43f6-4abb-9811-ad1a03a1ea36",
+    "title": "Maxus_Deliver9_MK1-ImmoBreakout",
+    "description": "Maxus_Deliver9_MK1-ImmoBreakout",
+    "makerName": "MAXUS",
+    "modelName": "Deliver 9 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "1a1e0ab2-d119-468e-a208-f894379f328a",
+    "title": "DS_DS3Crossback_MK1-ImmoBreakout",
+    "description": "DS_DS3Crossback_MK1-ImmoBreakout",
+    "makerName": "DS",
+    "modelName": "DS3 Crossback (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "1a7e6faa-96c4-443d-96e2-fcd1ec0bbdde",
+    "title": "Toyota_Aygo_X-CL-Breakout",
+    "description": "Toyota_Aygo_X-CL-Breakout",
+    "makerName": "TOYOTA",
+    "modelName": "Aygo X (CL)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2023
+    ],
+    "id": "1b30621b-92c5-4239-bd22-3c86461084b6",
+    "title": "Skoda_Superb_B8-ImmoBreakout",
+    "description": "Skoda_Superb_B8-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Superb (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "1c0db745-e3da-4647-90d3-51b8efef6d97",
+    "title": "Kia_XCeed_CD-ImmoBreakout",
+    "description": "Kia_XCeed_CD-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "XCeed (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2023,
+      2027
+    ],
+    "id": "1c2259b7-1685-48c9-9063-0f5a9e9ab065",
+    "title": "Kia_Picanto_JA-Facelift-ImmoBreakout",
+    "description": "Kia_Picanto_JA-Facelift-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Picanto (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "1d28de2d-5a16-43f7-8035-3c5991919910",
+    "title": "Chrysler_Pacifica_RU-ImmoBreakout",
+    "description": "Chrysler_Pacifica_RU-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Chrysler Pacifica (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2012
+    ],
+    "id": "1e7e78b5-a3eb-4d30-87de-f7ee944fb224",
+    "title": "Volkswagen_Golf_VI_52L-ImmoBreakout",
+    "description": "Volkswagen_Golf_VI_52L-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Golf (52L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "1e899f73-7f5d-476b-b257-a9adf8747e69",
+    "title": "Dacia_Sandero_MK2-ImmoBreakout",
+    "description": "Dacia_Sandero_MK2-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Sandero (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2022
+    ],
+    "id": "1ec5e8c9-12ac-4303-b394-ec384b076f89",
+    "title": "Nissan_NV200_MK1-ImmoBreakout",
+    "description": "Nissan_NV200_MK1-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "NV200 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2024
+    ],
+    "id": "1f1dc45f-6bd4-419b-a14c-b0ee044bc80a",
+    "title": "Mini_Countryman_F60-ImmoBreakout",
+    "description": "Mini_Countryman_F60-ImmoBreakout",
+    "makerName": "MINI",
+    "modelName": "Countryman (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "20ad6dd9-6c78-49fc-9c1b-ebdef5340f83",
+    "title": "Range-Rover_Evoque_L551-ImmoBreakout",
+    "description": "Range-Rover_Evoque_L551-ImmoBreakout",
+    "makerName": "LAND_ROVER",
+    "modelName": "Range Rover Evoque (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2026
+    ],
+    "id": "2258a511-00fc-4eb0-8bd0-71e9961d7116",
+    "title": "Skoda_Kamiq_MK1-2F-Breakout",
+    "description": "Skoda_Kamiq_MK1-2F-Breakout",
+    "makerName": "SKODA",
+    "modelName": "Kamiq (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2025
+    ],
+    "id": "23d86ac9-cca2-48ed-a156-266dfb38d110",
+    "title": "Citroen_Jumper_MK3-ImmoBreakout",
+    "description": "Citroen_Jumper_MK3-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "Jumper"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "268587e2-5cfd-4869-8595-8214c5841e37",
+    "title": "Renault_Clio_V-DoorsAndImmoBreakout",
+    "description": "Renault_Clio_V-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Clio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "26cbe775-7934-4643-a26e-f822ff504df5",
+    "title": "Peugeot_107_MK1-ImmoBreakout",
+    "description": "Peugeot_107_MK1-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "107 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "273c8a84-91fc-4b67-9a51-4da9a05de259",
+    "title": "Kia_Ceed_CD-47L-Breakout",
+    "description": "Kia_Ceed_CD-47L-Breakout",
+    "makerName": "KIA",
+    "modelName": "Ceed (47L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2022
+    ],
+    "id": "274aa3c6-5bf3-46fc-8e21-7d9388673cde",
+    "title": "Honda_CR-V_MK5-ImmoBreakout",
+    "description": "Honda_CR-V_MK5-ImmoBreakout",
+    "makerName": "HONDA",
+    "modelName": "CR-V"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2021
+    ],
+    "id": "275050d4-53e2-45d4-b152-201a51d12098",
+    "title": "Honda_Civic_X-ImmoBreakout",
+    "description": "Honda_Civic_X-ImmoBreakout",
+    "makerName": "HONDA",
+    "modelName": "Civic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2015
+    ],
+    "id": "27eb4666-3e06-4e38-98c8-fd2f6e523fce",
+    "title": "Volkswagen_Sharan_7N-ImmoBreakout",
+    "description": "Volkswagen_Sharan_7N-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Sharan (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2017
+    ],
+    "id": "2802ded9-6070-40d5-8c16-23f2b6e1cc3f",
+    "title": "Volkswagen_Polo_6R-ImmoBreakout",
+    "description": "Volkswagen_Polo_6R-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Polo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2024,
+      2029
+    ],
+    "id": "29133b6c-97d5-44b7-a77f-26f294278f83",
+    "title": "Renault_5_MK1-ImmoBreakout",
+    "description": "Renault_5_MK1-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "5 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "29de1bb5-acdc-4e20-aaa2-f8a8215badd4",
+    "title": "Cupra_Born_MK1-ImmoBreakout",
+    "description": "Cupra_Born_MK1-ImmoBreakout",
+    "makerName": "CUPRA",
+    "modelName": "Born (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2000,
+      2025
+    ],
+    "id": "2d5b8ebe-66f8-49dd-8d00-ade7d1084c8a",
+    "title": "AllMakes-TwoRelaysAndImmoBreakout",
+    "description": "AllMakes-TwoRelaysAndImmoBreakout",
+    "makerName": "INFINITI",
+    "modelName": "All Models Two Relays and Immo Breakout"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2025
+    ],
+    "id": "2e793675-84b1-46b3-a226-0cfb07c914c1",
+    "title": "Citroen_C4_All-DoorsAndImmoBreakdown",
+    "description": "Citroen_C4_All-DoorsAndImmoBreakdown",
+    "makerName": "CITROEN",
+    "modelName": "C4 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "2ea245f4-29cf-416e-b803-201e0ac64fac",
+    "title": "Jaguar_XE_X760-ImmoBreakout",
+    "description": "Jaguar_XE_X760-ImmoBreakout",
+    "makerName": "JAGUAR",
+    "modelName": "XE (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "2ecf20e0-7e55-4060-b3f9-1c04dc2aaf28",
+    "title": "Hyundai_Kona-e_OS-ImmoBreakout",
+    "description": "Hyundai_Kona-e_OS-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "Kona-e"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "2ed7a961-850e-4524-b1af-440867a3b0f9",
+    "title": "Porsche_Macan_95B-Immobreakout",
+    "description": "Porsche_Macan_95B-Immobreakout",
+    "makerName": "PORSCHE",
+    "modelName": "Macan (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "2ef0054c-37f2-4e5e-8bc6-53aa2be2ef67",
+    "title": "Ford_Edge_CD539_ImmoBreakout",
+    "description": "Ford_Edge_CD539_ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Edge (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2023
+    ],
+    "id": "2f0dc811-2d42-493d-ad76-e6efb87bac41",
+    "title": "Audi_TT_8S-ImmoBreakout",
+    "description": "Audi_TT_8S-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "TT (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2026
+    ],
+    "id": "2f608960-af29-4e63-b567-e6b8a217bd5b",
+    "title": "Hyundai_Tucson_NX4-Hybrid-ImmoBreakout",
+    "description": "Hyundai_Tucson_NX4-Hybrid-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "Tucson (Hybrid)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2014
+    ],
+    "id": "2fea4fbe-2935-407a-857e-68db6ba208a3",
+    "title": "Ford_Kuga_C394-ImmoBreakout",
+    "description": "Ford_Kuga_C394-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Kuga (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2020
+    ],
+    "id": "31fb25ad-33ce-4aa7-9d91-18283ae66e22",
+    "title": "BMW_4-Series_F32-ImmoBreakout",
+    "description": "BMW_4-Series_F32-ImmoBreakout",
+    "makerName": "BMW",
+    "modelName": "4 Series (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2025
+    ],
+    "id": "349c2755-f02f-4866-b9af-53df5fcb2adc",
+    "title": "Nissan_Qashqai_J12-ImmoBreakout",
+    "description": "Nissan_Qashqai_J12-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Qashqai (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "35080275-a2f3-4266-8b81-7b23176a9a7c",
+    "title": "Renault_Kadjar_MK1-ImmoBreakout",
+    "description": "Renault_Kadjar_MK1-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Kadjar (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "3598483f-c0de-4d8c-9ec4-86482576ae6a",
+    "title": "Volvo_XC60_MK2-ImmoBreakout",
+    "description": "Volvo_XC60_MK2-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "XC60 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2020
+    ],
+    "id": "35c1f050-51eb-48f3-9fcc-3ddf152a244a",
+    "title": "Tesla_Model-3_MK1PF-ImmoBreakout",
+    "description": "Tesla_Model-3_MK1PF-ImmoBreakout",
+    "makerName": "TESLA",
+    "modelName": "Model 3"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "35cf5dc1-2eb7-4429-b2df-2f5d1d3418bb",
+    "title": "Renault_Espace_MK1-ImmoBreakout",
+    "description": "Renault_Espace_MK1-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Espace (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "36f39e30-1c04-4feb-8ba6-f5c8a06dbcd8",
+    "title": "Fiat_500X_SGW-DoorsAndImmo",
+    "description": "Fiat_500X_SGW-DoorsAndImmo",
+    "makerName": "FIAT",
+    "modelName": "500X"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2025
+    ],
+    "id": "3725d26f-9a55-4773-aa08-487d790da29a",
+    "title": "Fiat_500_MK1-DoorsAndImmo",
+    "description": "Fiat_500_MK1-DoorsAndImmo",
+    "makerName": "FIAT",
+    "modelName": "500"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2026
+    ],
+    "id": "38edce8c-a174-4372-b204-0c290d5ec358",
+    "title": "Citroen_C4-e_MK3-ImmoBreakout",
+    "description": "Citroen_C4-e_MK3-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C4-e (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2020
+    ],
+    "id": "3a2f05d9-ee7f-4a35-aa0d-b63decbbfdab",
+    "title": "Renault_Megane_IV-52L-PF-ImmoBreakout",
+    "description": "Renault_Megane_IV-52L-PF-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Megane (52L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "3a583d5a-aea1-4c6e-81d0-41533cf5b0d7",
+    "title": "Nissan_Micra_K14SGW-ImmoBreakout",
+    "description": "Nissan_Micra_K14SGW-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Micra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "3b00970c-0200-4a70-be8c-3036069428db",
+    "title": "Mercedes_Benz_A-Class_W176-ImmoBreakout",
+    "description": "Mercedes_Benz_A-Class_W176-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "A Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2013
+    ],
+    "id": "3b1bab08-7de4-43e8-83ca-21aac2f55f6f",
+    "title": "Audi_A3_8P-ImmoBreakout",
+    "description": "Audi_A3_8P-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2018
+    ],
+    "id": "3b579e07-5f74-4ab6-9a0d-8e138eae41ee",
+    "title": "Audi_Q3_8U-ImmoBreakout",
+    "description": "Audi_Q3_8U-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "Q3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2013
+    ],
+    "id": "3ba00392-025b-440e-a570-299949323288",
+    "title": "Citroen_C4GrandPicasso_MK1-ImmoBreakout",
+    "description": "Citroen_C4GrandPicasso_MK1-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C4 Grand Picasso (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2016
+    ],
+    "id": "3c7c996c-0fb5-46da-a1e9-2875b7149cd5",
+    "title": "Kia_Rio_UB-ImmoBreakout",
+    "description": "Kia_Rio_UB-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Rio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2023,
+      2028
+    ],
+    "id": "3cc42a69-9d87-42a6-867b-8941628f1cb3",
+    "title": "Volvo_EX30_MK1-ImmoBreakout",
+    "description": "Volvo_EX30_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "EX30 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2017
+    ],
+    "id": "3ce2f2c2-f583-4f22-a524-903566a696e7",
+    "title": "Fiat_500L_NoSGW-ImmoBreakout",
+    "description": "Fiat_500L_NoSGW-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "500L (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2025,
+      2028
+    ],
+    "id": "3d86e1c4-cb05-4c34-a2bf-9c0d37c6839f",
+    "title": "Seat_Leon_KL1-FD-ImmoBreakout",
+    "description": "Seat_Leon_KL1-FD-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Leon (FD)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "3e532761-01b4-4a30-adad-6f4952ed256c",
+    "title": "Seat_Ateca_KH7-ImmoBreakout",
+    "description": "Seat_Ateca_KH7-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Ateca (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "3f177552-97b4-407f-8182-7f162ef43c91",
+    "title": "Kia_e-Niro_DE-ImmoBreakout",
+    "description": "Kia_e-Niro_DE-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "e-Niro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2021
+    ],
+    "id": "3f34fae9-97f2-42a3-8a3f-53dfb3ca03cb",
+    "title": "Opel_Movano_MK3-ImmoBreakout",
+    "description": "Opel_Movano_MK3-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Movano (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2005,
+      2018
+    ],
+    "id": "3f38c2fb-7168-4679-8d27-b31d31ba5501",
+    "title": "Fiat_Bravo_MK1-ImmoBreakout",
+    "description": "Fiat_Bravo_MK1-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Bravo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "3f77cfea-d754-4d98-bba0-0e62c6be7e10",
+    "title": "Toyota_Yaris_XP210-ImmoBreakout",
+    "description": "Toyota_Yaris_XP210-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Yaris (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "3fb3d9c7-695c-4e99-b42c-2cebfd121aae",
+    "title": "Volkswagen_Passat_3G-68L-ImmoBreakout",
+    "description": "Volkswagen_Passat_3G-68L-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Passat (69L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2025
+    ],
+    "id": "405530fa-3931-4298-a36b-e4c7df482b6b",
+    "title": "Volkswagen_Up-Electric_MK1-ImmoBreakout",
+    "description": "Volkswagen_Up-Electric_MK1-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Up electric (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2013
+    ],
+    "id": "4063e066-b1d2-4caa-986a-e5bc2a455907",
+    "title": "Hyundai_i10_PA-ImmoBreakout",
+    "description": "Hyundai_i10_PA-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i10 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "40e92a5e-45ed-4c61-9771-874856bf0f07",
+    "title": "Opel_Combo_E-ImmoBreakout",
+    "description": "Opel_Combo_E-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Combo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "4185945b-d61d-43a2-86ad-f20205dd5747",
+    "title": "Opel_Vivaro_MK3-GPO-Breakout",
+    "description": "Opel_Vivaro_MK3-GPO-Breakout",
+    "makerName": "OPEL",
+    "modelName": "Vivaro (GPO)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "41a9b977-372e-4104-a83f-e058305cffe1",
+    "title": "Opel_Vivaro_MK3-80L-GPO-Breakout",
+    "description": "Opel_Vivaro_MK3-80L-GPO-Breakout",
+    "makerName": "OPEL",
+    "modelName": "Vivaro (GPO)(80L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2024
+    ],
+    "id": "41db139a-84e0-4ae7-9459-d0eb98295345",
+    "title": "Skoda_Kodiaq_NS7-2F-ImmoBreakout",
+    "description": "Skoda_Kodiaq_NS7-2F-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Kodiaq (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "4220f1bc-86d1-4a6b-aa6e-df08d0ba1b71",
+    "title": "Kia_Niro_EV_SG2-ImmoBreakout",
+    "description": "Kia_Niro_EV_SG2-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Niro EV (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2005,
+      2014
+    ],
+    "id": "4229d247-1106-4279-85b2-6656f320671c",
+    "title": "Seat_Altea_MK1-ImmoBreakout",
+    "description": "Seat_Altea_MK1-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Altea (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "42e7032d-954c-4c08-8397-4041d315022a",
+    "title": "Ford_Transit_MK2-ImmoBreakout",
+    "description": "Ford_Transit_MK2-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Transit (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "441c24e9-1f07-42b4-985c-8f2187851a60",
+    "title": "Skoda_Fabia_MK4-ImmoBreakout",
+    "description": "Skoda_Fabia_MK4-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Fabia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "458e619b-4894-4dce-9aff-734468975f69",
+    "title": "BMW_1Series_F40-ImmoBreakout",
+    "description": "BMW_1Series_F40-ImmoBreakout",
+    "makerName": "BMW",
+    "modelName": "1 Series (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2025
+    ],
+    "id": "464fb557-d93d-47b6-8122-c2268317a7f4",
+    "title": "Hyundai_H1_TQ-ImmoBreakout",
+    "description": "Hyundai_H1_TQ-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "H1 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "46c08a20-5567-4c62-9778-393ff2f11451",
+    "title": "Jeep_Compass_MP-ImmoBreakout",
+    "description": "Jeep_Compass_MP-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Compass (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "46d7a4cb-906e-4ebd-a9d3-6d1ba054d2a8",
+    "title": "Volkswagen_T-Roc_MK1-ImmoBreakout",
+    "description": "Volkswagen_T-Roc_MK1-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "T-Roc (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2021
+    ],
+    "id": "47565603-72c9-496a-999b-1479491db18f",
+    "title": "Ford_Transit-Connect_MK2-Immobreakout",
+    "description": "Ford_Transit-Connect_MK2-Immobreakout",
+    "makerName": "FORD",
+    "modelName": "Transit Connect (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "476a3c8e-3041-40ec-b5e8-b46fdb8e061c",
+    "title": "Toyota_Auris_MK1-55L-ImmoBreakout",
+    "description": "Toyota_Auris_MK1-55L-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Auris (55L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "47b52ea5-ac79-46e2-ab23-61adbb8f684b",
+    "title": "Kia_Sportage_NQ5-ImmoBreakout",
+    "description": "Kia_Sportage_NQ5-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Sportage (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2019
+    ],
+    "id": "4839abe6-56fa-4a81-9d53-f538844df8f5",
+    "title": "Mercedes-Benz_CLA_C117-ImmobilizerBreakout",
+    "description": "Mercedes-Benz_CLA_C117-ImmobilizerBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "CLA (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2004,
+      2011
+    ],
+    "id": "49597a10-41ee-424b-ae45-abbd00b7d982",
+    "title": "Ford_Focus_C307_DoorsAndImmoBreakout",
+    "description": "Ford_Focus_C307_DoorsAndImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Focus (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2019
+    ],
+    "id": "49b91628-a9c4-4b4b-b3e9-9108fa09e330",
+    "title": "Toyota_Yaris_XP130-ImmoBreakout",
+    "description": "Toyota_Yaris_XP130-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Yaris (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2025
+    ],
+    "id": "4ad9851e-cd05-49b9-9ae1-c615c87641b8",
+    "title": "Peugeot_Boxer_MK3-ImmoBreakout",
+    "description": "Peugeot_Boxer_MK3-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "Boxer (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "4b0adae0-1df7-49ab-a428-150cb6e43c83",
+    "title": "Renault_Megane_e-Tech_GPO-ImmoBreakout",
+    "description": "Renault_Megane_e-Tech_GPO-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Megane e-Tech (GPO Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2024
+    ],
+    "id": "4b2cdc93-86be-4c0a-b61c-4b9f602f095b",
+    "title": "MG_EHS_MK1-ImmoBreakout",
+    "description": "MG_EHS_MK1-ImmoBreakout",
+    "makerName": "MG",
+    "modelName": "EHS (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2026
+    ],
+    "id": "4bd78068-3ccc-4000-a3c9-9a2de90f123b",
+    "title": "Mitsubishi_Outlander-Sport_GA3-Facelift-ImmoBreakout",
+    "description": "Mitsubishi_Outlander-Sport_GA3-Facelift-ImmoBreakout",
+    "makerName": "MITSUBISHI",
+    "modelName": "Outlander Sport (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2019
+    ],
+    "id": "4c1a3160-18ca-4339-a4ed-d293bd4b4c5c",
+    "title": "Ford_Focus_C346-ImmoBreakout",
+    "description": "Ford_Focus_C346-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Focus (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "4c67270a-ae41-402a-9aeb-6e5a60ae5def",
+    "title": "Dacia_Jogger_MK1-ImmoBreakout",
+    "description": "Dacia_Jogger_MK1-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Jogger (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "4d34a749-8af6-4fd1-99ce-1d133db00e54",
+    "title": "Fiat_500e_332-ImmoBreakout",
+    "description": "Fiat_500e_332-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "500E (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2022
+    ],
+    "id": "4dd1ee0c-8d2c-401e-86c0-a5a95ea0a05c",
+    "title": "Opel_Astra_KV2-ImmoBreakout",
+    "description": "Opel_Astra_KV2-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Astra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "4e28b241-5fec-4fea-9b4b-ce7d1b6b2702",
+    "title": "KIA_EV6_CV-ImmoBreakout",
+    "description": "KIA_EV6_CV-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "EV6 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "4e607161-4f5d-40e3-be72-f73ffe539742",
+    "title": "Ford_Kuga_CX482-ImmoBreakout",
+    "description": "Ford_Kuga_CX482-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Kuga (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2021
+    ],
+    "id": "4e7ae872-437c-49c1-9c2b-7cb3c0772062",
+    "title": "Mercedes-Benz_C-Class_W205-ImmoBreakout",
+    "description": "Mercedes-Benz_C-Class_W205-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "C-Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "4eafb1e9-2189-4c50-9e47-f609111d4c3a",
+    "title": "Smart_Forfour_W453-ImmoBreakout",
+    "description": "Smart_Forfour_W453-ImmoBreakout",
+    "makerName": "SMART",
+    "modelName": "Forfour (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "4f05b922-21b3-41fb-b740-e81606baa43c",
+    "title": "Nissan_Micra_K14SGW-36L-ImmoBreakout",
+    "description": "Nissan_Micra_K14SGW-36L-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Micra (36L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2002,
+      2010
+    ],
+    "id": "4fb0b702-e10b-4fef-8f64-8210361e8b19",
+    "title": "Nissan_Micra_K12-ImmoBreakout",
+    "description": "Nissan_Micra_K12-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Micra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "4fc87430-b09e-4c63-b48f-704a595f4f30",
+    "title": "Renault_Express_MK1-ImmoBreakout",
+    "description": "Renault_Express_MK1-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Express (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2025
+    ],
+    "id": "4fe6601b-2752-4d30-adb3-e753e1a16bbb",
+    "title": "Nissan_NV250_MK1-ImmoBreakout",
+    "description": "Nissan_NV250_MK1-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "NV250 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2020
+    ],
+    "id": "503408f1-1b17-4d83-b862-5aa4312053af",
+    "title": "Hyundai_i20_GB-Facelift_47L-Breakout",
+    "description": "Hyundai_i20_GB-Facelift_47L-Breakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i20 (47L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2015
+    ],
+    "id": "51870cda-c61f-4d67-b025-13b9e11c1321",
+    "title": "Fiat_500_312-Pre-Facelift-ImmoBreakout",
+    "description": "Fiat_500_312-Pre-Facelift-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "500 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "51a28660-38e2-4c39-906e-7ec6be412e0e",
+    "title": "Mercedes-Benz_EQA_H243-ImmoBreakout",
+    "description": "Mercedes-Benz_EQA_H243-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "EQA (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2026
+    ],
+    "id": "51af6db0-ad9b-40bd-b388-e5172182b274",
+    "title": "Renault_Arkana_LJL-ImmoBreakout",
+    "description": "Renault_Arkana_LJL-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Arkana (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2022
+    ],
+    "id": "51b6f0a5-bac0-4297-91ff-1619fa7cf00f",
+    "title": "Skoda_Kamiq_MK1-ImmoBreakout",
+    "description": "Skoda_Kamiq_MK1-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Kamiq (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "51e2c3fb-1ec3-4d28-9c9b-21b77670f6d6",
+    "title": "Citroen_C3_MK2_50L_ImmoBreakout",
+    "description": "Citroen_C3_MK2_50L_ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 (50L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "5336c8e7-8480-423e-9af0-5976e913bca2",
+    "title": "Audi_Q2_MK1-ImmoBreakout",
+    "description": "Audi_Q2_MK1-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "Q2 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2020
+    ],
+    "id": "534ed1fc-0c3b-4c2e-8b68-554921d4f940",
+    "title": "Seat_Leon_5F-2F-ImmoBreakout",
+    "description": "Seat_Leon_5F-2F-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Leon (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "54729a22-7435-4026-a610-6817aa2577db",
+    "title": "Dacia_Logan_L52-ImmoBreakout",
+    "description": "Dacia_Logan_L52-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Logan (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2016
+    ],
+    "id": "551453fc-b9cd-4d77-904e-5b379b0c4583",
+    "title": "Citroen_Jumpy_MK2-ImmoBreakout",
+    "description": "Citroen_Jumpy_MK2-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "Jumpy (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "56d043b9-df52-4889-8bb2-a8607ffd786e",
+    "title": "Renault_Trafic_MK3-DoorsAndImmo",
+    "description": "Renault_Trafic_MK3-DoorsAndImmo",
+    "makerName": "RENAULT",
+    "modelName": "Trafic"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2026
+    ],
+    "id": "5732a5be-c3e2-4a15-a87f-641a4461c108",
+    "title": "Maxus_eDeliver9_MK1-ImmoBreakout",
+    "description": "Maxus_eDeliver9_MK1-ImmoBreakout",
+    "makerName": "MAXUS",
+    "modelName": "eDeliver9 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2017
+    ],
+    "id": "576838f5-ccb9-4a03-ae34-ca030c69cd17",
+    "title": "Nissan_X-Trail_T32-PF-ImmoBreakout",
+    "description": "Nissan_X-Trail_T32-PF-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "X-Trail (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "5790531b-c941-4ab3-aace-978dca4486e4",
+    "title": "Toyota_Prius_XW50-ImmoBreakout",
+    "description": "Toyota_Prius_XW50-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Prius (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "59a67a25-03ff-4a31-acd7-31df53a57134",
+    "title": "Tesla_Model3_Mk1-ImmoBreakout",
+    "description": "Tesla_Model3_Mk1-ImmoBreakout",
+    "makerName": "TESLA",
+    "modelName": "Model 3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2027
+    ],
+    "id": "59ef3a68-ded5-40da-a431-7ff8636831ac",
+    "title": "Opel_Corsa_F-ImmoBreakout",
+    "description": "Opel_Corsa_F-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Corsa (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "5a5d127b-f289-45e6-9f95-700f1a257940",
+    "title": "Ford_Fiesta_MK7Facelift-ImmoBreakout",
+    "description": "Ford_Fiesta_MK7Facelift-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Fiesta (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2020
+    ],
+    "id": "5ac7297b-13ca-4a51-b575-3dc72a9e31eb",
+    "title": "Nissan_NV300_X61-ImmoBreakout",
+    "description": "Nissan_NV300_X61-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "NV300 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2014
+    ],
+    "id": "5b82d045-20b3-45ef-bad2-d562507daf99",
+    "title": "Peugeot_207_MK1-50L-ImmoBreakout",
+    "description": "Peugeot_207_MK1-50L-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "207 (50L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2021
+    ],
+    "id": "5bf5565d-5520-4345-9e2c-661949a18341",
+    "title": "BMW_i3_MK1-ImmoBreakout",
+    "description": "BMW_i3_MK1-ImmoBreakout",
+    "makerName": "BMW",
+    "modelName": "i3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2014
+    ],
+    "id": "5c4e5351-acf5-4a25-98bc-a7b1101f5ddc",
+    "title": "Volkswagen_Polo_6R-PF-ImmoBreakout",
+    "description": "Volkswagen_Polo_6R-PF-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Polo (PF)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2016
+    ],
+    "id": "5c680f2d-3db0-4a8d-9a16-672a7ac3318e",
+    "title": "Hyundai_i30_GD-ImmoBreakout",
+    "description": "Hyundai_i30_GD-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i30 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2018
+    ],
+    "id": "5cb0c130-38cf-43bf-8b74-4f4122b6d742",
+    "title": "Renault_Captur_J87-ImmoBreakout",
+    "description": "Renault_Captur_J87-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Captur (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "5d4fdd2c-3f4e-4837-8d71-d17b26ec1b4c",
+    "title": "Mercedes-Benz_Vito_2021-70L-ImmoBreakout",
+    "description": "Mercedes-Benz_Vito_2021-70L-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "Vito (70L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2026
+    ],
+    "id": "5e7b8f79-1b13-4464-b43a-6ad4b1c409c3",
+    "title": "Audi_Q4-e-Tron_MK1-ImmoBreakout",
+    "description": "Audi_Q4-e-Tron_MK1-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "Q4 e-Tron"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "5ee1b817-4d4b-4b80-af54-e0f6b9a1d5ca",
+    "title": "Skoda_Octavia_5E-ImmoBreakout",
+    "description": "Skoda_Octavia_5E-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Octavia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2014
+    ],
+    "id": "5fc81187-78e0-4e89-ba85-71e655b6d271",
+    "title": "Hyundai_i20_PB-ImmoBreakout",
+    "description": "Hyundai_i20_PB-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i20 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2015
+    ],
+    "id": "5ff6861f-88cf-4df3-9593-517aba2e4767",
+    "title": "Chevrolet_Spark_M300-DoorsAndImmo",
+    "description": "Chevrolet_Spark_M300-DoorsAndImmo",
+    "makerName": "CHEVROLET",
+    "modelName": "Spark"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "60852eed-6d02-4ec7-93aa-4a6df1cfef74",
+    "title": "Renault_Scenic_III-ImmoBreakout",
+    "description": "Renault_Scenic_III-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Scenic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "60ca1bb6-ce96-4aa3-924d-35a26f9073cd",
+    "title": "Jeep_Renegade_BU_FL-ImmoBreakdown",
+    "description": "Jeep_Renegade_BU_FL-ImmoBreakdown",
+    "makerName": "JEEP",
+    "modelName": "Renegade (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2020
+    ],
+    "id": "6224b898-c9e3-4798-afd4-ea0132b823f0",
+    "title": "Renault_Megane_IV_PF-47L-ImmoBreakout",
+    "description": "Renault_Megane_IV_PF-47L-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Megane (47L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "629886b9-56e4-4c19-8ab0-b070b82d6697",
+    "title": "Peugeot_308_P5_V3-ImmoBreakout",
+    "description": "Peugeot_308_P5_V3-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "308 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2019
+    ],
+    "id": "62b0d9ce-df86-445d-af4a-673656160359",
+    "title": "Mercedes-Benz_GLE_MK3-ImmoBreakout",
+    "description": "Mercedes-Benz_GLE_MK3-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "GLE (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "6345d6fd-c314-4466-b0ee-f7dba4d05caa",
+    "title": "Cupra_Formentor_MK1-ImmoBreakout",
+    "description": "Cupra_Formentor_MK1-ImmoBreakout",
+    "makerName": "CUPRA",
+    "modelName": "Formentor (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "636a82c0-4474-4956-a4ed-9781def4b748",
+    "title": "Peugeot_208_A9-ImmoBreakout",
+    "description": "Peugeot_208_A9-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "208 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "638f3cb9-10b0-4c43-b14b-57f233a3d183",
+    "title": "Maxus_eDeliver3_MK1-ImmoBreakout",
+    "description": "Maxus_eDeliver3_MK1-ImmoBreakout",
+    "makerName": "MAXUS",
+    "modelName": "eDELIVER3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2012
+    ],
+    "id": "63db1131-acbb-4d83-ae3e-77b24cd09fce",
+    "title": "Volkswagen_Golf_VI-DoorsAndImmoBreakout",
+    "description": "Volkswagen_Golf_VI-DoorsAndImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Golf (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2005,
+      2012
+    ],
+    "id": "63fc4490-8335-446c-9a7e-5195ae5cc202",
+    "title": "Renault_Clio_III-ImmoBreakout",
+    "description": "Renault_Clio_III-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Clio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "64c22d53-25d9-4d23-baf0-f6a748bda33d",
+    "title": "Citroen_C3_MK3-DoorsAndImmoBreakout",
+    "description": "Citroen_C3_MK3-DoorsAndImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2021
+    ],
+    "id": "64d5b873-ec98-4fb1-b200-fdcb32538a57",
+    "title": "Seat_Ibiza_MK5-ImmoBreakout",
+    "description": "Seat_Ibiza_MK5-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Ibiza (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2017
+    ],
+    "id": "64f05dd0-ccea-445f-9219-080662cfebf6",
+    "title": "Nissan_Leaf_ZE0-ImmoBreakout",
+    "description": "Nissan_Leaf_ZE0-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Leaf (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "651bf9c3-df19-41dc-9f05-4af881e869b3",
+    "title": "Seat_Ibiza_KJ-2F-Breakout",
+    "description": "Seat_Ibiza_KJ-2F-Breakout",
+    "makerName": "SEAT",
+    "modelName": "Ibiza (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2023,
+      2027
+    ],
+    "id": "6546654b-c249-4e4b-bfdd-0290a3b2a979",
+    "title": "Kia_EV9_MV-ImmoBreakout",
+    "description": "Kia_EV9_MV-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "EV9 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2020
+    ],
+    "id": "65eea2ad-6b70-4484-8993-840e0a5ee6f8",
+    "title": "Renault_Kangoo_X61-ImmoBreakout",
+    "description": "Renault_Kangoo_X61-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Kangoo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "66b40a96-be96-4cb9-978f-3a0d4cea6374",
+    "title": "Renault_Scenic_IV-51L-Breakout",
+    "description": "Renault_Scenic_IV-51L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Scenic (51L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "66ce4bba-e1ac-49dc-8eaf-9bed9c1ccc36",
+    "title": "Renault_Captur_MK2-DoorsAndImmoBreakout",
+    "description": "Renault_Captur_MK2-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Captur (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "6729654f-d026-412b-898a-fda2e7ce29f6",
+    "title": "Dacia_Duster_JD1-ImmoBreakout",
+    "description": "Dacia_Duster_JD1-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Duster (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "672b5538-6c9a-4a95-906a-1fd92d40f04a",
+    "title": "MG_MG3_MK1-ImmoBrekaout",
+    "description": "MG_MG3_MK1-ImmoBrekaout",
+    "makerName": "MG",
+    "modelName": "MG 3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2014
+    ],
+    "id": "67743629-8712-4835-9618-2939cb9b1e63",
+    "title": "Opel_Corsa_D-ImmoBreakout",
+    "description": "Opel_Corsa_D-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Corsa (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "67ddff8f-b8c2-40f9-bb77-0df74d244c47",
+    "title": "Audi_A4_8W-ImmoBreakout",
+    "description": "Audi_A4_8W-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A4"
+  },
+  {
+    "modelYearRange": [
+      2025,
+      2029
+    ],
+    "id": "68401910-cbc1-4abd-accf-cc21eb0791db",
+    "title": "Toyota_Yaris_XP210Facelift_ImmoBreakout",
+    "description": "Toyota_Yaris_XP210Facelift_ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Yaris (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "69d72610-2580-4d9b-8956-c8564def6bcb",
+    "title": "Peugeot_308_0714_ImmoBreakout",
+    "description": "Peugeot_308_0714_ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "308 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2023
+    ],
+    "id": "6a100805-9d61-48c7-b6d2-62bd684e1b33",
+    "title": "Fiat_Punto_MK3-ImmoBreakout",
+    "description": "Fiat_Punto_MK3-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Punto (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2016
+    ],
+    "id": "6aecee7e-8047-4d66-9ed8-988c971d9387",
+    "title": "Chevrolet_Cruze_J300-ImmoBreakout",
+    "description": "Chevrolet_Cruze_J300-ImmoBreakout",
+    "makerName": "CHEVROLET",
+    "modelName": "Cruze (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "6afc5fd2-3664-46d9-9132-f8d359e897d9",
+    "title": "Volvo_XC40-Recharge_MK1-ImmoBreakout",
+    "description": "Volvo_XC40-Recharge_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "XC40 Recharge (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "6bf1de2b-49a5-40c4-92e8-4de7ca124d5b",
+    "title": "Suzuki_Swift_A2L-ImmoBreakout",
+    "description": "Suzuki_Swift_A2L-ImmoBreakout",
+    "makerName": "SUZUKI",
+    "modelName": "Swift (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2018
+    ],
+    "id": "6cdb528a-884a-49b6-82da-c1d96dc54d22",
+    "title": "Volkswagen_Polo_6R-Facelift-ImmoBreakout",
+    "description": "Volkswagen_Polo_6R-Facelift-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Polo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "6d318d38-be55-4791-b93b-75a5c098c31d",
+    "title": "Opel_Crossland_MK1-ImmoBreakout",
+    "description": "Opel_Crossland_MK1-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Crossland (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2013
+    ],
+    "id": "6dbb40a4-9a58-45ca-851d-b7dc27946427",
+    "title": "Nissan_Qashqai_J10_ImmoBreakout",
+    "description": "Nissan_Qashqai_J10_ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Qashqai (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "6ec61a5e-15d7-47fe-9264-6270329ae6e0",
+    "title": "Dacia_Sandero_MK3-ImmoBreakout",
+    "description": "Dacia_Sandero_MK3-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Sandero (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "709af709-5ca1-4f93-b8d2-f70c702520b6",
+    "title": "Toyota_CorollaTouring_E210-ImmoBreakout",
+    "description": "Toyota_CorollaTouring_E210-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Corolla Touring (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2021
+    ],
+    "id": "73b8f053-966b-4104-8209-d87d99de8494",
+    "title": "Skoda_Kodiaq_NS7-ImmoBreakout",
+    "description": "Skoda_Kodiaq_NS7-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Kodiaq (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "748f5de8-7273-4843-9787-23f5740cb8bd",
+    "title": "Volkswagen_Taigo_CS1-ImmoBreakout",
+    "description": "",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Taigo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "74db33ae-7efc-4fed-a01a-bc259bec6963",
+    "title": "Skoda_Octavia_5E-58L-ImmoBreakout",
+    "description": "Skoda_Octavia_5E-58L-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Octavia (58L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2019
+    ],
+    "id": "7624f1fe-cf09-469e-ad9c-104309e3428b",
+    "title": "Ford_C-Max_MK2-ImmoBreakout",
+    "description": "Ford_C-Max_MK2-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "C-Max (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2027
+    ],
+    "id": "763a2922-f39f-4d6d-bde6-db0be4baaba7",
+    "title": "Peugeot_208_P21-ImmoBreakout",
+    "description": "Peugeot_208_P21-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "208 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2025
+    ],
+    "id": "773a8c32-eabf-4c23-a14c-65f977733fb8",
+    "title": "Fiat_Ducato_MK3-ImmoBreakout",
+    "description": "Fiat_Ducato_MK3-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Ducato (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "7789b8b4-ae8e-42fd-ba61-e2b1c6ba2885",
+    "title": "Kia_XCeed_Hybrid_CD-ImmoBreakout",
+    "description": "Kia_XCeed_Hybrid_CD-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "XCeed (Hybrid)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2021
+    ],
+    "id": "77ef84b5-2a5e-47e4-a8fa-427b0ddabd64",
+    "title": "Seat_Arona_MK1L-ImmoBreakout",
+    "description": "Seat_Arona_MK1L-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Arona (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "78a57cd1-65d0-4599-a816-5c632f1cd02f",
+    "title": "Peugeot_e-208_P21-ImmoBreakout",
+    "description": "Peugeot_e-208_P21-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "e-208 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "796b2334-aac6-46ee-9ff5-5be857105e6e",
+    "title": "Renault_Clio_IV-DoorsAndImmoBreakout",
+    "description": "Renault_Clio_IV-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Clio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "7a594d15-0347-4776-bdec-a562a9097d71",
+    "title": "Peugeot_5008_P87-DoorsAndImmoBreakout",
+    "description": "Peugeot_5008_P87-DoorsAndImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "5008 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "7b90214d-4a5f-4877-b455-4afaf554fd40",
+    "title": "Suzuki_Jimny_JB64W-ImmoBreakout",
+    "description": "Suzuki_Jimny_JB64W-ImmoBreakout",
+    "makerName": "SUZUKI",
+    "modelName": "Jimny (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2015
+    ],
+    "id": "7e262c68-b1e9-4dac-b101-f391756b21e0",
+    "title": "Opel_Astra_J-ImmoBreakout",
+    "description": "Opel_Astra_J-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Astra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2020
+    ],
+    "id": "7e6d390b-6dd1-4675-83b5-1373109d0dce",
+    "title": "Renault_Megane_IVPF-DoorsAndImmoBreakout",
+    "description": "Renault_Megane_IVPF-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Megane (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2022
+    ],
+    "id": "7f87b2c2-980d-42dd-8f8e-f33700bfc1dc",
+    "title": "Kia_Carens_RP-ImmoBreakout",
+    "description": "Kia_Carens_RP-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Carens (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2027
+    ],
+    "id": "7fe70e4b-1a53-4996-9120-9b1755b88ac1",
+    "title": "Hyundai_i20_BC3-DoorsAndImmoBreakout",
+    "description": "Hyundai_i20_BC3-DoorsAndImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i20 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "7ffcb741-58c3-4216-95d1-ad28d2f10307",
+    "title": "Renault_Megane_IVFacelift-ImmoBreakout",
+    "description": "Renault_Megane_IVFacelift-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Megane (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "8011752d-dcf8-4b66-9c1d-a38b653ecbf7",
+    "title": "Hyundai_i30_PD-ImmoBreakout",
+    "description": "Hyundai_i30_PD-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i30 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "8027b7f8-5e3e-48bf-b2a9-957778ffe753",
+    "title": "Kia_Picanto_JA_34L-Breakout",
+    "description": "Kia_Picanto_JA_34L-Breakout",
+    "makerName": "KIA",
+    "modelName": "Picanto (34L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2021
+    ],
+    "id": "803899c6-e0dd-45dc-a231-17974c71690d",
+    "title": "Mitsubishi_Outlander_GF-ImmoBreakout",
+    "description": "Mitsubishi_Outlander_GF-ImmoBreakout",
+    "makerName": "MITSUBISHI",
+    "modelName": "Outlander (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "80c79209-d5be-486a-a7ea-d23f9ebe9aab",
+    "title": "Nissan_eNV200_MK1-ImmoBreakout",
+    "description": "Nissan_eNV200_MK1-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "eNV-200 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2001,
+      2014
+    ],
+    "id": "80dee934-18a4-4f5c-99c2-9fd9f5f1e724",
+    "title": "Renault_Trafic_MK2-DoorsAndImmoBreakout",
+    "description": "Renault_Trafic_MK2-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Trafic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2014
+    ],
+    "id": "830178a1-dc91-4ba7-b1e9-3388d5fe88ef",
+    "title": "Renault_Master_MK2PF-ImmoBreakout",
+    "description": "Renault",
+    "makerName": "RENAULT",
+    "modelName": "Master (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "83a9e562-57f7-44d2-8748-5752c5ffcb78",
+    "title": "Kia_Rio_YB-ImmoBreakout",
+    "description": "Kia_Rio_YB-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Rio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "83bac22c-6e56-4047-8453-d9276be0d9e8",
+    "title": "Volkswagen_Polo_AW-45L-ImmoBreakout",
+    "description": "Volkswagen_Polo_AW-45L-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Polo (45L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2004,
+      2014
+    ],
+    "id": "83efdd38-a82b-4740-bc3f-a31e5a2f4815",
+    "title": "Opel_Zafira_B-ImmoBreakout",
+    "description": "Opel_Zafira_B-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Zafira (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "85101de6-30c4-44bc-abc9-fed2db63782d",
+    "title": "BMW_X2_F39-DoorsAndImmoBreakout",
+    "description": "BMW_X2_F39-DoorsAndImmoBreakout",
+    "makerName": "BMW",
+    "modelName": "X2 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2024,
+      2027
+    ],
+    "id": "85eeed50-9ddd-4bbe-8577-4139b41a0958",
+    "title": "Fiat_Ducato_MK3Facelift-ImmoBreakout",
+    "description": "Fiat_Ducato_MK3Facelift-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Ducato (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2026
+    ],
+    "id": "86b93137-e383-4652-8c87-b3068f12f2e5",
+    "title": "Lynk&Co_01_MK1-ImmoBreakout",
+    "description": "Lynk&Co_01_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "Lynk&Co 01 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2017
+    ],
+    "id": "86c6631b-940f-4923-a1ea-cca91533f631",
+    "title": "Volvo_XC60_MK1-ImmoBreakout",
+    "description": "Volvo_XC60_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "XC60 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "8740b9d5-6a73-4f64-b6a6-c9b41c37bb08",
+    "title": "Nissan_Pulsar_C13-ImmoBreakout",
+    "description": "Nissan_Pulsar_C13-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Pulsar (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "877e1654-77db-465a-9e1a-873efa526ed2",
+    "title": "Iveco_Daily_2014-Present-ImmoBreakout",
+    "description": "Iveco_Daily_2014-Present-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Iveco Daily"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "87e05883-9060-463a-95b4-6a775fa2bad6",
+    "title": "Peugeot_e-2008_P24-ImmoBreakout",
+    "description": "Peugeot_e-2008_P24-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "e-2008 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2022
+    ],
+    "id": "88a70992-e694-4a50-9b0d-0811708ec95b",
+    "title": "Fiat_Doblo_263-V2-Breakout",
+    "description": "Fiat_Doblo_263-V2-Breakout",
+    "makerName": "FIAT",
+    "modelName": "Doblo (V2)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "88e8afac-1107-460b-9518-e50f490c11bf",
+    "title": "Ford_Focus_C519-DoorsAndImmoBreakout",
+    "description": "Ford_Focus_C519-DoorsAndImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Focus (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2015
+    ],
+    "id": "8942a3ac-a243-4a9a-84b8-539742c5ca9c",
+    "title": "Volkswagen_Jetta_A6-ImmoBreakout",
+    "description": "Volkswagen_Jetta_A6-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Jetta (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "8a365e9c-7bbf-4bb6-9594-7adf50b97e8f",
+    "title": "Volkswagen_Passat_3G_53L-ImmoBreakout",
+    "description": "Volkswagen_Passat_3G_53L-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Passat (3G-2F)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2025
+    ],
+    "id": "8a63620e-64cd-4662-986d-4c7eee641dca",
+    "title": "Fiat_Panda_MK2-ImmoBreakout",
+    "description": "Fiat_Panda_MK2-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Panda (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "8ab96326-487f-49b4-ac85-9644ee38ed89",
+    "title": "Volvo_XC40_MK1-ImmoBreakout",
+    "description": "Volvo_XC40_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "XC40 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "8bd50123-ba19-4e9c-9444-00e4b715e87e",
+    "title": "Opel_Vivaro_MK3-ImmoBreakout",
+    "description": "Opel_Vivaro_MK3-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Vivaro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "8bf83671-0207-430f-8d76-8b937951ba19",
+    "title": "Mercedes-Benz_C-Class_W204-ImmoBreakout",
+    "description": "Mercedes-Benz_C-Class_W204-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "C-Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2021
+    ],
+    "id": "8c05d8ba-82c0-4d21-8a44-625efee33bd9",
+    "title": "Suzuki_Celerio_FE-ImmoBreakout",
+    "description": "Suzuki_Celerio_FE-ImmoBreakout",
+    "makerName": "SUZUKI",
+    "modelName": "Celerio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "8c18dd58-575b-42dc-863c-5b2a6061838c",
+    "title": "Volkswagen_Passat_3G-ImmoBreakout",
+    "description": "Volkswagen_Passat_3G-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Passat (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2025
+    ],
+    "id": "8c3557a3-3064-441a-a531-be3c7c70d717",
+    "title": "Fiat_Fiorino_MK3-ImmoBreakout",
+    "description": "Fiat_Fiorino_MK3-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Fiorino (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2027
+    ],
+    "id": "8c8371e4-7893-43ff-914c-cfe5e936eec0",
+    "title": "Honda_HR-V_RV-ImmoBreakout",
+    "description": "Honda_HR-V_RV-ImmoBreakout",
+    "makerName": "HONDA",
+    "modelName": "HR-V (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "8cf0edfd-aea1-4158-aab2-d42842a7b2f3",
+    "title": "Renault_Clio_IV-42L-Breakout",
+    "description": "Renault_Clio_IV-42L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Clio (42L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2018
+    ],
+    "id": "8d1e8759-b107-4dd3-b2b6-0b541f3b4cc2",
+    "title": "Citroen_C3-Picasso_MK1-ImmoBreakout",
+    "description": "Citroen_C3-Picasso_MK1-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 Picasso (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2023,
+      2028
+    ],
+    "id": "8dc9759d-57f5-47ed-96e7-ef11b60687d3",
+    "title": "Ford_Transit_Custom_T7-DockxImmo",
+    "description": "Ford_Transit_Custom_T7-DockxImmo",
+    "makerName": "FORD",
+    "modelName": "Transit Custom"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2022
+    ],
+    "id": "8e0f07a6-5a4e-4f22-b2a8-5015fb782ab2",
+    "title": "Dacia_Dokker_MK1-51L-Breakout",
+    "description": "Dacia_Dokker_MK1-51L-Breakout",
+    "makerName": "DACIA",
+    "modelName": "Dokker (51L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2026
+    ],
+    "id": "8f5afa74-8ea3-4035-a49b-343b7629ac41",
+    "title": "Volkswagen_Arteon_3H7-ImmoBreakout",
+    "description": "Volkswagen_Arteon_3H7-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Arteon (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "8fe32023-3a3c-4e7c-a5ed-291e73764d43",
+    "title": "AlfaRomeo_Giulia_952-ImmoBreakout",
+    "description": "AlfaRomeo_Giulia_952-ImmoBreakout",
+    "makerName": "ALFA_ROMEO",
+    "modelName": "Giulia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2021
+    ],
+    "id": "8fe7c52b-a41e-4233-aff6-0abee67beb7a",
+    "title": "Nissan_X-Trail_T32Facelift-ImmoBreakout",
+    "description": "Nissan_X-Trail_T32Facelift-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "X-Trail (51L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2025
+    ],
+    "id": "901dad93-4124-472c-9c45-b9dcf5259cfc",
+    "title": "Peugeot_508_AllVersions-ImmoBreakout",
+    "description": "Peugeot_508_AllVersions-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "508 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "90ac5295-f087-452f-aeb7-abc97318cbb1",
+    "title": "Kia_Proceed_CD-ImmoBreakout",
+    "description": "Kia_Proceed_CD-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Proceed (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2017
+    ],
+    "id": "91656107-7a7a-43a9-b26d-d8b7bbb2ccba",
+    "title": "Nissan_X-Trail-T32PF-57L-Breakout",
+    "description": "Nissan_X-Trail-T32PF-57L-Breakout",
+    "makerName": "NISSAN",
+    "modelName": "X-Trail (57L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2017
+    ],
+    "id": "91d13340-372a-4555-8145-7c92be1c8b08",
+    "title": "Citroen_C3-Picasso_MK1-50L-ImmoBreakout",
+    "description": "Citroen_C3-Picasso_MK1-50L-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 Picasso (50L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2017
+    ],
+    "id": "931f04e0-7421-442c-94b9-c24dd01359e3",
+    "title": "Ford_Fiesta_MK6-ImmoBreakdown",
+    "description": "Ford_Fiesta_MK6-ImmoBreakdown",
+    "makerName": "FORD",
+    "modelName": "Fiesta (Breakdown)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "9320ba40-698d-4e54-ac12-57172340db3a",
+    "title": "Smart_Fortwo_W453-ImmoBreakout",
+    "description": "Smart_Fortwo_W453-ImmoBreakout",
+    "makerName": "SMART",
+    "modelName": "Fortwo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2025
+    ],
+    "id": "935bd86c-1761-4986-add1-36658141fb64",
+    "title": "Toyota_Prius+_MK1-ImmoBreakout",
+    "description": "Toyota_Prius+_MK1-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Prius+ (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2001,
+      2014
+    ],
+    "id": "94d2ca94-dc51-404f-82a1-174a8a2b53b1",
+    "title": "Opel_Vivaro_MK2-DoorsAndImmoBreakout",
+    "description": "Opel_Vivaro_MK2-DoorsAndImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Vivaro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2027
+    ],
+    "id": "957dd600-1d60-4552-8b75-475b5b223d5c",
+    "title": "BYD_ATTO3_MK1-ImmoBreakout",
+    "description": "BYD_ATTO3_MK1-ImmoBreakout",
+    "makerName": "BYD",
+    "modelName": "ATTO3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2017
+    ],
+    "id": "95f6f506-8c9c-48a0-8a5d-a345c07db988",
+    "title": "Peugeot_5008_T87-ImmoBreakout",
+    "description": "Peugeot_5008_T87-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "5008 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2021
+    ],
+    "id": "96055a9c-bad4-42f9-aa26-dd802f6177d4",
+    "title": "Kia_Niro_DE-ImmoBreakout",
+    "description": "Kia_Niro_DE-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Niro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "9614c196-6659-4408-a841-2b651ce6d516",
+    "title": "Ford-Galaxy_mk3-immobreakout",
+    "description": "Ford-Galaxy_mk3-immobreakout",
+    "makerName": "FORD",
+    "modelName": "Galaxy"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "967d3dbb-7d9d-4bb1-96fb-c47353418de6",
+    "title": "Skoda_Enyaq_MK1-DoorsAndImmoBreakout",
+    "description": "Skoda_Enyaq_MK1-DoorsAndImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Enyaq (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "97b2c0cf-92f3-43ef-bd6c-eba3f41d4799",
+    "title": "Peugeot_3008_2020-ImmoBreakout",
+    "description": "Peugeot_3008_2020-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "3008 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "97f24059-36f6-4b6c-8a56-270a13315a1c",
+    "title": "Fiat_500_312-ImmoBreakout",
+    "description": "Fiat_500_312-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "500 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2021
+    ],
+    "id": "991d4b9e-aa3f-4923-b2c5-91f38d90cf63",
+    "title": "Skoda_Fabia_NJ-ImmoBreakout",
+    "description": "Skoda_Fabia_NJ-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Fabia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "99e1cdb0-484e-4844-abf9-e80ec3859710",
+    "title": "Opel_Vivaro_MK4-ImmoBreakout",
+    "description": "Opel_Vivaro_MK4-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Vivaro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2022
+    ],
+    "id": "9b27e32b-f53b-4dfc-bc92-7484ff26f5d5",
+    "title": "Dacia_Dokker_Mk1-ImmoBreakout",
+    "description": "Dacia_Dokker_Mk1-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Dokker (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2024
+    ],
+    "id": "9c74be9f-6069-4b79-be14-ab7707c127de",
+    "title": "Audi_A5_F5-ImmoBreakout",
+    "description": "Audi_A5_F5-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A5 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "9d943492-8a95-4140-8022-9db546102ec9",
+    "title": "Seat_Tarraco_KN2-ImmoBreakout",
+    "description": "Seat_Tarraco_KN2-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Tarraco (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2020
+    ],
+    "id": "9e5f7903-fa5e-4845-9460-ac56ed734966",
+    "title": "Seat_Alhambra_7N-70L-ImmoBreakout",
+    "description": "Seat_Alhambra_7N-70L-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Alhambra (70L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "9ecf21f3-d096-4f3b-a5a5-f8daf884ce2b",
+    "title": "Ford_Transit_Custom_Mk1FL-ImmoBreakout",
+    "description": "Ford_Transit_Custom_Mk1FL-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Transit"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "9f16bdcd-b3b1-4acf-b341-ccbdf3332c9b",
+    "title": "Hyundai_IONIQ5_NE-ImmoBreakout",
+    "description": "Hyundai_IONIQ5_NE-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "IONIQ5 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2020
+    ],
+    "id": "9f2bd30c-63bc-4ae9-9c15-c1879eb16807",
+    "title": "Volkswagen_Golf_VII2F-Breakout",
+    "description": "Volkswagen_Golf_VII2F-Breakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Golf (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "9ff47f46-c8eb-40fe-95be-00c03f1b2611",
+    "title": "Seat_Arona_MK1-ImmoBreakout",
+    "description": "Seat_Arona_MK1-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Arona (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "a0130a97-2542-488d-8f5f-2b1297c99b1e",
+    "title": "Chevrolet_Camaro_MK6-ImmoBreakout",
+    "description": "Chevrolet_Camaro_MK6-ImmoBreakout",
+    "makerName": "CHEVROLET",
+    "modelName": "Camaro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2004,
+      2011
+    ],
+    "id": "a09edbe0-5b71-4d44-acd7-0cd9747c24cb",
+    "title": "Nissan_Note_E11-ImmoBreakout",
+    "description": "Nissan_Note_E11-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Note (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2023
+    ],
+    "id": "a1268d7d-60d3-4aa0-a865-4e92ff1ca74d",
+    "title": "Volkswagen_Sharan_7NFacelift_CAN-ImmoBreakout",
+    "description": "Volkswagen_Sharan_7NFacelift_CAN-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Sharan (CAN)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2013
+    ],
+    "id": "a1d6279f-de29-4c4f-950f-bbb41f35bccd",
+    "title": "Peugeot_206+_MK1-DoorsAndImmoBreakout",
+    "description": "Peugeot_206+_MK1-DoorsAndImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "206+ (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2023
+    ],
+    "id": "a3a79c3c-0159-4492-ad43-88d9be0841db",
+    "title": "Mercedes-Benz_E-Class_W213-ImmoBreakout",
+    "description": "Mercedes-Benz_E-Class_W213-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "E-Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2016
+    ],
+    "id": "a3c0df33-d839-461e-be70-bfa0eb55b9f3",
+    "title": "Ford_Ka_MK2-ImmoBreakout",
+    "description": "Ford_Ka_MK2-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Ka (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "a3e85fd4-0eb4-4494-81a0-f1a8ce4cf5a4",
+    "title": "Toyota_CorollaTouringSports_E210-ImmoBreakout",
+    "description": "Toyota_CorollaTouringSports_E210-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Corolla Touring Sports"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "a464e84f-b93e-44a1-88d6-ba640d87040a",
+    "title": "Mercedes-Benz_Vito_2021-ImmoBreakout",
+    "description": "Mercedes-Benz_Vito_2021-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "Vito (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2017
+    ],
+    "id": "a522d2cf-5f01-43fb-b343-909d0561ac3f",
+    "title": "Seat_Ibiza_6P2FL-ImmoBreakout",
+    "description": "Seat_Ibiza_6P2FL-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Ibiza (45L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "a5365087-39ab-4401-91b0-8e6d960c6c1b",
+    "title": "Skoda_Fabia_5J-ImmoBreakout",
+    "description": "Skoda_Fabia_5J-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Fabia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2019
+    ],
+    "id": "a55bafc3-d980-4fab-a0bf-ccec136a8a4a",
+    "title": "RangeRover_DiscoverySport_L550-ImmoBreakout",
+    "description": "RangeRover_DiscoverySport_L550-ImmoBreakout",
+    "makerName": "LAND_ROVER",
+    "modelName": "Discovery Sport (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2022
+    ],
+    "id": "a5cd5775-cea6-48d5-b791-0bd75db13611",
+    "title": "Opel_Astra_K-ImmoBreakout",
+    "description": "Opel_Astra_K-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Astra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "a623ef0c-686b-4ea0-ab03-bbc8a00bf537",
+    "title": "Toyota_Yaris_XP210-34L-Breakout",
+    "description": "Toyota_Yaris_XP210-34L-Breakout",
+    "makerName": "TOYOTA",
+    "modelName": "Yaris (34L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "a6b8084a-a7b0-47c7-992f-4625625fc6d5",
+    "title": "Citroen_C3_MK2_46L-ImmoBreakout",
+    "description": "Citroen_C3_MK2_46L-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 (46L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2018
+    ],
+    "id": "a79fdf6a-2c08-47a8-bde0-31585dd5de77",
+    "title": "Jeep_Wrangler_JK-ImmoBreakout",
+    "description": "Jeep_Wrangler_JK-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Wrangler (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2020
+    ],
+    "id": "a7affb2a-b85d-4233-a9ca-f613d5464051",
+    "title": "Fiat_Talento_MK2_81L-immobreakout",
+    "description": "Fiat_Talento_MK2_81L-immobreakout",
+    "makerName": "FIAT",
+    "modelName": "Talento (81L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2027
+    ],
+    "id": "a7c23c1f-b7cd-4c35-9ba5-33ec41751882",
+    "title": "Tesla_ModelY_Mk1-ImmoBreakout",
+    "description": "Tesla_ModelY_Mk1-ImmoBreakout",
+    "makerName": "TESLA",
+    "modelName": "Model Y (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "a8b245c9-e575-4705-844a-40910ce9a102",
+    "title": "Toyota_Corolla_Touring_Hybrid-E210_ImmoBreakout",
+    "description": "Toyota_Corolla_Touring_Hybrid-E210_ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Corolla Touring Hybrid (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2024
+    ],
+    "id": "a9231674-47bd-4fc9-be99-72711c49a390",
+    "title": "Opel_Grandland_MK1-ImmoBreakout",
+    "description": "Opel_Grandland_MK1-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Grandland (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2020
+    ],
+    "id": "a9d1cbe9-aff6-4a06-ae48-d16a484734c3",
+    "title": "Hyundai_i20_GB-ImmoBreakout",
+    "description": "Hyundai_i20_GB-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i20 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "a9e2d294-5dc5-488d-bb49-85ff3205683c",
+    "title": "Renault_Master_MK3-PF-ImmoBreakout",
+    "description": "Renault_Master_MK3-PF-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Master (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2026
+    ],
+    "id": "aa15a61e-012b-40ce-b44e-8e89d9695d90",
+    "title": "Suzuki_Swace_E210-ImmoBreakout",
+    "description": "Suzuki_Swace_E210-ImmoBreakout",
+    "makerName": "SUZUKI",
+    "modelName": "Swace (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2025
+    ],
+    "id": "aa7b93ef-57ba-4ecf-accc-5be4f69e09a5",
+    "title": "BMW_F-Series_AllDoorsActivations",
+    "description": "BMW_F-Series_AllDoorsActivations",
+    "makerName": "BMW",
+    "modelName": "All"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "abb9aa7e-3294-4c10-b127-110b1c34ed55",
+    "title": "Kia_Niro_SG2-ImmoBreakout",
+    "description": "Kia_Niro_SG2-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Niro (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "ac23406a-1cce-4a6a-a4f0-706a0a7f7638",
+    "title": "Dacia_Sandero_MK2-54L-Breakout",
+    "description": "Dacia_Sandero_MK2-54L-Breakout",
+    "makerName": "DACIA",
+    "modelName": "Sandero (54L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2011
+    ],
+    "id": "ac47708c-f653-4acb-866c-b2e50d562bb1",
+    "title": "Hyundai_i30_FD-ImmoBreakout",
+    "description": "Hyundai_i30_FD-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i30 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2022
+    ],
+    "id": "ac5f4b9c-2aa9-49ae-8817-c25460919c51",
+    "title": "Citroen_C1_MK2-DoorsAndImmoBreakout",
+    "description": "Citroen_C1_MK2-DoorsAndImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C1 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "ac7e18c2-7aa5-4ea7-ac4e-966aab5d5369",
+    "title": "Mazda_CX-30_MK1-ImmoBreakout",
+    "description": "Mazda_CX-30_MK1-ImmoBreakout",
+    "makerName": "MAZDA",
+    "modelName": "CX-30 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "ac83cc31-0d47-4179-a747-8527cd15a683",
+    "title": "Peugeot_Partner_K9-ImmoBreakout",
+    "description": "Peugeot_Partner_K9-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "Partner (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "ac89a111-4da1-47e2-93e4-7561d9ad1d13",
+    "title": "Mercedes-Benz_E-Class_W212-ImmoBreakout",
+    "description": "Mercedes-Benz_E-Class_W212-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "E-Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2017
+    ],
+    "id": "ac9b960f-f0e7-4a0b-8dd9-fad8b08a01f0",
+    "title": "Opel_Insignia_G9-DoorsAndImmoBreakout",
+    "description": "Opel_Insignia_G9-DoorsAndImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Insignia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2017
+    ],
+    "id": "ac9ced04-bb25-4013-9083-3bfa9d5396aa",
+    "title": "Audi_A5_8T-INE",
+    "description": "Audi_A5_8T-INE",
+    "makerName": "AUDI",
+    "modelName": "A5 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "acd09ab2-e1b4-4c0a-889f-3c009893209c",
+    "title": "Peugeot_2008_A9-ImmoBreakout",
+    "description": "Peugeot_2008_A9-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "2008 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "acd26cf9-83a7-4438-98c8-1a8133122177",
+    "title": "Audi_Q3_F3-62L-ImmoBreakout",
+    "description": "Audi_Q3_F3-62L-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "Q3 (62L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2024
+    ],
+    "id": "ad580ac3-ebdb-44c0-b1bd-c0d8fcf8f60e",
+    "title": "Toyota_C-HR-Hybrid_MK1-Immobreakout",
+    "description": "Toyota_C-HR-Hybrid_MK1-Immobreakout",
+    "makerName": "TOYOTA",
+    "modelName": "C-HR Hybrid (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2014
+    ],
+    "id": "ad820de9-e4e6-4e69-98f1-66b3c1df982f",
+    "title": "Iveco_Daily-2006-2014-ImmoBreakout",
+    "description": "Iveco_Daily-2006-2014-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Iveco Daily"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2022
+    ],
+    "id": "adeae345-5f7e-40ff-a194-3f31dc8d3234",
+    "title": "Kia_Sportage_QL-ImmoBreakout",
+    "description": "Kia_Sportage_QL-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Sportage (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "aed90389-d83e-45a9-b7b3-2dac76b79d3b",
+    "title": "AlfaRomeo_Stelvio_949SGW-ImmoBreakout",
+    "description": "AlfaRomeo_Stelvio_949SGW-ImmoBreakout",
+    "makerName": "ALFA_ROMEO",
+    "modelName": "Stelvio (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2021
+    ],
+    "id": "af6c9cff-e1cd-4067-8188-7b9dccbbc645",
+    "title": "Lexus_NX_MK1-ImmoBreakout",
+    "description": "Lexus_NX_MK1-ImmoBreakout",
+    "makerName": "LEXUS",
+    "modelName": "NX (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2019
+    ],
+    "id": "af9ea15a-b217-4a00-b82b-5cb95db6f23e",
+    "title": "Nissan_Micra_K14-ImmoBreakout",
+    "description": "Nissan_Micra_K14-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Micra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2017
+    ],
+    "id": "afe89153-cd3a-4883-866a-70507d4264e6",
+    "title": "BMW_5-Series_F10-ImmoBreakout",
+    "description": "BMW_5-Series_F10-ImmoBreakout",
+    "makerName": "BMW",
+    "modelName": "5 Series (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2017
+    ],
+    "id": "b3e4d768-baa1-49be-bdb5-5ef7e60fc984",
+    "title": "Citroen_C3-Picasso_MK1-60L-Breakout",
+    "description": "Citroen_C3-Picasso_MK1-60L-Breakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 Picasso (60L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "b5788918-ede2-4485-a5cd-8321d786d013",
+    "title": "Fiat_500e_332-ImmoBreakout",
+    "description": "Fiat_500e_332-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "500e (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2028
+    ],
+    "id": "b5c9eab7-6fef-4a22-b068-00165e7ce39d",
+    "title": "Fiat_Doblò_K9-ImmoBreakout",
+    "description": "Fiat_Doblò_K9-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Doblò (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2022
+    ],
+    "id": "b7308b12-e154-494f-a528-8c4a0ee9b609",
+    "title": "Mercedes-Benz_GLC_X253-ImmoBreakout",
+    "description": "Mercedes-Benz_GLC_X253-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "GLC (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "b8509ebf-3488-4a2f-813d-81dd51fe4879",
+    "title": "Mini_Cooper_R55-ImmoBreakout",
+    "description": "Mini_Cooper_R55-ImmoBreakout",
+    "makerName": "MINI",
+    "modelName": "Cooper"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "b985124c-3b7b-44ec-b82c-2fbc95c2de61",
+    "title": "Audi_Q5_80A-ImmoBreakout",
+    "description": "Audi_Q5_80A-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "Q5 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2020
+    ],
+    "id": "ba764e49-7efd-4a12-af82-be4cff4964b7",
+    "title": "Renault_Kangoo_X61-60L-Breakout",
+    "description": "Renault_Kangoo_X61-60L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Kangoo (60L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2023,
+      2027
+    ],
+    "id": "bb395c2d-c929-4558-845a-20322caf2d10",
+    "title": "Dacia_Duster_JD1-GPO-Breakout",
+    "description": "Dacia_Duster_JD1-GPO-Breakout",
+    "makerName": "DACIA",
+    "modelName": "Duster (GPO Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "bbb03b33-f69d-4d4c-9590-95581aa99fc6",
+    "title": "Mercedes-Benz_A-Class_W177Diesel-ImmoBreakout",
+    "description": "Mercedes-Benz_A-Class_W177Diesel-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "A-Class (Diesel)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "bc3482a9-8ea5-41fe-8e7a-f49871d509ee",
+    "title": "Ford_Ranger_P703-ImmoBreakout",
+    "description": "Ford_Ranger_P703-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "Ranger (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2022
+    ],
+    "id": "bc38fc57-0e39-4316-81c0-3c3b64b15d45",
+    "title": "Opel_Karl-Rocks-ImmoBreakout",
+    "description": "Opel_Karl-Rocks-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Karl Rocks (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2018
+    ],
+    "id": "bcc19845-2cdb-40f9-9b75-ad3ad237480d",
+    "title": "Audi_A7_4G8-ImmoBreakout",
+    "description": "Audi_A7_4G8-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A7 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2025
+    ],
+    "id": "bd03894f-7945-4ab6-9a6f-27de83416dc7",
+    "title": "Skoda_Citigo_MK1-Breakout",
+    "description": "Skoda_Citigo_MK1-Breakout",
+    "makerName": "SKODA",
+    "modelName": "Citigo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2026
+    ],
+    "id": "bd72f9af-08d2-4876-9f9d-c2bf339cd16f",
+    "title": "Mercedes-Benz_Sprinter_907-71L-Breakout",
+    "description": "Mercedes-Benz_Sprinter_907-71L-Breakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "Sprinter (71L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2019
+    ],
+    "id": "c03d4e21-6670-424a-a566-997996e09b7a",
+    "title": "Nissan_Juke_F15-ImmoBreakout",
+    "description": "Nissan_Juke_F15-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Juke (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2016
+    ],
+    "id": "c0b90ed7-33d4-4670-b761-cde023f717cd",
+    "title": "Peugeot_Bipper_MK1-ImmoBreakout",
+    "description": "Peugeot_Bipper_MK1-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "Bipper (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2005,
+      2011
+    ],
+    "id": "c177db1d-1485-4e0f-8f74-2339492d50ba",
+    "title": "Mercedes-Benz_B-Class_W245-ImmoBreakout",
+    "description": "Mercedes-Benz_B-Class_W245-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "B-Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2026
+    ],
+    "id": "c2752d28-a50f-40b6-9892-6cce50ca639d",
+    "title": "Maxus_eT90_MK1-ImmoBreakout",
+    "description": "Maxus_eT90_MK1-ImmoBreakout",
+    "makerName": "MAXUS",
+    "modelName": "eT90 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2021
+    ],
+    "id": "c319af9b-cc75-4eb4-a6fd-bfe076710212",
+    "title": "Fiat_Fiorino_MK1-DoorsAndImmoBreakout",
+    "description": "Fiat_Fiorino_MK1-DoorsAndImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Fiorino (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2020
+    ],
+    "id": "c319e533-585f-4606-bbfa-0eb427184039",
+    "title": "Audi_A3_8V-ImmoBreakout",
+    "description": "Audi_A3_8V-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "c363a5b9-ef52-4cbd-8380-e3c1d4f4b9ee",
+    "title": "Citroen_C1_MK1-ImmoBreakout",
+    "description": "Citroen_C1_MK1-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C1 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2005,
+      2011
+    ],
+    "id": "c38a5e90-a2ef-4310-8d58-3b4a377ad003",
+    "title": "Skoda_Octavia_1Z-ImmoBreakout",
+    "description": "Skoda_Octavia_1Z-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Octavia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "c3c97701-5936-41ba-b42e-ae89a21d5130",
+    "title": "Jeep_Wrangler_JL-ImmoBreakout",
+    "description": "Jeep_Wrangler_JL-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Wrangler (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "c3da110f-764a-422f-84b7-88147598e235",
+    "title": "Renault_Trafic_MK3-ImmoBreakout",
+    "description": "Renault_Trafic_MK3-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Trafic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "c3f6946f-cbb6-4199-95ef-4c58e231bcda",
+    "title": "Renault_GrandScenic_IV-ImmoBreakout",
+    "description": "Renault_GrandScenic_IV-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Grand Scenic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2019
+    ],
+    "id": "c3fa5143-ddc3-4f5d-bc46-959768c7dcd3",
+    "title": "Opel_Adam_MK1-ImmoBreakout",
+    "description": "Opel_Adam_MK1-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Adam (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2001,
+      2008
+    ],
+    "id": "c42988b4-46cb-48cc-b3ad-0c21176f92c8",
+    "title": "Peugeot_307_MK1-ImmoBreakout",
+    "description": "Peugeot_307_MK1-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "307 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "c4481972-5112-4cb7-b53d-262b7dd8dc78",
+    "title": "Citroen_C5-Aircross_MK1-ImmoBreakout",
+    "description": "Citroen_C5-Aircross_MK1-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C5 Aircross (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "c45825f6-d3b5-402b-9118-ddb773745e8b",
+    "title": "Nissan_Leaf_MK2-ImmoBreakout",
+    "description": "Nissan_Leaf_MK2-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Leaf (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2024
+    ],
+    "id": "c525847d-575e-4ed8-ba5f-ebf8185701ee",
+    "title": "Dodge_Charger_LD-ImmoBreakout",
+    "description": "Dodge_Charger_LD-ImmoBreakout",
+    "makerName": "DODGE",
+    "modelName": "Charger (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "c56667d5-76bb-4f4e-bad4-998648975777",
+    "title": "Renault_Master_MK3PF-80L-ImmoBreakout",
+    "description": "Renault_Master_MK3PF-80L-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Master (80L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2025,
+      2029
+    ],
+    "id": "c62ea141-574a-4a14-854c-54619a3611e4",
+    "title": "Renault_Captur_MK2-Facelift_Breakout",
+    "description": "Renault_Captur_MK2-Facelift_Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Captur (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "c6f6f893-ac09-4486-862e-8fdc4a988314",
+    "title": "Jeep_Avenger_EV_MK1-ImmoBreakout",
+    "description": "Jeep_Avenger_EV_MK1-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Avenger EV (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2021
+    ],
+    "id": "c9c00068-27b3-4fb3-98a8-0242fdeda738",
+    "title": "AlfaRomeo_Giulietta_940-ImmoBreakout",
+    "description": "AlfaRomeo_Giulietta_940-ImmoBreakout",
+    "makerName": "ALFA_ROMEO",
+    "modelName": "Giulietta (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2025
+    ],
+    "id": "ca9a7814-c6d3-42ac-a821-09125d530783",
+    "title": "Seat_Mii_MK1-ImmoBreakout",
+    "description": "Seat_Mii_MK1-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Mii (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2028
+    ],
+    "id": "ca9e6cfa-5bc3-497a-8cc8-2d9cfcf03dee",
+    "title": "Fiat_Doblò-e_K9-ImmoBreakout",
+    "description": "Fiat_Doblò-e_K9-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Doblò-e (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "caae2ea0-adc6-4f37-ad6e-c9bbdbbb919c",
+    "title": "Toyota_Auris_MK1-ImmoBreakdown",
+    "description": "Toyota_Auris_MK1-ImmoBreakdown",
+    "makerName": "TOYOTA",
+    "modelName": "Auris (Breakdown)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "cb11064e-633c-4402-9a1f-68c6f49a9ef3",
+    "title": "Volkswagen_T-Cross_MK1-ImmoBreakout",
+    "description": "Volkswagen_T-Cross_MK1-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "T-Cross (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "cc7b852f-3cba-4f05-b399-434aa9560368",
+    "title": "Polestar_2_MK1-ImmoBreakout",
+    "description": "Polestar_2_MK1-ImmoBreakout",
+    "makerName": "POLESTAR",
+    "modelName": "2 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "cc8ce3ab-90bf-4a8b-ac1b-d83f01769f0c",
+    "title": "Kia_Ceed_JD-ImmoBreakout",
+    "description": "Kia_Ceed_JD-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Ceed (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "cca39b51-2656-4f87-bfef-8a774bc3225f",
+    "title": "Renault_ZOE_MK2-INE",
+    "description": "Renault_ZOE_MK2-INE",
+    "makerName": "RENAULT",
+    "modelName": "ZOE (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2017
+    ],
+    "id": "cca3bbac-e1bf-4b74-a4e2-a7126c0be31d",
+    "title": "Kia_Picanto_TA-ImmoBreakout",
+    "description": "Kia_Picanto_TA-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Picanto (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2020
+    ],
+    "id": "ccda3cfc-5636-49a5-a4c4-7bb7bae634e5",
+    "title": "Renault_Twingo_MK3-DoorsAndImmoBreakout",
+    "description": "Renault_Twingo_MK3-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Twingo (GPO)(41L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "cd583c52-133b-4c6e-a0e9-e3c9dc3ce86c",
+    "title": "Toyota_Auris-Hybrid_MK1-ImmoBreakout",
+    "description": "Toyota_Auris-Hybrid_MK1-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Auris Hybrid (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "cfa487a2-ede1-413c-91a2-2b3d3cd07091",
+    "title": "Renault_Master_MK3PF-81L-Breakout",
+    "description": "Renault_Master_MK3PF-81L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Master (81L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2016
+    ],
+    "id": "d06c9b54-1566-4072-b3b0-852430325d46",
+    "title": "Nissan_Micra_K13-ImmoBreakou",
+    "description": "Nissan_Micra_K13-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Micra (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "d09c5b00-eefe-43f4-b952-92e2d3c9c554",
+    "title": "Audi_A1_GB-DoorsAndImmoBreakout",
+    "description": "Audi_A1_GB-DoorsAndImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A1 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "d0eee084-8fe5-4725-8453-23fcfedd6c19",
+    "title": "Opel_Vivaro_MK3-85L-Breakout",
+    "description": "Opel_Vivaro_MK3-85L-Breakout",
+    "makerName": "OPEL",
+    "modelName": "Vivaro (85L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2017
+    ],
+    "id": "d295be99-2a51-4642-9a8c-c6660ad2859a",
+    "title": "Opel_Meriva_B-ImmoBreakout",
+    "description": "Opel_Meriva_B-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Meriva (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2023
+    ],
+    "id": "d2c3debf-eb30-43eb-9791-076a9ca8dd00",
+    "title": "Renault_Trafic_MK3-80L-Breakout",
+    "description": "Renault_Trafic_MK3-80L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Trafic (80L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "d33759c3-f2df-4e85-a62e-f4c4893ee8a1",
+    "title": "Mercedes-Benz_A-Class_W177-ImmoBreakout",
+    "description": "Mercedes-Benz_A-Class_W177-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "A-Class (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "d6347ee1-32ae-442c-b985-6f02f7f56e4d",
+    "title": "Kia_Stonic_YB-ImmoBreakout",
+    "description": "Kia_Stonic_YB-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Stonic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2017
+    ],
+    "id": "d6473c8a-925c-488c-b330-06cdf1371513",
+    "title": "Seat_Leon_5F-ImmoBreakout",
+    "description": "Seat_Leon_5F-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Leon (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2020
+    ],
+    "id": "d68b06c1-e008-499b-9aa6-c3c719a0ac4a",
+    "title": "Renault_Kangoo_X61-56L-Breakout",
+    "description": "Renault_Kangoo_X61-56L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Kangoo (56L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2018
+    ],
+    "id": "d6eb212b-fd9c-4405-b6fd-186a98f4d5d9",
+    "title": "Volvo_V60_MK1-ImmoBreakout",
+    "description": "Volvo_V60_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "V60 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2018
+    ],
+    "id": "d7504826-95b4-4b5c-9a43-3ebfd125a5ba",
+    "title": "Alfa-Romeo_MiTo_MK1-ImmoBreakout",
+    "description": "Alfa-Romeo_MiTo_MK1-ImmoBreakout",
+    "makerName": "ALFA_ROMEO",
+    "modelName": "MiTo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "d7ed97fe-e578-4e98-b5b8-a57a4dd9bbfa",
+    "title": "Renault_ZOE_MK1-ImmoBreakout",
+    "description": "Renault_ZOE_MK1-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "ZOE (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2004,
+      2010
+    ],
+    "id": "d83fd32d-a9d5-43f3-ab9b-f410a9cf40ed",
+    "title": "Suzuki_Swift_R4-ImmoBreakout",
+    "description": "Suzuki_Swift_R4-ImmoBreakout",
+    "makerName": "SUZUKI",
+    "modelName": "Swift (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "d8afd1b0-9fc5-4a13-b7ba-80f4f98afd02",
+    "title": "Mercedes-Benz_EQV_W447-ImmoBreakout",
+    "description": "Mercedes-Benz_EQV_W447-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "EQV (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2020
+    ],
+    "id": "d99e522b-04e6-4f71-91f1-2777d7103aa1",
+    "title": "Opel_Mokka_J13-ImmoBreakout",
+    "description": "Opel_Mokka_J13-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Mokka (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2020
+    ],
+    "id": "d9df7236-0432-44c9-b921-30a00f284108",
+    "title": "Renault_Twingo_MK3-37L-Breakout",
+    "description": "Renault_Twingo_MK3-37L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Twingo (GPO)(37L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2019
+    ],
+    "id": "db844dd2-f815-4816-a9a8-16644fda5d59",
+    "title": "Opel_Corsa_E-ImmoBreakout",
+    "description": "Opel_Corsa_E-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Corsa (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "dcdb8b36-39c4-4447-b371-d325414a58ec",
+    "title": "Jaguar_E-Pace_X540-ImmoBreakout",
+    "description": "Jaguar_E-Pace_X540-ImmoBreakout",
+    "makerName": "JAGUAR",
+    "modelName": "E-Pace"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2025
+    ],
+    "id": "dcf32cc1-5d8c-4cd4-957f-cae44ce8d930",
+    "title": "Fiat_500X_334-ImmoBreakout",
+    "description": "Fiat_500X_334-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "500X (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2022
+    ],
+    "id": "dd0e058c-bfe4-413e-a615-145286d0cedf",
+    "title": "Hyundai_Ioniq-e_AE-ImmoBreakout",
+    "description": "Hyundai_Ioniq-e_AE-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "Ioniq-e (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "ddae1168-322c-4bdf-b082-116b2d35920d",
+    "title": "Skoda_Kamiq_MK1-DoorsAndImmo",
+    "description": "Skoda_Kamiq_MK1-DoorsAndImmo",
+    "makerName": "SKODA",
+    "modelName": "Kamiq"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "ddf37177-7b64-418f-aa10-14b3161e9ab5",
+    "title": "Hyundai_i10_AC3-ImmoBreakout",
+    "description": "Hyundai_i10_AC3-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i10 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2022
+    ],
+    "id": "de59fae2-6420-421a-a29b-190aaed431c7",
+    "title": "Dacia_Lodgy_MK1-ImmoBreakout",
+    "description": "Dacia_Lodgy_MK1-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Lodgy (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "de90a7a5-8717-45d1-8538-41ad5e580e9f",
+    "title": "Volkswagen_ID.3_Mk1_ImmoGPO",
+    "description": "Volkswagen_ID.3_Mk1_ImmoGPO",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "ID.3 (GPO Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "df56ecbf-d2c3-45ee-86d4-242882d3a311",
+    "title": "Chevrolet_Spark_M300-ImmoBreakout",
+    "description": "Chevrolet_Spark_M300-ImmoBreakout",
+    "makerName": "CHEVROLET",
+    "modelName": "Spark (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2016
+    ],
+    "id": "df6135fb-4c8b-4405-ae33-0d1909ff6732",
+    "title": "Volkswagen_Golf_VII-ImmoBreakout",
+    "description": "Volkswagen_Golf_VII-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Golf (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "e0273450-d398-4657-b84d-5f970872e277",
+    "title": "Citroen_C3_Aircross_MK1-DoorsAndImmoBreakout",
+    "description": "Citroen_C3_Aircross_MK1-DoorsAndImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 Aircross (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "e0544574-e482-4c70-afab-4b6de47c66b3",
+    "title": "Dacia_Jogger_52L-ImmoBreakout",
+    "description": "Dacia_Jogger_52L-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Jogger (52L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2022
+    ],
+    "id": "e08adedb-84d5-4ad2-aabf-1dc038501e20",
+    "title": "Hyundai_i40_MK1-ImmoBreakout",
+    "description": "Hyundai_i40_MK1-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "i40 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2019
+    ],
+    "id": "e09961c5-6559-48a2-9b38-55ce71a0ef4d",
+    "title": "Opel_Zafira_Tourer-ImmoBreakout",
+    "description": "Opel_Zafira_Tourer-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Zafira Tourer (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "e0d3de2b-76ef-4f3f-9d18-a3e882d12f9a",
+    "title": "Kia_Soul-EV_SK3-ImmoBreakout",
+    "description": "Kia_Soul-EV_SK3-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Soul EV (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "e10d3d1d-64ce-482b-b1d6-d003e46d3d75",
+    "title": "Mercedes-Benz_Sprinter_907-ImmoBreakout",
+    "description": "Mercedes-Benz_Sprinter_907-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "Sprinter (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "e1ee68fb-449f-455e-8384-9db3746e122f",
+    "title": "Mitsubishi_ASX_MK2-ImmoBreakout",
+    "description": "Mitsubishi_ASX_MK2-ImmoBreakout",
+    "makerName": "MITSUBISHI",
+    "modelName": "ASX (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "e238a896-cb67-409c-9b32-2f2391337e17",
+    "title": "Opel_Mokka-e_MK1-ImmoBreakout",
+    "description": "Opel_Mokka-e_MK1-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Mokka-e"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "e2adf0b3-4bee-45a8-b82c-449a9ae5bdef",
+    "title": "Kia_Picanto_JA-ImmoBreakout",
+    "description": "Kia_Picanto_JA-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Picanto (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2018
+    ],
+    "id": "e2efd203-4713-40ac-9448-da41e82862f9",
+    "title": "BMW_3-Series_F30-ImmoBreakout",
+    "description": "BMW_3-Series_F30-ImmoBreakout",
+    "makerName": "BMW",
+    "modelName": "3 Series (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "e32fc425-7420-4f3c-b90f-0bf270c2e028",
+    "title": "Dacia_Spring_I-ImmoBreakout",
+    "description": "Dacia_Spring_I-ImmoBreakout",
+    "makerName": "DACIA",
+    "modelName": "Spring (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2027
+    ],
+    "id": "e35683e1-0d8c-4397-bacc-5eb2b0a8a872",
+    "title": "Peugeot_2008_P24-ImmoBreakout",
+    "description": "Peugeot_2008_P24-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "2008 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "e358c63c-851a-4611-9b75-ad3870b15c70",
+    "title": "Toyota_Corolla_E210-ImmoBreakout",
+    "description": "Toyota_Corolla_E210-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Corolla (Brekaout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "e3a91be6-b631-4f3c-b972-ee27514407b6",
+    "title": "Volkswagen_Tiguan_MK2-ImmoBreakout",
+    "description": "Volkswagen_Tiguan_MK2-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Tiguan (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2025,
+      2029
+    ],
+    "id": "e3c6162e-9c06-42d9-8f62-ed1c9b6a0b58",
+    "title": "Nissan_Qashqai_J12_Facelift-Breakout",
+    "description": "Nissan_Qashqai_J12_Facelift-Breakout",
+    "makerName": "NISSAN",
+    "modelName": "Qashqai (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2003,
+      2020
+    ],
+    "id": "e3c97c9d-e32a-496b-b801-635c59fd09d1",
+    "title": "Volkswagen_Caddy_2K-ImmoBreakout",
+    "description": "Volkswagen_Caddy_2K-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Caddy (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "e3df1160-d587-4738-af33-2432abee4f7e",
+    "title": "Skoda_Octavia_NX-ImmoBreakout",
+    "description": "Skoda_Octavia_NX-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Octavia (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2020
+    ],
+    "id": "e442dee3-039e-4e9b-a8cd-e6f51505895d",
+    "title": "Hyundai_Tucson_TL-ImmoBreakout",
+    "description": "Hyundai_Tucson_TL-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "Tucson (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2018
+    ],
+    "id": "e455993d-b32a-4ec6-9e56-ba97e4e8d2da",
+    "title": "Toyota_RAV4_XA40-ImmoBreakout",
+    "description": "Toyota_RAV4_XA40-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "RAV4 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2026
+    ],
+    "id": "e4933f23-c825-4ab9-8a6a-4b779a49ef95",
+    "title": "Skoda_Scala_MK1-ImmoBreakout",
+    "description": "Skoda_Scala_MK1-ImmoBreakout",
+    "makerName": "SKODA",
+    "modelName": "Scala (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2017
+    ],
+    "id": "e512eab3-cf05-4221-9c11-43e9897d6942",
+    "title": "Nissan_Qashqai_J11_PF-ImmoBreakout",
+    "description": "Nissan_Qashqai_J11_PF-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Qashqai (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2022
+    ],
+    "id": "e62295f9-ee37-464e-8177-139c29993b46",
+    "title": "Nissan_Qashqai_J11-ImmoBreakout",
+    "description": "Nissan_Qashqai_J11-ImmoBreakout",
+    "makerName": "NISSAN",
+    "modelName": "Qashqai (GPS)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2024
+    ],
+    "id": "e62318a1-16f8-456e-abcf-df24616814b0",
+    "title": "Ford_EcoSport_MK2FL-ImmoBreakout",
+    "description": "Ford_EcoSport_MK2FL-ImmoBreakout",
+    "makerName": "FORD",
+    "modelName": "EcoSport (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "e6a11e2e-8c7c-4d5e-a9b7-20b3f225ee58",
+    "title": "Kia_Sportage_NQ5-52L-ImmoBreakout",
+    "description": "Kia_Sportage_NQ5-52L-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Sportage (52L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2026
+    ],
+    "id": "e6ab4095-e048-4c94-b163-143455286605",
+    "title": "Toyota_bZ4X_MK1-ImmoBreakout",
+    "description": "Toyota_bZ4X_MK1-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "bZ4X (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2013,
+      2022
+    ],
+    "id": "e6b46440-525b-4759-ab83-d1caf41f38f7",
+    "title": "Peugeot_308_MK2-ImmoBreakout",
+    "description": "Peugeot_308_MK2-ImmoBreakout",
+    "makerName": "PEUGEOT",
+    "modelName": "308 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2021,
+      2027
+    ],
+    "id": "e6fdbc01-9ff8-42aa-8c9a-2c48db825ec5",
+    "title": "Opel_Mokka_MK2-ImmoBreakout",
+    "description": "Opel_Mokka_MK2-ImmoBreakout",
+    "makerName": "OPEL",
+    "modelName": "Mokka (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2018
+    ],
+    "id": "e70c9db0-7d36-4aa6-930a-66b2d2ffda30",
+    "title": "Citroen_Berlingo_MK2-ImmoBreakout",
+    "description": "Citroen_Berlingo_MK2-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "Berlingo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "e750fa3b-8e82-4093-b4a3-ec49298e4301",
+    "title": "Jeep_Avenger_MK1-ImmoBreakout",
+    "description": "Jeep_Avenger_MK1-ImmoBreakout",
+    "makerName": "JEEP",
+    "modelName": "Avenger (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2006,
+      2024
+    ],
+    "id": "e79ca638-7121-4305-8dbe-dcce31c568c5",
+    "title": "Fiat_Ducato_MK3(GPOS)-ImmoBreakout",
+    "description": "Fiat_Ducato_MK3(GPOS)-ImmoBreakout",
+    "makerName": "FIAT",
+    "modelName": "Ducato (GPO)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "e84420aa-b765-43b5-8111-3de684d0d9eb",
+    "title": "Citroen_Berlingo_B9-ImmoBreakout",
+    "description": "Citroen_Berlingo_B9-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "Berlingo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "e85453e7-2121-40fd-a2ff-8dcf0ccde62d",
+    "title": "Honda_Civic_XI-ImmoBreakout",
+    "description": "Honda_Civic_XI-ImmoBreakout",
+    "makerName": "HONDA",
+    "modelName": "Civic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2020
+    ],
+    "id": "e93be2d4-fd00-4213-8e02-8fa21bcff1aa",
+    "title": "Renault_Megane_IV-PF-DoorsAndImmo",
+    "description": "Renault_Megane_IV-PF-DoorsAndImmo",
+    "makerName": "RENAULT",
+    "modelName": "Megane"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2019
+    ],
+    "id": "e9cd823a-c36a-48ee-bcb4-840b0d0e749a",
+    "title": "DS_DS3_I-ImmoBreakout",
+    "description": "DS_DS3_I-ImmoBreakout",
+    "makerName": "DS",
+    "modelName": "DS3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2010,
+      2015
+    ],
+    "id": "e9cdaa31-cda6-4dee-90d4-962b9eb71290",
+    "title": "Volkswagen_Passat_B7-ImmoBreakout",
+    "description": "Volkswagen_Passat_B7-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Passat (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "ea8d18ed-4e95-43bd-ab61-024b49d13749",
+    "title": "Kia_Ceed-Hybrid_CD-ImmoBreakout",
+    "description": "Kia_Ceed-Hybrid_CD-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Ceed Hybrid (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "eafbede1-aedd-437e-819f-37f05e12732f",
+    "title": "Volvo_XC60-MK2-ImmoBreakout",
+    "description": "Volvo_XC60-MK2-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "V60 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "eb64a2d0-8af6-46d7-91c3-ba3da091ed3b",
+    "title": "Renault_Kadjar_MK1-57L-ImmoBreakout",
+    "description": "Renault_Kadjar_MK1-57L-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Kadjar (57L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "eb64a3d9-2680-4d8b-a362-4aaad29bd36d",
+    "title": "Hyundai_IONIQ6_CE-ImmoBreakout",
+    "description": "Hyundai_IONIQ6_CE-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "IONIQ6 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2023
+    ],
+    "id": "ed85fa92-a141-4c2f-b4e7-0a4aa2e5b695",
+    "title": "Renault_Trafic_Mk3-81L-Breakout",
+    "description": "Renault_Trafic_Mk3-81L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Trafic (81L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "ed9c921f-c92d-431d-b31a-60f72ca43fda",
+    "title": "MG_ZS_MK1-ImmoBreakout",
+    "description": "MG_ZS_MK1-ImmoBreakout",
+    "makerName": "MG",
+    "modelName": "ZS (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2022
+    ],
+    "id": "ede428bd-9747-4344-82c3-8e14e1d3acd4",
+    "title": "Kia_Sportage_QL-58L-ImmoBreakout",
+    "description": "Kia_Sportage_QL-58L-ImmoBreakout",
+    "makerName": "KIA",
+    "modelName": "Sportage (58L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2017
+    ],
+    "id": "ef033d56-2ea9-4ac1-808c-938fcf24cb18",
+    "title": "Seat_Ibiza_6P-ImmoBreakout",
+    "description": "Seat_Ibiza_6P-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Ibiza (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "efcac77a-df6f-427a-bea9-202b14722c78",
+    "title": "Seat_Leon_KL1-ImmoBreakout",
+    "description": "Seat_Leon_KL1-ImmoBreakout",
+    "makerName": "SEAT",
+    "modelName": "Leon (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "f0d6b84c-3316-4877-a817-1fefc08404c8",
+    "title": "Toyota_C-HR_AX10-ImmoBreakout",
+    "description": "Toyota_C-HR_AX10-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "C-HR (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "f0e48048-f82a-464a-91c6-d58be700c8d8",
+    "title": "Toyota_Prius_XW30-ImmoBreakout",
+    "description": "Toyota_Prius_XW30-ImmoBreakout",
+    "makerName": "TOYOTA",
+    "modelName": "Prius (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2007,
+      2014
+    ],
+    "id": "f1e718b8-8161-41c3-bce1-4f7b3feec441",
+    "title": "Renault_Twingo_MK2-DoorsAndImmoBreakout",
+    "description": "Renault_Twingo_MK2-DoorsAndImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Twingo (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2012,
+      2019
+    ],
+    "id": "f259c7f0-c857-496c-9b48-a09d1a20e323",
+    "title": "Renault_Clio_IV-44L_Breakout",
+    "description": "Renault_Clio_IV-44L_Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Clio (44L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "f2e299de-5c9b-41ef-b48c-9e6db761498e",
+    "title": "Mercedes-Benz_GLE_W167-ImmoBreakout",
+    "description": "Mercedes-Benz_GLE_W167-ImmoBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "GLE (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2018
+    ],
+    "id": "f2f1dedc-36aa-42bb-b318-05de090d9783",
+    "title": "Audi_A1_8X-DoorsAndImmoBreakout",
+    "description": "Audi_A1_8X-DoorsAndImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A1 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "f3a669ad-bef1-47f2-b823-40fda0261b0e",
+    "title": "Mitsubishi_Spacestar_MK2-ImmoBreakout",
+    "description": "Mitsubishi_Spacestar_MK2-ImmoBreakout",
+    "makerName": "MITSUBISHI",
+    "modelName": "Spacestar (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2016,
+      2025
+    ],
+    "id": "f59a15c7-780a-42de-93ac-c959f05f42a3",
+    "title": "Renault_Scenic_IV-ImmoBreakout",
+    "description": "Renault_Scenic_IV-ImmoBreakout",
+    "makerName": "RENAULT",
+    "modelName": "Scenic (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2024,
+      2028
+    ],
+    "id": "f655656f-d6e4-497c-b9f9-692ad22c5f5b",
+    "title": "Volkswagen_T-Roc_MK1-FL-ImmoBreakout",
+    "description": "Volkswagen_T-Roc_MK1-FL-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "T-Roc (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2015,
+      2025
+    ],
+    "id": "f6de1fdf-9da7-457d-b78f-42ece7f5d1e9",
+    "title": "Volkswagen_Touran_5T-ImmoBreakout",
+    "description": "Volkswagen_Touran_5T-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Touran (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2017,
+      2025
+    ],
+    "id": "f8122e7f-2118-4997-a028-fc5632de865e",
+    "title": "Volkswagen_Crafter_MK2_CAN-ImmoBreakout",
+    "description": "Volkswagen_Crafter_MK2_CAN-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Crafter (CAN)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2027
+    ],
+    "id": "f829b48d-7ae5-4dd2-bf4c-eb4243799757",
+    "title": "Volkswagen_ID.Buzz_MK1-ImmoBreakout",
+    "description": "Volkswagen_ID.Buzz_MK1-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "ID.Buzz (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2022,
+      2027
+    ],
+    "id": "f8fadfa2-05cd-4501-b02c-fd9517a6e9cd",
+    "title": "Maxus_eDeliver7_MK1-ImmoBreakout",
+    "description": "Maxus_eDeliver7_MK1-ImmoBreakout",
+    "makerName": "MAXUS",
+    "modelName": "eDeliver7 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2018
+    ],
+    "id": "fb6daac2-1815-431f-8721-c6f40712804e",
+    "title": "Volvo_V40_MK1-ImmoBreakout",
+    "description": "Volvo_V40_MK1-ImmoBreakout",
+    "makerName": "VOLVO",
+    "modelName": "V40 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2014,
+      2019
+    ],
+    "id": "fb9be155-92cc-4d66-878c-7135887f74b4",
+    "title": "Renault_Master_MK3PF_83L-Breakout",
+    "description": "Renault_Master_MK3PF_83L-Breakout",
+    "makerName": "RENAULT",
+    "modelName": "Master (83L)(Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2009,
+      2016
+    ],
+    "id": "fbadbf20-224c-4109-bff0-ab8fdcc18676",
+    "title": "Citroen_C3_MK2-ImmoBreakout",
+    "description": "Citroen_C3_MK2-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "C3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "fbe50873-b0b0-406b-af98-4e50a4cff2b2",
+    "title": "Volkswagen_ID.3_MK1-ImmoBreakout",
+    "description": "Volkswagen_ID.3_MK1-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "ID.3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2018,
+      2025
+    ],
+    "id": "fc3c6b63-82a9-41ef-a81f-39ffaa05991b",
+    "title": "Smart_Fortwo_EQ_W453-ImmoBreakout",
+    "description": "Smart_Fortwo_EQ_W453-ImmoBreakout",
+    "makerName": "SMART",
+    "modelName": "Fortwo EQ (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2026
+    ],
+    "id": "fc6045d1-7335-4862-b33c-cd69b387dafd",
+    "title": "Hyundai_Tucson_NX4-ImmoBreakout",
+    "description": "Hyundai_Tucson_NX4-ImmoBreakout",
+    "makerName": "HYUNDAI",
+    "modelName": "Tucson (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2020,
+      2025
+    ],
+    "id": "fd3d2838-0c44-4678-bc8a-fe87f992d23a",
+    "title": "Audi_A3_8Y-ImmoBreakout",
+    "description": "Audi_A3_8Y-ImmoBreakout",
+    "makerName": "AUDI",
+    "modelName": "A3 (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2000,
+      2025
+    ],
+    "id": "fe252aa3-d5e9-4c0a-9449-42ee1f960e81",
+    "title": "AllMakes-OneRelayAndImmoBreakout",
+    "description": "AllMakes-OneRelayAndImmoBreakout",
+    "makerName": "INFINITI",
+    "modelName": "All Models One Relay and Immo Breakout"
+  },
+  {
+    "modelYearRange": [
+      2011,
+      2025
+    ],
+    "id": "fe472ed9-a9d1-485c-bf03-4e96ae5a82c0",
+    "title": "Volkswagen_UP!_Mk1-ImmoBreakout",
+    "description": "Volkswagen_UP!_Mk1-ImmoBreakout",
+    "makerName": "VOLKSWAGEN",
+    "modelName": "Up! (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2019,
+      2025
+    ],
+    "id": "ff1fd556-dce1-4a1e-909e-8b09c5d2c64f",
+    "title": "Mercedes-Benz_CLA_C118-ImmobilizerBreakout",
+    "description": "Mercedes-Benz_CLA_C118-ImmobilizerBreakout",
+    "makerName": "MERCEDES_BENZ",
+    "modelName": "CLA (Breakout)"
+  },
+  {
+    "modelYearRange": [
+      2008,
+      2018
+    ],
+    "id": "ff77ca43-93dc-4bc4-a49a-a6712193fe79",
+    "title": "Citroen_Berlingo_MK2-60L-ImmoBreakout",
+    "description": "Citroen_Berlingo_MK2-60L-ImmoBreakout",
+    "makerName": "CITROEN",
+    "modelName": "Berlingo (60L)(Breakout)"
+  }
+]

@@ -221,7 +221,7 @@ export function LoginPage() {
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6, delay: 0.15, ease: [0.16, 1, 0.3, 1] }}
-        className="w-full max-w-sm overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-xl shadow-brand-900/5"
+        className="w-full max-w-sm shrink-0 overflow-hidden rounded-2xl border border-brand-100 bg-white shadow-xl shadow-brand-900/5"
       >
         <div className="relative min-h-[22rem] p-6 sm:p-8">
           <button

@@ -39,17 +39,33 @@ type ProfileQueryRow = {
 };
 
 /**
- * Admin "user management" page ("/department"): every user in the admin's
- * own department, or — for a FLEETii admin — every user in the single
- * costumer they navigated in for (costumerId/costumerName passed via router
- * state from CostumerDetailsPage's own "BRUGERE" button, same "filtering by
- * navigation" pattern as VehiclesPage.tsx's own "Administration af
- * køretøjer": there's no in-page way to switch to a DIFFERENT costumer or
- * to "every costumer" here, and reaching this page without that router
- * state — e.g. a direct URL/refresh — redirects back to "/admin" below). A
- * regular admin's own users are always within their own single costumer
- * already (see user_profiles_select_admin_own_department), so none of this
- * applies to them. Click a row to open it in UserDetailsPage, which handles
+ * Admin "user management" page ("/department"): two modes, both scoped to a
+ * target costumer (costumerId/costumerName via router state, or the
+ * viewer's own costumerId for a regular admin).
+ *
+ * LOCKED (departmentId also given — DepartmentDetailsPage's own BRUGERE
+ * button, a department row already selected there): lists just that ONE
+ * department's users, no in-page way to widen back out — "filtering by
+ * navigation", same pattern this app already uses for costumerId scoping
+ * elsewhere. To see a different department's users, go back and select a
+ * different row on DepartmentDetailsPage.
+ *
+ * UNLOCKED (no departmentId — AdminFrontpage/CostumerDetailsPage's own
+ * BRUGERE button, straight there): lists every user across the WHOLE target
+ * costumer (matching what that button's own count badge already showed),
+ * with an in-page Afdeling filter to narrow it back down —
+ * CostumerDetailsPage's own BRUGERE used to fall back to DepartmentDetailsPage
+ * as a picker whenever the costumer had 0 or 2+ departments; this replaced
+ * that (2026-08-28, at the user's request) since landing on a whole
+ * different page just to pick one felt like the wrong destination for a
+ * button whose badge already promised "every user here". A regular admin's
+ * own users are always within their own single department already (RLS
+ * itself enforces that regardless of mode — see user_profiles_select_admin_own_department),
+ * so none of this distinction is visible to them in practice.
+ *
+ * Reaching this page with neither a costumerId a FLEETii admin could resolve
+ * nor one of their own (a regular admin always has one) redirects back to
+ * "/admin" below. Click a row to open it in UserDetailsPage, which handles
  * editing (via update-user.mts, including that user's Rettigheder
  * overrides) and blocking/unblocking access (via delete-user.mts/
  * unblock-user.mts) from there, plus a link to create a new user. Blocked
@@ -59,22 +75,28 @@ type ProfileQueryRow = {
  * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { afdeling, afdelingId, costumerId, profile } = useAuth();
+  const { costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as { costumerId?: string; costumerName?: string; emailWarning?: boolean } | null;
+  const state = location.state as
+    | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string; emailWarning?: boolean }
+    | null;
   const emailWarning = state?.emailWarning ?? false;
-  /** Whether afdelingId's department shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — see useIdentSettings' own doc comment. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears (a user's identity is core information), only its value source swaps. */
-  const { useUserIdent } = useIdentSettings(afdelingId);
   /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
   const columnCount = 4;
 
-  /** A FLEETii admin has no costumer of their own — for them, targetCostumerId only ever comes from router state (CostumerDetailsPage's own "BRUGERE" button), never a fallback of any kind (see this component's own doc comment). */
+  /** A FLEETii admin has no costumer of their own — for them, targetCostumerId only ever comes from router state. */
   const isFleetiiAdmin = profile?.role === "FLEETii admin";
   const targetCostumerId = state?.costumerId ?? costumerId;
   const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
+  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
+  const targetDepartmentId = state?.departmentId ?? null;
+  const targetDepartmentName = state?.departmentName ?? null;
 
-  /** Redirects back to "/admin" if a FLEETii admin reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback to show instead. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
+  /** Whether targetDepartmentId's OWN department_settings shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — deliberately the LISTED department's own setting, not the viewing admin's currently-active one. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears, only its value source swaps. UNLOCKED mode (targetDepartmentId null) has no single department's setting to apply across users from several departments at once, so useIdentSettings' own fail-closed default (plain E-mail) applies uniformly there instead. */
+  const { useUserIdent } = useIdentSettings(targetDepartmentId);
+
+  /** Redirects back to "/admin" if a FLEETii admin reaches this page without even a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
   useEffect(() => {
     if (isFleetiiAdmin && !targetCostumerId) {
       navigate("/admin", { replace: true });
@@ -103,12 +125,18 @@ export function DepartmentPage() {
           "user_id, email, full_name, phone, user_ident, department_id, costumer_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
         )
         .order("full_name", { ascending: true });
-      // RLS (user_profiles_select_allow_fleetii_admin) already lets a
-      // FLEETii admin see every user platform-wide — this narrows the
-      // actual QUERY to just the target costumer instead of fetching
-      // everyone and filtering client-side, now that there's no in-page
-      // "every costumer" mode left to justify pulling the whole table.
-      if (isFleetiiAdmin && targetCostumerId) {
+      // LOCKED mode: scope straight to targetDepartmentId (a department_id
+      // already determines its own costumer, so no separate costumer_id
+      // filter is needed there). UNLOCKED mode, FLEETii admin: scope to the
+      // whole target costumer instead — RLS already lets that role read any
+      // costumer, so without this the query would otherwise pull every user
+      // platform-wide just to show one costumer's worth. UNLOCKED mode,
+      // regular admin: no added filter at all — RLS
+      // (user_profiles_select_admin_own_department) already limits them to
+      // their own current department regardless of what's asked for here.
+      if (targetDepartmentId) {
+        query = query.eq("department_id", targetDepartmentId);
+      } else if (isFleetiiAdmin && targetCostumerId) {
         query = query.eq("costumer_id", targetCostumerId);
       }
 
@@ -127,24 +155,22 @@ export function DepartmentPage() {
     }
 
     void loadUsers();
-    // Re-fetches whenever the active department changes (via PageHeader's
-    // "Skift afdeling") — user_profiles' SELECT RLS
-    // (user_profiles_select_admin_own_department) scopes rows to the
-    // admin's CURRENT department, so the previously-fetched list stops
-    // containing anything relevant the moment afdelingId changes; an empty
-    // dependency array left this page showing a stale (or empty, since none
-    // of the old rows match the new department_id) table until a hard
-    // refresh. Also re-fetches if targetCostumerId itself changes (a
-    // FLEETii admin navigating here for a different costumer without a
-    // full remount, e.g. via browser back/forward).
-  }, [afdelingId, isFleetiiAdmin, targetCostumerId]);
+    // Re-fetches whenever the target scope itself changes (a different
+    // department/costumer selected without a full remount, e.g. via browser
+    // back/forward).
+  }, [targetDepartmentId, targetCostumerId, isFleetiiAdmin]);
 
-  const departmentUsers = isFleetiiAdmin ? users : users.filter((u) => u.department_id === afdelingId);
+  // Server-side filtering above already scopes `users` to the right set for
+  // either mode — kept as its own name (rather than using `users` directly
+  // below) purely so the rest of this file's filter-chain reads the same as
+  // before.
+  const departmentUsers = users;
 
   /** Same popup-filter pattern as VehiclesPage's fleet-table filter: a funnel button toggles an InlinePopup of dropdown selects, each populated from the actual rows in view (not free-text search) so every option is guaranteed to match something. */
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
+  /** UNLOCKED mode only — narrows the whole-costumer user list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
   const [filterAfdeling, setFilterAfdeling] = useState("");
   const [filterRolle, setFilterRolle] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
@@ -165,15 +191,17 @@ export function DepartmentPage() {
   /** Mirrors the Bruger column's own display logic (useUserIdent toggle) so the filter's dropdown values and matching always agree with what's actually shown in the table. */
   const brugerValue = (user: ProfileRow) => (useUserIdent ? user.user_ident || user.email : user.email) ?? "—";
   /**
-   * The filter fields form a hierarchy — Afdeling > Rolle > Bruger/Navn — where each
-   * field's own option list is scoped down by whatever is picked ABOVE it (so picking an
-   * Afdeling narrows Rolle's options, etc.), never by a field at its own level or below.
-   * Bruger and Navn sit at the same bottom rung (both identify one specific user), so they
+   * The filter fields form a hierarchy — Afdeling > Rolle > Bruger/Navn (UNLOCKED
+   * mode only — LOCKED mode has no Afdeling tier at all, departmentUsers above
+   * is already scoped to one department there, and the dropdown below isn't
+   * rendered) — where each field's own option list is scoped down by whatever
+   * is picked ABOVE it, never by a field at its own level or below. Bruger and
+   * Navn sit at the same bottom rung (both identify one specific user), so they
    * share the same scope rather than narrowing each other.
    */
   const afdelingScopedUsers = filterAfdeling ? departmentUsers.filter((u) => u.department_id === filterAfdeling) : departmentUsers;
   const rolleScopedUsers = filterRolle ? afdelingScopedUsers.filter((u) => u.role === filterRolle) : afdelingScopedUsers;
-  /** Deduped by department_id (the filter's actual match key) while keeping department_name for the option label — a Map collapses repeats from users sharing the same department. */
+  /** Deduped by department_id (the filter's actual match key) while keeping department_name for the option label — a Map collapses repeats from users sharing the same department. UNLOCKED mode only; stays empty (and unused) in LOCKED mode since departmentUsers there is already just one department. */
   const afdelingOptions = Array.from(
     new Map(departmentUsers.map((u) => [u.department_id, u.department_name] as const)).entries(),
   )
@@ -212,7 +240,8 @@ export function DepartmentPage() {
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">
-                  Brugeradministration: {isFleetiiAdmin ? (targetCostumerName ?? "—") : (afdeling ?? "—")}
+                  Brugere{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
+                  {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
                 </h2>
                 <div className="relative" ref={filterRef}>
                   <button
@@ -235,26 +264,32 @@ export function DepartmentPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge brugere på disse kriterier:</p>
-                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Afdeling
-                          <select
-                            value={filterAfdeling}
-                            onChange={(e) => {
-                              setFilterAfdeling(e.target.value);
-                              setFilterRolle("");
-                              setFilterBruger("");
-                              setFilterNavn("");
-                            }}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {afdelingOptions.map(([departmentId, departmentName]) => (
-                              <option key={departmentId} value={departmentId}>
-                                {departmentName}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
+                        {/* LOCKED mode (targetDepartmentId set) hides this entirely — nothing to widen back out to from in-page, see this component's own doc comment. */}
+                        {!targetDepartmentId && (
+                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                            Afdeling
+                            <select
+                              value={filterAfdeling}
+                              onChange={(e) => {
+                                // Changing an upstream field invalidates every field below it in
+                                // the Afdeling > Rolle > Bruger/Navn hierarchy, so all of them
+                                // reset rather than risking a stale, now-impossible combination.
+                                setFilterAfdeling(e.target.value);
+                                setFilterRolle("");
+                                setFilterBruger("");
+                                setFilterNavn("");
+                              }}
+                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            >
+                              <option value="">Alle</option>
+                              {afdelingOptions.map(([departmentId, departmentName]) => (
+                                <option key={departmentId} value={departmentId}>
+                                  {departmentName}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Rolle
                           <select
@@ -282,14 +317,14 @@ export function DepartmentPage() {
                               const value = e.target.value;
                               setFilterBruger(value);
                               if (!value) return;
-                              // Bruger/Navn each identify one specific user, so — unlike the
-                              // upstream fields — picking one flows UP the hierarchy instead of
-                              // down: it fills in Afdeling/Rolle (and the other of Bruger/Navn)
-                              // from that user's own actual values, even if those were still
-                              // "Alle" beforehand. Matched against the full departmentUsers list
-                              // (not the already-scoped option source) since Bruger/Navn values
-                              // (email/user_ident) are unique per user, so the match is
-                              // unambiguous regardless of the current scope.
+                              // Bruger/Navn each identify one specific user, so — unlike
+                              // Afdeling/Rolle above — picking one flows UP the hierarchy instead
+                              // of down: it fills in Afdeling/Rolle (and the other of
+                              // Bruger/Navn) from that user's own actual values, even if those
+                              // were still "Alle" beforehand. Matched against the full
+                              // departmentUsers list (not the already-scoped option source)
+                              // since Bruger/Navn values (email/user_ident) are unique per user,
+                              // so the match is unambiguous regardless of the current scope.
                               const match = departmentUsers.find((u) => brugerValue(u) === value);
                               if (match) {
                                 setFilterAfdeling(match.department_id ?? "");
@@ -401,7 +436,16 @@ export function DepartmentPage() {
                       !error &&
                       filteredUsers.map((user, index) => {
                         const isAlternate = index % 2 === 1;
-                        const goToUser = () => navigate(`/user-details/${user.user_id}`, { state: { user } });
+                        const goToUser = () =>
+                          navigate(`/user-details/${user.user_id}`, {
+                            state: {
+                              user,
+                              costumerId: targetCostumerId,
+                              costumerName: targetCostumerName,
+                              departmentId: targetDepartmentId,
+                              departmentName: targetDepartmentName,
+                            },
+                          });
                         return (
                           <tr
                             key={user.user_id}
@@ -445,7 +489,14 @@ export function DepartmentPage() {
                 <button
                   type="button"
                   onClick={() =>
-                    navigate("/user-details", { state: { costumerId: targetCostumerId, costumerName: targetCostumerName } })
+                    navigate("/user-details", {
+                      state: {
+                        costumerId: targetCostumerId,
+                        costumerName: targetCostumerName,
+                        departmentId: targetDepartmentId,
+                        departmentName: targetDepartmentName,
+                      },
+                    })
                   }
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >

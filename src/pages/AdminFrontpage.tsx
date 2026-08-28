@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 
@@ -34,26 +35,26 @@ type Costumer = {
  * regular admin — see App.tsx's RootRoute); for that role, the grid area
  * instead shows an "INSTALLATIONER" button plus the costumer list embedded
  * directly (same table CostumerAdministrationPage.tsx's own full-page
- * version shows, "Kunde" as its own column header) — no separate hub page,
- * so a FLEETii admin sees the actual customer list the moment they land
- * here rather than one more click away. Per-costumer management
- * (afdelinger/køretøjer/brugere) lives on CostumerDetailsPage.tsx instead,
- * reached by clicking a row here.
+ * version shows, "Kunde" as its own column header), with an "Opret kunde"
+ * button below it (straight to CostumerNewPage.tsx, same as
+ * CostumerAdministrationPage.tsx's own) — no separate hub page needed for
+ * either, so a FLEETii admin sees the actual customer list, and can start
+ * creating a new one, the moment they land here rather than one more click
+ * away. Per-costumer management (afdelinger/køretøjer/brugere) lives on
+ * CostumerDetailsPage.tsx instead, reached by clicking a row here.
  * A plain "admin" instead gets the 2x2 grid itself — AFDELINGER,
  * KØRETØJER, BRUGERE, RAPPORTER (disabled, not implemented yet) — same
  * layout/labels as CostumerDetailsPage.tsx's own grid, since a regular
  * admin has no "home" costumer's worth of separate customer navigation to
  * go through first; a FLEETii admin has no "home" costumer of their own at
  * all, so manages any given costumer's equivalents through
- * CostumerDetailsPage instead. AFDELINGER additionally fetches that
- * admin's own costumer's departments (see handleOpenDepartments below) and
- * jumps straight to EditDepartmentsPage.tsx.
+ * CostumerDetailsPage instead. AFDELINGER jumps straight to
+ * DepartmentDetailsPage.tsx (see handleOpenDepartments below), which now
+ * fetches that admin's own costumer's departments itself.
  */
 export function AdminFrontpage() {
   const navigate = useNavigate();
   const { profile, costumerId, costumerName } = useAuth();
-  const [departmentsLoading, setDepartmentsLoading] = useState(false);
-  const [departmentsError, setDepartmentsError] = useState<string | null>(null);
   /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. FLEETii-admin only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
   const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
   const [costumers, setCostumers] = useState<Costumer[]>([]);
@@ -61,6 +62,41 @@ export function AdminFrontpage() {
   const [costumersError, setCostumersError] = useState<string | null>(null);
   /** Whether the RAPPORTER button's "not implemented yet" InlinePopup is open — a plain click-to-toggle rather than a `title` tooltip, since hover has no equivalent on iOS/touch (see this project's own outline-button/InlinePopup conventions elsewhere, e.g. NewVehiclePage.tsx's "?" info popovers). */
   const [showRapporterInfo, setShowRapporterInfo] = useState(false);
+  /** Row counts for the AFDELINGER/KØRETØJER/BRUGERE buttons' own tables, scoped to this admin's own costumer — drives each button's green corner CountBadge. null until loaded (no badge yet), same admin-only scope as the grid itself. */
+  const [departmentsCount, setDepartmentsCount] = useState<number | null>(null);
+  const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
+  const [usersCount, setUsersCount] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (profile?.role !== "admin" || !costumerId) return;
+
+    let cancelled = false;
+    void supabase
+      .from("departments")
+      .select("department_id", { count: "exact", head: true })
+      .eq("costumer_id", costumerId)
+      .then(({ count }) => {
+        if (!cancelled) setDepartmentsCount(count ?? 0);
+      });
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id", { count: "exact", head: true })
+      .eq("costumer_id", costumerId)
+      .then(({ count }) => {
+        if (!cancelled) setVehiclesCount(count ?? 0);
+      });
+    void supabase
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("costumer_id", costumerId)
+      .then(({ count }) => {
+        if (!cancelled) setUsersCount(count ?? 0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.role, costumerId]);
 
   useEffect(() => {
     if (profile?.role !== "FLEETii admin") return;
@@ -98,26 +134,16 @@ export function AdminFrontpage() {
     };
   }, [profile?.role]);
 
-  /** Fetches this admin's own costumer's departments (RLS already scopes departments' SELECT to any authenticated user, see departments_select_policy.sql — the costumer_id filter here is just "which ones", not a permission check) and hands them to EditDepartmentsPage.tsx via router state, same shape DepartmentDetailsPage.tsx passes. */
-  const handleOpenDepartments = async () => {
+  /** AFDELINGER's own handler — DepartmentDetailsPage.tsx now fetches its own department list (given just costumerId/costumerName via router state), so this just navigates straight there; always lands on that page regardless of how many departments there are, since its whole job IS managing departments, not skipping past them. */
+  const handleOpenDepartments = () => {
     if (!costumerId) return;
+    navigate("/department-details", { state: { costumerId, costumerName } });
+  };
 
-    setDepartmentsLoading(true);
-    setDepartmentsError(null);
-
-    const { data, error } = await supabase
-      .from("departments")
-      .select("department_id, name, address")
-      .eq("costumer_id", costumerId)
-      .order("name", { ascending: true });
-
-    setDepartmentsLoading(false);
-    if (error) {
-      setDepartmentsError(error.message);
-      return;
-    }
-
-    navigate("/edit-departments", { state: { costumerId, costumerName, departments: data ?? [] } });
+  /** KØRETØJER/BRUGERE's own handler — navigates straight to `destination` UNLOCKED (costumerId/costumerName only, no departmentId), matching what those buttons' own count badges already promised: every vehicle/user across this admin's whole costumer, not just one department's worth. VehiclesPage/DepartmentPage both support this unlocked, whole-costumer mode (with their own in-page Afdeling filter) precisely for this button — see their own doc comments. Used to fetch this costumer's departments first and fall back to DepartmentDetailsPage as a picker whenever there wasn't exactly one department; removed 2026-08-28 at the user's request (mirroring the same change on CostumerDetailsPage.tsx's own version of this handler), since landing on a whole different page just to pick one felt like the wrong destination for a button whose badge already showed the full count. */
+  const goToVehiclesOrUsers = (destination: "/fleet-table" | "/department") => {
+    if (!costumerId) return;
+    navigate(destination, { state: { costumerId, costumerName } });
   };
 
   return (
@@ -167,34 +193,42 @@ export function AdminFrontpage() {
                   <hr className="border-brand-200" />
 
                   <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        disabled={departmentsLoading}
-                        onClick={() => void handleOpenDepartments()}
-                        className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        {departmentsLoading ? "Indlæser…" : "AFDELINGER"}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate("/fleet-table")}
-                        className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
-                      >
-                        KØRETØJER
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => navigate("/department")}
-                        className="flex aspect-square items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 transition hover:bg-brand-100"
-                      >
-                        BRUGERE
-                      </button>
-                      <div className="relative aspect-square">
+                    <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                      <div className="relative aspect-square w-28">
+                        <button
+                          type="button"
+                          onClick={handleOpenDepartments}
+                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                        >
+                          AFDELINGER
+                        </button>
+                        <CountBadge count={departmentsCount} />
+                      </div>
+                      <div className="relative aspect-square w-28">
+                        <button
+                          type="button"
+                          onClick={() => goToVehiclesOrUsers("/fleet-table")}
+                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                        >
+                          KØRETØJER
+                        </button>
+                        <CountBadge count={vehiclesCount} />
+                      </div>
+                      <div className="relative aspect-square w-28">
+                        <button
+                          type="button"
+                          onClick={() => goToVehiclesOrUsers("/department")}
+                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                        >
+                          BRUGERE
+                        </button>
+                        <CountBadge count={usersCount} />
+                      </div>
+                      <div className="relative aspect-square w-28">
                         <button
                           type="button"
                           onClick={() => setShowRapporterInfo((prev) => !prev)}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 text-center text-lg font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
+                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
                         >
                           RAPPORTER
                         </button>
@@ -204,7 +238,6 @@ export function AdminFrontpage() {
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                       </div>
                     </div>
-                    {departmentsError && <p className="text-sm text-red-600">{departmentsError}</p>}
                   </div>
                 </>
               )}
@@ -297,6 +330,14 @@ export function AdminFrontpage() {
                         </tbody>
                       </table>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => navigate("/costumer-new")}
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      Opret kunde
+                    </button>
                   </div>
                 </>
               )}
