@@ -9,6 +9,7 @@ import { useAuth } from "./AuthContext";
 import { getVehicleDataSource } from "../lib/vehicleDataSource";
 import type { Vehicle2Hire, VehicleGPS2Hire } from "../lib/vehicleDataSource";
 import { supabase } from "../lib/supabase";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 
 export type { Vehicle2Hire, VehicleGPS2Hire } from "../lib/vehicleDataSource";
 
@@ -28,7 +29,10 @@ type PositionBroadcastPayload = { vehicleId: string; lat: number; lng: number };
  * Must be nested inside <AuthProvider> (see App.tsx).
  */
 export function VehicleProvider({ children }: { children: ReactNode }) {
-  const { isFullyAuthenticated } = useAuth();
+  const { isFullyAuthenticated, costumerId, profile } = useAuth();
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  /** Which "fleet-positions:*" Realtime topic this session may subscribe to — see fleet_positions_realtime_authorization.sql's RLS policy on realtime.messages, which enforces the exact same rule server-side (this is just what to ask for, not the actual authorization). A FLEETii admin (no costumer of their own) gets the platform-wide topic; everyone else gets their own costumer's. Null while the profile hasn't resolved yet (costumerId/role both still unknown) — no channel is opened until then. */
+  const positionsTopic = isFleetiiAdmin ? "fleet-positions:fleetii-admin" : costumerId ? `fleet-positions:${costumerId}` : null;
   const [vehicles, setVehicles] = useState<Vehicle2Hire[]>([]);
   const [gpsPositions, setGpsPositions] = useState<VehicleGPS2Hire[]>([]);
   // True until the initial fetch resolves — VehicleDetailsPage's fetch-by-id
@@ -76,12 +80,12 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     };
   }, [isFullyAuthenticated]);
 
-  /** Listens for the "position" broadcast netlify/functions/2hire-webhook.mts sends the instant 2hire reports a vehicle's new position (see that function's own doc comment) — only while liveTrackingEnabled (see useSetLiveTracking), and only ever patches gpsPositions, one vehicle at a time. Replaces what FleetManagementPage.tsx used to do with a 10s setInterval poll of the ENTIRE fleet: this is push-based (no request at all when nothing moves) and scoped to exactly the vehicle that changed. Plain Realtime Broadcast, not a postgres_changes table subscription — no RLS/publication setup needed, since it isn't tied to any table. */
+  /** Listens for the "position" broadcast netlify/functions/2hire-webhook.mts sends the instant 2hire reports a vehicle's new position (see that function's own doc comment) — only while liveTrackingEnabled (see useSetLiveTracking), and only ever patches gpsPositions, one vehicle at a time. Replaces what FleetManagementPage.tsx used to do with a 10s setInterval poll of the ENTIRE fleet: this is push-based (no request at all when nothing moves) and scoped to exactly the vehicle that changed. A PRIVATE Realtime Broadcast channel (config.private: true), scoped per-costumer via positionsTopic — see that constant's own comment and fleet_positions_realtime_authorization.sql's RLS policy, which is what actually enforces that a caller may only receive their own costumer's topic (this file only chooses which topic to ask for). Not a postgres_changes table subscription — no table publication setup needed. */
   useEffect(() => {
-    if (!liveTrackingEnabled || !isFullyAuthenticated) return;
+    if (!liveTrackingEnabled || !isFullyAuthenticated || !positionsTopic) return;
 
     const channel = supabase
-      .channel("fleet-positions")
+      .channel(positionsTopic, { config: { private: true } })
       .on("broadcast", { event: "position" }, ({ payload }) => {
         const { vehicleId, lat, lng } = payload as PositionBroadcastPayload;
         setGpsPositions((prev) => {
@@ -103,7 +107,7 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [liveTrackingEnabled, isFullyAuthenticated]);
+  }, [liveTrackingEnabled, isFullyAuthenticated, positionsTopic]);
 
   return (
     <VehicleContext.Provider value={vehicles}>
