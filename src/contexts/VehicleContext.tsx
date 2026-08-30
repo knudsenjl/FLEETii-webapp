@@ -8,6 +8,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useAuth } from "./AuthContext";
 import { getVehicleDataSource } from "../lib/vehicleDataSource";
 import type { Vehicle2Hire, VehicleGPS2Hire } from "../lib/vehicleDataSource";
+import { supabase } from "../lib/supabase";
 
 export type { Vehicle2Hire, VehicleGPS2Hire } from "../lib/vehicleDataSource";
 
@@ -15,6 +16,10 @@ const VehicleGPSContext = createContext<VehicleGPS2Hire[] | undefined>(undefined
 const VehicleContext = createContext<Vehicle2Hire[] | undefined>(undefined);
 const VehicleRefreshContext = createContext<(() => Promise<void>) | undefined>(undefined);
 const VehiclesLoadingContext = createContext<boolean | undefined>(undefined);
+const VehicleLiveTrackingContext = createContext<((enabled: boolean) => void) | undefined>(undefined);
+
+/** Raw shape of a "position" broadcast message — see netlify/functions/2hire-webhook.mts's own httpSend() call, which is the only thing that ever sends one. */
+type PositionBroadcastPayload = { vehicleId: string; lat: number; lng: number };
 
 /**
  * Loads the vehicle fleet and GPS positions once a user is fully
@@ -32,6 +37,8 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
   // truly not in the fleet" (see use2hireVehicle's doc comment: the list
   // starts empty and is only populated once this resolves).
   const [loading, setLoading] = useState(true);
+  /** Whether the "position" broadcast listener below is currently active — see useSetLiveTracking. Off by default; a page opts in (e.g. FleetManagementPage.tsx's "Live" toggle) rather than this running for every session regardless of whether anyone's watching a map. */
+  const [liveTrackingEnabled, setLiveTrackingEnabled] = useState(false);
 
   /** Re-fetches both lists on demand (see useRefreshVehicles) — used after a direct DB write (e.g. HandleVehiclePage's save) so every page reading use2hireVehicle() picks up the change without needing a full browser reload. */
   const loadVehicles = useCallback(async () => {
@@ -69,11 +76,42 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
     };
   }, [isFullyAuthenticated]);
 
+  /** Listens for the "position" broadcast netlify/functions/2hire-webhook.mts sends the instant 2hire reports a vehicle's new position (see that function's own doc comment) — only while liveTrackingEnabled (see useSetLiveTracking), and only ever patches gpsPositions, one vehicle at a time. Replaces what FleetManagementPage.tsx used to do with a 10s setInterval poll of the ENTIRE fleet: this is push-based (no request at all when nothing moves) and scoped to exactly the vehicle that changed. Plain Realtime Broadcast, not a postgres_changes table subscription — no RLS/publication setup needed, since it isn't tied to any table. */
+  useEffect(() => {
+    if (!liveTrackingEnabled || !isFullyAuthenticated) return;
+
+    const channel = supabase
+      .channel("fleet-positions")
+      .on("broadcast", { event: "position" }, ({ payload }) => {
+        const { vehicleId, lat, lng } = payload as PositionBroadcastPayload;
+        setGpsPositions((prev) => {
+          const index = prev.findIndex((g) => g.vehicleId === vehicleId);
+          if (index !== -1 && prev[index].lat === lat && prev[index].lng === lng) return prev;
+          const patched = { vehicleId, lat, lng };
+          // A vehicle's very FIRST-ever position report has no existing
+          // entry to patch — append it rather than silently dropping the
+          // update, so it actually appears on the map instead of only
+          // showing up after the next full reload.
+          if (index === -1) return [...prev, patched];
+          const next = [...prev];
+          next[index] = patched;
+          return next;
+        });
+      })
+      .subscribe();
+
+    return () => {
+      void supabase.removeChannel(channel);
+    };
+  }, [liveTrackingEnabled, isFullyAuthenticated]);
+
   return (
     <VehicleContext.Provider value={vehicles}>
       <VehicleGPSContext.Provider value={gpsPositions}>
         <VehiclesLoadingContext.Provider value={loading}>
-          <VehicleRefreshContext.Provider value={loadVehicles}>{children}</VehicleRefreshContext.Provider>
+          <VehicleRefreshContext.Provider value={loadVehicles}>
+            <VehicleLiveTrackingContext.Provider value={setLiveTrackingEnabled}>{children}</VehicleLiveTrackingContext.Provider>
+          </VehicleRefreshContext.Provider>
         </VehiclesLoadingContext.Provider>
       </VehicleGPSContext.Provider>
     </VehicleContext.Provider>
@@ -98,6 +136,13 @@ export function use2hireGPS() {
 export function useRefreshVehicles() {
   const ctx = useContext(VehicleRefreshContext);
   if (ctx === undefined) throw new Error("useRefreshVehicles skal bruges inden i en VehicleProvider");
+  return ctx;
+}
+
+/** Turns the shared "position" broadcast listener on/off (see VehicleProvider's own effect) — a single app-wide flag rather than a per-page subscription, so multiple pages could share it later without opening a second channel. Call with false on unmount/navigate-away so the channel doesn't stay open after the page that turned it on (today, only FleetManagementPage.tsx) is left. Must be called under <VehicleProvider>. */
+export function useSetLiveTracking() {
+  const ctx = useContext(VehicleLiveTrackingContext);
+  if (ctx === undefined) throw new Error("useSetLiveTracking skal bruges inden i en VehicleProvider");
   return ctx;
 }
 

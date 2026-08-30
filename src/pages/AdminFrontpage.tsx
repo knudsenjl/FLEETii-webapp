@@ -197,6 +197,13 @@ export function AdminFrontpage() {
 
                   <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => navigate("/fleet-map")}
+                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                      >
+                        Flådestyring
+                      </button>
                       <div className="relative aspect-square w-28">
                         <button
                           type="button"
@@ -240,13 +247,6 @@ export function AdminFrontpage() {
                         )}
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => navigate("/fleet-map")}
-                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                      >
-                        Flådestyring
-                      </button>
                     </div>
                   </div>
                 </>

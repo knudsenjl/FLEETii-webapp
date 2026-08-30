@@ -10,6 +10,12 @@
 // (RLS-gated, authenticated users only) to serve VehicleGPS2Hire data. These
 // two writes are deliberately independent: an unrecognized signal still
 // gets a history row even though it has no live-state column to update yet.
+// A "position" signal additionally pushes a Realtime Broadcast message
+// (see the bottom of the handler below) straight to any browser currently
+// watching FleetManagementPage.tsx's "Live" toggle — see
+// VehicleContext.tsx's own "fleet-positions" broadcast listener — so the
+// map marker moves the instant 2hire reports it, instead of that page
+// having to poll for changes.
 //
 // Docs: https://developer.2hire.io/docs/receiving-signals
 import { getAdminClient } from "./_shared/adminClient.js";
@@ -131,6 +137,34 @@ export default async (req: Request) => {
     if (error) {
       console.error("[2hire-webhook] failed to persist signal:", error);
       return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    }
+  }
+
+  // Pushes the new position straight to any browser currently watching
+  // FleetManagementPage.tsx's "Live" toggle (see VehicleContext.tsx's own
+  // "fleet-positions" broadcast listener) — a plain Realtime Broadcast
+  // message, not tied to any table, so this needs no RLS/publication setup
+  // at all (unlike a postgres_changes subscription, which was considered
+  // and rejected as overbuilt for this). httpSend() posts over REST without
+  // holding a WebSocket open, which is what makes this safe to call from a
+  // single, short-lived function invocation. Scoped to "position" only —
+  // the map marker is the only thing this drives; online/trip_detected/etc.
+  // stay on the existing once-per-session fetch. Best-effort: a failure
+  // here is logged, never turned into a failed response to 2hire — the
+  // vehicle_signals write above already persisted the real state, so a
+  // missed broadcast just means the map isn't live-updated until the next
+  // page load/refresh, not a data loss.
+  if (signal === "position") {
+    try {
+      const channel = admin.channel("fleet-positions");
+      await channel.httpSend("position", {
+        vehicleId,
+        lat: Number(body.payload.data.latitude),
+        lng: Number(body.payload.data.longitude),
+      });
+      await admin.removeChannel(channel);
+    } catch (broadcastError) {
+      console.error("[2hire-webhook] failed to broadcast live position:", broadcastError);
     }
   }
 
