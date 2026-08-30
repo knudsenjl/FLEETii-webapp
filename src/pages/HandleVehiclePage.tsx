@@ -5,10 +5,12 @@ import { PageHeader } from "../components/PageHeader";
 import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS, formatKilometerstand, shortSignalTimestamp } from "../lib/bookings";
+import type { DepartmentOption } from "../lib/departments";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
 import {
   boardProfileId,
@@ -17,9 +19,6 @@ import {
   sortBoardProfiles,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
-
-/** A department the vehicle could be assigned to — scoped to the vehicle's OWN costumer, fetched fresh alongside the vehicle's other fields (see vehicleCostumerId / the departments-loading effect below), not the viewer's — a FLEETii admin has no costumer of their own and must still be able to reassign a vehicle belonging to any costumer. */
-type DepartmentOption = { department_id: string; name: string };
 
 /** The DisplayVehicle shape, as passed in via router state from VehicleDetailsPage's "Rediger køretøj" button. Only vehicleId is actually used here — the editable fields (plate/brand/model/year) are fetched fresh from vehicle_profiles on mount instead of trusted from router state, since VehicleDetailsPage's own Vehicle type only carries an already-combined "brand model" display string, not the separate fields this form edits/saves. */
 type Vehicle = {
@@ -76,7 +75,7 @@ export function HandleVehiclePage() {
   const refreshVehicles = useRefreshVehicles();
   const { profile, session } = useAuth();
   /** Gates the "QR-kode"/"2hire-profil" section below — 2hire-board device internals, not something a regular admin manages. */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   const state = location.state as { vehicle?: Vehicle } | null;
   const vehicle = state?.vehicle ?? null;
 

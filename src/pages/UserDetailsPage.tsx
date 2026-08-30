@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin, isDepartmentAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -10,6 +11,7 @@ import { RettighederSettings, type RettighederSettingsHandle } from "../componen
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
+import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 
 /** A row from the `user_profiles` table. When reached with one pre-filled via router state (clicking a row on DepartmentPage), the form edits it (see UserDetailsPage's own doc comment below for how). */
@@ -28,9 +30,6 @@ type ProfileRow = {
   /** Set once "Bloker brugers adgang" (delete-user.mts) has been used, cleared by "Genetabler brugers adgang" (unblock-user.mts) — see UserDetailsPage's own doc comment for why blocking is reversible rather than a true delete. */
   deleted_at: string | null;
 };
-
-/** A department the user's home department could be set to, or a department listed in the Afdelinger grants table below — scoped to the target costumer (see targetCostumerId below: the edited user's own costumer when editing, router state's costumerId when a FLEETii admin is creating a new user, or otherwise the viewing admin's own costumer). */
-type DepartmentOption = { department_id: string; name: string };
 
 /**
  * Admin "create/edit user" form. Validates every field is
@@ -69,7 +68,7 @@ type DepartmentOption = { department_id: string; name: string };
  * A FLEETii admin has no costumerId of their own, so creating a brand-new
  * user (never editing an existing one — see targetCostumerId) requires
  * costumerId/costumerName arriving via router state (DepartmentPage's own
- * "Opret ny bruger" button — "filtering by navigation" same as
+ * "Opret bruger" button — "filtering by navigation" same as
  * VehiclesPage.tsx/DepartmentPage.tsx): a read-only "Kunde" row shows which
  * one, and reaching the create form without it (e.g. a direct URL/refresh)
  * redirects to "/admin" instead. Nothing else on the page (the
@@ -95,7 +94,7 @@ export function UserDetailsPage() {
     | null;
   const stateUser = navState?.user ?? null;
   // The department-locked BRUGERE list this page was reached from (DepartmentPage's
-  // own row click or "Opret ny bruger" button) — carried along purely so every
+  // own row click or "Opret bruger" button) — carried along purely so every
   // "return to the list" navigate("/department", ...) call below lands back on
   // that SAME locked scope, not a bare "/department" with no scope at all (which
   // would just redirect to "/admin" now that DepartmentPage requires one — see its
@@ -227,8 +226,8 @@ export function UserDetailsPage() {
   const [grantsLoading, setGrantsLoading] = useState(true);
   const [grantsError, setGrantsError] = useState<string | null>(null);
 
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret ny bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), router state's costumerId when a FLEETii admin is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
   const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isFleetiiAdmin ? (navState?.costumerId ?? null) : costumerId;
   const targetCostumerName = user ? null : isFleetiiAdmin ? (navState?.costumerName ?? null) : null;
@@ -250,15 +249,7 @@ export function UserDetailsPage() {
       setDepartmentOptions([]);
       return;
     }
-    void supabase
-      .from("departments")
-      .select("department_id, name")
-      .eq("costumer_id", targetCostumerId)
-      .order("name", { ascending: true })
-      .returns<DepartmentOption[]>()
-      .then(({ data }) => {
-        setDepartmentOptions(data ?? []);
-      });
+    void fetchDepartmentOptions(targetCostumerId).then(setDepartmentOptions);
   }, [targetCostumerId]);
 
   // A costumer with only one department has no real choice to make — force
@@ -339,7 +330,7 @@ export function UserDetailsPage() {
   // that function's own guard — this is a UX pre-check only, not the
   // authorization boundary (the server re-checks it regardless).
   useEffect(() => {
-    if (!user || user.role !== "admin" || !user.department_id) {
+    if (!user || !isDepartmentAdmin(user.role) || !user.department_id) {
       setIsLastAdmin(false);
       return;
     }
@@ -702,7 +693,7 @@ export function UserDetailsPage() {
               <h2 className="text-xl font-semibold text-brand-800">
                 {user
                   ? `Opdater bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
-                  : "Opret ny bruger"}
+                  : "Opret bruger"}
               </h2>
 
               <div className="rounded-2xl border border-brand-100">
@@ -765,7 +756,7 @@ export function UserDetailsPage() {
                       departments are checked "Tilladt" here). */}
                   <div className="rounded-2xl border border-brand-100 bg-brand-50/40">
                     <div className="rounded-2xl">
-                      {(profile?.role === "admin" || profile?.role === "FLEETii admin") &&
+                      {isAnyAdmin(profile?.role) &&
                         departmentOptions.length !== 1 && (
                           <div className="grid grid-cols-2 items-start gap-2 p-0.5">
                             <div className="relative flex items-center justify-between gap-2">
@@ -933,7 +924,7 @@ export function UserDetailsPage() {
                 />
               )}
 
-              {!user && (profile?.role === "admin" || profile?.role === "FLEETii admin") && (
+              {!user && isAnyAdmin(profile?.role) && (
                 // "Ny bruger": gated on the LOGGED-IN admin's own role
                 // (profile?.role), not the new user's selected role — this
                 // is a department_settings-scoped view (rights for everyone

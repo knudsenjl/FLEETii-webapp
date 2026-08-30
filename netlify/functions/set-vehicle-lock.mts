@@ -29,9 +29,9 @@
 // the caller is a FLEETii admin, same as every other function this plan
 // touches. That lookup needs the service-role client, so it's built before
 // the sendGenericCommand call now instead of after it.
-import { createClient } from "@supabase/supabase-js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
-import { requireUser } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isFleetiiAdminRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -54,14 +54,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: SetVehicleLockBody;
   try {
@@ -83,9 +80,6 @@ export default async (req: Request) => {
   const locked = body.locked;
   const command = body.command ?? (locked ? "stop" : "start");
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   // Real 2hire command first — the vehicle_signals write below only happens
   // if this actually succeeds, so "locked" always reflects a confirmed real
@@ -109,7 +103,7 @@ export default async (req: Request) => {
     if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, {
       isFleetiiAdmin,
       costumerId: vehicle?.costumer_id ?? null,

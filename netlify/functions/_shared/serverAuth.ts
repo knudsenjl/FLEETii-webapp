@@ -77,3 +77,25 @@ export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
 export async function requireFleetiiAdmin(req: Request): Promise<AdminCheckResult> {
   return requireRole(req, ["FLEETii admin"], "Kun FLEETii-administratorer har adgang til denne handling.");
 }
+
+/**
+ * Shared `user_profiles.role` checks for a role value already fetched from
+ * the DB (a `caller`/`target`'s own row) — distinct from requireAdmin/
+ * requireFleetiiAdmin above, which authenticate the CALLER via their bearer
+ * token; these just answer "is this specific role value X?" for whichever
+ * profile a function has already looked up (e.g. deciding costumer/
+ * department scoping once the caller is known to be *some* kind of admin).
+ * Every Netlify Function used to re-implement the same raw string
+ * comparison at its own call site (delete-user.mts/update-user.mts/
+ * create-user.mts/bulk-import-*.mts and the 2hire-*.mts functions) —
+ * centralizing here, same as src/lib/roles.ts on the client side, avoids the
+ * literal drifting out of sync in one call site.
+ */
+export function isFleetiiAdminRole(role?: string | null): boolean {
+  return role === "FLEETii admin";
+}
+
+/** True if `role` is either admin tier ("admin" or "FLEETii admin") — see isFleetiiAdminRole. */
+export function isAnyAdminRole(role?: string | null): boolean {
+  return role === "admin" || role === "FLEETii admin";
+}

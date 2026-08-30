@@ -27,8 +27,8 @@
 // department's last remaining non-archived admin — doing so would leave no
 // one able to manage that department's users at all, since only an admin
 // can create another admin.
-import { createClient } from "@supabase/supabase-js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isAnyAdminRole, isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type DeleteUserBody = { userId?: string };
 
@@ -42,14 +42,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: DeleteUserBody;
   try {
@@ -63,9 +60,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "userId er påkrævet." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const [{ data: caller }, { data: target }] = await Promise.all([
     admin
@@ -99,27 +93,36 @@ export default async (req: Request) => {
   // way to recover from on its own (only an admin can create another
   // admin). Excludes already-archived admins from the count — a banned,
   // archived admin doesn't actually cover the department anymore.
-  if (target.role === "admin") {
+  //
+  // Same protection for "FLEETii admin", platform-wide rather than
+  // per-department (see the same exception above): unlike "admin", it
+  // can't be recreated through create-user.mts/bulk-import-users.mts at all
+  // (see ALLOWED_ROLES in _shared/userAccount.ts) — losing the last one
+  // would lock the whole platform out of every FLEETii-admin-only function
+  // (e.g. delete-costumer.mts) with no recovery path whatsoever.
+  if (isAnyAdminRole(target.role)) {
     let adminCountQuery = admin
       .from("user_profiles")
       .select("user_id", { count: "exact", head: true })
-      .eq("role", "admin")
+      .eq("role", target.role)
       .is("deleted_at", null)
       .neq("user_id", targetUserId);
-    adminCountQuery =
-      target.department_id === null
-        ? adminCountQuery.is("department_id", null)
-        : adminCountQuery.eq("department_id", target.department_id);
+    if (!isFleetiiAdminRole(target.role)) {
+      adminCountQuery =
+        target.department_id === null
+          ? adminCountQuery.is("department_id", null)
+          : adminCountQuery.eq("department_id", target.department_id);
+    }
     const { count: otherAdminCount, error: countError } = await adminCountQuery;
 
     if (countError) {
       return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
     }
     if (!otherAdminCount) {
-      return new Response(
-        JSON.stringify({ error: "Kan ikke slette den sidste administrator i afdelingen." }),
-        { status: 409 },
-      );
+      const message = isFleetiiAdminRole(target.role)
+        ? "Kan ikke slette den sidste FLEETii-administrator."
+        : "Kan ikke slette den sidste administrator i afdelingen.";
+      return new Response(JSON.stringify({ error: message }), { status: 409 });
     }
   }
 

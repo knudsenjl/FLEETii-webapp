@@ -6,6 +6,7 @@ import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { CarGlyph } from "../components/CarGlyph";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import {
@@ -62,41 +63,8 @@ export function BookingsPage() {
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in the new first column below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/FleetManagementPage.tsx. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
-  /** The genuine Køretøj-ID/Reg.nr pair per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback. Same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. */
-  const [identByVehicleId, setIdentByVehicleId] = useState<
-    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
-  >({});
-
-  useEffect(() => {
-    const vehicleIds = Array.from(new Set(departmentBookings.map((b) => b.vehicle)));
-    if (vehicleIds.length === 0) {
-      setIdentByVehicleId({});
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate")
-      .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setIdentByVehicleId(
-          Object.fromEntries(
-            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
-          ),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // departmentBookings itself is intentionally omitted (fresh array every
-    // render) — its content-based vehicleId set (joined below) is what
-    // actually determines whether a re-fetch is needed.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [departmentBookings.map((b) => b.vehicle).join("|")]);
+  /** The genuine Køretøj-ID/Reg.nr pair per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback. */
+  const identByVehicleId = useVehicleIdentLookup(departmentBookings.map((b) => b.vehicle));
 
   /** Whether the viewer is allowed to create a new reservation, per Tillad_ny_reservation (admins always can, but they use AllBookingsPage instead — see this page's own doc comment). */
   const [userMayCreateBooking, setUserMayCreateBooking] = useState(false);

@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import {
-  BOOKING_ID_COLUMN,
   BOOKINGS_SELECT_COLUMNS,
   DEPARTMENT_COLUMN,
   USER_ID_COLUMN,
@@ -12,14 +11,10 @@ import {
   formatVehicleIdentLabel,
   formatVehicleLabel,
   isMapVisible,
-  isoPrefix,
   mapBookingRow,
   nowIsoString,
   resolveVehicleGpsPosition,
-  toDisplayVehicle,
-  userAnsatId,
   type BookingRow,
-  type EditingBooking,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { CarGlyph } from "../components/CarGlyph";
@@ -29,30 +24,18 @@ import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
-import { useVehicleLockState } from "../hooks/useVehicleLockState";
+import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingLifecycle";
 import { useIdentSettings } from "../hooks/useIdentSettings";
-import { useTimedFlag } from "../hooks/useTimedFlag";
-import { useLocateVehicle } from "../hooks/useLocateVehicle";
+import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
 import { supabase } from "../lib/supabase";
-import { isSettingTilladt } from "../lib/settings";
 import { useReverseGeocode } from "../lib/geocode";
 
-/** A booking as fetched fresh on mount below (see mapBookingRow) — same shape BookingDetailsPage.tsx's own fetch-by-id fallback produces. */
-type BookingDetails = {
-  id: string;
-  vehicle: string;
+/** A booking as fetched fresh on mount below (see mapBookingRow) — same shape BookingDetailsPage.tsx's own fetch-by-id fallback produces, and a superset of useBookingLifecycle's own LifecycleBooking (the extra startDate/start/endDate/end fields are display strings this page's own formatBookingPeriod call below needs). */
+type BookingDetails = LifecycleBooking & {
   startDate: string;
   start: string;
   endDate: string | null;
   end: string | null;
-  startIso: string;
-  endIso: string | null;
-  use: string;
-  userId: string | null;
-  userEmail: string | null;
-  userIdent: string | null;
-  /** References departments.department_id — NOT a department name. Threaded into EditingBooking (goToEditBooking below) so ReservationPage's "Kunde/afdeling" picker can pre-fill to this booking's own current department for a FLEETii admin, instead of starting unset. */
-  departmentId: string | null;
 };
 
 /** Fallback map center used when the booked vehicle has no GPS fix. */
@@ -76,7 +59,9 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * Afslut/Rediger/Slet as plain ghost links rather than full buttons — this
  * page's information hierarchy deliberately differs from
  * BookingDetailsPage.tsx (admin/FLEETii admin's equivalent view of a single
- * booking, still the original table layout), not an oversight to reconcile.
+ * booking, still the original table layout), not an oversight to reconcile
+ * — the two DO share their underlying actions/handlers, via
+ * useBookingLifecycle.
  * Renamed from BookingNextPage (route "/booking-next") when this redesign
  * started: only "user" role lands here or on "/bookings" — admin/FLEETii
  * admin have their own separate pages (AdminFrontpage, AllBookingsPage,
@@ -92,54 +77,54 @@ export function BookingPage() {
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [bookingLoading, setBookingLoading] = useState(true);
 
-  const [isCancelling, setIsCancelling] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [isFinishing, setIsFinishing] = useState(false);
-  const [showFinishConfirm, setShowFinishConfirm] = useState(false);
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
-  const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
   /** Time-gated to the 15-minutes-before-start through 15-minutes-after-end window (see isMapVisible) — this page is role "user" only (requireRole in App.tsx), so there's no admin-always-visible override to make here, unlike BookingDetailsPage.tsx's own use of the same map. */
   const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. */
   const { address, addressLoading } = useReverseGeocode(position, mapVisible);
+  /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
+  const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-map:${booking?.vehicle ?? ""}`);
 
-  /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel and blocked-state) for this booking's vehicle — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the "Køretøj:" row below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge on that row. */
-  const [vehicleIdentInfo, setVehicleIdentInfo] = useState<{
-    vehicleIdent: string | null;
-    numberPlate: string | null;
-    drivmiddel: string | null;
-    blocked: boolean;
-  } | null>(null);
-  useEffect(() => {
-    if (!booking) return;
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_profiles")
-      .select("vehicle_ident, number_plate, drivmiddel, blocked_at")
-      .eq("vehicle_id", booking.vehicle)
-      .maybeSingle<{ vehicle_ident: string | null; number_plate: string | null; drivmiddel: string | null; blocked_at: string | null }>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setVehicleIdentInfo(
-          data
-            ? {
-                vehicleIdent: data.vehicle_ident,
-                numberPlate: data.number_plate,
-                drivmiddel: data.drivmiddel,
-                blocked: data.blocked_at !== null,
-              }
-            : null,
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [booking?.vehicle]);
+  const {
+    twoHireVehicle,
+    vehicleIdentInfo,
+    userMayDeleteBooking,
+    userMayEditBooking,
+    isCancelling,
+    showCancelConfirm,
+    setShowCancelConfirm,
+    isFinishing,
+    showFinishConfirm,
+    setShowFinishConfirm,
+    error,
+    vehicleLocked,
+    lockEnabled,
+    unlockEnabled,
+    lockStateLoading,
+    setLock,
+    lockError,
+    lockConfirmationKey,
+    triggerLockConfirmation,
+    isLocating,
+    locateError,
+    canFinishBooking,
+    goToVehicleDetails,
+    goToEditBooking,
+    handleCancelBooking,
+    handleFinishBooking,
+    handleLocate,
+    handleHonk,
+  } = useBookingLifecycle(booking, {
+    // This page is role "user" only (requireRole in App.tsx), so there's no
+    // admin override to make on the Lås/Lås op buttons here, unlike
+    // BookingDetailsPage.tsx's own isAdmin-gated use of the same hook.
+    isAdminLock: false,
+    useUserIdent,
+    userId: profile?.user_id,
+    afdelingId,
+  });
 
   /** Hero card's vehicle title — "{brand} {model}", falling back to formatVehicleLabel's own plate-or-ident text while twoHireVehicle hasn't loaded yet, so it doesn't flash blank. */
   const vehicleTitle =
@@ -152,36 +137,6 @@ export function BookingPage() {
         ? ` · ${vehicleIdentInfo.drivmiddel}${twoHireVehicle?.autonomyPercentage ? ` ${twoHireVehicle.autonomyPercentage}` : ""}`
         : ""
     }`;
-
-  /** "Slet reservation" only when Tillad_slet_reservation is true for this department — this page is role "user" only (requireRole in App.tsx), so there's no admin-always-shown override to make here. */
-  const [userMayDeleteBooking, setUserMayDeleteBooking] = useState(false);
-
-  /** "Rediger reservation" only when Tillad_rediger_reservation is true for this department. */
-  const [userMayEditBooking, setUserMayEditBooking] = useState(false);
-
-  const {
-    locked: vehicleLocked,
-    lockEnabled,
-    unlockEnabled,
-    loading: lockStateLoading,
-    setLock,
-    error: lockError,
-  } = useVehicleLockState(
-    booking?.vehicle ?? "",
-    booking ? { bookingId: booking.id, startIso: booking.startIso, endIso: booking.endIso } : null,
-    false,
-  );
-  /** "Køretøjet er nu låst/låst op"/"Lygterne blinker" confirmation shown for 3s right after a successful setLock/locate — see the Lås/Lås op and "Blink" buttons below. */
-  const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
-  const { isLocating, locateError, locate } = useLocateVehicle();
-
-  useEffect(() => {
-    void isSettingTilladt("Tillad_slet_reservation", profile?.user_id, afdelingId).then(setUserMayDeleteBooking);
-  }, [profile?.user_id, afdelingId]);
-
-  useEffect(() => {
-    void isSettingTilladt("Tillad_rediger_reservation", profile?.user_id, afdelingId).then(setUserMayEditBooking);
-  }, [profile?.user_id, afdelingId]);
 
   /** Finds the viewer's own currently-active booking, or failing that their soonest upcoming one — see this page's own doc comment for why (no bookingId to link from, unlike BookingDetailsPage.tsx). Same query BookingsPage.tsx's "Næste reservation" row uses (end >= now OR end is null, ordered by start ascending), just limited to the single first result and scoped to this viewer only (no admin cross-department branch — this page is reached only as role "user"'s landing page). */
   useEffect(() => {
@@ -240,90 +195,6 @@ export function BookingPage() {
     ) : null;
   }
 
-  /** Every role can navigate to VehicleDetailsPage — both from the "Køretøj:" row link below and the map marker — matching VehicleDetailsPage's own doc comment, which already accounts for a regular user landing there via their own booking (its map/edit/delete actions stay separately admin-gated within that page itself). */
-  const goToVehicleDetails = () => {
-    if (!twoHireVehicle) return;
-    navigate(`/vehicle-details/${twoHireVehicle.vehicleId}`, {
-      state: {
-        vehicle: toDisplayVehicle(twoHireVehicle),
-        booking: { id: booking.id, startIso: booking.startIso, endIso: booking.endIso },
-      },
-    });
-  };
-
-  /** Starts the "Rediger reservation" flow: back through ReservationPage -> (optionally) AvailablePage -> ConfirmPage, pre-filled with this booking's current bruger/anvendelse/start/end/vehicle, updating this row (by booking_id) instead of inserting a new one. vehicleId is carried through to AvailablePage so this booking's current vehicle bypasses the department filter there (see AvailablePage's availableVehicles) even outside the editing admin's own department. */
-  const goToEditBooking = () => {
-    const editing: EditingBooking = {
-      bookingId: booking.id,
-      userId: booking.userId,
-      userLabel: useUserIdent ? userAnsatId(booking) : booking.userEmail,
-      anvendelse: booking.use,
-      startIso: booking.startIso,
-      endIso: booking.endIso,
-      vehicleId: booking.vehicle,
-      departmentId: booking.departmentId,
-    };
-    navigate("/reservation", { state: { editing } });
-  };
-
-  /** Deletes this booking and returns to the bookings list. */
-  const handleCancelBooking = async () => {
-    setIsCancelling(true);
-    setError(null);
-
-    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
-
-    if (deleteError) {
-      setError(deleteError.message);
-      setIsCancelling(false);
-      setShowCancelConfirm(false);
-      return;
-    }
-
-    navigate("/bookings", { replace: true });
-  };
-
-  /** "Afslut reservation" is enabled only within the booking's own period — from its start until its end (or always, for an open-ended booking), same wall-clock comparison as computeLockButtonState. */
-  const nowPrefix = isoPrefix(nowIsoString());
-  const bookingStarted = nowPrefix >= isoPrefix(booking.startIso);
-  const bookingExpired = booking.endIso !== null && nowPrefix >= isoPrefix(booking.endIso);
-  const canFinishBooking = bookingStarted && !bookingExpired;
-
-  /** "Blink": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split). */
-  const handleLocate = async () => {
-    const success = await locate(booking.vehicle);
-    if (success) triggerLockConfirmation("located");
-  };
-
-  /** "Horn": intentionally a stub — 2hire's generic-command API doesn't have a confirmed horn/honk command yet (see 2hire-vehicle-command.mts), so this just surfaces "Endnu ikke implementeret" until the right command is found. Reuses the same lockConfirmationKey as Lås/Lås op/Blink rather than a second useTimedFlag instance, since only one of these popups is ever relevant at a time. */
-  const handleHonk = () => {
-    triggerLockConfirmation("horn");
-  };
-
-  /** Ends this booking early: locks the vehicle, then sets its "end" to now — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. If locking fails, the booking is left untouched (see useVehicleLockState's own error, shown below the Lås/Lås op buttons) rather than shortening a booking whose vehicle didn't actually get secured. */
-  const handleFinishBooking = async () => {
-    setIsFinishing(true);
-    setError(null);
-
-    const lockSuccess = await setLock(true);
-    if (!lockSuccess) {
-      setIsFinishing(false);
-      setShowFinishConfirm(false);
-      return;
-    }
-
-    const { error: updateError } = await supabase.from("bookings").update({ end: nowIsoString() }).eq(BOOKING_ID_COLUMN, booking.id);
-
-    if (updateError) {
-      setError(updateError.message);
-      setIsFinishing(false);
-      setShowFinishConfirm(false);
-      return;
-    }
-
-    navigate("/bookings", { replace: true });
-  };
-
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 text-brand-900">
       <div
@@ -358,7 +229,10 @@ export function BookingPage() {
                     </span>
                   )}
                 </div>
-                <CarGlyph className="h-7 w-11 shrink-0 text-brand-600" />
+                {/* Green when 2hire's "trip_detected" signal is currently true for this vehicle (see liveVehicleDataSource.ts's tripDetected mapping) — brand-colored otherwise, same as before this signal existed. */}
+                <CarGlyph
+                  className={`h-7 w-11 shrink-0 ${twoHireVehicle?.tripDetected === "TRUE" ? "text-green-600" : "text-brand-600"}`}
+                />
               </button>
               {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Alle" ("all") is the way to see everything else. */}
               <button
@@ -439,9 +313,12 @@ export function BookingPage() {
             <div className="flex flex-col gap-1.5">
               <div className="relative isolate h-52 overflow-hidden rounded-2xl border border-brand-100">
                 <LeafletMap
-                  lat={position?.lat ?? DENMARK_CENTER.lat}
-                  lng={position?.lng ?? DENMARK_CENTER.lng}
-                  zoom={position ? 17 : 7}
+                  lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
+                  lng={savedMapView?.lng ?? position?.lng ?? DENMARK_CENTER.lng}
+                  zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
+                  markerLat={position?.lat ?? DENMARK_CENTER.lat}
+                  markerLng={position?.lng ?? DENMARK_CENTER.lng}
+                  onViewChange={handleMapViewChange}
                   showMarker={Boolean(position)}
                   markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
                   onMarkerClick={goToVehicleDetails}

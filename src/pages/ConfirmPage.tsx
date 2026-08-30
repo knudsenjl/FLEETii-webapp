@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { supabase } from "../lib/supabase";
 import {
@@ -175,7 +176,7 @@ export function ConfirmPage() {
       return;
     }
 
-    navigate(profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/allbookings" : "/bookings", { replace: true });
+    navigate(isAnyAdmin(profile?.role) ? "/allbookings" : "/bookings", { replace: true });
   };
 
   /** [label, value] — Start/Slut show "dd/mm" (dropping the year). Kunde/afdeling comes first — a final, read-only "security check" confirming which department this booking is actually about to be written to, before "Bekræft" is pressed. Køretøj comes right after it. */

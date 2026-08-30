@@ -24,7 +24,7 @@
 // then are the auth accounts deleted (best-effort per user; a failure here
 // just leaves harmless orphaned auth.users rows with no matching profile,
 // recoverable from costumer_purge_log if it ever matters).
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 
 type DeleteCostumerBody = { costumerId?: string; confirmName?: string };
@@ -39,14 +39,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: DeleteCostumerBody;
   try {
@@ -60,9 +57,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "costumerId er påkrævet." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data: costumer, error: costumerError } = await admin
     .from("costumers")

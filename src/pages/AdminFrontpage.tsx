@@ -9,6 +9,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
+import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `costumers` table, for the embedded list below — same fields CostumerAdministrationPage.tsx's own full-page version fetches, so the object handed to CostumerDetailsPage via router state already has everything it displays. */
@@ -68,7 +69,7 @@ export function AdminFrontpage() {
   const [usersCount, setUsersCount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (profile?.role !== "admin" || !costumerId) return;
+    if (!isDepartmentAdmin(profile?.role) || !costumerId) return;
 
     let cancelled = false;
     void supabase
@@ -99,7 +100,7 @@ export function AdminFrontpage() {
   }, [profile?.role, costumerId]);
 
   useEffect(() => {
-    if (profile?.role !== "FLEETii admin") return;
+    if (!isFleetiiAdmin(profile?.role)) return;
 
     let cancelled = false;
     void supabase
@@ -179,16 +180,18 @@ export function AdminFrontpage() {
                 >
                   Reservationer
                 </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/fleet-map")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
-                  Flådestyring
-                </button>
+                {!isDepartmentAdmin(profile?.role) && (
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleet-map")}
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Flådestyring
+                  </button>
+                )}
               </div>
 
-              {profile?.role === "admin" && (
+              {isDepartmentAdmin(profile?.role) && (
                 <>
                   <hr className="border-brand-200" />
 
@@ -237,12 +240,19 @@ export function AdminFrontpage() {
                         )}
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                       </div>
+                      <button
+                        type="button"
+                        onClick={() => navigate("/fleet-map")}
+                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                      >
+                        Flådestyring
+                      </button>
                     </div>
                   </div>
                 </>
               )}
 
-              {profile?.role === "FLEETii admin" && (
+              {isFleetiiAdmin(profile?.role) && (
                 <>
                   <hr className="border-brand-200" />
 
@@ -259,6 +269,8 @@ export function AdminFrontpage() {
                         </span>
                       )}
                     </button>
+
+                    <hr className="border-brand-200" />
 
                     <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
                       <table className="w-full border-collapse text-[0.7rem]">

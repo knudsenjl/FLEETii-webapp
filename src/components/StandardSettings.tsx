@@ -17,6 +17,10 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { InlinePopup } from "./InlinePopup";
 import { supabase } from "../lib/supabase";
+import { invalidateIdentSettingsCache } from "../hooks/useIdentSettings";
+
+/** Setting names useIdentSettings() caches per department — a successful write to either, on the department_settings table, must invalidate that cache (see handleToggle below) or every already-mounted page keeps showing the pre-toggle Bruger-ID/Køretøj-ID display until a full reload. */
+const IDENT_SETTING_NAMES: readonly string[] = ["use_user_ident", "use_vehicle_ident"];
 
 interface StandardSettingsProps {
   table: "department_settings" | "user_settings";
@@ -244,6 +248,8 @@ export function StandardSettings({ table, scopeColumn, scopeId, settings = STAND
     if (error) {
       setValues((prev) => ({ ...prev, [name]: checked ? "false" : "true" }));
       setErrorByName((prev) => ({ ...prev, [name]: error.message }));
+    } else if (table === "department_settings" && IDENT_SETTING_NAMES.includes(name)) {
+      invalidateIdentSettingsCache(scopeId);
     }
     setSavingName(null);
   };

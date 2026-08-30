@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { supabase } from "../lib/supabase";
 import {
   BOOKING_ID_COLUMN,
@@ -86,7 +88,7 @@ export function AvailablePage() {
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
   /** For a FLEETii admin, state.departmentId (ReservationPage's own "Kunde/afdeling" pick) is authoritative — they have no afdelingId of their own. Every other role keeps using afdelingId directly, unchanged. */
-  const targetDepartmentId = profile?.role === "FLEETii admin" ? (state?.departmentId ?? null) : afdelingId;
+  const targetDepartmentId = isFleetiiAdmin(profile?.role) ? (state?.departmentId ?? null) : afdelingId;
 
   const [bookings, setBookings] = useState<BookingWindow[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);
@@ -144,41 +146,8 @@ export function AvailablePage() {
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in the new first column below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/BookingsPage.tsx. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
-  /** The genuine Køretøj-ID/Reg.nr pair per listed vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback. Same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. */
-  const [identByVehicleId, setIdentByVehicleId] = useState<
-    Record<string, { vehicleIdent: string | null; numberPlate: string | null }>
-  >({});
-
-  useEffect(() => {
-    const vehicleIds = availableVehicles.map((v) => v.id);
-    if (vehicleIds.length === 0) {
-      setIdentByVehicleId({});
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate")
-      .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setIdentByVehicleId(
-          Object.fromEntries(
-            (data ?? []).map((row) => [row.vehicle_id, { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate }]),
-          ),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // availableVehicles itself is intentionally omitted (fresh array every
-    // render) — its content-based vehicleId set (joined below) is what
-    // actually determines whether a re-fetch is needed.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [availableVehicles.map((v) => v.id).join("|")]);
+  /** The genuine Køretøj-ID/Reg.nr pair per listed vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback. */
+  const identByVehicleId = useVehicleIdentLookup(availableVehicles.map((v) => v.id));
 
   /** Pre-selects the vehicle the booking being edited already had (see ReservationPage's "editing.vehicleId") — that vehicle bypasses the department filter above, and its own booking row is excluded from the conflict check, so it's guaranteed to show up as available here for its original period. state?.selectedVehicleId (present only after a browser back-navigation from ConfirmPage — see the "Reserver"/"Opdater" button below) wins over that, so a real pick the admin already made isn't silently replaced by the editing-default. Still just a plain initial value otherwise: the user can pick a different vehicle same as any other row. */
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(

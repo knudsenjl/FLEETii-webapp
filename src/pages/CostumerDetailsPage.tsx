@@ -461,7 +461,7 @@ export function CostumerDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">
-              {isEditing ? "Rediger kundedata" : "Kundedata"} - {costumer.name ?? "—"}
+              {isEditing ? `Rediger ${costumer.name ?? "—"}` : (costumer.name ?? "—")}
             </h2>
 
             {isEditing ? (
@@ -670,6 +670,10 @@ export function CostumerDetailsPage() {
                 <hr className="border-brand-200" />
 
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                  {/* Same grid-header treatment as DepartmentDetailsPage's own "Valgt afdeling" row — a status label, not an action, hence the darker background (bg-brand-100 vs the buttons' bg-brand-50) and no hover/click affordance. */}
+                  <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
+                    {costumer.name ?? "—"}
+                  </div>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
@@ -717,6 +721,19 @@ export function CostumerDetailsPage() {
                     )}
                     <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                   </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/fleet-map", {
+                        state: {
+                          filters: { costumerId: costumer.costumer_id, department: "", plate: "", status: "" },
+                        },
+                      })
+                    }
+                    className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Flådestyring
+                  </button>
                 </div>
               </>
             )}

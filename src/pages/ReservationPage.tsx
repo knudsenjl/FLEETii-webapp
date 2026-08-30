@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
@@ -143,9 +144,9 @@ export function ReservationPage() {
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
   /** Present only when this page was reached via a browser back-navigation from AvailablePage — see ReservationFormSnapshot's own doc comment. Wins over every other default below, but never over editing's OWN fields where a snapshot field is itself blank (e.g. anvendelseCustom empty) — see each initializer. */
   const formSnapshot = (location.state as { formSnapshot?: ReservationFormSnapshot } | null)?.formSnapshot ?? null;
-  const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
+  const isAdmin = isAnyAdmin(profile?.role);
   /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   /** Pre-fills to the booking being edited's own current department (see EditingBooking's departmentId) — otherwise unset, requiring an explicit pick, same as bruger's own editing?.userId prefill just below. */
   const [selectedDepartmentId, setSelectedDepartmentId] = useState(
     formSnapshot?.selectedDepartmentId ?? editing?.departmentId ?? "",

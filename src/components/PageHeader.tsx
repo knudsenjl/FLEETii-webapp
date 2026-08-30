@@ -6,6 +6,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
@@ -33,13 +34,13 @@ function DepartmentCheckmark() {
  * hence a small menu instead of a single destination.
  */
 function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
-  if (role === "FLEETii admin") {
+  if (isFleetiiAdmin(role)) {
     return [
       { label: "Brugerindstillinger", path: "/settings-user" },
       { label: "FLEETii-indstillinger", path: "/settings-superadmin" },
     ];
   }
-  if (role === "admin") {
+  if (isDepartmentAdmin(role)) {
     return [
       { label: "Brugerindstillinger", path: "/settings-user" },
       { label: "Afdelingsindstillinger", path: "/settings-department" },
@@ -82,7 +83,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
   /** Whether the "Alle" pseudo-entry (below) should be offered — only for a FLEETii admin (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. */
-  const canSwitchToAll = profile?.role === "FLEETii admin";
+  const canSwitchToAll = isFleetiiAdmin(profile?.role);
 
   /** departmentId null means "Alle" (see canSwitchToAll/AuthContext's switchDepartment) — the FLEETii admin's own default, unscoped state. */
   const handleSwitch = async (departmentId: string | null) => {
@@ -304,7 +305,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
             Afdeling: {costumerName ? `${costumerName}/` : ""}
             {/* afdeling is only ever null for a FLEETii admin sitting on "Alle" (see PageHeader's own "Skift afdeling" pseudo-entry) — every other role always has a real department, so "—" (missing data) never actually applies to them. */}
-            {afdeling ?? (profile?.role === "FLEETii admin" ? "Alle" : "—")}
+            {afdeling ?? (isFleetiiAdmin(profile?.role) ? "Alle" : "—")}
           </p>
         </div>
       )}

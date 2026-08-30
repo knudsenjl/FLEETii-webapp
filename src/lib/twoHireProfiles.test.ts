@@ -1,5 +1,13 @@
 import { describe, expect, it } from "vitest";
-import { boardProfileId, boardProfileLabel, narrowProfilesForVehicle, profileMatchesVehicle, sortBoardProfiles } from "./twoHireProfiles";
+import {
+  boardProfileId,
+  boardProfileLabel,
+  narrowProfilesForVehicle,
+  profileMakerMatches,
+  profileModelMatches,
+  profileYearMatches,
+  sortBoardProfiles,
+} from "./twoHireProfiles";
 
 describe("boardProfileId", () => {
   it("reads the confirmed real 'id' field", () => {
@@ -100,84 +108,109 @@ describe("sortBoardProfiles", () => {
   });
 });
 
-describe("profileMatchesVehicle", () => {
-  it("matches when maker/model/year all align", () => {
-    const profile = { makerName: "Volkswagen", modelName: "Golf", modelYearRange: [2018, 2022] };
-    expect(profileMatchesVehicle(profile, { brand: "Volkswagen", model: "Golf", model_year: "2020" })).toBe(true);
+describe("profileMakerMatches", () => {
+  it("matches when the maker aligns", () => {
+    const profile = { makerName: "Volkswagen" };
+    expect(profileMakerMatches(profile, "Volkswagen")).toBe(true);
   });
 
   it("matches leniently regardless of case/separator style", () => {
     const profile = { makerName: "Mercedes-Benz" };
-    expect(profileMatchesVehicle(profile, { brand: "MERCEDES_BENZ", model: "", model_year: "" })).toBe(true);
+    expect(profileMakerMatches(profile, "MERCEDES_BENZ")).toBe(true);
   });
 
-  it("does not exclude on missing profile fields (passes rather than excludes)", () => {
+  it("does not exclude on a missing profile makerName (passes rather than excludes)", () => {
     const profile = { title: "Testprofil" };
-    expect(profileMatchesVehicle(profile, { brand: "Volkswagen", model: "Golf", model_year: "2020" })).toBe(true);
+    expect(profileMakerMatches(profile, "Volkswagen")).toBe(true);
   });
 
   it("rejects a genuine maker mismatch", () => {
     const profile = { makerName: "Volkswagen" };
-    expect(profileMatchesVehicle(profile, { brand: "Toyota", model: "", model_year: "" })).toBe(false);
-  });
-
-  it("rejects when the vehicle's year falls outside the profile's modelYearRange", () => {
-    const profile = { modelYearRange: [2018, 2020] };
-    expect(profileMatchesVehicle(profile, { brand: "", model: "", model_year: "2023" })).toBe(false);
-  });
-
-  it("matches on year-range overlap when the vehicle's own year is itself a range", () => {
-    const profile = { modelYearRange: [2018, 2020] };
-    expect(profileMatchesVehicle(profile, { brand: "", model: "", model_year: "2014-2025" })).toBe(true);
+    expect(profileMakerMatches(profile, "Toyota")).toBe(false);
   });
 
   // Real production examples (2hire's own board-profiles catalog dump,
-  // 2026-08-27 — 453 profiles, 40 makers) — underscores as word separators,
-  // and "(...)" annotations describing the physical device/size variant
-  // rather than the vehicle's actual model.
+  // 2026-08-27 — 453 profiles, 40 makers) — underscores as word separators.
+  it("treats '_' as a word separator, so MERCEDES_BENZ matches Mercedes-Benz", () => {
+    const profile = { makerName: "MERCEDES_BENZ" };
+    expect(profileMakerMatches(profile, "Mercedes-Benz")).toBe(true);
+  });
+});
+
+describe("profileModelMatches", () => {
+  it("matches when the model aligns", () => {
+    const profile = { modelName: "Golf" };
+    expect(profileModelMatches(profile, "Golf")).toBe(true);
+  });
+
+  it("does not exclude on a missing profile modelName (passes rather than excludes)", () => {
+    const profile = { title: "Testprofil" };
+    expect(profileModelMatches(profile, "Golf")).toBe(true);
+  });
+
+  // Real production examples (2hire's own board-profiles catalog dump,
+  // 2026-08-27 — 453 profiles, 40 makers) — "(...)" annotations describing
+  // the physical device/size variant rather than the vehicle's actual model.
   it("ignores a trailing '(Breakout)' annotation on modelName", () => {
-    const profile = { makerName: "NISSAN", modelName: "GLE (Breakout)" };
-    expect(profileMatchesVehicle(profile, { brand: "Nissan", model: "GLE", model_year: "" })).toBe(true);
+    const profile = { modelName: "GLE (Breakout)" };
+    expect(profileModelMatches(profile, "GLE")).toBe(true);
   });
 
   it("ignores multiple stacked annotations, e.g. '(GPS)(Breakout)'", () => {
-    const profile = { makerName: "NISSAN", modelName: "Qashqai (GPS)(Breakout)" };
-    expect(profileMatchesVehicle(profile, { brand: "Nissan", model: "Qashqai", model_year: "" })).toBe(true);
+    const profile = { modelName: "Qashqai (GPS)(Breakout)" };
+    expect(profileModelMatches(profile, "Qashqai")).toBe(true);
   });
 
   it("ignores a size annotation, e.g. '(44L)', regardless of which size", () => {
-    const profileSmall = { makerName: "RENAULT", modelName: "Clio (44L)(Breakout)" };
-    const profileLarge = { makerName: "RENAULT", modelName: "Clio (58L)(Breakout)" };
-    expect(profileMatchesVehicle(profileSmall, { brand: "Renault", model: "Clio", model_year: "" })).toBe(true);
-    expect(profileMatchesVehicle(profileLarge, { brand: "Renault", model: "Clio", model_year: "" })).toBe(true);
-  });
-
-  it("treats '_' as a word separator, so MERCEDES_BENZ matches Mercedes-Benz", () => {
-    const profile = { makerName: "MERCEDES_BENZ", modelName: "GLE" };
-    expect(profileMatchesVehicle(profile, { brand: "Mercedes-Benz", model: "GLE", model_year: "" })).toBe(true);
+    const profileSmall = { modelName: "Clio (44L)(Breakout)" };
+    const profileLarge = { modelName: "Clio (58L)(Breakout)" };
+    expect(profileModelMatches(profileSmall, "Clio")).toBe(true);
+    expect(profileModelMatches(profileLarge, "Clio")).toBe(true);
   });
 
   it("still rejects a genuine model mismatch after annotation-stripping", () => {
-    const profile = { makerName: "NISSAN", modelName: "Qashqai (GPS)(Breakout)" };
-    expect(profileMatchesVehicle(profile, { brand: "Nissan", model: "Juke", model_year: "" })).toBe(false);
+    const profile = { modelName: "Qashqai (GPS)(Breakout)" };
+    expect(profileModelMatches(profile, "Juke")).toBe(false);
   });
 
   it("keeps a real hyphen inside a model name as a word separator, not noise (e.g. 'CR-V', 'Kona-e')", () => {
-    const crv = { makerName: "HONDA", modelName: "CR-V" };
-    expect(profileMatchesVehicle(crv, { brand: "Honda", model: "CR-V", model_year: "" })).toBe(true);
+    const crv = { modelName: "CR-V" };
+    expect(profileModelMatches(crv, "CR-V")).toBe(true);
     // "Kona" alone still counts as a match for "Kona-e" (shorter side fully
     // contained in the longer) — narrowProfilesForVehicle relies on this to
     // avoid excluding a plausible variant just because the exact suffix
     // wasn't typed.
-    const konaE = { makerName: "HYUNDAI", modelName: "Kona-e" };
-    expect(profileMatchesVehicle(konaE, { brand: "Hyundai", model: "Kona", model_year: "" })).toBe(true);
+    const konaE = { modelName: "Kona-e" };
+    expect(profileModelMatches(konaE, "Kona")).toBe(true);
   });
 
   it("does not confuse distinct alphanumeric model codes, e.g. Fiat 500 vs 500X", () => {
-    const the500 = { makerName: "FIAT", modelName: "500" };
-    const the500X = { makerName: "FIAT", modelName: "500X" };
-    expect(profileMatchesVehicle(the500, { brand: "Fiat", model: "500X", model_year: "" })).toBe(false);
-    expect(profileMatchesVehicle(the500X, { brand: "Fiat", model: "500", model_year: "" })).toBe(false);
+    const the500 = { modelName: "500" };
+    const the500X = { modelName: "500X" };
+    expect(profileModelMatches(the500, "500X")).toBe(false);
+    expect(profileModelMatches(the500X, "500")).toBe(false);
+  });
+});
+
+describe("profileYearMatches", () => {
+  it("matches when the vehicle's year falls inside the profile's modelYearRange", () => {
+    const profile = { modelYearRange: [2018, 2022] };
+    expect(profileYearMatches(profile, "2020")).toBe(true);
+  });
+
+  it("does not exclude on a missing profile modelYearRange (passes rather than excludes)", () => {
+    const profile = { title: "Testprofil" };
+    expect(profileYearMatches(profile, "2020")).toBe(true);
+  });
+
+  it("rejects when the vehicle's year falls outside the profile's modelYearRange", () => {
+    const profile = { modelYearRange: [2018, 2020] };
+    expect(profileYearMatches(profile, "2023")).toBe(false);
+  });
+
+  it("matches on year-range overlap when the vehicle's own year is itself a range", () => {
+    const profile = { modelYearRange: [2018, 2020] };
+    expect(profileYearMatches(profile, "2014-2025")).toBe(true);
   });
 });
 

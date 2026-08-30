@@ -25,7 +25,7 @@
 // the FLEETii admin's own default/unscoped state — in which case this
 // clears department_id/costumer_id back to null rather than looking up a
 // department at all.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 
@@ -43,13 +43,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }), {
-      status: 500,
-    });
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: SwitchDepartmentBody;
   try {
@@ -64,9 +62,6 @@ export default async (req: Request) => {
   // here, not a malformed request).
   const departmentId = asTrimmedString(body.departmentId) || null;
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   let targetDepartmentId: string | null = null;
   let targetCostumerId: string | null = null;

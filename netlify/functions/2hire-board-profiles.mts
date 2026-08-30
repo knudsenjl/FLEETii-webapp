@@ -13,8 +13,8 @@
 // (always resolves to the global credential in practice — see
 // delete-vehicle.mts's identical reasoning for resolving fresh rather than
 // hardcoding).
-import { createClient } from "@supabase/supabase-js";
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isFleetiiAdminRole, requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { getTwoHireBoardProfiles } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -33,17 +33,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "costumerId er påkrævet." }), { status: 400 });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const { admin } = adminClientResult;
 
   try {
     const { data: caller, error: callerError } = await admin
@@ -53,7 +47,7 @@ export default async (req: Request) => {
       .maybeSingle<{ role: string }>();
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, { isFleetiiAdmin, costumerId });
 
     const profiles = await getTwoHireBoardProfiles(credentials);

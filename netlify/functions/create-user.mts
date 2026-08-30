@@ -19,9 +19,9 @@
 // boundary (RLS's INSERT policy on `user_profiles` is deliberately absent,
 // precisely because writes are meant to only ever happen here). Reached
 // from UserDetailsPage.tsx.
-import { createClient } from "@supabase/supabase-js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import {
   buildWelcomeEmailHtml,
@@ -59,15 +59,15 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const defaultPassword = process.env.DEFAULT_USER_PASSWORD;
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+  }
+  const { admin } = adminClientResult;
 
-  if (!supabaseUrl || !serviceRoleKey || !defaultPassword) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY/DEFAULT_USER_PASSWORD." }),
-      { status: 500 },
-    );
+  const defaultPassword = process.env.DEFAULT_USER_PASSWORD;
+  if (!defaultPassword) {
+    return new Response(JSON.stringify({ error: "Serveren mangler DEFAULT_USER_PASSWORD." }), { status: 500 });
   }
 
   let body: CreateUserBody;
@@ -88,9 +88,6 @@ export default async (req: Request) => {
   }
   const role = rawRole;
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   // An admin may only create users within their own costumer — mirrors
   // update-user.mts's identical check (broadened from an earlier, stricter
@@ -125,7 +122,7 @@ export default async (req: Request) => {
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql) —
   // they just need the requested department to actually exist.
-  const isFleetiiAdmin = caller?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
   if (isFleetiiAdmin) {
     if (!requestedDepartmentRow) {
       return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });

@@ -44,6 +44,8 @@ type VehicleSignalRow = {
   autonomy_percentage_updated_at: string | null;
   distance_covered_meters: number | null;
   distance_covered_updated_at: string | null;
+  trip_detected: boolean | null;
+  trip_detected_updated_at: string | null;
 };
 
 /** Formats a timestamptz value as "DD/MM/YYYY HH.MM" (2hire's wire format), or "" if null. */
@@ -99,6 +101,8 @@ function toVehicle2Hire(
     distanceCoveredUpdatedAt: formatSignalTimestamp(signal?.distance_covered_updated_at ?? null),
     online: signal?.online === true ? "TRUE" : "FALSE",
     onlineUpdatedAt: formatSignalTimestamp(signal?.online_updated_at ?? null),
+    tripDetected: signal?.trip_detected === true ? "TRUE" : "FALSE",
+    tripDetectedUpdatedAt: formatSignalTimestamp(signal?.trip_detected_updated_at ?? null),
     brakingSystemWarning: "",
     brakingSystemWarningUpdatedAt: "",
     drivingRelatedFailureWarning: "",
@@ -133,7 +137,7 @@ export const liveVehicleDataSource: VehicleDataSource = {
       supabase
         .from("vehicle_signals")
         .select(
-          "vehicle_id, online, online_updated_at, autonomy_percentage, autonomy_percentage_updated_at, distance_covered_meters, distance_covered_updated_at",
+          "vehicle_id, online, online_updated_at, autonomy_percentage, autonomy_percentage_updated_at, distance_covered_meters, distance_covered_updated_at, trip_detected, trip_detected_updated_at",
         )
         .returns<VehicleSignalRow[]>(),
       supabase.from("vehicle_departments").select("vehicle_id, department_id").returns<VehicleDepartmentRow[]>(),

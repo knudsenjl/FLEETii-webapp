@@ -7,9 +7,9 @@
 // policy, deliberately, matching create-user.mts/delete-user.mts's approach
 // of doing all writes server-side — so requireAdmin() plus the costumer
 // check below is this function's actual authorization boundary.
-import { createClient } from "@supabase/supabase-js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isAnyAdminRole, isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type UpdateUserBody = {
   userId?: string;
@@ -51,13 +51,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }), {
-      status: 500,
-    });
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: UpdateUserBody;
   try {
@@ -82,9 +80,6 @@ export default async (req: Request) => {
   }
   const role = rawRole;
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const requestedDepartmentName = asTrimmedString(body.department) || null;
   const [{ data: caller }, { data: target }, { data: requestedDepartmentRow, error: requestedDepartmentError }] =
@@ -96,9 +91,9 @@ export default async (req: Request) => {
         .maybeSingle<{ costumer_id: string | null; role: string }>(),
       admin
         .from("user_profiles")
-        .select("costumer_id, email")
+        .select("costumer_id, department_id, role, email")
         .eq("user_id", targetUserId)
-        .maybeSingle<{ costumer_id: string | null; email: string | null }>(),
+        .maybeSingle<{ costumer_id: string | null; department_id: string | null; role: string; email: string | null }>(),
       requestedDepartmentName
         ? admin
             .from("departments")
@@ -117,7 +112,7 @@ export default async (req: Request) => {
   // A FLEETii admin isn't scoped to one costumer — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
-  const isFleetiiAdmin = caller?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
   if (!isFleetiiAdmin) {
     if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
       return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });
@@ -143,6 +138,40 @@ export default async (req: Request) => {
     });
     if (emailError) {
       return new Response(JSON.stringify({ error: emailError.message }), { status: 400 });
+    }
+  }
+
+  // Refuse to demote the last remaining non-archived admin in a department,
+  // or the last remaining "FLEETii admin" platform-wide, out of that role —
+  // same "no one left to manage users" hole delete-user.mts already guards
+  // against for archiving, and role changes go through this endpoint too.
+  // Only ever fires as a demotion AWAY from "FLEETii admin", never a
+  // reassignment INTO it — ALLOWED_ROLES above never offers it as a value
+  // this form can set. Excludes already-archived holders from the count,
+  // same reasoning as delete-user.mts.
+  if (isAnyAdminRole(target.role) && target.role !== role) {
+    let adminCountQuery = admin
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("role", target.role)
+      .is("deleted_at", null)
+      .neq("user_id", targetUserId);
+    if (!isFleetiiAdminRole(target.role)) {
+      adminCountQuery =
+        target.department_id === null
+          ? adminCountQuery.is("department_id", null)
+          : adminCountQuery.eq("department_id", target.department_id);
+    }
+    const { count: otherAdminCount, error: countError } = await adminCountQuery;
+
+    if (countError) {
+      return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
+    }
+    if (!otherAdminCount) {
+      const message = isFleetiiAdminRole(target.role)
+        ? "Kan ikke ændre rollen for den sidste FLEETii-administrator."
+        : "Kan ikke ændre rollen for den sidste administrator i afdelingen.";
+      return new Response(JSON.stringify({ error: message }), { status: 409 });
     }
   }
 

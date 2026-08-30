@@ -12,6 +12,7 @@ import { LockStatusIcon } from "../components/LockStatusIcon";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
+import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
 
 /**
  * Dedicated vehicle_profiles.vehicle_id for a copy of WB20418 (see
@@ -25,7 +26,7 @@ import { useLocateVehicle } from "../hooks/useLocateVehicle";
  */
 const TEST_VEHICLE_ID = "6ae6ac0e-b918-4843-b3c4-eae02560c06b";
 
-/** This vehicle's e2e DEVICE identifier (vehicle_profiles.iot_id) — NOT TEST_VEHICLE_ID. getDeviceState/simulateTrip/updateBattery all key on this, not the vehicleId — see twoHireClient.ts's own doc comments on why the two ids are different things. */
+/** This vehicle's e2e DEVICE identifier (vehicle_profiles.iot_id) — NOT TEST_VEHICLE_ID. getDeviceState keys on this, not the vehicleId — see twoHireClient.ts's own doc comment on why the two ids are different things. */
 const TEST_DEVICE_IDENTIFIER = "741482310302896";
 
 /** Fallback map center used when the test vehicle has no GPS fix. */
@@ -52,6 +53,8 @@ export function TwoHireTestPage() {
   const gpsPositions = use2hireGPS();
   const twoHireVehicle = vehicles.find((v) => v.vehicleId === TEST_VEHICLE_ID);
   const position = gpsPositions.find((p) => p.vehicleId === TEST_VEHICLE_ID);
+  /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Always the same fixed test vehicle, so no per-vehicle scoping is needed here (unlike BookingDetailsPage.tsx/VehicleDetailsPage.tsx's own use of this hook). */
+  const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot("2hire-test-map");
 
   const authHeaders: Record<string, string> = session?.access_token
     ? { Authorization: `Bearer ${session.access_token}` }
@@ -211,9 +214,12 @@ export function TwoHireTestPage() {
 
               <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                 <LeafletMap
-                  lat={position?.lat ?? DENMARK_CENTER.lat}
-                  lng={position?.lng ?? DENMARK_CENTER.lng}
-                  zoom={position ? 17 : 7}
+                  lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
+                  lng={savedMapView?.lng ?? position?.lng ?? DENMARK_CENTER.lng}
+                  zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
+                  markerLat={position?.lat ?? DENMARK_CENTER.lat}
+                  markerLng={position?.lng ?? DENMARK_CENTER.lng}
+                  onViewChange={handleMapViewChange}
                   showMarker={Boolean(position)}
                   markerTooltip={twoHireVehicle?.plate ?? TEST_VEHICLE_ID}
                   className="absolute inset-0"

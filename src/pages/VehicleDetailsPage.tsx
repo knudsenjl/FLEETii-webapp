@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -13,6 +14,7 @@ import { LockStatusIcon } from "../components/LockStatusIcon";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
@@ -93,9 +95,9 @@ export function VehicleDetailsPage() {
   // own requireAdmin (App.tsx) and the server-side requireAdmin() helper;
   // this page has no requireAdmin route gate of its own (see doc comment
   // above), so it has to make this check itself.
-  const isAdmin = profile?.role === "admin" || profile?.role === "FLEETii admin";
+  const isAdmin = isAnyAdmin(profile?.role);
   /** Stricter than isAdmin — gates the "QR-kode:"/"2hire-profil:" rows below, which a regular admin has no reason to see (2hire-board device internals, not fleet-management info). */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   const state = location.state as { vehicle?: Vehicle; booking?: RouterBooking } | null;
   const stateVehicle = state?.vehicle ?? null;
   const booking = state?.booking ?? null;
@@ -111,6 +113,8 @@ export function VehicleDetailsPage() {
   const vehicle = stateVehicle ?? fetchedVehicle;
   const gpsPositions = use2hireGPS();
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
+  /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this vehicle so refreshing on a different vehicle's page never shows a stale, unrelated vehicle's last-saved view. */
+  const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`vehicle-details-map:${vehicle?.vehicleId ?? ""}`);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -588,9 +592,12 @@ export function VehicleDetailsPage() {
                 <div className="flex min-h-0 flex-1 flex-col gap-1">
                   <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                     <LeafletMap
-                      lat={position?.lat ?? DENMARK_CENTER.lat}
-                      lng={position?.lng ?? DENMARK_CENTER.lng}
-                      zoom={position ? 17 : 7}
+                      lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
+                      lng={savedMapView?.lng ?? position?.lng ?? DENMARK_CENTER.lng}
+                      zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
+                      markerLat={position?.lat ?? DENMARK_CENTER.lat}
+                      markerLng={position?.lng ?? DENMARK_CENTER.lng}
+                      onViewChange={handleMapViewChange}
                       showMarker={Boolean(position)}
                       markerTooltip={vehicle.plate}
                       className="absolute inset-0"

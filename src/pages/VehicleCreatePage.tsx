@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { QrScanButton } from "../components/QrScanButton";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
@@ -27,7 +28,7 @@ type CostumerOrder = {
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate wherever this is displayed (same convention as VehicleDetailsPage.tsx/HandleVehiclePage.tsx). */
   vehicle_ident: string | null;
   number_plate: string;
-  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Brand:"/"Mærke:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Mærke:"/"Model:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
   brand: string | null;
   model: string | null;
   model_year: string | null;
@@ -52,7 +53,7 @@ type CostumerOrderQueryRow = {
   department_id: string | null;
   vehicle_ident: string | null;
   number_plate: string;
-  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Brand:"/"Mærke:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Mærke:"/"Model:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
   brand: string | null;
   model: string | null;
   model_year: string | null;
@@ -104,22 +105,24 @@ export function VehicleCreatePage() {
   const location = useLocation();
   const { orderId } = useParams<{ orderId: string }>();
   const stateOrder = (location.state as { order?: CostumerOrder } | null)?.order ?? null;
-  const [fetchedOrder, setFetchedOrder] = useState<CostumerOrder | null>(null);
-  // Lazy-initialized true whenever a fetch-by-id is actually going to happen
-  // (orderId present, no stateOrder yet) — starting this false and only
-  // flipping it inside the fetch effect below raced the redirect effect
-  // further down: both effects run in the same post-mount pass, so the
-  // redirect effect would still see the ORIGINAL (false) value and fire
-  // immediately, bouncing straight back to "/fleetii-admin-installations"
-  // before the fetch ever got a chance to resolve.
-  const [orderLoading, setOrderLoading] = useState(() => Boolean(orderId) && !stateOrder);
-  const order = stateOrder ?? fetchedOrder;
+  // undefined = "haven't fetched yet" (so `order` below falls back to
+  // stateOrder for an instant first paint); null = "fetched, confirmed gone".
+  // Same convention as CostumerDetailsPage.tsx's own fetchedCostumer —
+  // fetchedOrder wins once it arrives, NOT stateOrder: browsers keep
+  // history.state across a same-URL reload, so a plain browser refresh would
+  // otherwise keep showing whatever was true at the moment this page was
+  // first navigated to, silently ignoring any edit ("Opdater") made since —
+  // confirmed live 2026-08-28 (a saved Brand edit reverted to the original
+  // value after a refresh, purely because stateOrder never gets updated).
+  const [fetchedOrder, setFetchedOrder] = useState<CostumerOrder | null | undefined>(undefined);
+  const [orderLoading, setOrderLoading] = useState(false);
+  const order = fetchedOrder !== undefined ? fetchedOrder : stateOrder;
   /** Whether this order's own department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(order?.department_id ?? null);
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/vehicle-create/:orderId" (no router state) — skipped entirely when stateOrder is already present. Naturally scoped to a FLEETii admin (any costumer) by costumer_orders' SELECT RLS policy — an orderId outside it just resolves to null, same as "not found". */
+  /** Always (re)fetches the order by id — even when router state already has one, since that state can be stale (see fetchedOrder's own comment above). stateOrder still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. Naturally scoped to a FLEETii admin (any costumer) by costumer_orders' SELECT RLS policy — an orderId outside it just resolves to null, same as "not found". */
   useEffect(() => {
-    if (stateOrder || !orderId) return;
+    if (!orderId) return;
 
     let cancelled = false;
     setOrderLoading(true);
@@ -162,7 +165,7 @@ export function VehicleCreatePage() {
     return () => {
       cancelled = true;
     };
-  }, [orderId, stateOrder]);
+  }, [orderId]);
 
   // Redirects back to the installations list once it's clear the order can't
   // be resolved: either no :orderId AND no router state at all (reached with
@@ -176,13 +179,40 @@ export function VehicleCreatePage() {
 
   const [vehicleRegistered, setVehicleRegistered] = useState(order?.vehicle_registered ?? false);
   const [registeredVehicleId, setRegisteredVehicleId] = useState(order?.vehicle_id ?? null);
-  /** Editable Brand/Mærke/Årgang — local state rather than reading order.brand/model/model_year directly, since these are now editable inputs (see the "Brand:"/"Mærke:"/"Årgang:" rows below) that persist to costumer_orders on blur (saveOrderField). Only editable while !vehicleRegistered: 2hire-register-vehicle.mts snapshots these onto the new vehicle_profiles row at registration time, so editing them afterward wouldn't retroactively change the already-created vehicle — misleading to allow. */
+  /** Editable Mærke/Model/Årgang — local state rather than reading order.brand/model/model_year directly, since these are editable inputs (see the "Mærke:"/"Model:"/"Årgang:" rows below). Only editable while isEditingOrder (see "Rediger" below) AND !vehicleRegistered: 2hire-register-vehicle.mts snapshots these onto the new vehicle_profiles row at registration time, so editing them afterward wouldn't retroactively change the already-created vehicle — misleading to allow. */
   const [brandInput, setBrandInput] = useState(order?.brand ?? "");
   const [modelInput, setModelInput] = useState(order?.model ?? "");
   const [modelYearInput, setModelYearInput] = useState(order?.model_year ?? "");
-  /** Editable Drivmiddel — same local-state-plus-persist-on-change pattern as Brand/Mærke/Årgang above, just a <select> instead of a free-text input (see the "Drivmiddel:" row below), so it saves immediately on change rather than needing a blur. */
+  /** Editable Drivmiddel — same local-state pattern as Mærke/Model/Årgang above, just a <select> instead of a free-text input (see the "Drivmiddel:" row below). */
   const [drivmiddelInput, setDrivmiddelInput] = useState(order?.drivmiddel ?? "Benzin");
-  const [orderFieldSaveError, setOrderFieldSaveError] = useState<string | null>(null);
+  /** Editable Nummerplade/Kontaktperson/Kontakt e-mail/Kontakt tlf./FLEETii-device fields — same "local state, only editable while isEditingOrder" treatment as Brand/Mærke/Årgang/Drivmiddel above, added 2026-08-28 when "Rediger" was introduced to batch-edit every field on this review table together (previously only Brand/Mærke/Årgang/Drivmiddel were editable at all, and always-editable/auto-saving rather than behind a Rediger/Opdater/Fortryd toggle — see handleUpdateOrder/handleCancelEditOrder below). Køretøj-ID (vehicle_ident) and Kunde/Afdeling are deliberately NOT included: vehicle_ident is optional and rarely typed by the costumer in the first place, while Kunde/Afdeling are foreign keys with no picker on this page — reassigning either is a materially different, riskier operation than correcting a typo. */
+  const [numberPlateInput, setNumberPlateInput] = useState(order?.number_plate ?? "");
+  const [contactPersonInput, setContactPersonInput] = useState(order?.contactperson ?? "");
+  const [contactEmailInput, setContactEmailInput] = useState(order?.contactemail ?? "");
+  const [contactNumberInput, setContactNumberInput] = useState(order?.contactnumber ?? "");
+  const [needsFleetiiDeviceInput, setNeedsFleetiiDeviceInput] = useState(order?.needs_fleetii_device ?? true);
+  const [fleetiiDeviceIdInput, setFleetiiDeviceIdInput] = useState(order?.fleetii_device_id ?? "");
+  /** Whether the review table below is in batch-edit mode — toggled by "Rediger" (only shown pre-registration, alongside "Slet"; both swap for "Fortryd"/"Opdater" while this is true). See handleUpdateOrder/handleCancelEditOrder and editSnapshotRef below. */
+  const [isEditingOrder, setIsEditingOrder] = useState(false);
+  const [isSavingOrderEdit, setIsSavingOrderEdit] = useState(false);
+  /** Snapshot of every editable *Input value taken the moment "Rediger" is pressed — NOT `order` itself, since `order` is a static, never-updated snapshot from router state/the fetch-by-id effect: after a first successful Opdater, a later Fortryd reverting to `order.*` would silently discard that already-saved edit and jump back to the ORIGINAL pre-any-edit values. Restored verbatim by handleCancelEditOrder ("Fortryd"). */
+  const editSnapshotRef = useRef<{
+    numberPlate: string;
+    brand: string;
+    model: string;
+    modelYear: string;
+    drivmiddel: string;
+    contactPerson: string;
+    contactEmail: string;
+    contactNumber: string;
+    needsFleetiiDevice: boolean;
+    fleetiiDeviceId: string;
+  } | null>(null);
+  /** Whether the not-yet-registered "Slet" button's Ja/Fortryd confirmation dialog is open — see the ConfirmDialog rendered at the bottom of this component. */
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+  /** Whether "Opdater"'s own Ja/Fortryd confirmation dialog is open — same guard treatment as "Slet"'s confirmDeleteOpen above. */
+  const [confirmUpdateOpen, setConfirmUpdateOpen] = useState(false);
+  const [orderEditError, setOrderEditError] = useState<string | null>(null);
 
   // Populates the step flags/vehicleId/editable fields once `order` resolves
   // asynchronously (the fetch-by-id path above) — the useState initializers
@@ -198,16 +228,91 @@ export function VehicleCreatePage() {
     setModelInput(order.model ?? "");
     setModelYearInput(order.model_year ?? "");
     setDrivmiddelInput(order.drivmiddel);
+    setNumberPlateInput(order.number_plate);
+    setContactPersonInput(order.contactperson);
+    setContactEmailInput(order.contactemail ?? "");
+    setContactNumberInput(order.contactnumber);
+    setNeedsFleetiiDeviceInput(order.needs_fleetii_device);
+    setFleetiiDeviceIdInput(order.fleetii_device_id ?? "");
   }, [order]);
 
-  /** Persists a single edited Brand/Mærke/Årgang/Drivmiddel field to costumer_orders on blur (text fields) or change (the Drivmiddel <select>) — a direct Supabase update, same as handleRegisterVehicle's own cleanup delete below. Only called with a genuinely changed, non-empty trimmed value (see the input's onBlur/onChange handlers). */
-  const saveOrderField = async (field: "brand" | "model" | "model_year" | "drivmiddel", value: string) => {
-    if (!order) return;
-    setOrderFieldSaveError(null);
-    const { error } = await supabase.from("costumer_orders").update({ [field]: value }).eq("order_id", order.order_id);
-    if (error) {
-      setOrderFieldSaveError(error.message);
+  /** Whether every required field in the batch-edit form below is filled in — mirrors NewVehiclePage.tsx's own required-field rules for the same underlying columns (Nummerplade/Kontaktperson/Kontakt e-mail/Kontakt tlf. are all RequiredFieldRow there, so required here too; FLEETii device id required only when needsFleetiiDeviceInput is off). Gates "Opdater" below. */
+  const canSubmitOrderEdit =
+    numberPlateInput.trim().length > 0 &&
+    contactPersonInput.trim().length > 0 &&
+    contactEmailInput.trim().length > 0 &&
+    contactNumberInput.trim().length > 0 &&
+    (needsFleetiiDeviceInput || fleetiiDeviceIdInput.trim().length > 0);
+
+  /** "Rediger" — snapshots the current editable values (so "Fortryd" has something correct to revert to, see editSnapshotRef above) and enters batch-edit mode. */
+  const handleStartEditOrder = () => {
+    editSnapshotRef.current = {
+      numberPlate: numberPlateInput,
+      brand: brandInput,
+      model: modelInput,
+      modelYear: modelYearInput,
+      drivmiddel: drivmiddelInput,
+      contactPerson: contactPersonInput,
+      contactEmail: contactEmailInput,
+      contactNumber: contactNumberInput,
+      needsFleetiiDevice: needsFleetiiDeviceInput,
+      fleetiiDeviceId: fleetiiDeviceIdInput,
+    };
+    setOrderEditError(null);
+    setIsEditingOrder(true);
+  };
+
+  /** "Fortryd" (batch-edit mode) — restores every *Input back to editSnapshotRef's own values (NOT `order`, see its own doc comment above) and leaves edit mode without saving anything. */
+  const handleCancelEditOrder = () => {
+    const snapshot = editSnapshotRef.current;
+    if (snapshot) {
+      setNumberPlateInput(snapshot.numberPlate);
+      setBrandInput(snapshot.brand);
+      setModelInput(snapshot.model);
+      setModelYearInput(snapshot.modelYear);
+      setDrivmiddelInput(snapshot.drivmiddel);
+      setContactPersonInput(snapshot.contactPerson);
+      setContactEmailInput(snapshot.contactEmail);
+      setContactNumberInput(snapshot.contactNumber);
+      setNeedsFleetiiDeviceInput(snapshot.needsFleetiiDevice);
+      setFleetiiDeviceIdInput(snapshot.fleetiiDeviceId);
     }
+    setOrderEditError(null);
+    setIsEditingOrder(false);
+  };
+
+  /** "Opdater" (batch-edit mode) — persists every editable field in ONE update, unlike the old per-field auto-save this replaced. Leaves edit mode on success; the *Input values already hold what was just saved, so nothing needs re-syncing from `order` (which never changes). */
+  const handleUpdateOrder = async () => {
+    if (!order || !canSubmitOrderEdit) return;
+
+    setIsSavingOrderEdit(true);
+    setOrderEditError(null);
+
+    const { error } = await supabase
+      .from("costumer_orders")
+      .update({
+        number_plate: numberPlateInput.trim(),
+        brand: brandInput.trim() || null,
+        model: modelInput.trim() || null,
+        model_year: modelYearInput.trim() || null,
+        drivmiddel: drivmiddelInput,
+        contactperson: contactPersonInput.trim(),
+        contactemail: contactEmailInput.trim() || null,
+        contactnumber: contactNumberInput.trim(),
+        needs_fleetii_device: needsFleetiiDeviceInput,
+        fleetii_device_id: needsFleetiiDeviceInput ? null : fleetiiDeviceIdInput.trim() || null,
+      })
+      .eq("order_id", order.order_id);
+
+    if (error) {
+      setOrderEditError(error.message);
+      setIsSavingOrderEdit(false);
+      return;
+    }
+
+    setIsSavingOrderEdit(false);
+    setIsEditingOrder(false);
+    setConfirmUpdateOpen(false);
   };
 
   /** "Registrér køretøj i 2hire" form state — only relevant while !vehicleRegistered. */
@@ -279,37 +384,33 @@ export function VehicleCreatePage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [showMotorApiPopup]);
 
-  /** Fills Brand/Mærke/Årgang/Drivmiddel from a just-loaded MotorAPI result — replaces what used to be four separate per-field "↓↙" fill buttons the admin had to click individually; now it all happens together the moment the "i" button's lookup resolves. Only while still editable (!vehicleRegistered — once registered these fields are locked, see the render branches below), and only overwrites a field MotorAPI actually has a value for, same as each old button's own individual behavior. Persists via saveOrderField exactly where a value differs from what's already saved, same comparison target each field's own old button used (Brand/Mærke/Årgang against order's own persisted value; Drivmiddel against the current drivmiddelInput — Drivmiddel's own pre-existing asymmetry, not something introduced here). */
+  /** Whether the "Kun mulig hvis redigering er aktiv" notice (shown when the MotorAPI button is clicked outside "Rediger" mode — see handleOpenMotorApiPopup below) is visible. Auto-hides after 3s, same timed-notice pattern as FleetManagementPage.tsx's own showEmptyNotice. */
+  const [showEditRequiredNotice, setShowEditRequiredNotice] = useState(false);
+  useEffect(() => {
+    if (!showEditRequiredNotice) return;
+    const timeout = setTimeout(() => setShowEditRequiredNotice(false), 3000);
+    return () => clearTimeout(timeout);
+  }, [showEditRequiredNotice]);
+
+  /** Fills Mærke/Model/Årgang/Drivmiddel from a MotorAPI result — replaces what used to be four separate per-field "↓↙" fill buttons the admin had to click individually; now it all happens together whenever the "i" button's lookup data is (re)applied, see handleOpenMotorApiPopup below. Only while isEditingOrder ("Rediger" — these fields are only meant to change during a batch-edit, see the render branches below) AND !vehicleRegistered (once registered they're locked forever), and only overwrites a field MotorAPI actually has a value for, same as each old button's own individual behavior. Only sets local *Input state — no longer persists on its own (previously called saveOrderField immediately, comparing against order.brand/model/model_year: since those never change after the FIRST save, that comparison went stale after any Opdater and could also silently skip a real save, plus the immediate persist bypassed "Fortryd" entirely). Persisting now goes through the same handleUpdateOrder ("Opdater") batch save as every other manually-typed field. */
   const autofillFromMotorApi = (result: unknown) => {
-    if (vehicleRegistered || !order) return;
+    if (vehicleRegistered || !order || !isEditingOrder) return;
 
     const brandValue = motorApiVehicleField(result, ["make"]);
-    if (brandValue) {
-      setBrandInput(brandValue);
-      if (brandValue !== order.brand) void saveOrderField("brand", brandValue);
-    }
+    if (brandValue) setBrandInput(brandValue);
 
     const modelValue =
       [motorApiVehicleField(result, ["model"]), motorApiVehicleField(result, ["variant"])].filter(Boolean).join(" ") || null;
-    if (modelValue) {
-      setModelInput(modelValue);
-      if (modelValue !== order.model) void saveOrderField("model", modelValue);
-    }
+    if (modelValue) setModelInput(modelValue);
 
     const modelYearValue = motorApiVehicleField(result, ["model_year"]);
-    if (modelYearValue) {
-      setModelYearInput(modelYearValue);
-      if (modelYearValue !== order.model_year) void saveOrderField("model_year", modelYearValue);
-    }
+    if (modelYearValue) setModelYearInput(modelYearValue);
 
     const drivmiddelValue = motorApiDrivmiddel(result);
-    if (drivmiddelValue) {
-      setDrivmiddelInput(drivmiddelValue);
-      if (drivmiddelValue !== drivmiddelInput) void saveOrderField("drivmiddel", drivmiddelValue);
-    }
+    if (drivmiddelValue) setDrivmiddelInput(drivmiddelValue);
   };
 
-  /** Fetches the MotorAPI lookup exactly once and caches it in motorApiResult — every caller (currently just the "i" popup below) goes through this single guarded entry point, so no combination of clicks ever triggers a second network call once a result (or an in-flight request) already exists. MotorAPI usage counts against a daily quota, so this matters beyond just avoiding redundant work. On success, also runs autofillFromMotorApi once with the fresh result. */
+  /** Fetches the MotorAPI lookup exactly once and caches it in motorApiResult — every caller (handleOpenMotorApiPopup below) goes through this single guarded entry point, so no combination of clicks ever triggers a second network call once a result (or an in-flight request) already exists. MotorAPI usage counts against a daily quota, so this matters beyond just avoiding redundant work. On success, also runs autofillFromMotorApi once with the fresh result — handleOpenMotorApiPopup is responsible for re-running autofillFromMotorApi against the cached result on later opens, since this function itself won't fire again once motorApiResult is populated. */
   const ensureMotorApiDataLoaded = () => {
     if (motorApiResult !== null || motorApiLoading || !order) return;
 
@@ -338,11 +439,21 @@ export function VehicleCreatePage() {
       });
   };
 
-  /** Opens the MotorAPI popup, loading its data (via ensureMotorApiDataLoaded) only on the transition into "open" — a re-click just toggles visibility of what's already loaded/cached. */
+  /** Opens the MotorAPI popup — only while isEditingOrder ("Rediger"), since the whole point is autofilling Mærke/Model/Årgang/Drivmiddel, which are only editable then anyway; outside edit mode this just flashes showEditRequiredNotice instead of doing anything (button stays visible either way, unlike the old vehicleRegistered-only guard, since "not editing yet" is a much more common/expected state to click it in than "already registered"). First-ever open fetches+caches the data (ensureMotorApiDataLoaded, which also autofills once on success); every later open reuses the cached motorApiResult — no new network call (quota) — but still re-runs autofillFromMotorApi against it, so re-opening while isEditingOrder re-applies MotorAPI's values even if the admin has since typed something else in, or entered a fresh "Rediger" session after an earlier Opdater. A plain close (re-click while already open) does neither. */
   const handleOpenMotorApiPopup = () => {
+    if (!isEditingOrder) {
+      setShowEditRequiredNotice(true);
+      return;
+    }
+
     const opening = !showMotorApiPopup;
     setShowMotorApiPopup(opening);
-    if (opening) ensureMotorApiDataLoaded();
+    if (!opening) return;
+    if (motorApiResult !== null) {
+      autofillFromMotorApi(motorApiResult);
+      return;
+    }
+    ensureMotorApiDataLoaded();
   };
 
   /** Loads 2hire's own board profiles for the picker above — skipped once the vehicle is already registered (no longer needed). costumerId is required by the Function since which 2hire credential answers this depends on it (see the "per-costumer 2hire credentials" plan). */
@@ -508,17 +619,17 @@ export function VehicleCreatePage() {
     // design as VehicleDetailsPage.tsx's own merged "Køretøj:" row, just
     // labeled "Nummerplade:" here instead (this page's own choice, not
     // matched on VehicleDetailsPage).
-    ["Nummerplade:", formatVehicleIdentLabel(order.vehicle_ident, order.number_plate, useVehicleIdent)],
-    ["Brand:", order.brand ?? "—"],
-    ["Mærke:", order.model ?? "—"],
-    ["Årgang:", order.model_year ?? "—"],
+    ["Nummerplade:", formatVehicleIdentLabel(order.vehicle_ident, numberPlateInput, useVehicleIdent)],
+    ["Mærke:", brandInput || "—"],
+    ["Model:", modelInput || "—"],
+    ["Årgang:", modelYearInput || "—"],
     ["Drivmiddel:", drivmiddelInput],
-    ["Kontaktperson:", order.contactperson],
-    ["Kontakt e-mail:", order.contactemail ?? "—"],
-    ["Kontakt tlf.:", order.contactnumber],
+    ["Kontaktperson:", contactPersonInput],
+    ["Kontakt e-mail:", contactEmailInput || "—"],
+    ["Kontakt tlf.:", contactNumberInput],
     [
       "FLEETii device:",
-      order.needs_fleetii_device ? "Nyt device skal installeres" : `Eksisterende device (id: ${order.fleetii_device_id})`,
+      needsFleetiiDeviceInput ? "Nyt device skal installeres" : `Eksisterende device (id: ${fleetiiDeviceIdInput || "—"})`,
     ],
     ...(registeredVehicleId ? ([["2hire vehicle-id:", registeredVehicleId]] as [string, string][]) : []),
   ];
@@ -548,25 +659,21 @@ export function VehicleCreatePage() {
                   // Drivmiddel is a fixed choice (see DRIVMIDDEL_OPTIONS),
                   // so it gets its own <select> branch here instead of joining
                   // the generic editableField handling below — but otherwise
-                  // matches Brand/Mærke/Årgang's row shape exactly. Same
-                  // "editable only before registration" rule as those three:
-                  // once vehicleRegistered, this falls through to the plain
-                  // read-only span at the bottom of this map, showing `value`
-                  // (kept in sync with order.drivmiddel). MotorAPI no longer
-                  // fills this via a per-field button here — see
-                  // autofillFromMotorApi, run once as a whole right when the
-                  // "i" button on the Køretøj row below loads the data.
-                  if (label === "Drivmiddel:" && !vehicleRegistered) {
+                  // matches Mærke/Model/Årgang's row shape exactly. Editable
+                  // while isEditingOrder ("Rediger", see below) AND
+                  // !vehicleRegistered — once vehicleRegistered, this falls
+                  // through to the plain read-only span at the bottom of this
+                  // map. MotorAPI no longer fills this via a per-field button
+                  // here — see autofillFromMotorApi, run once as a whole
+                  // right when the "i" button on the Nummerplade row below
+                  // loads the data.
+                  if (label === "Drivmiddel:" && isEditingOrder && !vehicleRegistered) {
                     return (
                       <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
                         <select
                           value={drivmiddelInput}
-                          onChange={(e) => {
-                            const next = e.target.value;
-                            setDrivmiddelInput(next);
-                            void saveOrderField("drivmiddel", next);
-                          }}
+                          onChange={(e) => setDrivmiddelInput(e.target.value)}
                           className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         >
                           {DRIVMIDDEL_OPTIONS.map((option) => (
@@ -579,22 +686,75 @@ export function VehicleCreatePage() {
                     );
                   }
 
-                  /** Brand/Mærke/Årgang are editable (see saveOrderField) while the vehicle isn't registered yet — 2hire-register-vehicle.mts snapshots them onto vehicle_profiles at registration time, so editing afterward wouldn't change anything real and reverts to plain text (using `value`, which the sync effect keeps equal to order.brand/model/model_year regardless). MotorAPI no longer fills these via a per-field button here — see autofillFromMotorApi. */
+                  /** Mærke/Model/Årgang/Nummerplade/Kontaktperson/Kontakt e-mail/Kontakt tlf. are all plain-text edits — editable while isEditingOrder AND !vehicleRegistered (2hire-register-vehicle.mts snapshots brand/model/model_year onto vehicle_profiles at registration time, so editing them afterward wouldn't change anything real; the whole batch-edit form is scoped to the not-yet-registered state regardless, see "Rediger" below). All saved together by handleUpdateOrder ("Opdater") — no more per-field auto-save on blur. */
                   const editableField =
-                    label === "Brand:"
-                      ? { value: brandInput, setValue: setBrandInput, field: "brand" as const, original: order.brand }
+                    label === "Nummerplade:"
+                      ? { value: numberPlateInput, setValue: setNumberPlateInput }
                       : label === "Mærke:"
-                        ? { value: modelInput, setValue: setModelInput, field: "model" as const, original: order.model }
-                        : label === "Årgang:"
-                          ? {
-                              value: modelYearInput,
-                              setValue: setModelYearInput,
-                              field: "model_year" as const,
-                              original: order.model_year,
-                            }
-                          : null;
+                        ? { value: brandInput, setValue: setBrandInput }
+                        : label === "Model:"
+                          ? { value: modelInput, setValue: setModelInput }
+                          : label === "Årgang:"
+                            ? { value: modelYearInput, setValue: setModelYearInput }
+                            : label === "Kontaktperson:"
+                              ? { value: contactPersonInput, setValue: setContactPersonInput }
+                              : label === "Kontakt e-mail:"
+                                ? { value: contactEmailInput, setValue: setContactEmailInput }
+                                : label === "Kontakt tlf.:"
+                                  ? { value: contactNumberInput, setValue: setContactNumberInput }
+                                  : null;
 
-                  if (editableField && !vehicleRegistered) {
+                  // Nummerplade keeps its MotorAPI lookup button alongside the input while editing — same button/popup as the read-only branch further below, just paired with an input instead of a plain span.
+                  if (editableField && label === "Nummerplade:" && isEditingOrder && !vehicleRegistered) {
+                    return (
+                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                        <div className="flex min-w-0 items-center gap-1">
+                          <input
+                            type="text"
+                            value={editableField.value}
+                            onChange={(e) => editableField.setValue(e.target.value)}
+                            className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          />
+                          <div className="relative shrink-0" ref={motorApiRef}>
+                            <button
+                              type="button"
+                              onClick={handleOpenMotorApiPopup}
+                              aria-label="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
+                              title="Slå op i MotorAPI"
+                              className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition"
+                            >
+                              {motorApiLoading ? (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
+                                  <path d="M21 12a9 9 0 1 1-9-9" />
+                                </svg>
+                              ) : (
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                                  <circle cx="11" cy="11" r="7" />
+                                  <path d="m21 21-4.3-4.3" />
+                                </svg>
+                              )}
+                            </button>
+                            <InlinePopup
+                              visible={showMotorApiPopup}
+                              align="right"
+                              message={
+                                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
+                                  {motorApiLoading
+                                    ? "Henter fra MotorAPI…"
+                                    : motorApiError
+                                      ? motorApiError
+                                      : JSON.stringify(motorApiResult, null, 2)}
+                                </pre>
+                              }
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  }
+
+                  if (editableField && isEditingOrder && !vehicleRegistered) {
                     return (
                       <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
@@ -602,14 +762,37 @@ export function VehicleCreatePage() {
                           type="text"
                           value={editableField.value}
                           onChange={(e) => editableField.setValue(e.target.value)}
-                          onBlur={() => {
-                            const trimmed = editableField.value.trim();
-                            if (trimmed && trimmed !== editableField.original) {
-                              void saveOrderField(editableField.field, trimmed);
-                            }
-                          }}
                           className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
+                      </div>
+                    );
+                  }
+
+                  // FLEETii device combines two columns (needs_fleetii_device/fleetii_device_id) into one displayed row — same special-casing as Drivmiddel/Nummerplade above, editable while isEditingOrder.
+                  if (label === "FLEETii device:" && isEditingOrder && !vehicleRegistered) {
+                    return (
+                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                        <div className="flex min-w-0 items-center gap-2">
+                          <label className="flex items-center gap-1 text-sm text-brand-800">
+                            <input
+                              type="checkbox"
+                              checked={needsFleetiiDeviceInput}
+                              onChange={(e) => setNeedsFleetiiDeviceInput(e.target.checked)}
+                              className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                            />
+                            Nyt device
+                          </label>
+                          {!needsFleetiiDeviceInput && (
+                            <input
+                              type="text"
+                              value={fleetiiDeviceIdInput}
+                              onChange={(e) => setFleetiiDeviceIdInput(e.target.value)}
+                              placeholder="device id"
+                              className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            />
+                          )}
+                        </div>
                       </div>
                     );
                   }
@@ -618,17 +801,17 @@ export function VehicleCreatePage() {
                     <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
                       <div className="flex min-w-0 items-center gap-1">
-                        {/* Plain text, same transparent-border look as Kunde/Afdeling/every other genuinely non-editable row below — a bordered input-shaped box here would visually claim this field is editable when it isn't (this row combines vehicle_ident/number_plate, neither is a field of its own to write back to — see the "Nummerplade:" row's own comment in the rows array above for why it's labeled that despite sometimes showing vehicle_ident instead). */}
+                        {/* Plain text, same transparent-border look as Kunde/Afdeling/every other genuinely non-editable row below — a bordered input-shaped box here would visually claim this field is editable when it isn't. */}
                         <span className="min-w-0 flex-1 truncate rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
-                        {/* Right-aligned in the value column, not the label column. On the transition into "open", this ALSO autofills Brand/Mærke/Årgang/Drivmiddel below from the same lookup (see ensureMotorApiDataLoaded/autofillFromMotorApi) — there's no separate per-field fill button anymore. */}
+                        {/* Right-aligned in the value column, not the label column. On the transition into "open", this ALSO autofills Mærke/Model/Årgang/Drivmiddel below from the same lookup (see ensureMotorApiDataLoaded/autofillFromMotorApi) — there's no separate per-field fill button anymore. */}
                         <div className="relative shrink-0" ref={motorApiRef}>
                           {/* Same lookup-button look as CostumerNewPage.tsx's CVR lookup (magnifying glass, spinner while in flight) — replaced the old plain "i" glyph so both external-lookup buttons in the app read the same way. */}
                           <button
                             type="button"
                             onClick={handleOpenMotorApiPopup}
-                            aria-label="Slå nummerplade op i MotorAPI og udfyld Brand/Mærke/Årgang/Drivmiddel"
+                            aria-label="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
                             title="Slå op i MotorAPI"
-                            className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50"
+                            className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition"
                           >
                             {motorApiLoading ? (
                               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
@@ -654,6 +837,11 @@ export function VehicleCreatePage() {
                               </pre>
                             }
                           />
+                          <InlinePopup
+                            visible={showEditRequiredNotice}
+                            align="right"
+                            message="Kun mulig hvis redigering er aktiv"
+                          />
                         </div>
                       </div>
                     </div>
@@ -667,8 +855,6 @@ export function VehicleCreatePage() {
                 })}
               </div>
             </div>
-            {orderFieldSaveError && <p className="text-sm text-red-600">{orderFieldSaveError}</p>}
-
             <div className="flex flex-col gap-3">
               {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
               {vehicleRegistered ? (
@@ -785,27 +971,81 @@ export function VehicleCreatePage() {
                     {registerError && <p className="text-sm text-red-600">{registerError}</p>}
                     <button
                       type="button"
-                      disabled={!qrCode.trim() || !selectedProfileId || isRegistering || isDeleting}
+                      disabled={!qrCode.trim() || !selectedProfileId || isRegistering || isDeleting || isEditingOrder}
                       onClick={() => void handleRegisterVehicle()}
                       className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       {isRegistering ? "Registrerer…" : "Registrér køretøj i 2hire"}
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete()}
-                    disabled={isDeleting || isRegistering}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isDeleting ? "Sletter…" : "Slet"}
-                  </button>
+                  {orderEditError && <p className="text-sm text-red-600">{orderEditError}</p>}
+                  {isEditingOrder ? (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={handleCancelEditOrder}
+                        disabled={isSavingOrderEdit}
+                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Fortryd
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmUpdateOpen(true)}
+                        disabled={!canSubmitOrderEdit || isSavingOrderEdit}
+                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {isSavingOrderEdit ? "Opdaterer…" : "Opdater"}
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={handleStartEditOrder}
+                        disabled={isRegistering}
+                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Rediger
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteOpen(true)}
+                        disabled={isDeleting || isRegistering}
+                        className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Slet
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
           </section>
         </motion.main>
       </div>
+
+      {confirmDeleteOpen && (
+        <ConfirmDialog
+          message="Er du sikker på, at du vil slette denne bestilling?"
+          error={deleteError}
+          onCancel={() => setConfirmDeleteOpen(false)}
+          onConfirm={() => void handleDelete()}
+          isPending={isDeleting}
+          confirmPendingLabel="Sletter…"
+        />
+      )}
+
+      {confirmUpdateOpen && (
+        <ConfirmDialog
+          message="Er du sikker på, at du vil opdatere denne bestilling?"
+          error={orderEditError}
+          onCancel={() => setConfirmUpdateOpen(false)}
+          onConfirm={() => void handleUpdateOrder()}
+          isPending={isSavingOrderEdit}
+          confirmPendingLabel="Opdaterer…"
+        />
+      )}
     </div>
   );
 }

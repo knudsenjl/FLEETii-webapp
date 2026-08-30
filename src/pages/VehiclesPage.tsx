@@ -2,17 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { LockStatusIcon } from "../components/LockStatusIcon";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
+import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 
 type Vehicle = DisplayVehicle;
-
-/** A department belonging to the costumer this page is scoped to — populates the Afdeling filter (unlocked mode only, see this component's own doc comment) and determines which vehicles (by departmentIds membership) are in scope for the whole costumer. */
-type DepartmentOption = { department_id: string; name: string };
 
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table"): two modes,
@@ -49,7 +48,7 @@ export function VehiclesPage() {
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
   /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state. */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
 
   const state = location.state as
     | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
@@ -115,15 +114,9 @@ export function VehiclesPage() {
     }
 
     let cancelled = false;
-    void supabase
-      .from("departments")
-      .select("department_id, name")
-      .eq("costumer_id", targetCostumerId)
-      .order("name")
-      .returns<DepartmentOption[]>()
-      .then(({ data }) => {
-        if (!cancelled) setDepartmentOptions(data ?? []);
-      });
+    void fetchDepartmentOptions(targetCostumerId).then((options) => {
+      if (!cancelled) setDepartmentOptions(options);
+    });
 
     return () => {
       cancelled = true;
@@ -391,14 +384,14 @@ export function VehiclesPage() {
                   }
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
-                  Registrer nyt køretøj
+                  Opret køretøj
                 </button>
                 <button
                   type="button"
                   onClick={() => navigate("/import-vehicles")}
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
-                  Registrer nye køretøjer fra fil
+                  Opret køretøjer fra fil
                 </button>
               </div>
             </div>
