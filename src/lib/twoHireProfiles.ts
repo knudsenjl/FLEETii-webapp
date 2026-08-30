@@ -89,18 +89,6 @@ export function profileYearMatches(profile: TwoHireBoardProfile, vehicleModelYea
   return yearRangesOverlap(profileYearRange(profile), parseYearRange(vehicleModelYear));
 }
 
-/** Whether a 2hire board profile matches a vehicle's own brand/model/model_year on ALL three axes simultaneously (strict AND — see profileMakerMatches/profileModelMatches/profileYearMatches). Prefer narrowProfilesForVehicle for a picker's own default candidate list: real profile catalogs don't always align cleanly on all three axes for the same vehicle (e.g. a profile with no year data at all), so a strict simultaneous match can land on zero candidates where a hierarchical narrowing would still surface something useful. Kept for the (rarer) case where an exact simultaneous match specifically matters. */
-export function profileMatchesVehicle(
-  profile: TwoHireBoardProfile,
-  vehicle: { brand: string; model: string; model_year: string },
-): boolean {
-  return (
-    profileMakerMatches(profile, vehicle.brand) &&
-    profileModelMatches(profile, vehicle.model) &&
-    profileYearMatches(profile, vehicle.model_year)
-  );
-}
-
 /**
  * Progressively narrows `profiles` down to the best candidates for a
  * vehicle's own brand/model/model_year — hierarchy maker -> model -> year,
@@ -110,10 +98,7 @@ export function profileMatchesVehicle(
  * maker+model-matched set rather than nothing, and a vehicle with no
  * maker-matching profile at all falls back to the full input list (nothing
  * to narrow from). This is what VehicleCreatePage.tsx/HandleVehiclePage.tsx
- * actually use for their picker's default selection/narrowed view;
- * profileMatchesVehicle's strict simultaneous AND-match is the stricter
- * alternative, kept separately since it's easy to land on zero results with
- * against a real, messy profile catalog.
+ * actually use for their picker's default selection/narrowed view.
  */
 export function narrowProfilesForVehicle(
   profiles: TwoHireBoardProfile[],

@@ -256,8 +256,8 @@ export function VehicleDeletePage() {
     // vehicle_ident AND it's actually set, else just number_plate — same
     // design as VehicleDetailsPage.tsx's own merged "Køretøj:" row.
     ["Køretøj:", formatVehicleIdentLabel(vehicleIdent, order.number_plate, useVehicleIdent)],
-    ["Brand:", order.brand],
-    ["Mærke:", order.model],
+    ["Mærke:", order.brand],
+    ["Model:", order.model],
     ["Årgang:", order.model_year],
     ["Anmodet af:", order.contactperson],
     ["Kontakt e-mail:", order.contactemail ?? "—"],

@@ -14,6 +14,7 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { isPasswordRecoveryCallback, supabase } from "../lib/supabase";
 import { fetchSettingText } from "../lib/settings";
+import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
 
 /** localStorage key for the idle-timeout tracker below — deliberately plain localStorage regardless of "remember me" (lib/supabase.ts's rememberAwareStorage), since it needs to survive a full browser/VS Code restart to catch "closed overnight" — a non-sensitive timestamp, not the session itself. */
 const LAST_ACTIVITY_KEY = "fleetii_last_activity";
@@ -113,8 +114,8 @@ interface AuthContextValue {
 
 /** Renders a role string as the Danish label shown in page headers ("FLEETii Administrator" / "Administrator" / "Bruger"). Any value other than "admin"/"FLEETii admin" (including null/undefined) is treated as a regular user. */
 export function formatRoleLabel(role?: string | null): string {
-  if (role === "FLEETii admin") return "FLEETii Administrator";
-  return role === "admin" ? "Administrator" : "Bruger";
+  if (isFleetiiAdmin(role)) return "FLEETii Administrator";
+  return isDepartmentAdmin(role) ? "Administrator" : "Bruger";
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -130,7 +131,7 @@ export async function fetchCostumerDeactivatedAt(userId: string): Promise<string
     console.error("[AuthContext] fetchCostumerDeactivatedAt failed:", error);
     return null;
   }
-  if (data?.role === "FLEETii admin") return null;
+  if (isFleetiiAdmin(data?.role)) return null;
   return data?.departments?.costumers?.deactivated_at ?? null;
 }
 
@@ -192,13 +193,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // is_fleetii_admin() being left untouched by costumers_add_
       // deactivated_at.sql — see fetchCostumerDeactivatedAt's doc comment
       // for why.
-      costumerDeactivatedAt: profileFields.role === "FLEETii admin" ? null : (departments?.costumers?.deactivated_at ?? null),
+      costumerDeactivatedAt: isFleetiiAdmin(profileFields.role) ? null : (departments?.costumers?.deactivated_at ?? null),
     };
   };
 
   /** Fetches the departments the given user is allowed to switch into. A FLEETii admin has no personal user_departments grants (platform-wide role, intentionally cleared — see the "let FLEETii admin operate unscoped" work) — for them alone, this returns EVERY department platform-wide instead, each carrying its own costumer's name (PageHeader.tsx shows "Kunde / Afdeling" for these, disambiguating same-named departments across costumers); switching into one of these goes through switch-department.mts rather than the direct update every other role uses (see switchDepartment below), since the column-scoped GRANT backing that direct update can never touch costumer_id. Returns [] (and logs) on any Supabase error, same degrade-gracefully approach as loadProfile. */
   const loadAvailableDepartments = async (userId: string, role: string | null): Promise<DepartmentOption[]> => {
-    if (role === "FLEETii admin") {
+    if (isFleetiiAdmin(role)) {
       const { data, error } = await supabase
         .from("departments")
         .select("department_id, name, costumers(name)")
@@ -495,7 +496,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const switchDepartment = async (departmentId: string | null): Promise<string | null> => {
     if (!session) return "Ikke logget ind.";
 
-    if (profile?.role === "FLEETii admin") {
+    if (isFleetiiAdmin(profile?.role)) {
       try {
         const response = await fetch("/.netlify/functions/switch-department", {
           method: "POST",

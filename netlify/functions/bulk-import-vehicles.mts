@@ -25,11 +25,12 @@
 // bulk-import-users.mts's identical reasoning re: findOrCreateDepartment's
 // race-free-within-one-batch requirement. A failed row is recorded and
 // skipped, not fatal to the batch.
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
 
 type BulkImportVehiclesBody = {
@@ -67,14 +68,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: BulkImportVehiclesBody;
   try {
@@ -105,9 +103,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Filen indeholder ingen rækker." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data: caller } = await admin
     .from("user_profiles")
@@ -115,7 +110,7 @@ export default async (req: Request) => {
     .eq("user_id", authResult.userId)
     .maybeSingle<{ costumer_id: string | null; role: string; full_name: string | null; email: string | null; phone: string | null }>();
 
-  const isFleetiiAdmin = caller?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
   let costumerId: string;
   if (isFleetiiAdmin) {
     const requested = asTrimmedString(body.costumerId);

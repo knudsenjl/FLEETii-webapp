@@ -2,11 +2,13 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { LockStatusIcon } from "../components/LockStatusIcon";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import {
@@ -54,7 +56,7 @@ type Booking = {
 export function AllBookingsPage() {
   const { afdelingId, costumerId, profile } = useAuth();
   /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the Kunde/Afdeling filters below (not just the existing Bruger/Køretøj ones) actually narrow the list down, since departmentBookings otherwise shows every booking platform-wide. */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   const navigate = useNavigate();
   /** Whether afdelingId's department shows "Bruger-ID" (vs. plain "Bruger"/E-mail) in the filter, and combines Køretøj-ID into the "Køretøj" column below ("{ident} / {plate}" — see formatVehicleIdentLabel) rather than swapping to it — see useIdentSettings' own doc comment. Unlike every other gated row in the app, these never fully disappear when off: a booking's user/vehicle is core information, not an optional extra, so they revert to the pre-feature display instead (see the label/value swaps below). */
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
@@ -70,10 +72,6 @@ export function AllBookingsPage() {
   >([]);
   /** Which of the listed bookings' vehicles are currently locked (vehicle_signals.locked), keyed by vehicleId — same bulk-fetch pattern as VehiclesPage.tsx's own Lås column. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
-  /** The genuine Køretøj-ID/Reg.nr (number_plate) pair PLUS blocked-state per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the new first column below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge next to that column. Same bulk-fetch pattern as lockedByVehicleId. */
-  const [identByVehicleId, setIdentByVehicleId] = useState<
-    Record<string, { vehicleIdent: string | null; numberPlate: string | null; blocked: boolean }>
-  >({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -254,36 +252,8 @@ export function AllBookingsPage() {
     };
   }, [bookings]);
 
-  /** Bulk-loads the new first column's Køretøj-ID/Reg.nr pair for every distinct vehicle among the loaded bookings in one query — same pattern as the lockedByVehicleId effect above. */
-  useEffect(() => {
-    const vehicleIds = Array.from(new Set(bookings.map((b) => b.vehicle)));
-    if (vehicleIds.length === 0) {
-      setIdentByVehicleId({});
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate, blocked_at")
-      .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null; blocked_at: string | null }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setIdentByVehicleId(
-          Object.fromEntries(
-            (data ?? []).map((row) => [
-              row.vehicle_id,
-              { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate, blocked: row.blocked_at !== null },
-            ]),
-          ),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bookings]);
+  /** The genuine Køretøj-ID/Reg.nr (number_plate) pair PLUS blocked-state per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the new first column below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge next to that column. */
+  const identByVehicleId = useVehicleIdentLookup(bookings.map((b) => b.vehicle));
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">

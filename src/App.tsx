@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VehicleProvider } from "./contexts/VehicleContext";
+import { isAnyAdmin } from "./lib/roles";
 import { ProtectedRoute } from "./components/ProtectedRoute";
 import { LoginPage } from "./pages/LoginPage";
 import { ReservationPage } from "./pages/ReservationPage";
@@ -66,7 +67,7 @@ function RootRoute() {
     }
     return (
       <Navigate
-        to={profile?.role === "admin" || profile?.role === "FLEETii admin" ? "/admin" : "/booking"}
+        to={isAnyAdmin(profile?.role) ? "/admin" : "/booking"}
         replace
       />
     );

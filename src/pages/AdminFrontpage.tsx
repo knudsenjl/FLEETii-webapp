@@ -9,6 +9,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
+import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `costumers` table, for the embedded list below — same fields CostumerAdministrationPage.tsx's own full-page version fetches, so the object handed to CostumerDetailsPage via router state already has everything it displays. */
@@ -68,7 +69,7 @@ export function AdminFrontpage() {
   const [usersCount, setUsersCount] = useState<number | null>(null);
 
   useEffect(() => {
-    if (profile?.role !== "admin" || !costumerId) return;
+    if (!isDepartmentAdmin(profile?.role) || !costumerId) return;
 
     let cancelled = false;
     void supabase
@@ -99,7 +100,7 @@ export function AdminFrontpage() {
   }, [profile?.role, costumerId]);
 
   useEffect(() => {
-    if (profile?.role !== "FLEETii admin") return;
+    if (!isFleetiiAdmin(profile?.role)) return;
 
     let cancelled = false;
     void supabase
@@ -179,7 +180,7 @@ export function AdminFrontpage() {
                 >
                   Reservationer
                 </button>
-                {profile?.role !== "admin" && (
+                {!isDepartmentAdmin(profile?.role) && (
                   <button
                     type="button"
                     onClick={() => navigate("/fleet-map")}
@@ -190,7 +191,7 @@ export function AdminFrontpage() {
                 )}
               </div>
 
-              {profile?.role === "admin" && (
+              {isDepartmentAdmin(profile?.role) && (
                 <>
                   <hr className="border-brand-200" />
 
@@ -251,7 +252,7 @@ export function AdminFrontpage() {
                 </>
               )}
 
-              {profile?.role === "FLEETii admin" && (
+              {isFleetiiAdmin(profile?.role) && (
                 <>
                   <hr className="border-brand-200" />
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -102,7 +103,7 @@ export function DepartmentDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { profile } = useAuth();
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   const state = location.state as { costumerId?: string; costumerName?: string } | null;
   const costumerId = state?.costumerId ?? null;
   const costumerName = state?.costumerName ?? null;

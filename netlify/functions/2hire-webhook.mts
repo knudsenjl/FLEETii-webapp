@@ -12,7 +12,7 @@
 // gets a history row even though it has no live-state column to update yet.
 //
 // Docs: https://developer.2hire.io/docs/receiving-signals
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { isWebhookSignatureValid } from "./_shared/webhookSignature.js";
 
 const TOPIC_PATTERN = /^vehicle:([^:]+):generic:([a-z_]+)$/;
@@ -40,6 +40,15 @@ function toColumnUpdate(
       return { distance_covered_meters: Number(payload.data.meters), distance_covered_updated_at: updatedAt };
     case "autonomy_percentage":
       return { autonomy_percentage: Number(payload.data.percentage), autonomy_percentage_updated_at: updatedAt };
+    // See vehicle_signals_add_trip_detected.sql. The payload.data key is
+    // inferred as "trip_detected" (self-named, same convention as "online"'s
+    // own payload.data.online) — 2hire's docs for this specific signal
+    // weren't available while wiring this up; every delivery is preserved
+    // verbatim in vehicle_signal_history.signal_value regardless, so a wrong
+    // guess here is recoverable/verifiable from real delivered payloads
+    // without losing any data.
+    case "trip_detected":
+      return { trip_detected: Boolean(payload.data.trip_detected), trip_detected_updated_at: updatedAt };
     default:
       return null;
   }
@@ -63,14 +72,14 @@ export default async (req: Request) => {
   }
 
   const secret = process.env.TWOHIRE_WEBHOOK_SECRET;
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!secret || !supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler TWOHIRE_WEBHOOK_SECRET/SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  if (!secret) {
+    return new Response(JSON.stringify({ error: "Serveren mangler TWOHIRE_WEBHOOK_SECRET." }), { status: 500 });
   }
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+  }
+  const { admin } = adminClientResult;
 
   // Signature validation needs the exact raw bytes 2hire signed, so read the
   // body as text once — never JSON.parse first and re-stringify.
@@ -99,9 +108,6 @@ export default async (req: Request) => {
 
   const [, vehicleId, signal] = topicMatch;
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   // Every generic signal gets a history row — known or not, see this
   // file's own header comment and vehicle_signal_history_table.sql.

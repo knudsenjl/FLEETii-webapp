@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
@@ -10,10 +11,7 @@ import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
 import { motorApiDrivmiddel, motorApiVehicleField } from "../lib/motorApi";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 import { stripNumberSpacing } from "../lib/textNormalization";
-import { supabase } from "../lib/supabase";
-
-/** A department belonging to the Kunde picked below (FLEETii admin only) — same shape as UserDetailsPage.tsx's own DepartmentOption. */
-type DepartmentOption = { department_id: string; name: string };
+import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 
 /**
  * Admin "Opret køretøj" page ("/new-vehicle"): rather than creating the
@@ -39,7 +37,7 @@ export function NewVehiclePage() {
   const location = useLocation();
   const state = location.state as { costumerId?: string; costumerName?: string } | null;
   /** A FLEETii admin has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from router state rather than a picker. */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   const selectedCostumerId = isFleetiiAdmin ? (state?.costumerId ?? "") : "";
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
@@ -65,15 +63,9 @@ export function NewVehiclePage() {
     }
 
     let cancelled = false;
-    void supabase
-      .from("departments")
-      .select("department_id, name")
-      .eq("costumer_id", selectedCostumerId)
-      .order("name", { ascending: true })
-      .returns<DepartmentOption[]>()
-      .then(({ data }) => {
-        if (!cancelled) setDepartmentOptions(data ?? []);
-      });
+    void fetchDepartmentOptions(selectedCostumerId).then((options) => {
+      if (!cancelled) setDepartmentOptions(options);
+    });
 
     return () => {
       cancelled = true;
@@ -399,7 +391,7 @@ export function NewVehiclePage() {
                     </div>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Brand:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Mærke:</label>
                     <input
                       type="text"
                       value={brand}
@@ -408,7 +400,7 @@ export function NewVehiclePage() {
                     />
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Mærke:</label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Model:</label>
                     <input
                       type="text"
                       value={maerke}

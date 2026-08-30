@@ -29,7 +29,7 @@
 // drop_costumers_delete_policy.sql), which is exactly why this needs to be
 // a Netlify Function rather than a plain client-side .delete() call — same
 // reason delete-costumer.mts itself is a Function and not a client call.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 
 type DeleteDraftCostumerBody = { costumerId?: string };
@@ -44,14 +44,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: DeleteDraftCostumerBody;
   try {
@@ -65,9 +62,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "costumerId er påkrævet." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data: costumer, error: costumerError } = await admin
     .from("costumers")

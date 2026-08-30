@@ -10,7 +10,7 @@
 // needs to complete. It only ever touches the caller's OWN id, taken from
 // their verified bearer token, never a client-supplied one — so one user
 // can never clear another's flag.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { requireUser } from "./_shared/serverAuth.js";
 
 export default async (req: Request) => {
@@ -23,18 +23,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const { admin } = adminClientResult;
 
   const { error } = await admin.auth.admin.updateUserById(authResult.userId, {
     app_metadata: { must_change_password: false },

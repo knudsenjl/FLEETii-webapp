@@ -17,7 +17,7 @@
 // "who to contact", and the vehicle's own vehicle_profiles row supplies the
 // snapshot fields, both resolved server-side rather than trusted from the
 // request body.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
@@ -94,14 +94,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Serveren mangler MAIL_RECIEVER." }), { status: 500 });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: SendVehicleDeletionRequestBody;
   try {
@@ -115,21 +112,33 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "vehicleId er påkrævet." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
-  const { data: caller } = await admin
-    .from("user_profiles")
-    .select("costumer_id, department_id, full_name, email, phone")
-    .eq("user_id", authResult.userId)
-    .maybeSingle<{
-      costumer_id: string | null;
-      department_id: string | null;
-      full_name: string | null;
-      email: string | null;
-      phone: string | null;
-    }>();
+  // caller/vehicle are independent lookups (neither reads the other's
+  // result), so they're fetched together rather than one after another.
+  const [{ data: caller }, { data: vehicle }] = await Promise.all([
+    admin
+      .from("user_profiles")
+      .select("costumer_id, department_id, full_name, email, phone")
+      .eq("user_id", authResult.userId)
+      .maybeSingle<{
+        costumer_id: string | null;
+        department_id: string | null;
+        full_name: string | null;
+        email: string | null;
+        phone: string | null;
+      }>(),
+    admin
+      .from("vehicle_profiles")
+      .select("number_plate, brand, model, model_year, costumer_id")
+      .eq("vehicle_id", vehicleId)
+      .maybeSingle<{
+        number_plate: string | null;
+        brand: string | null;
+        model: string | null;
+        model_year: string | null;
+        costumer_id: string | null;
+      }>(),
+  ]);
 
   if (!caller?.costumer_id) {
     return new Response(
@@ -137,19 +146,6 @@ export default async (req: Request) => {
       { status: 403 },
     );
   }
-
-  const { data: vehicle } = await admin
-    .from("vehicle_profiles")
-    .select("number_plate, brand, model, model_year, costumer_id")
-    .eq("vehicle_id", vehicleId)
-    .maybeSingle<{
-      number_plate: string | null;
-      brand: string | null;
-      model: string | null;
-      model_year: string | null;
-      costumer_id: string | null;
-    }>();
-
   if (!vehicle) {
     return new Response(JSON.stringify({ error: "Køretøjet findes ikke." }), { status: 404 });
   }
@@ -160,22 +156,15 @@ export default async (req: Request) => {
     );
   }
 
-  const { data: customer } = await admin
-    .from("costumers")
-    .select("name")
-    .eq("costumer_id", caller.costumer_id)
-    .maybeSingle<{ name: string | null }>();
+  // customer/department are likewise independent of each other.
+  const [{ data: customer }, { data: department }] = await Promise.all([
+    admin.from("costumers").select("name").eq("costumer_id", caller.costumer_id).maybeSingle<{ name: string | null }>(),
+    caller.department_id
+      ? admin.from("departments").select("name").eq("department_id", caller.department_id).maybeSingle<{ name: string | null }>()
+      : Promise.resolve({ data: null }),
+  ]);
   const customerName = customer?.name ?? "—";
-
-  let departmentName = "—";
-  if (caller.department_id) {
-    const { data: department } = await admin
-      .from("departments")
-      .select("name")
-      .eq("department_id", caller.department_id)
-      .maybeSingle<{ name: string | null }>();
-    departmentName = department?.name ?? "—";
-  }
+  const departmentName = department?.name ?? "—";
 
   const contactperson = caller.full_name ?? caller.email ?? "—";
 

@@ -13,7 +13,7 @@
 // CostumerDetailsPage's own block/reactivate toggle is (see
 // costumers_add_deactivated_at.sql) — a costumer's deactivated_at is just a
 // row flag, nothing in auth.users to touch.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { requireAdmin } from "./_shared/serverAuth.js";
 
 type UnblockUserBody = { userId?: string };
@@ -28,14 +28,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: UnblockUserBody;
   try {
@@ -49,9 +46,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "userId er påkrævet." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const [{ data: caller }, { data: target }] = await Promise.all([
     admin

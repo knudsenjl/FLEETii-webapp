@@ -31,8 +31,8 @@
 // via resolveTwoHireCredentials, not hardcoded to global) even though this
 // route is itself FLEETii-admin-gated — see delete-vehicle.mts's identical
 // reasoning.
-import { createClient } from "@supabase/supabase-js";
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isFleetiiAdminRole, requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { registerVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -48,14 +48,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: RegisterVehicleOrderBody;
   try {
@@ -72,9 +69,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "orderId, qrCode og profileId er påkrævet." }), { status: 400 });
   }
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data: order } = await admin
     .from("costumer_orders")
@@ -114,7 +108,7 @@ export default async (req: Request) => {
       .maybeSingle<{ role: string }>();
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, { isFleetiiAdmin, costumerId: order.costumer_id });
 
     const result = await registerVehicle({ qrCode, profileId }, credentials);

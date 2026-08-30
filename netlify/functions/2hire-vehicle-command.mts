@@ -19,8 +19,8 @@
 // the caller's own costumer_id, which a FLEETii admin doesn't have) and
 // whether the caller is a FLEETii admin — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
-import { createClient } from "@supabase/supabase-js";
-import { requireAdmin, requireUser } from "./_shared/serverAuth.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { isFleetiiAdminRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -49,17 +49,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const { admin } = adminClientResult;
 
   try {
     const [{ data: vehicle, error: vehicleError }, { data: caller, error: callerError }] = await Promise.all([
@@ -77,7 +71,7 @@ export default async (req: Request) => {
     if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = caller?.role === "FLEETii admin";
+    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, {
       isFleetiiAdmin,
       costumerId: vehicle?.costumer_id ?? null,

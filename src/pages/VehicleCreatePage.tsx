@@ -28,7 +28,7 @@ type CostumerOrder = {
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. Null/empty falls back to number_plate wherever this is displayed (same convention as VehicleDetailsPage.tsx/HandleVehiclePage.tsx). */
   vehicle_ident: string | null;
   number_plate: string;
-  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Brand:"/"Mærke:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Mærke:"/"Model:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
   brand: string | null;
   model: string | null;
   model_year: string | null;
@@ -53,7 +53,7 @@ type CostumerOrderQueryRow = {
   department_id: string | null;
   vehicle_ident: string | null;
   number_plate: string;
-  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Brand:"/"Mærke:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
+  /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx's "Ny bestilling" form, fillable/editable right here instead (see the "Mærke:"/"Model:"/"Årgang:" rows below, autofillable from MotorAPI via the Køretøj row's "i" button). */
   brand: string | null;
   model: string | null;
   model_year: string | null;
@@ -179,11 +179,11 @@ export function VehicleCreatePage() {
 
   const [vehicleRegistered, setVehicleRegistered] = useState(order?.vehicle_registered ?? false);
   const [registeredVehicleId, setRegisteredVehicleId] = useState(order?.vehicle_id ?? null);
-  /** Editable Brand/Mærke/Årgang — local state rather than reading order.brand/model/model_year directly, since these are editable inputs (see the "Brand:"/"Mærke:"/"Årgang:" rows below). Only editable while isEditingOrder (see "Rediger" below) AND !vehicleRegistered: 2hire-register-vehicle.mts snapshots these onto the new vehicle_profiles row at registration time, so editing them afterward wouldn't retroactively change the already-created vehicle — misleading to allow. */
+  /** Editable Mærke/Model/Årgang — local state rather than reading order.brand/model/model_year directly, since these are editable inputs (see the "Mærke:"/"Model:"/"Årgang:" rows below). Only editable while isEditingOrder (see "Rediger" below) AND !vehicleRegistered: 2hire-register-vehicle.mts snapshots these onto the new vehicle_profiles row at registration time, so editing them afterward wouldn't retroactively change the already-created vehicle — misleading to allow. */
   const [brandInput, setBrandInput] = useState(order?.brand ?? "");
   const [modelInput, setModelInput] = useState(order?.model ?? "");
   const [modelYearInput, setModelYearInput] = useState(order?.model_year ?? "");
-  /** Editable Drivmiddel — same local-state pattern as Brand/Mærke/Årgang above, just a <select> instead of a free-text input (see the "Drivmiddel:" row below). */
+  /** Editable Drivmiddel — same local-state pattern as Mærke/Model/Årgang above, just a <select> instead of a free-text input (see the "Drivmiddel:" row below). */
   const [drivmiddelInput, setDrivmiddelInput] = useState(order?.drivmiddel ?? "Benzin");
   /** Editable Nummerplade/Kontaktperson/Kontakt e-mail/Kontakt tlf./FLEETii-device fields — same "local state, only editable while isEditingOrder" treatment as Brand/Mærke/Årgang/Drivmiddel above, added 2026-08-28 when "Rediger" was introduced to batch-edit every field on this review table together (previously only Brand/Mærke/Årgang/Drivmiddel were editable at all, and always-editable/auto-saving rather than behind a Rediger/Opdater/Fortryd toggle — see handleUpdateOrder/handleCancelEditOrder below). Køretøj-ID (vehicle_ident) and Kunde/Afdeling are deliberately NOT included: vehicle_ident is optional and rarely typed by the costumer in the first place, while Kunde/Afdeling are foreign keys with no picker on this page — reassigning either is a materially different, riskier operation than correcting a typo. */
   const [numberPlateInput, setNumberPlateInput] = useState(order?.number_plate ?? "");
@@ -392,7 +392,7 @@ export function VehicleCreatePage() {
     return () => clearTimeout(timeout);
   }, [showEditRequiredNotice]);
 
-  /** Fills Brand/Mærke/Årgang/Drivmiddel from a MotorAPI result — replaces what used to be four separate per-field "↓↙" fill buttons the admin had to click individually; now it all happens together whenever the "i" button's lookup data is (re)applied, see handleOpenMotorApiPopup below. Only while isEditingOrder ("Rediger" — these fields are only meant to change during a batch-edit, see the render branches below) AND !vehicleRegistered (once registered they're locked forever), and only overwrites a field MotorAPI actually has a value for, same as each old button's own individual behavior. Only sets local *Input state — no longer persists on its own (previously called saveOrderField immediately, comparing against order.brand/model/model_year: since those never change after the FIRST save, that comparison went stale after any Opdater and could also silently skip a real save, plus the immediate persist bypassed "Fortryd" entirely). Persisting now goes through the same handleUpdateOrder ("Opdater") batch save as every other manually-typed field. */
+  /** Fills Mærke/Model/Årgang/Drivmiddel from a MotorAPI result — replaces what used to be four separate per-field "↓↙" fill buttons the admin had to click individually; now it all happens together whenever the "i" button's lookup data is (re)applied, see handleOpenMotorApiPopup below. Only while isEditingOrder ("Rediger" — these fields are only meant to change during a batch-edit, see the render branches below) AND !vehicleRegistered (once registered they're locked forever), and only overwrites a field MotorAPI actually has a value for, same as each old button's own individual behavior. Only sets local *Input state — no longer persists on its own (previously called saveOrderField immediately, comparing against order.brand/model/model_year: since those never change after the FIRST save, that comparison went stale after any Opdater and could also silently skip a real save, plus the immediate persist bypassed "Fortryd" entirely). Persisting now goes through the same handleUpdateOrder ("Opdater") batch save as every other manually-typed field. */
   const autofillFromMotorApi = (result: unknown) => {
     if (vehicleRegistered || !order || !isEditingOrder) return;
 
@@ -439,7 +439,7 @@ export function VehicleCreatePage() {
       });
   };
 
-  /** Opens the MotorAPI popup — only while isEditingOrder ("Rediger"), since the whole point is autofilling Brand/Mærke/Årgang/Drivmiddel, which are only editable then anyway; outside edit mode this just flashes showEditRequiredNotice instead of doing anything (button stays visible either way, unlike the old vehicleRegistered-only guard, since "not editing yet" is a much more common/expected state to click it in than "already registered"). First-ever open fetches+caches the data (ensureMotorApiDataLoaded, which also autofills once on success); every later open reuses the cached motorApiResult — no new network call (quota) — but still re-runs autofillFromMotorApi against it, so re-opening while isEditingOrder re-applies MotorAPI's values even if the admin has since typed something else in, or entered a fresh "Rediger" session after an earlier Opdater. A plain close (re-click while already open) does neither. */
+  /** Opens the MotorAPI popup — only while isEditingOrder ("Rediger"), since the whole point is autofilling Mærke/Model/Årgang/Drivmiddel, which are only editable then anyway; outside edit mode this just flashes showEditRequiredNotice instead of doing anything (button stays visible either way, unlike the old vehicleRegistered-only guard, since "not editing yet" is a much more common/expected state to click it in than "already registered"). First-ever open fetches+caches the data (ensureMotorApiDataLoaded, which also autofills once on success); every later open reuses the cached motorApiResult — no new network call (quota) — but still re-runs autofillFromMotorApi against it, so re-opening while isEditingOrder re-applies MotorAPI's values even if the admin has since typed something else in, or entered a fresh "Rediger" session after an earlier Opdater. A plain close (re-click while already open) does neither. */
   const handleOpenMotorApiPopup = () => {
     if (!isEditingOrder) {
       setShowEditRequiredNotice(true);
@@ -620,8 +620,8 @@ export function VehicleCreatePage() {
     // labeled "Nummerplade:" here instead (this page's own choice, not
     // matched on VehicleDetailsPage).
     ["Nummerplade:", formatVehicleIdentLabel(order.vehicle_ident, numberPlateInput, useVehicleIdent)],
-    ["Brand:", brandInput || "—"],
-    ["Mærke:", modelInput || "—"],
+    ["Mærke:", brandInput || "—"],
+    ["Model:", modelInput || "—"],
     ["Årgang:", modelYearInput || "—"],
     ["Drivmiddel:", drivmiddelInput],
     ["Kontaktperson:", contactPersonInput],
@@ -659,7 +659,7 @@ export function VehicleCreatePage() {
                   // Drivmiddel is a fixed choice (see DRIVMIDDEL_OPTIONS),
                   // so it gets its own <select> branch here instead of joining
                   // the generic editableField handling below — but otherwise
-                  // matches Brand/Mærke/Årgang's row shape exactly. Editable
+                  // matches Mærke/Model/Årgang's row shape exactly. Editable
                   // while isEditingOrder ("Rediger", see below) AND
                   // !vehicleRegistered — once vehicleRegistered, this falls
                   // through to the plain read-only span at the bottom of this
@@ -686,13 +686,13 @@ export function VehicleCreatePage() {
                     );
                   }
 
-                  /** Brand/Mærke/Årgang/Nummerplade/Kontaktperson/Kontakt e-mail/Kontakt tlf. are all plain-text edits — editable while isEditingOrder AND !vehicleRegistered (2hire-register-vehicle.mts snapshots brand/model/model_year onto vehicle_profiles at registration time, so editing them afterward wouldn't change anything real; the whole batch-edit form is scoped to the not-yet-registered state regardless, see "Rediger" below). All saved together by handleUpdateOrder ("Opdater") — no more per-field auto-save on blur. */
+                  /** Mærke/Model/Årgang/Nummerplade/Kontaktperson/Kontakt e-mail/Kontakt tlf. are all plain-text edits — editable while isEditingOrder AND !vehicleRegistered (2hire-register-vehicle.mts snapshots brand/model/model_year onto vehicle_profiles at registration time, so editing them afterward wouldn't change anything real; the whole batch-edit form is scoped to the not-yet-registered state regardless, see "Rediger" below). All saved together by handleUpdateOrder ("Opdater") — no more per-field auto-save on blur. */
                   const editableField =
                     label === "Nummerplade:"
                       ? { value: numberPlateInput, setValue: setNumberPlateInput }
-                      : label === "Brand:"
+                      : label === "Mærke:"
                         ? { value: brandInput, setValue: setBrandInput }
-                        : label === "Mærke:"
+                        : label === "Model:"
                           ? { value: modelInput, setValue: setModelInput }
                           : label === "Årgang:"
                             ? { value: modelYearInput, setValue: setModelYearInput }
@@ -720,7 +720,7 @@ export function VehicleCreatePage() {
                             <button
                               type="button"
                               onClick={handleOpenMotorApiPopup}
-                              aria-label="Slå nummerplade op i MotorAPI og udfyld Brand/Mærke/Årgang/Drivmiddel"
+                              aria-label="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
                               title="Slå op i MotorAPI"
                               className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition"
                             >
@@ -803,13 +803,13 @@ export function VehicleCreatePage() {
                       <div className="flex min-w-0 items-center gap-1">
                         {/* Plain text, same transparent-border look as Kunde/Afdeling/every other genuinely non-editable row below — a bordered input-shaped box here would visually claim this field is editable when it isn't. */}
                         <span className="min-w-0 flex-1 truncate rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
-                        {/* Right-aligned in the value column, not the label column. On the transition into "open", this ALSO autofills Brand/Mærke/Årgang/Drivmiddel below from the same lookup (see ensureMotorApiDataLoaded/autofillFromMotorApi) — there's no separate per-field fill button anymore. */}
+                        {/* Right-aligned in the value column, not the label column. On the transition into "open", this ALSO autofills Mærke/Model/Årgang/Drivmiddel below from the same lookup (see ensureMotorApiDataLoaded/autofillFromMotorApi) — there's no separate per-field fill button anymore. */}
                         <div className="relative shrink-0" ref={motorApiRef}>
                           {/* Same lookup-button look as CostumerNewPage.tsx's CVR lookup (magnifying glass, spinner while in flight) — replaced the old plain "i" glyph so both external-lookup buttons in the app read the same way. */}
                           <button
                             type="button"
                             onClick={handleOpenMotorApiPopup}
-                            aria-label="Slå nummerplade op i MotorAPI og udfyld Brand/Mærke/Årgang/Drivmiddel"
+                            aria-label="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
                             title="Slå op i MotorAPI"
                             className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition"
                           >

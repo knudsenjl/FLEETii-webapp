@@ -2,19 +2,56 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { use2hireGPS, use2hireVehicle, useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel, toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
+import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 
 /** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
-/** A department belonging to the target costumer — populates the Afdeling filter and determines which vehicles (by departmentIds membership) are in scope. Same shape/role as VehiclesPage.tsx's own DepartmentOption. */
-type DepartmentOption = { department_id: string; name: string };
+/** How often the "Live" toggle (see the polling effect below) re-fetches vehicles/GPS positions while enabled. VehicleContext otherwise only fetches this once per session (see its own doc comment) — 10s is frequent enough to feel live without hammering Supabase on every render. */
+const LIVE_POLL_INTERVAL_MS = 10_000;
+
+type FleetMapSnapshot = {
+  mapView?: { lat: number; lng: number; zoom: number };
+  clusterMarkers?: boolean;
+  filters?: { costumerId: string; department: string; plate: string; status: string };
+};
+
+/** sessionStorage key for the reload-surviving snapshot below — see savedSnapshot's own doc comment for why this exists ALONGSIDE the router-state mechanism (which only survives browser-BACK, not an actual page reload). */
+const SNAPSHOT_STORAGE_KEY = "fleet-map:snapshot";
+
+/** Reads the sessionStorage snapshot written by writeStoredSnapshot() below — null on any access/parse failure (private-browsing storage quirks, corrupted JSON), never thrown. */
+function readStoredSnapshot(): FleetMapSnapshot | null {
+  try {
+    const raw = sessionStorage.getItem(SNAPSHOT_STORAGE_KEY);
+    return raw ? (JSON.parse(raw) as FleetMapSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** Merges `partial` into the stored snapshot — mapView (on every pan/zoom, see LeafletMap's onViewChange below) and clusterMarkers/filters (on their own, much less frequent, change) are written independently rather than all at once. Best-effort: silently does nothing if sessionStorage is unavailable/full. */
+function writeStoredSnapshot(partial: FleetMapSnapshot): void {
+  try {
+    sessionStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify({ ...readStoredSnapshot(), ...partial }));
+  } catch {
+    // best-effort only
+  }
+}
+
+/** True exactly when this page load is a genuine browser refresh (F5/reload button) rather than an in-app navigation ("Flådestyring" button, a direct link) — both otherwise look identical from inside the component (a fresh mount with no router state), so the Navigation Timing API is what actually tells them apart. Deliberately narrow: a fresh, non-reload visit must still reset to the normal defaults (see this page's own doc comment), so the sessionStorage snapshot below is only ever consulted for this one specific case. */
+function isPageReload(): boolean {
+  const [entry] = performance.getEntriesByType("navigation") as PerformanceNavigationTiming[];
+  return entry?.type === "reload";
+}
 
 /**
  * Admin "Flådestyring" page ("/fleet-map"): a single map showing every
@@ -38,20 +75,31 @@ export function FleetManagementPage() {
   const { afdelingId, costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
-  /** The map view (center/zoom), cluster toggle, AND filter picks this page itself snapshotted right before navigating to VehicleDetailsPage — see goToVehicleDetails and LeafletMap's own onViewChange/skipInitialFitBounds doc comments. Only ever present on the history entry a browser-back actually lands back on; a fresh visit (direct link, "Flådestyring" button) has neither, falling back to the normal fit-all-vehicles/clustered/afdelingId-scoped defaults below. */
-  const savedSnapshot = (
-    location.state as {
-      mapView?: { lat: number; lng: number; zoom: number };
-      clusterMarkers?: boolean;
-      filters?: { costumerId: string; department: string; plate: string; status: string };
-    } | null
-  ) ?? null;
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  /** The map view (center/zoom), cluster toggle, AND filter picks this page itself snapshotted right before navigating to VehicleDetailsPage — see goToVehicleDetails and LeafletMap's own onViewChange/skipInitialFitBounds doc comments. Present on the history entry a browser-back actually lands back on. Falls back to the sessionStorage snapshot (see readStoredSnapshot/isPageReload above) when this load is a genuine browser refresh instead — router state alone doesn't survive that, only browser-back. A fresh visit with neither (direct link, "Flådestyring" button) still falls all the way back to the normal fit-all-vehicles/clustered/afdelingId-scoped defaults below. */
+  const savedSnapshot: FleetMapSnapshot | null =
+    (location.state as FleetMapSnapshot | null) ?? (isPageReload() ? readStoredSnapshot() : null);
   const savedMapView = savedSnapshot?.mapView ?? null;
   /** The map's own latest center/zoom, kept up to date via LeafletMap's onViewChange — read (not reacted to) right before navigating away in goToVehicleDetails, so browser-back can restore exactly where the admin was looking instead of resetting to the fleet's default fit-all-vehicles view. A ref, not state: this only ever needs to be read at the moment of navigating away, not on every pan/zoom re-render. */
   const mapViewRef = useRef(savedMapView);
   const gpsPositions = use2hireGPS();
   const twoHireVehicles = use2hireVehicle();
+  const refreshVehicles = useRefreshVehicles();
+  /** "Live" toggle (the map's own control, see LeafletMap's liveToggle prop below) — off by default, and not persisted across a remount/refresh: unlike the view/filter snapshot above, silently resuming a background poll the admin never explicitly restarted here would be surprising, not helpful. */
+  const [liveEnabled, setLiveEnabled] = useState(false);
+  /** Polls vehicles/GPS positions on an interval while liveEnabled — see VehicleContext.tsx's own doc comment for why that's otherwise fetched exactly once per session. Fires once immediately on enable (so pressing "Live" feels instant, not "wait 10s for the first update"), then every LIVE_POLL_INTERVAL_MS after. This refreshes the app-wide vehicle context, same as HandleVehiclePage.tsx/VehicleCreatePage.tsx's own save-triggered refresh — every vehicle updates, not just the ones currently visible on this map, but only the ones actually shown here are what the admin sees change. */
+  useEffect(() => {
+    if (!liveEnabled) return;
+
+    void refreshVehicles();
+    const intervalId = setInterval(() => {
+      void refreshVehicles();
+    }, LIVE_POLL_INTERVAL_MS);
+
+    return () => {
+      clearInterval(intervalId);
+    };
+  }, [liveEnabled, refreshVehicles]);
 
   /** FLEETii-admin-only "Kunde" filter — same seeding/meaning as VehiclesPage.tsx's own filterCostumerId ("" = "Alle", every costumer). Restored from savedSnapshot.filters first (a browser-back should land back on exactly the scope the admin had picked), then the admin's own costumerId if their account happens to carry one, otherwise "". */
   const [filterCostumerId, setFilterCostumerId] = useState(savedSnapshot?.filters?.costumerId ?? costumerId ?? "");
@@ -108,12 +156,9 @@ export function FleetManagementPage() {
     }
 
     let cancelled = false;
-    const query = supabase.from("departments").select("department_id, name").order("name");
-    void (targetCostumerId ? query.eq("costumer_id", targetCostumerId) : query)
-      .returns<DepartmentOption[]>()
-      .then(({ data }) => {
-        if (!cancelled) setDepartmentOptions(data ?? []);
-      });
+    void fetchDepartmentOptions(targetCostumerId).then((options) => {
+      if (!cancelled) setDepartmentOptions(options);
+    });
 
     return () => {
       cancelled = true;
@@ -142,45 +187,8 @@ export function FleetManagementPage() {
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in each marker's tooltip below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx: vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire) is an UNGATED vehicle_ident-or-number_plate fallback, so it can't be reused directly here — the genuine pair is fetched straight from vehicle_profiles instead. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
-  /** The genuine Køretøj-ID/Reg.nr pair PLUS blocked-state per in-scope vehicle, keyed by vehicleId — same bulk-fetch pattern as AllBookingsPage.tsx's identByVehicleId. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") is appended as "(Blokeret)" text onto vehicleTooltip below, since a map marker tooltip is plain text, not a badge-capable element. */
-  const [identByVehicleId, setIdentByVehicleId] = useState<
-    Record<string, { vehicleIdent: string | null; numberPlate: string | null; blocked: boolean }>
-  >({});
-
-  useEffect(() => {
-    const vehicleIds = Array.from(new Set(departmentGpsPositions.map((g) => g.vehicleId)));
-    if (vehicleIds.length === 0) {
-      setIdentByVehicleId({});
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate, blocked_at")
-      .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null; blocked_at: string | null }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setIdentByVehicleId(
-          Object.fromEntries(
-            (data ?? []).map((row) => [
-              row.vehicle_id,
-              { vehicleIdent: row.vehicle_ident, numberPlate: row.number_plate, blocked: row.blocked_at !== null },
-            ]),
-          ),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-    // departmentGpsPositions itself is intentionally omitted from the
-    // dependency array (it's a fresh array/object every render) — its
-    // content-based vehicleId set is what actually determines whether a
-    // re-fetch is needed, same reasoning as LeafletMap.tsx's extraMarkersKey.
-    // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [departmentGpsPositions.map((g) => g.vehicleId).join("|")]);
+  /** The genuine Køretøj-ID/Reg.nr pair PLUS blocked-state per in-scope vehicle, keyed by vehicleId. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") is appended as "(Blokeret)" text onto vehicleTooltip below, since a map marker tooltip is plain text, not a badge-capable element. */
+  const identByVehicleId = useVehicleIdentLookup(departmentGpsPositions.map((g) => g.vehicleId));
 
   /** Køretøj-ID/Reg.nr tooltip text for one vehicle — "{ident} / {plate}" or just plate, same combined semantics as formatVehicleIdentLabel everywhere else; falls back to "—" only if vehicle_profiles hasn't loaded yet for it. Appends " (Blokeret)" when the vehicle is administratively blocked. */
   const vehicleTooltip = (vehicleId: string): string =>
@@ -232,6 +240,14 @@ export function FleetManagementPage() {
     }
     setFilterCostumerId(costumerId ?? "");
   }, [isFleetiiAdmin, costumerId]);
+
+  /** Persists clusterMarkers/filters to sessionStorage on every change — together with the mapView write in onViewChange above, this is what lets a genuine browser refresh (see isPageReload) restore the map the same way browser-back already does via router state alone. */
+  useEffect(() => {
+    writeStoredSnapshot({
+      clusterMarkers,
+      filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate, status: filterStatus },
+    });
+  }, [clusterMarkers, filterCostumerId, filterDepartment, filterPlate, filterStatus]);
 
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
@@ -398,10 +414,14 @@ export function FleetManagementPage() {
                   lat={savedMapView?.lat ?? center.lat}
                   lng={savedMapView?.lng ?? center.lng}
                   zoom={savedMapView?.zoom ?? (primary ? 13 : 7)}
+                  markerLat={center.lat}
+                  markerLng={center.lng}
                   skipInitialFitBounds={savedMapView !== null}
                   onViewChange={(view) => {
                     mapViewRef.current = view;
+                    writeStoredSnapshot({ mapView: view });
                   }}
+                  liveToggle={{ active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) }}
                   showMarker={Boolean(primary)}
                   markerTooltip={primary ? vehicleTooltip(primary.vehicleId) : undefined}
                   onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}

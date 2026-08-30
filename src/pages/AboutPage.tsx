@@ -7,6 +7,7 @@
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin, isFleetiiAdmin } from "../lib/roles";
 
 /**
  * Static "About FLEETii" page: product description, Brugerguide/
@@ -75,7 +76,7 @@ export function AboutPage() {
                       Brugerguide
                     </a>
                   )}
-                  {administratormanualUrl && (profile?.role === "admin" || profile?.role === "FLEETii admin") && (
+                  {administratormanualUrl && isAnyAdmin(profile?.role) && (
                     <a
                       href={administratormanualUrl}
                       target="_blank"
@@ -85,7 +86,7 @@ export function AboutPage() {
                       Administratormanual
                     </a>
                   )}
-                  {fleetiiAdministratormanualUrl && profile?.role === "FLEETii admin" && (
+                  {fleetiiAdministratormanualUrl && isFleetiiAdmin(profile?.role) && (
                     <a
                       href={fleetiiAdministratormanualUrl}
                       target="_blank"

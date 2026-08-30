@@ -29,10 +29,13 @@ const positionMarkerIcon = L.divIcon({
 });
 
 type LeafletMapProps = {
-  /** Center coordinate (also the primary marker's position when showMarker is true). */
+  /** Center coordinate — also the primary marker's position when showMarker is true, UNLESS markerLat/markerLng are given (see their own doc comment). */
   lat: number;
   lng: number;
   zoom?: number;
+  /** The primary marker's actual position, when it needs to differ from `lat`/`lng` (the map's own center) — e.g. VehicleDetailsPage.tsx/BookingDetailsPage.tsx/BookingPage.tsx restoring a saved pan/zoom across a browser refresh (see useMapViewSnapshot): the map's CENTER should stay wherever the admin last left it, but the marker must still show the vehicle's real, live GPS position, which may be somewhere else entirely on that restored view. Defaults to `lat`/`lng` (the marker sits exactly where the map is centered) — the original behavior every other caller (e.g. FleetManagementPage.tsx) still relies on. */
+  markerLat?: number;
+  markerLng?: number;
   className?: string;
   /** Additional markers besides the primary one (e.g. every vehicle on the fleet map besides the "primary"/selected one). */
   extraMarkers?: { lat: number; lng: number; tooltip?: string; onClick?: () => void }[];
@@ -51,6 +54,8 @@ type LeafletMapProps = {
   skipInitialFitBounds?: boolean;
   /** Fired whenever the map's own center/zoom settles (Leaflet's "moveend" — covers the initial view, a user's own pan/zoom, and every programmatic setView/fitBounds alike). Lets a caller remember what the admin was actually looking at across an unmount, since this component's own view-preservation refs (see below) only survive re-renders, not a full unmount/remount — e.g. FleetManagementPage snapshots the latest value into router state right before navigating to VehicleDetailsPage, so browser-back can restore it instead of recentering on the fleet's default fit-all-vehicles view. */
   onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
+  /** Optional "Live" toggle control, stacked below Recenter (which is itself below Leaflet's own zoom buttons) — LeafletMap has no opinion on what "live" means (polling, a Realtime subscription, etc.); it just renders the button and reports clicks via `onToggle`, and highlights it whenever `active` is true. Omitted entirely (no button rendered) when this prop isn't given — see FleetManagementPage.tsx for the one caller that currently uses it. */
+  liveToggle?: { active: boolean; onToggle: () => void };
 };
 
 /** Renders an OpenStreetMap tile map with a primary marker and optional extra markers/clustering. See LeafletMapProps for what each prop controls. */
@@ -58,6 +63,8 @@ export function LeafletMap({
   lat,
   lng,
   zoom = 13,
+  markerLat,
+  markerLng,
   className,
   extraMarkers = [],
   showMarker = true,
@@ -68,7 +75,12 @@ export function LeafletMap({
   showMarkerIcon = true,
   skipInitialFitBounds = false,
   onViewChange,
+  liveToggle,
 }: LeafletMapProps) {
+  // Falls back to the map's own center whenever markerLat/markerLng aren't
+  // given — see their own doc comment above.
+  const effectiveMarkerLat = markerLat ?? lat;
+  const effectiveMarkerLng = markerLng ?? lng;
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   // Callers routinely pass a fresh inline closure for onMarkerClick on every
@@ -81,6 +93,17 @@ export function LeafletMap({
   // Same reasoning as onMarkerClickRef just above.
   const onViewChangeRef = useRef(onViewChange);
   onViewChangeRef.current = onViewChange;
+  // Same reasoning again — liveToggle.onToggle is read through a ref so the
+  // main effect below only needs to care about WHETHER a live toggle exists
+  // (hasLiveToggle, a stable boolean) rather than the whole object, which is
+  // typically a fresh literal every render.
+  const onLiveToggleRef = useRef(liveToggle?.onToggle);
+  onLiveToggleRef.current = liveToggle?.onToggle;
+  const hasLiveToggle = liveToggle !== undefined;
+  // The Live button's own DOM node, so the lightweight effect below can
+  // restyle it in place (active/inactive) without tearing down and
+  // rebuilding the whole map just to reflect a toggle click.
+  const liveButtonRef = useRef<HTMLElement | null>(null);
   // Content-based signature for extraMarkers, used as the effect's actual
   // dependency below instead of the array reference — FleetManagementPage.tsx
   // passes a fresh `.map()` array every render even when the underlying
@@ -104,7 +127,14 @@ export function LeafletMap({
   // primary vehicle) apart from "some other, non-view prop changed" (cluster,
   // tooltip config, marker positions/content) — only the former re-applies
   // the incoming lat/lng/zoom and re-fits bounds; the latter restores
-  // whatever view the map actually had right before its teardown.
+  // whatever view the map actually had right before its teardown. This
+  // classification deliberately looks at lat/lng/zoom ONLY, not
+  // markerLat/markerLng — a caller whose marker moved but whose own center
+  // didn't (e.g. VehicleDetailsPage.tsx's live GPS update arriving after a
+  // savedMapView-restored center, see markerLat/markerLng's own doc comment)
+  // still needs a rebuild to reposition the marker (hence markerLat/
+  // markerLng ARE in the effect's dependency array below), but that rebuild
+  // should restore the admin's own pan/zoom, not re-fit/recenter around it.
   const lastViewPropsRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
   const savedViewRef = useRef<{ center: L.LatLngTuple; zoom: number } | null>(null);
 
@@ -143,7 +173,7 @@ export function LeafletMap({
     const tooltipOffset: [number, number] = showMarkerIcon ? [0, -28] : [0, -6];
 
     if (showMarker) {
-      const marker = L.marker([lat, lng], { icon });
+      const marker = L.marker([effectiveMarkerLat, effectiveMarkerLng], { icon });
       addMarkerToMap(marker);
       // Binding the SAME logical click on both the marker and its own
       // interactive tooltip below (two genuinely separate Leaflet layers,
@@ -183,7 +213,73 @@ export function LeafletMap({
         if (permanentTooltips) marker.getTooltip()?.on("click", handleClick);
       }
       marker.on("click", handleClick);
+
+      // "Recenter" control, stacked directly below Leaflet's own zoom
+      // buttons (same "topleft" corner, added after the map's own default
+      // zoom control so it renders underneath it) — now that a restored
+      // pan/zoom (see markerLat/markerLng's own doc comment) can leave the
+      // marker scrolled out of view entirely, there needs to be a one-click
+      // way back to it without hunting for it by hand. Recenters only (does
+      // not touch the current zoom level) — a plain L.Control rather than a
+      // React element since this whole map is built imperatively; removed
+      // automatically along with everything else on map.remove() below, no
+      // separate cleanup needed.
+      const RecenterControl = L.Control.extend({
+        onAdd: () => {
+          const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+          const button = L.DomUtil.create("a", "", container);
+          button.href = "#";
+          button.title = "Centrer på køretøjet";
+          button.setAttribute("aria-label", "Centrer på køretøjet");
+          button.style.display = "flex";
+          button.style.alignItems = "center";
+          button.style.justifyContent = "center";
+          button.innerHTML =
+            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/></svg>';
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.on(button, "click", (event) => {
+            L.DomEvent.preventDefault(event);
+            map.setView([effectiveMarkerLat, effectiveMarkerLng], map.getZoom());
+          });
+          return container;
+        },
+      });
+      new RecenterControl({ position: "topleft" }).addTo(map);
     }
+
+    // "Live" toggle control, stacked below Recenter (added right after it,
+    // same "topleft" corner) — unlike Recenter, not gated on showMarker: its
+    // presence shouldn't flicker in/out as a filter transiently narrows the
+    // visible markers down to zero. LeafletMap itself has no opinion on what
+    // "live" means (see liveToggle's own doc comment) — this control is
+    // purely the button; a separate, lightweight effect below (not this
+    // whole-map-rebuilding one) keeps its highlighted/plain styling in sync
+    // with liveToggle.active without tearing anything down.
+    if (hasLiveToggle) {
+      const LiveControl = L.Control.extend({
+        onAdd: () => {
+          const container = L.DomUtil.create("div", "leaflet-bar leaflet-control");
+          const button = L.DomUtil.create("a", "", container);
+          button.href = "#";
+          button.title = "Vis GPS-positioner live";
+          button.setAttribute("aria-label", "Vis GPS-positioner live");
+          button.style.display = "flex";
+          button.style.alignItems = "center";
+          button.style.justifyContent = "center";
+          button.innerHTML =
+            '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.5 5.5a9 9 0 0 0 0 13"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+          L.DomEvent.disableClickPropagation(container);
+          L.DomEvent.on(button, "click", (event) => {
+            L.DomEvent.preventDefault(event);
+            onLiveToggleRef.current?.();
+          });
+          liveButtonRef.current = button;
+          return container;
+        },
+      });
+      new LiveControl({ position: "topleft" }).addTo(map);
+    }
+
     extraMarkers.forEach((marker) => {
       const extraMarker = L.marker([marker.lat, marker.lng], { icon });
       addMarkerToMap(extraMarker);
@@ -220,7 +316,7 @@ export function LeafletMap({
     // fresh mount out of this too — see its own doc comment.
     if (!viewPropsUnchanged && !skipInitialFitBounds && extraMarkers.length > 0) {
       const bounds = L.latLngBounds([
-        [lat, lng],
+        [effectiveMarkerLat, effectiveMarkerLng],
         ...extraMarkers.map((marker): [number, number] => [marker.lat, marker.lng]),
       ]);
       map.fitBounds(bounds, { padding: [40, 40] });
@@ -251,6 +347,7 @@ export function LeafletMap({
       savedViewRef.current = { center: [map.getCenter().lat, map.getCenter().lng], zoom: map.getZoom() };
       map.remove();
       mapRef.current = null;
+      liveButtonRef.current = null;
     };
     // extraMarkers itself is intentionally omitted — extraMarkersKey (a
     // content-based signature, see its own comment above) is the real
@@ -258,7 +355,36 @@ export function LeafletMap({
     // suggestion would be wrong (using the array reference directly would
     // rebuild the whole map on every caller re-render, see the comment above).
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [lat, lng, zoom, showMarker, markerTooltip, cluster, permanentTooltips, showMarkerIcon, skipInitialFitBounds, extraMarkersKey]);
+  }, [
+    lat,
+    lng,
+    zoom,
+    markerLat,
+    markerLng,
+    showMarker,
+    markerTooltip,
+    cluster,
+    permanentTooltips,
+    showMarkerIcon,
+    skipInitialFitBounds,
+    extraMarkersKey,
+    hasLiveToggle,
+  ]);
+
+  // Restyles the Live button in place (green when active, plain otherwise)
+  // whenever liveToggle.active changes — deliberately its own effect rather
+  // than a dependency of the main one above, which would tear down and
+  // rebuild the entire map (tiles, markers, both controls) just to reflect
+  // a toggle click. Runs after the main effect on the same commit (later
+  // declaration order), so liveButtonRef.current is already set by the time
+  // this reads it, including on the very first mount.
+  useEffect(() => {
+    const button = liveButtonRef.current;
+    if (!button) return;
+    const active = liveToggle?.active ?? false;
+    button.style.color = active ? "#16a34a" : "";
+    button.style.backgroundColor = active ? "#f0fdf4" : "";
+  }, [liveToggle?.active]);
 
   return <div ref={containerRef} className={className} />;
 }

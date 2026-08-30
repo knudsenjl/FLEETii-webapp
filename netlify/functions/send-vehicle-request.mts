@@ -17,9 +17,9 @@
 // Mail transport (SMTP) lives in _shared/mailer.ts, shared with
 // create-user.mts's welcome email. MAIL_RECIEVER is this function's own
 // recipient (FLEETii staff) — unrelated to who create-user.mts emails.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleRequestBody = {
@@ -137,14 +137,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Serveren mangler MAIL_RECIEVER." }), { status: 500 });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
+  const { admin } = adminClientResult;
 
   let body: SendVehicleRequestBody;
   try {
@@ -186,9 +183,6 @@ export default async (req: Request) => {
 
   let afdeling = asTrimmedString(body.afdeling) || "—";
 
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
 
   const { data: caller } = await admin
     .from("user_profiles")
@@ -205,7 +199,7 @@ export default async (req: Request) => {
   // module comment up top.
   let costumerId: string | null;
   let departmentId: string | null;
-  if (caller?.role === "FLEETii admin") {
+  if (isFleetiiAdminRole(caller?.role)) {
     const requestedDepartmentId = asTrimmedString(body.departmentId);
     if (!requestedDepartmentId) {
       return new Response(JSON.stringify({ error: "Kunde og afdeling er påkrævet." }), { status: 400 });
@@ -235,36 +229,37 @@ export default async (req: Request) => {
     );
   }
 
-  const { data: customer } = await admin
-    .from("costumers")
-    .select("name")
-    .eq("costumer_id", costumerId)
-    .maybeSingle<{ name: string | null }>();
+  // The costumer name is only needed for the email built further below
+  // (alongside insertedOrder.order_id), never by the insert itself — so this
+  // read and the costumer_orders write run concurrently rather than one
+  // after the other.
+  const [{ data: customer }, { data: insertedOrder, error: insertError }] = await Promise.all([
+    admin.from("costumers").select("name").eq("costumer_id", costumerId).maybeSingle<{ name: string | null }>(),
+    admin
+      .from("costumer_orders")
+      .insert({
+        order_type: "Opret",
+        costumer_id: costumerId,
+        department_id: departmentId,
+        vehicle_ident: vehicleIdent || null,
+        parking: parking || null,
+        number_plate: nummerplade,
+        brand: brand || null,
+        model: maerke || null,
+        model_year: aargang || null,
+        fuel_level: fuelLevel || null,
+        mileage: mileage || null,
+        drivmiddel,
+        needs_fleetii_device: needsFleetiiDevice,
+        fleetii_device_id: needsFleetiiDevice ? null : fleetiiDeviceId,
+        contactperson: kontaktperson,
+        contactemail: kontaktemail,
+        contactnumber: kontaktnummer,
+      })
+      .select("order_id")
+      .single<{ order_id: string }>(),
+  ]);
   const customerName = customer?.name ?? "—";
-
-  const { data: insertedOrder, error: insertError } = await admin
-    .from("costumer_orders")
-    .insert({
-      order_type: "Opret",
-      costumer_id: costumerId,
-      department_id: departmentId,
-      vehicle_ident: vehicleIdent || null,
-      parking: parking || null,
-      number_plate: nummerplade,
-      brand: brand || null,
-      model: maerke || null,
-      model_year: aargang || null,
-      fuel_level: fuelLevel || null,
-      mileage: mileage || null,
-      drivmiddel,
-      needs_fleetii_device: needsFleetiiDevice,
-      fleetii_device_id: needsFleetiiDevice ? null : fleetiiDeviceId,
-      contactperson: kontaktperson,
-      contactemail: kontaktemail,
-      contactnumber: kontaktnummer,
-    })
-    .select("order_id")
-    .single<{ order_id: string }>();
 
   if (insertError || !insertedOrder) {
     // Raw Postgres error logged server-side only — NewVehiclePage.tsx

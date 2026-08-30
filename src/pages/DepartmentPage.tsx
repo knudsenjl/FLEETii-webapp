@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -86,7 +87,7 @@ export function DepartmentPage() {
   const columnCount = 4;
 
   /** A FLEETii admin has no costumer of their own — for them, targetCostumerId only ever comes from router state. */
-  const isFleetiiAdmin = profile?.role === "FLEETii admin";
+  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
   const targetCostumerId = state?.costumerId ?? costumerId;
   const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
   /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */

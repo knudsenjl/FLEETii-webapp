@@ -13,6 +13,7 @@ import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin } from "../lib/roles";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { Modal } from "./Modal";
 
@@ -74,7 +75,7 @@ export function ProtectedRoute({
     return <Navigate to="/set-password" replace />;
   }
 
-  if (requireAdmin && profile?.role !== "admin" && profile?.role !== "FLEETii admin") {
+  if (requireAdmin && !isAnyAdmin(profile?.role)) {
     return <ForbiddenNotice />;
   }
 

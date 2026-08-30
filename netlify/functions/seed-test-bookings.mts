@@ -32,7 +32,7 @@
 // one collision as fatal. Overlapping bookings for DIFFERENT vehicles are
 // fine (and expected, at this booking density) — only the same vehicle can't
 // be double-booked.
-import { createClient } from "@supabase/supabase-js";
+import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
 import { requireUser } from "./_shared/serverAuth.js";
 
@@ -76,18 +76,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
 
-  const supabaseUrl = process.env.SUPABASE_URL ?? process.env.VITE_SUPABASE_URL;
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!supabaseUrl || !serviceRoleKey) {
-    return new Response(
-      JSON.stringify({ error: "Serveren mangler SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY." }),
-      { status: 500 },
-    );
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) {
+    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
-
-  const admin = createClient(supabaseUrl, serviceRoleKey, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  const { admin } = adminClientResult;
 
   const [departmentsResult, vehicleDepartmentsResult, userDepartmentsResult, anvendelseResult] = await Promise.all([
     admin.from("departments").select("department_id, name").returns<DepartmentRow[]>(),
