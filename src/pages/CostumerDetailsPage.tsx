@@ -674,6 +674,19 @@ export function CostumerDetailsPage() {
                   <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
                     {costumer.name ?? "—"}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      navigate("/fleet-map", {
+                        state: {
+                          filters: { costumerId: costumer.costumer_id, department: "", plate: "", status: "" },
+                        },
+                      })
+                    }
+                    className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    Flådestyring
+                  </button>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
@@ -721,19 +734,6 @@ export function CostumerDetailsPage() {
                     )}
                     <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate("/fleet-map", {
-                        state: {
-                          filters: { costumerId: costumer.costumer_id, department: "", plate: "", status: "" },
-                        },
-                      })
-                    }
-                    className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    Flådestyring
-                  </button>
                 </div>
               </>
             )}
