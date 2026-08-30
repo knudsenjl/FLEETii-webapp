@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -23,6 +23,7 @@ type FleetMapSnapshot = {
   mapView?: { lat: number; lng: number; zoom: number };
   clusterMarkers?: boolean;
   filters?: { costumerId: string; department: string; plate: string; status: string };
+  liveEnabled?: boolean;
 };
 
 /** sessionStorage key for the reload-surviving snapshot below — see savedSnapshot's own doc comment for why this exists ALONGSIDE the router-state mechanism (which only survives browser-BACK, not an actual page reload). */
@@ -76,7 +77,7 @@ export function FleetManagementPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
-  /** The map view (center/zoom), cluster toggle, AND filter picks this page itself snapshotted right before navigating to VehicleDetailsPage — see goToVehicleDetails and LeafletMap's own onViewChange/skipInitialFitBounds doc comments. Present on the history entry a browser-back actually lands back on. Falls back to the sessionStorage snapshot (see readStoredSnapshot/isPageReload above) when this load is a genuine browser refresh instead — router state alone doesn't survive that, only browser-back. A fresh visit with neither (direct link, "Flådestyring" button) still falls all the way back to the normal fit-all-vehicles/clustered/afdelingId-scoped defaults below. */
+  /** The map view (center/zoom), cluster toggle, filter picks, AND Live toggle this page itself snapshotted right before navigating to VehicleDetailsPage — see goToVehicleDetails and LeafletMap's own onViewChange/skipInitialFitBounds doc comments. Present on the history entry a browser-back actually lands back on. Falls back to the sessionStorage snapshot (see readStoredSnapshot/isPageReload above) when this load is a genuine browser refresh instead — router state alone doesn't survive that, only browser-back. A fresh visit with neither (direct link, "Flådestyring" button) still falls all the way back to the normal fit-all-vehicles/clustered/afdelingId-scoped defaults below. */
   const savedSnapshot: FleetMapSnapshot | null =
     (location.state as FleetMapSnapshot | null) ?? (isPageReload() ? readStoredSnapshot() : null);
   const savedMapView = savedSnapshot?.mapView ?? null;
@@ -85,8 +86,12 @@ export function FleetManagementPage() {
   const gpsPositions = use2hireGPS();
   const twoHireVehicles = use2hireVehicle();
   const refreshVehicles = useRefreshVehicles();
-  /** "Live" toggle (the map's own control, see LeafletMap's liveToggle prop below) — off by default, and not persisted across a remount/refresh: unlike the view/filter snapshot above, silently resuming a background poll the admin never explicitly restarted here would be surprising, not helpful. */
-  const [liveEnabled, setLiveEnabled] = useState(false);
+  /** "Live" toggle (the map's own control, see LeafletMap's liveToggle prop below) — restored from savedSnapshot exactly like mapView/clusterMarkers/filters above (browser-back, or a genuine refresh), so a poll the admin deliberately turned on stays on across either instead of silently reverting. Defaults to off otherwise, same as every other field in the snapshot. */
+  const [liveEnabled, setLiveEnabled] = useState(savedSnapshot?.liveEnabled ?? false);
+  /** Persists liveEnabled on every change (on AND off — an explicit "turned it off" must overwrite a stale "on" from earlier in the session too), same sessionStorage channel as mapView/clusterMarkers/filters. */
+  useEffect(() => {
+    writeStoredSnapshot({ liveEnabled });
+  }, [liveEnabled]);
   /** Polls vehicles/GPS positions on an interval while liveEnabled — see VehicleContext.tsx's own doc comment for why that's otherwise fetched exactly once per session. Fires once immediately on enable (so pressing "Live" feels instant, not "wait 10s for the first update"), then every LIVE_POLL_INTERVAL_MS after. This refreshes the app-wide vehicle context, same as HandleVehiclePage.tsx/VehicleCreatePage.tsx's own save-triggered refresh — every vehicle updates, not just the ones currently visible on this map, but only the ones actually shown here are what the admin sees change. */
   useEffect(() => {
     if (!liveEnabled) return;
@@ -179,11 +184,22 @@ export function FleetManagementPage() {
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
-  /** GPS positions for exactly the vehicles that passed every filter above — the map only ever shows markers for these. */
+  /** GPS positions for exactly the vehicles that passed every filter above — the map only ever shows markers for these. Sorted by vehicleId — gpsPositions itself comes from a plain, unordered SQL select (see liveVehicleDataSource.ts's getGpsPositions), so without this, which vehicle lands at index 0 (and thus becomes `primary` below) could silently shuffle between two Live-toggle polls of the exact same underlying vehicle set, which would make the map's own center (see stableCenter below) and the marker structure both look like they'd changed when nothing really had. */
   const filteredVehicleIds = new Set(filteredVehicles.map((v) => v.vehicleId));
-  const departmentGpsPositions = gpsPositions.filter((g) => filteredVehicleIds.has(g.vehicleId));
+  const departmentGpsPositions = gpsPositions
+    .filter((g) => filteredVehicleIds.has(g.vehicleId))
+    .sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
   const [primary, ...rest] = departmentGpsPositions;
+  /** The primary vehicle's OWN, always-current position — feeds the marker (via markerLat/markerLng below) and the tooltip/showMarker checks, and updates on every Live-toggle poll. Deliberately NOT used for the map's own center — see stableCenter below. */
   const center = primary ?? DENMARK_CENTER;
+  /** The map's own center — frozen to wherever the CURRENT primary vehicle was when it last became primary, not recomputed on every position it later reports (unlike `center` above). Recomputes only when `primary?.vehicleId` itself changes (a genuine reason to recenter: a filter changed, or the old primary dropped out of scope) — a live GPS poll updating the SAME vehicle's position is deliberately invisible to this, so the Live toggle only ever moves markers (see LeafletMap.tsx's own position-sync effect) instead of also recentering/rebuilding the whole map underneath the admin every 10s. */
+  const stableCenter = useMemo(
+    () => (primary ? { lat: primary.lat, lng: primary.lng } : DENMARK_CENTER),
+    // primary.lat/primary.lng are deliberately excluded — see this constant's
+    // own doc comment just above.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [primary?.vehicleId],
+  );
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in each marker's tooltip below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx: vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire) is an UNGATED vehicle_ident-or-number_plate fallback, so it can't be reused directly here — the genuine pair is fetched straight from vehicle_profiles instead. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
@@ -252,13 +268,14 @@ export function FleetManagementPage() {
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
     if (!twoHireVehicle) return;
-    // Stamps the map's current view, cluster toggle, AND filter picks onto
-    // THIS page's own history entry (replace, not push) right before
-    // navigating away — so a browser-back from VehicleDetailsPage lands back
-    // on a "/fleet-map" entry that still remembers where the admin was
-    // looking, whether they'd switched to "Vis enkeltvis", and whatever
-    // Kunde/Afdeling/Køretøj/Status they'd filtered to, instead of resetting
-    // all of it to defaults. Same formSnapshot-style pattern as
+    // Stamps the map's current view, cluster toggle, filter picks, AND Live
+    // toggle onto THIS page's own history entry (replace, not push) right
+    // before navigating away — so a browser-back from VehicleDetailsPage
+    // lands back on a "/fleet-map" entry that still remembers where the
+    // admin was looking, whether they'd switched to "Vis enkeltvis",
+    // whatever Kunde/Afdeling/Køretøj/Status they'd filtered to, and whether
+    // Live polling was on, instead of resetting all of it to defaults. Same
+    // formSnapshot-style pattern as
     // ReservationPage.tsx/AvailablePage.tsx. mapView is omitted (not just
     // null) when unknown (moveend hasn't fired even once yet) — matches
     // savedMapView's own "absent, not null" check for "no override" ??
@@ -269,6 +286,7 @@ export function FleetManagementPage() {
         ...(mapViewRef.current ? { mapView: mapViewRef.current } : {}),
         clusterMarkers,
         filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate, status: filterStatus },
+        liveEnabled,
       },
     });
     navigate(`/vehicle-details/${vehicleId}`, { state: { vehicle: toDisplayVehicle(twoHireVehicle) } });
@@ -411,8 +429,8 @@ export function FleetManagementPage() {
 
               <div className="relative mt-4 min-h-[16rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                 <LeafletMap
-                  lat={savedMapView?.lat ?? center.lat}
-                  lng={savedMapView?.lng ?? center.lng}
+                  lat={savedMapView?.lat ?? stableCenter.lat}
+                  lng={savedMapView?.lng ?? stableCenter.lng}
                   zoom={savedMapView?.zoom ?? (primary ? 13 : 7)}
                   markerLat={center.lat}
                   markerLng={center.lng}
@@ -426,6 +444,7 @@ export function FleetManagementPage() {
                   markerTooltip={primary ? vehicleTooltip(primary.vehicleId) : undefined}
                   onMarkerClick={primary ? () => goToVehicleDetails(primary.vehicleId) : undefined}
                   extraMarkers={rest.map((g) => ({
+                    id: g.vehicleId,
                     lat: g.lat,
                     lng: g.lng,
                     tooltip: vehicleTooltip(g.vehicleId),

@@ -1,8 +1,14 @@
 // Thin React wrapper around a plain Leaflet map. Leaflet manages its own DOM
 // inside containerRef imperatively (not through React's render cycle), so
-// the map is created once in an effect and torn down on unmount/dependency
-// change — see the dependency-array comment below for exactly which prop
-// changes are allowed to trigger that teardown/rebuild.
+// the map is created once in a "structural" effect and torn down on
+// unmount/structural-prop change — see that effect's own dependency-array
+// comment for exactly which prop changes are allowed to trigger that
+// teardown/rebuild. Marker POSITION changes (e.g. FleetManagementPage's
+// Live-toggle polling every 10s) deliberately do NOT go through that
+// effect at all — see the position-sync effect further down — so a live
+// GPS update just slides the existing marker to its new spot instead of
+// tearing down and redrawing the whole map (tiles included), which used to
+// look like the whole thing "blinking" every poll.
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
@@ -28,17 +34,26 @@ const positionMarkerIcon = L.divIcon({
   popupAnchor: [0, -9],
 });
 
+type ExtraMarker = {
+  /** Stable per-marker identity (e.g. a vehicleId) — used to match this marker back to the SAME Leaflet marker instance across a position-only update (see the position-sync effect below), so a live GPS poll can't accidentally reposition the wrong marker if the caller's own array happens to reorder between renders (e.g. an unordered DB query). Falls back to `tooltip` when omitted — callers that never reposition markers after creation (i.e. everyone except FleetManagementPage.tsx today) don't need to set this. */
+  id?: string;
+  lat: number;
+  lng: number;
+  tooltip?: string;
+  onClick?: () => void;
+};
+
 type LeafletMapProps = {
   /** Center coordinate — also the primary marker's position when showMarker is true, UNLESS markerLat/markerLng are given (see their own doc comment). */
   lat: number;
   lng: number;
   zoom?: number;
-  /** The primary marker's actual position, when it needs to differ from `lat`/`lng` (the map's own center) — e.g. VehicleDetailsPage.tsx/BookingDetailsPage.tsx/BookingPage.tsx restoring a saved pan/zoom across a browser refresh (see useMapViewSnapshot): the map's CENTER should stay wherever the admin last left it, but the marker must still show the vehicle's real, live GPS position, which may be somewhere else entirely on that restored view. Defaults to `lat`/`lng` (the marker sits exactly where the map is centered) — the original behavior every other caller (e.g. FleetManagementPage.tsx) still relies on. */
+  /** The primary marker's actual position, when it needs to differ from `lat`/`lng` (the map's own center) — e.g. VehicleDetailsPage.tsx/BookingDetailsPage.tsx/BookingPage.tsx restoring a saved pan/zoom across a browser refresh (see useMapViewSnapshot), or FleetManagementPage.tsx keeping the map's own center pinned to whichever vehicle is "primary" while the marker itself tracks that vehicle's live position independently (see this component's position-sync effect below for how a change here moves the marker WITHOUT recentering the map or rebuilding anything). Defaults to `lat`/`lng` (the marker sits exactly where the map is centered) — the original behavior any caller that doesn't set these still gets. */
   markerLat?: number;
   markerLng?: number;
   className?: string;
   /** Additional markers besides the primary one (e.g. every vehicle on the fleet map besides the "primary"/selected one). */
-  extraMarkers?: { lat: number; lng: number; tooltip?: string; onClick?: () => void }[];
+  extraMarkers?: ExtraMarker[];
   /** Whether to render a marker at lat/lng at all (false shows just the tiles, e.g. when no GPS fix exists). */
   showMarker?: boolean;
   markerTooltip?: string;
@@ -104,16 +119,29 @@ export function LeafletMap({
   // restyle it in place (active/inactive) without tearing down and
   // rebuilding the whole map just to reflect a toggle click.
   const liveButtonRef = useRef<HTMLElement | null>(null);
-  // Content-based signature for extraMarkers, used as the effect's actual
-  // dependency below instead of the array reference — FleetManagementPage.tsx
-  // passes a fresh `.map()` array every render even when the underlying
-  // vehicle positions haven't moved, and depending on the array reference
-  // directly would tear down and rebuild the whole Leaflet map (losing pan/
-  // zoom, re-fitting bounds) on every one of those unrelated re-renders.
-  // Click-handler identity isn't part of the signature — those are rebound
-  // fresh every time the effect actually runs regardless, so their own
-  // per-render identity churn shouldn't force a rebuild.
-  const extraMarkersKey = extraMarkers.map((m) => `${m.lat}:${m.lng}:${m.tooltip ?? ""}`).join("|");
+  // The primary/extra marker instances + the cluster group (if any), from
+  // the most recent structural build — read (not reacted to) by the
+  // position-sync effect below to reposition them in place. extraMarkers is
+  // keyed by id (falling back to tooltip) rather than array index, so a
+  // caller whose own array happens to reorder between polls (e.g. an
+  // unordered DB query — see FleetManagementPage.tsx's own defensive sort)
+  // still moves the RIGHT Leaflet marker instance rather than whichever one
+  // happened to sit at the same index last time.
+  const primaryMarkerRef = useRef<L.Marker | null>(null);
+  const extraMarkerRefsById = useRef<Map<string, L.Marker>>(new Map());
+  const clusterGroupRef = useRef<L.MarkerClusterGroup | null>(null);
+  // Content-based signature for extraMarkers' STRUCTURE (which vehicles are
+  // present at all, and their tooltip text) — deliberately excludes lat/lng,
+  // and deliberately SORTED (order-independent), so a live GPS poll (which
+  // only ever changes position, and whose backing query has no guaranteed
+  // row order — see FleetManagementPage.tsx) never counts as a structural
+  // change on its own. The actual positions are handled entirely by the
+  // separate, lightweight position-sync effect below instead of this
+  // whole-map-rebuilding one.
+  const extraMarkersStructureKey = extraMarkers
+    .map((m) => `${m.id ?? m.tooltip ?? ""}:${m.tooltip ?? ""}`)
+    .sort()
+    .join("|");
   // Every prop change below tears down and rebuilds the WHOLE Leaflet map
   // (simplest way to keep marker/cluster/tooltip rendering in sync — see the
   // effect's own dependency array), which would normally also reset pan/zoom
@@ -122,19 +150,11 @@ export function LeafletMap({
   // changes `cluster`, not where the admin was actually looking, so
   // rebuilding from the props alone would zoom back out to all of Denmark
   // every time it's pressed. These two refs let the effect tell "the center/
-  // zoom props themselves genuinely changed" (a real recenter, e.g. this
-  // vehicle's live GPS position moved, or FleetManagementPage picked a new
-  // primary vehicle) apart from "some other, non-view prop changed" (cluster,
-  // tooltip config, marker positions/content) — only the former re-applies
-  // the incoming lat/lng/zoom and re-fits bounds; the latter restores
-  // whatever view the map actually had right before its teardown. This
-  // classification deliberately looks at lat/lng/zoom ONLY, not
-  // markerLat/markerLng — a caller whose marker moved but whose own center
-  // didn't (e.g. VehicleDetailsPage.tsx's live GPS update arriving after a
-  // savedMapView-restored center, see markerLat/markerLng's own doc comment)
-  // still needs a rebuild to reposition the marker (hence markerLat/
-  // markerLng ARE in the effect's dependency array below), but that rebuild
-  // should restore the admin's own pan/zoom, not re-fit/recenter around it.
+  // zoom props themselves genuinely changed" (a real recenter, e.g. a picker
+  // choosing a new primary vehicle) apart from "some other, non-view prop
+  // changed" (cluster, tooltip config, marker structure) — only the former
+  // re-applies the incoming lat/lng/zoom and re-fits bounds; the latter
+  // restores whatever view the map actually had right before its teardown.
   const lastViewPropsRef = useRef<{ lat: number; lng: number; zoom: number } | null>(null);
   const savedViewRef = useRef<{ center: L.LatLngTuple; zoom: number } | null>(null);
 
@@ -158,6 +178,7 @@ export function LeafletMap({
       maxZoom: 19,
     }).addTo(map);
     const clusterGroup = cluster ? L.markerClusterGroup().addTo(map) : null;
+    clusterGroupRef.current = clusterGroup;
     const addMarkerToMap = (marker: L.Marker) => {
       if (clusterGroup) {
         clusterGroup.addLayer(marker);
@@ -175,6 +196,7 @@ export function LeafletMap({
     if (showMarker) {
       const marker = L.marker([effectiveMarkerLat, effectiveMarkerLng], { icon });
       addMarkerToMap(marker);
+      primaryMarkerRef.current = marker;
       // Binding the SAME logical click on both the marker and its own
       // interactive tooltip below (two genuinely separate Leaflet layers,
       // each independently registered with the map's own click-target
@@ -239,12 +261,16 @@ export function LeafletMap({
           L.DomEvent.disableClickPropagation(container);
           L.DomEvent.on(button, "click", (event) => {
             L.DomEvent.preventDefault(event);
-            map.setView([effectiveMarkerLat, effectiveMarkerLng], map.getZoom());
+            const target: L.LatLngExpression =
+              primaryMarkerRef.current?.getLatLng() ?? [effectiveMarkerLat, effectiveMarkerLng];
+            map.setView(target, map.getZoom());
           });
           return container;
         },
       });
       new RecenterControl({ position: "topleft" }).addTo(map);
+    } else {
+      primaryMarkerRef.current = null;
     }
 
     // "Live" toggle control, stacked below Recenter (added right after it,
@@ -280,9 +306,11 @@ export function LeafletMap({
       new LiveControl({ position: "topleft" }).addTo(map);
     }
 
-    extraMarkers.forEach((marker) => {
+    const extraMarkerRefs = new Map<string, L.Marker>();
+    extraMarkers.forEach((marker, index) => {
       const extraMarker = L.marker([marker.lat, marker.lng], { icon });
       addMarkerToMap(extraMarker);
+      extraMarkerRefs.set(marker.id ?? marker.tooltip ?? String(index), extraMarker);
       // See the primary marker's identical handling (including the
       // dedupe-guard comment) just above.
       let lastHandledAt = 0;
@@ -307,13 +335,14 @@ export function LeafletMap({
         extraMarker.on("click", handleExtraClick);
       }
     });
+    extraMarkerRefsById.current = extraMarkerRefs;
 
     // Only fits to every marker's bounds on a genuine center/zoom prop
     // change (or the very first mount) — a rebuild triggered by some OTHER
-    // prop (cluster, tooltip config, marker content) restores the saved view
-    // above instead, and re-fitting here would immediately override that
-    // right back out to fit everything again. skipInitialFitBounds opts a
-    // fresh mount out of this too — see its own doc comment.
+    // prop (cluster, tooltip config, marker structure) restores the saved
+    // view above instead, and re-fitting here would immediately override
+    // that right back out to fit everything again. skipInitialFitBounds
+    // opts a fresh mount out of this too — see its own doc comment.
     if (!viewPropsUnchanged && !skipInitialFitBounds && extraMarkers.length > 0) {
       const bounds = L.latLngBounds([
         [effectiveMarkerLat, effectiveMarkerLng],
@@ -348,26 +377,30 @@ export function LeafletMap({
       map.remove();
       mapRef.current = null;
       liveButtonRef.current = null;
+      primaryMarkerRef.current = null;
+      extraMarkerRefsById.current = new Map();
+      clusterGroupRef.current = null;
     };
-    // extraMarkers itself is intentionally omitted — extraMarkersKey (a
-    // content-based signature, see its own comment above) is the real
+    // extraMarkers itself is intentionally omitted — extraMarkersStructureKey
+    // (a content-based signature, see its own comment above) is the real
     // dependency here, so the rule's raw "extraMarkers"/"extraMarkers.length"
     // suggestion would be wrong (using the array reference directly would
-    // rebuild the whole map on every caller re-render, see the comment above).
+    // rebuild the whole map on every caller re-render, see the comment
+    // above). markerLat/markerLng are ALSO deliberately omitted — a
+    // position-only change is handled entirely by the effect below instead,
+    // without tearing down and rebuilding the map at all.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [
     lat,
     lng,
     zoom,
-    markerLat,
-    markerLng,
     showMarker,
     markerTooltip,
     cluster,
     permanentTooltips,
     showMarkerIcon,
     skipInitialFitBounds,
-    extraMarkersKey,
+    extraMarkersStructureKey,
     hasLiveToggle,
   ]);
 
@@ -385,6 +418,35 @@ export function LeafletMap({
     button.style.color = active ? "#16a34a" : "";
     button.style.backgroundColor = active ? "#f0fdf4" : "";
   }, [liveToggle?.active]);
+
+  // Content-based signature for extraMarkers' POSITIONS (id + lat/lng) —
+  // triggers the position-sync effect below whenever any marker actually
+  // moved, without needing the array reference itself as a dependency (same
+  // "fresh array every render" reasoning as extraMarkersStructureKey above).
+  const extraMarkersPositionKey = extraMarkers.map((m, i) => `${m.id ?? m.tooltip ?? i}:${m.lat}:${m.lng}`).join("|");
+
+  // Moves the existing marker instances to their new positions IN PLACE
+  // (Leaflet's Marker#setLatLng) instead of going through the structural
+  // effect above — this is what lets FleetManagementPage's Live toggle (a
+  // poll every 10s, see its own doc comment) just slide markers to their
+  // new spot rather than tearing down and redrawing the whole map (tile
+  // layer included) on every update, which is what used to make the map
+  // visibly "blink". Cluster mode needs an explicit refreshClusters() nudge
+  // afterward — leaflet.markercluster doesn't recompute cluster membership
+  // on its own just because a member marker moved.
+  useEffect(() => {
+    if (primaryMarkerRef.current) {
+      primaryMarkerRef.current.setLatLng([effectiveMarkerLat, effectiveMarkerLng]);
+    }
+    extraMarkers.forEach((marker, index) => {
+      extraMarkerRefsById.current.get(marker.id ?? marker.tooltip ?? String(index))?.setLatLng([marker.lat, marker.lng]);
+    });
+    clusterGroupRef.current?.refreshClusters();
+    // extraMarkers itself is intentionally omitted — extraMarkersPositionKey
+    // (a content-based signature) is the real dependency, same reasoning as
+    // extraMarkersStructureKey above.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [effectiveMarkerLat, effectiveMarkerLng, extraMarkersPositionKey]);
 
   return <div ref={containerRef} className={className} />;
 }
