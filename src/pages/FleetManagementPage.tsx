@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
-import { use2hireGPS, use2hireVehicle, useRefreshVehicles } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
@@ -15,9 +15,6 @@ import { fetchDepartmentOptions, type DepartmentOption } from "../lib/department
 
 /** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
-
-/** How often the "Live" toggle (see the polling effect below) re-fetches vehicles/GPS positions while enabled. VehicleContext otherwise only fetches this once per session (see its own doc comment) — 10s is frequent enough to feel live without hammering Supabase on every render. */
-const LIVE_POLL_INTERVAL_MS = 10_000;
 
 type FleetMapSnapshot = {
   mapView?: { lat: number; lng: number; zoom: number };
@@ -77,34 +74,39 @@ export function FleetManagementPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
-  /** The map view (center/zoom), cluster toggle, filter picks, AND Live toggle this page itself snapshotted right before navigating to VehicleDetailsPage — see goToVehicleDetails and LeafletMap's own onViewChange/skipInitialFitBounds doc comments. Present on the history entry a browser-back actually lands back on. Falls back to the sessionStorage snapshot (see readStoredSnapshot/isPageReload above) when this load is a genuine browser refresh instead — router state alone doesn't survive that, only browser-back. A fresh visit with neither (direct link, "Flådestyring" button) still falls all the way back to the normal fit-all-vehicles/clustered/afdelingId-scoped defaults below. */
+  /** router-state snapshot — either the full one goToVehicleDetails stamps right before navigating to VehicleDetailsPage (present on the history entry a browser-back actually lands back on — NOT a reload, so storedSnapshot below is never in play there and this is the only source anyway), or the PARTIAL one CostumerDetailsPage.tsx's/DepartmentDetailsPage.tsx's own "Flådestyring" button passes (just `filters`, for a fresh costumer/department-scoped visit — no mapView/clusterMarkers/liveEnabled at all, and frozen at whatever it was on that one navigation — the browser preserves it verbatim across a later reload, unlike sessionStorage below, which keeps getting overwritten as the admin actually interacts). */
+  const routerSnapshot = (location.state as FleetMapSnapshot | null) ?? null;
+  /** The sessionStorage snapshot (see readStoredSnapshot/isPageReload above), consulted only on a genuine browser refresh — router state alone doesn't survive that, only browser-back does. */
+  const storedSnapshot = isPageReload() ? readStoredSnapshot() : null;
+  /** Merges the two PER FIELD (not "pick one object") — storedSnapshot's own fields win when present, since it's continuously kept fresh while the admin interacts (every pan/zoom, filter change, or Live toggle rewrites it — see the write effects below), whereas routerSnapshot is a frozen snapshot from whichever ONE navigation last pushed it. routerSnapshot only fills in whatever storedSnapshot doesn't have — which matters specifically on the FIRST reload of a session (storedSnapshot not written yet) or when routerSnapshot is only PARTIAL (CostumerDetailsPage's own button only ever sets `filters`): picking one object wholesale, rather than merging, would let that partial state permanently block mapView/clusterMarkers/liveEnabled from ever being restored from sessionStorage on a later refresh of that same page, even after they'd been correctly written there. A fresh, non-reload visit (storedSnapshot null) still falls through to routerSnapshot alone, or all the way to the normal fit-all-vehicles/clustered/afdelingId-scoped defaults below when neither exists. */
   const savedSnapshot: FleetMapSnapshot | null =
-    (location.state as FleetMapSnapshot | null) ?? (isPageReload() ? readStoredSnapshot() : null);
+    routerSnapshot || storedSnapshot
+      ? {
+          mapView: storedSnapshot?.mapView ?? routerSnapshot?.mapView,
+          clusterMarkers: storedSnapshot?.clusterMarkers ?? routerSnapshot?.clusterMarkers,
+          filters: storedSnapshot?.filters ?? routerSnapshot?.filters,
+          liveEnabled: storedSnapshot?.liveEnabled ?? routerSnapshot?.liveEnabled,
+        }
+      : null;
   const savedMapView = savedSnapshot?.mapView ?? null;
   /** The map's own latest center/zoom, kept up to date via LeafletMap's onViewChange — read (not reacted to) right before navigating away in goToVehicleDetails, so browser-back can restore exactly where the admin was looking instead of resetting to the fleet's default fit-all-vehicles view. A ref, not state: this only ever needs to be read at the moment of navigating away, not on every pan/zoom re-render. */
   const mapViewRef = useRef(savedMapView);
   const gpsPositions = use2hireGPS();
   const twoHireVehicles = use2hireVehicle();
   const refreshVehicles = useRefreshVehicles();
+  const setLiveTracking = useSetLiveTracking();
   /** "Live" toggle (the map's own control, see LeafletMap's liveToggle prop below) — restored from savedSnapshot exactly like mapView/clusterMarkers/filters above (browser-back, or a genuine refresh), so a poll the admin deliberately turned on stays on across either instead of silently reverting. Defaults to off otherwise, same as every other field in the snapshot. */
   const [liveEnabled, setLiveEnabled] = useState(savedSnapshot?.liveEnabled ?? false);
   /** Persists liveEnabled on every change (on AND off — an explicit "turned it off" must overwrite a stale "on" from earlier in the session too), same sessionStorage channel as mapView/clusterMarkers/filters. */
   useEffect(() => {
     writeStoredSnapshot({ liveEnabled });
   }, [liveEnabled]);
-  /** Polls vehicles/GPS positions on an interval while liveEnabled — see VehicleContext.tsx's own doc comment for why that's otherwise fetched exactly once per session. Fires once immediately on enable (so pressing "Live" feels instant, not "wait 10s for the first update"), then every LIVE_POLL_INTERVAL_MS after. This refreshes the app-wide vehicle context, same as HandleVehiclePage.tsx/VehicleCreatePage.tsx's own save-triggered refresh — every vehicle updates, not just the ones currently visible on this map, but only the ones actually shown here are what the admin sees change. */
+  /** Turns the shared "position" broadcast listener on/off in step with the Live toggle (see VehicleContext.tsx's useSetLiveTracking/2hire-webhook.mts's own httpSend call) — event-driven, not a poll: this page no longer re-fetches anything on a timer, only when 2hire actually reports a moved vehicle. Also does a single, ONE-OFF refreshVehicles() on the off->on transition (not repeated) — the broadcast only reports FUTURE moves, so a vehicle that moved before Live was ever turned on this session would otherwise stay stale until it moves again; this is a one-time baseline, not the busy-waiting this replaced. Disables on unmount too, so navigating away doesn't leave the listener open for no one. */
   useEffect(() => {
-    if (!liveEnabled) return;
-
-    void refreshVehicles();
-    const intervalId = setInterval(() => {
-      void refreshVehicles();
-    }, LIVE_POLL_INTERVAL_MS);
-
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [liveEnabled, refreshVehicles]);
+    setLiveTracking(liveEnabled);
+    if (liveEnabled) void refreshVehicles();
+    return () => setLiveTracking(false);
+  }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
   /** FLEETii-admin-only "Kunde" filter — same seeding/meaning as VehiclesPage.tsx's own filterCostumerId ("" = "Alle", every costumer). Restored from savedSnapshot.filters first (a browser-back should land back on exactly the scope the admin had picked), then the admin's own costumerId if their account happens to carry one, otherwise "". */
   const [filterCostumerId, setFilterCostumerId] = useState(savedSnapshot?.filters?.costumerId ?? costumerId ?? "");
@@ -439,6 +441,7 @@ export function FleetManagementPage() {
                     mapViewRef.current = view;
                     writeStoredSnapshot({ mapView: view });
                   }}
+                  recenterFitsAllMarkers
                   liveToggle={{ active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) }}
                   showMarker={Boolean(primary)}
                   markerTooltip={primary ? vehicleTooltip(primary.vehicleId) : undefined}

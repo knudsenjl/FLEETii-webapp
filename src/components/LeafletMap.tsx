@@ -71,6 +71,8 @@ type LeafletMapProps = {
   onViewChange?: (view: { lat: number; lng: number; zoom: number }) => void;
   /** Optional "Live" toggle control, stacked below Recenter (which is itself below Leaflet's own zoom buttons) — LeafletMap has no opinion on what "live" means (polling, a Realtime subscription, etc.); it just renders the button and reports clicks via `onToggle`, and highlights it whenever `active` is true. Omitted entirely (no button rendered) when this prop isn't given — see FleetManagementPage.tsx for the one caller that currently uses it. */
   liveToggle?: { active: boolean; onToggle: () => void };
+  /** Makes the Recenter control re-fit the view to every visible marker (primary + extraMarkers, same bounds/padding as the initial-mount fitBounds above) instead of its default behavior of centering on just the primary marker's own position. Right for a multi-vehicle map like FleetManagementPage.tsx, where there's no one vehicle the admin is specifically tracking — "primary" there is just whichever vehicle happens to sort first (see extraMarkersStructureKey's own comment), an internal bookkeeping detail with no meaning to the admin, so recentering on it instead of showing every vehicle again was reported as a bug. Deliberately re-fits bounds at CLICK time rather than replaying a view captured once after mount — capturing "the" initial view is inherently racy (the very first setView on map creation and the subsequent fitBounds can both fire moveend, and which one a caller's onViewChange handler sees first isn't guaranteed), whereas recomputing fitBounds from the markers' CURRENT positions (already available in this same closure) needs no timing assumptions at all, and self-heals if the vehicle set has changed since mount. Falls back to the default single-marker recenter when there are no extraMarkers (nothing to fit bounds to). Off by default. */
+  recenterFitsAllMarkers?: boolean;
 };
 
 /** Renders an OpenStreetMap tile map with a primary marker and optional extra markers/clustering. See LeafletMapProps for what each prop controls. */
@@ -91,6 +93,7 @@ export function LeafletMap({
   skipInitialFitBounds = false,
   onViewChange,
   liveToggle,
+  recenterFitsAllMarkers = false,
 }: LeafletMapProps) {
   // Falls back to the map's own center whenever markerLat/markerLng aren't
   // given — see their own doc comment above.
@@ -261,6 +264,14 @@ export function LeafletMap({
           L.DomEvent.disableClickPropagation(container);
           L.DomEvent.on(button, "click", (event) => {
             L.DomEvent.preventDefault(event);
+            if (recenterFitsAllMarkers && extraMarkers.length > 0) {
+              const bounds = L.latLngBounds([
+                [effectiveMarkerLat, effectiveMarkerLng],
+                ...extraMarkers.map((marker): [number, number] => [marker.lat, marker.lng]),
+              ]);
+              map.fitBounds(bounds, { padding: [40, 40] });
+              return;
+            }
             const target: L.LatLngExpression =
               primaryMarkerRef.current?.getLatLng() ?? [effectiveMarkerLat, effectiveMarkerLng];
             map.setView(target, map.getZoom());
@@ -278,9 +289,11 @@ export function LeafletMap({
     // presence shouldn't flicker in/out as a filter transiently narrows the
     // visible markers down to zero. LeafletMap itself has no opinion on what
     // "live" means (see liveToggle's own doc comment) — this control is
-    // purely the button; a separate, lightweight effect below (not this
-    // whole-map-rebuilding one) keeps its highlighted/plain styling in sync
-    // with liveToggle.active without tearing anything down.
+    // purely the button, colored correctly from the moment it's created
+    // (see the initialActive read below); a separate, lightweight effect
+    // further down handles keeping an ALREADY-existing button's styling in
+    // sync when liveToggle.active later changes value on its own, without
+    // tearing anything down for that case.
     if (hasLiveToggle) {
       const LiveControl = L.Control.extend({
         onAdd: () => {
@@ -294,6 +307,22 @@ export function LeafletMap({
           button.style.justifyContent = "center";
           button.innerHTML =
             '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2" fill="currentColor" stroke="none"/><path d="M8.5 8.5a5 5 0 0 0 0 7"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M5.5 5.5a9 9 0 0 0 0 13"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>';
+          // Applied here, not left to the separate restyle effect below, so
+          // a freshly-(re)created button starts correctly colored even when
+          // this structural effect reruns for a reason OTHER than
+          // liveToggle.active changing (e.g. vehicle/GPS data arriving a
+          // moment after mount flips showMarker, which — being a structural
+          // dependency — tears down and recreates this whole control). The
+          // restyle effect's own dependency is liveToggle.active's VALUE,
+          // which doesn't change in that case, so it would never fire again
+          // to fix up the new button — leaving it permanently uncolored
+          // even while liveEnabled was genuinely true the whole time. This
+          // was the actual cause of the "Live turns black after a refresh"
+          // report: the state was always correct, only the freshly-rebuilt
+          // button's paint was stale.
+          const initialActive = liveToggle?.active ?? false;
+          button.style.color = initialActive ? "#16a34a" : "";
+          button.style.backgroundColor = initialActive ? "#f0fdf4" : "";
           L.DomEvent.disableClickPropagation(container);
           L.DomEvent.on(button, "click", (event) => {
             L.DomEvent.preventDefault(event);
@@ -402,15 +431,19 @@ export function LeafletMap({
     skipInitialFitBounds,
     extraMarkersStructureKey,
     hasLiveToggle,
+    recenterFitsAllMarkers,
   ]);
 
   // Restyles the Live button in place (green when active, plain otherwise)
-  // whenever liveToggle.active changes — deliberately its own effect rather
-  // than a dependency of the main one above, which would tear down and
-  // rebuild the entire map (tiles, markers, both controls) just to reflect
-  // a toggle click. Runs after the main effect on the same commit (later
-  // declaration order), so liveButtonRef.current is already set by the time
-  // this reads it, including on the very first mount.
+  // whenever liveToggle.active changes value WITHOUT the structural effect
+  // above also rerunning (a plain toggle click) — deliberately its own
+  // effect rather than a dependency of the main one, which would tear down
+  // and rebuild the entire map (tiles, markers, both controls) just to
+  // reflect a click. The button's INITIAL color is set directly inside the
+  // structural effect above instead (see initialActive there) — this
+  // effect alone used to also be relied on for that, which broke as soon as
+  // the structural effect reran for some unrelated reason (see its own
+  // comment for the real bug this caused).
   useEffect(() => {
     const button = liveButtonRef.current;
     if (!button) return;
