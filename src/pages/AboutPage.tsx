@@ -4,10 +4,13 @@
 // (Bruger, Administrator, FLEETii-administrator) and contact details;
 // PageHeader itself handles showing/hiding "Log ud" and the role/afdeling
 // row based on whether the visitor is actually logged in.
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
+import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isFleetiiAdmin } from "../lib/roles";
+import { ANTI_CLONING_NOTICE } from "../lib/legal";
 
 /**
  * Static "About FLEETii" page: product description, Brugerguide/
@@ -41,6 +44,8 @@ import { isAnyAdmin, isFleetiiAdmin } from "../lib/roles";
  */
 export function AboutPage() {
   const { profile } = useAuth();
+  /** Toggles the anti-cloning clause popup below the copyright line — see ANTI_CLONING_NOTICE's own comment for why this same clause is shared with LoginPage.tsx's identical copyright line. */
+  const [showCopyrightNotice, setShowCopyrightNotice] = useState(false);
   const brugerguideUrl = import.meta.env.VITE_BRUGERMANUAL_URL;
   const administratormanualUrl = import.meta.env.VITE_ADMINMANUAL_URL;
   const fleetiiAdministratormanualUrl = import.meta.env.VITE_FLEETIIMANUAL_URL;
@@ -100,7 +105,13 @@ export function AboutPage() {
               </div>
 
               <p className="text-sm text-brand-700">
-                FLEETii understøtter flådeadministration og køretøjsbrugere i din afdeling.
+                FLEETii er den digitale nøgle- og flådestyringsløsning, der giver jeres
+                organisation nøglefri adgang til flåden, fleksible bookinger, forhindre uønsket
+                anvendelse, realtidsdata og et fuldt overblik — uden besvær med fysiske nøgler.
+              </p>
+
+              <p className="text-sm text-brand-700">
+                FLEETii understøtter flådeadministratorer og køretøjsbrugere i din organisation.
               </p>
 
               <div className="flex flex-col gap-1.5">
@@ -114,11 +125,12 @@ export function AboutPage() {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <h3 className="text-sm font-semibold text-brand-800">Køretøjsbrugere</h3>
+                <h3 className="text-sm font-semibold text-brand-800">Brugere af køretøjerne</h3>
                 <p className="text-sm text-brand-700">
                   Her kan du se dine aktuelle reservationer (næste og kommende). Herudover kan du
-                  bl.a. låse din reserverede bil op, og låse den under brugen af bilen og ved
-                  afslutning af reservationen.
+                  bl.a. låse din reserverede bil op direkte fra din mobil uden adgang til den
+                  fysiske bilnøgle, og låse den under brugen af bilen og ved afslutning af
+                  reservationen.
                 </p>
               </div>
 
@@ -143,18 +155,41 @@ export function AboutPage() {
                     <span>CVR: 31 98 30 37</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-brand-500">
-                      <path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8Z" />
-                    </svg>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-brand-500">
+                        <path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8Z" />
+                      </svg>
+                    </span>
                     <a href="tel:+4570608689" className="hover:underline">70 60 86 89</a>
                   </div>
                   <div className="flex items-center gap-2">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-brand-500">
-                      <rect x="3" y="5" width="18" height="14" rx="2" />
-                      <path d="m4 7 8 6 8-6" />
-                    </svg>
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-brand-500">
+                        <rect x="3" y="5" width="18" height="14" rx="2" />
+                        <path d="m4 7 8 6 8-6" />
+                      </svg>
+                    </span>
                     <a href="mailto:info@fleeti.dk" className="hover:underline">info@fleeti.dk</a>
                   </div>
+                </div>
+              </div>
+
+              {/* Proprietary notice — the only real recourse if the UI/workflow is cloned is having asserted ownership somewhere; see the repo's own LICENSE file for the full terms. */}
+              <div className="flex justify-center">
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowCopyrightNotice((prev) => !prev)}
+                    className="text-center text-xs text-brand-400 underline decoration-dotted underline-offset-2 transition hover:text-brand-600"
+                  >
+                    © {new Date().getFullYear()} FLEETii. Alle rettigheder forbeholdes.
+                    <br />
+                    Uautoriseret kopiering eller efterligning af denne software er ikke tilladt.
+                  </button>
+                  {showCopyrightNotice && (
+                    <div className="fixed inset-0 z-10" onClick={() => setShowCopyrightNotice(false)} />
+                  )}
+                  <InlinePopup visible={showCopyrightNotice} position="top" message={ANTI_CLONING_NOTICE} />
                 </div>
               </div>
             </div>

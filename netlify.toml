@@ -21,6 +21,17 @@
   to = "/index.html"
   status = 200
 
+# Applies to the whole SPA — stops the app being embedded in an <iframe> on
+# someone else's site (a cheap way to "skin"/clone a UI without copying any
+# code), on top of the LICENSE's own ownership notice.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    Content-Security-Policy = "frame-ancestors 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+
 # The bulk-import CSV templates (public/templates/bulk-import/*.csv, linked
 # from ImportUsersPage.tsx) would otherwise be served as text/csv, which
 # browsers have no built-in renderer for — clicking the link just downloads

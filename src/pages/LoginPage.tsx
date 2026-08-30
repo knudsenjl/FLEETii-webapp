@@ -13,6 +13,8 @@ import { setRememberMe, supabase } from "../lib/supabase";
 import { fetchCostumerDeactivatedAt, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
+import { InlinePopup } from "../components/InlinePopup";
+import { ANTI_CLONING_NOTICE } from "../lib/legal";
 
 /** Placeholder for a possible future multi-step login flow; today there's only one step. */
 type Step = { name: "credentials" };
@@ -47,6 +49,8 @@ export function LoginPage() {
   const [username, setUsername] = useState(formSnapshot?.username ?? "");
   const [password, setPassword] = useState(formSnapshot?.password ?? "");
   const [rememberMe, setRememberMeState] = useState(true);
+  /** Toggles the anti-cloning clause popup below the copyright line — see ANTI_CLONING_NOTICE's own comment for why this same clause is shared with AboutPage.tsx's identical copyright line. */
+  const [showCopyrightNotice, setShowCopyrightNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** The real signInWithPassword error's own message — null unless this is at least the SECOND consecutive failed attempt (see handleCredentialsSubmit). The generic error text above never reveals whether a failure is genuinely bad credentials or something else (network/CORS/the getSession()-race above); surfacing the raw detail on a repeat failure lets that be diagnosed straight from the UI, without needing devtools open to read the console.error below. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
@@ -354,9 +358,21 @@ export function LoginPage() {
         </div>
       </motion.div>
 
-      <p className="mt-6 text-center text-xs text-brand-400">
-        © {new Date().getFullYear()} FLEETii. Alle rettigheder forbeholdes.
-      </p>
+      <div className="mt-6 flex justify-center">
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowCopyrightNotice((prev) => !prev)}
+            className="text-xs text-brand-400 underline decoration-dotted underline-offset-2 transition hover:text-brand-600"
+          >
+            © {new Date().getFullYear()} FLEETii. Alle rettigheder forbeholdes.
+          </button>
+          {showCopyrightNotice && (
+            <div className="fixed inset-0 z-10" onClick={() => setShowCopyrightNotice(false)} />
+          )}
+          <InlinePopup visible={showCopyrightNotice} position="top" message={ANTI_CLONING_NOTICE} />
+        </div>
+      </div>
     </div>
   );
 }
