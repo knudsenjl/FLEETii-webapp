@@ -22,6 +22,9 @@ export interface Vehicle2Hire {
   distanceCoveredUpdatedAt: string;
   online: string;
   onlineUpdatedAt: string;
+  /** 2hire's "trip_detected" generic signal ("TRUE"/"FALSE", same string convention as `online` above) — optional (unlike every other field here) since the checked-in mock fixture (a real captured 2hire response, predating this signal) doesn't have it; liveVehicleDataSource.ts always sets it. Drives BookingPage.tsx's hero-card car icon turning green. */
+  tripDetected?: string;
+  tripDetectedUpdatedAt?: string;
   brakingSystemWarning: string;
   brakingSystemWarningUpdatedAt: string;
   drivingRelatedFailureWarning: string;
