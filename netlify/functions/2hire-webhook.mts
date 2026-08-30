@@ -13,9 +13,17 @@
 // A "position" signal additionally pushes a Realtime Broadcast message
 // (see the bottom of the handler below) straight to any browser currently
 // watching FleetManagementPage.tsx's "Live" toggle — see
-// VehicleContext.tsx's own "fleet-positions" broadcast listener — so the
+// VehicleContext.tsx's own "fleet-positions:*" broadcast listener — so the
 // map marker moves the instant 2hire reports it, instead of that page
-// having to poll for changes.
+// having to poll for changes. Sent to TWO topics: the vehicle's own
+// "fleet-positions:<costumerId>" (what that costumer's own users/admins
+// subscribe to) AND the fixed "fleet-positions:fleetii-admin" (what a
+// FLEETii admin subscribes to instead, since they need every costumer's
+// positions at once, e.g. FleetManagementPage's "Alle" filter) — see
+// fleet_positions_realtime_authorization.sql's RLS policy on
+// realtime.messages, which is what actually restricts who may receive each
+// topic; sending to both here is just picking the right addressees, not the
+// security boundary itself.
 //
 // Docs: https://developer.2hire.io/docs/receiving-signals
 import { getAdminClient } from "./_shared/adminClient.js";
@@ -142,27 +150,47 @@ export default async (req: Request) => {
 
   // Pushes the new position straight to any browser currently watching
   // FleetManagementPage.tsx's "Live" toggle (see VehicleContext.tsx's own
-  // "fleet-positions" broadcast listener) — a plain Realtime Broadcast
-  // message, not tied to any table, so this needs no RLS/publication setup
-  // at all (unlike a postgres_changes subscription, which was considered
-  // and rejected as overbuilt for this). httpSend() posts over REST without
-  // holding a WebSocket open, which is what makes this safe to call from a
-  // single, short-lived function invocation. Scoped to "position" only —
-  // the map marker is the only thing this drives; online/trip_detected/etc.
-  // stay on the existing once-per-session fetch. Best-effort: a failure
-  // here is logged, never turned into a failed response to 2hire — the
-  // vehicle_signals write above already persisted the real state, so a
-  // missed broadcast just means the map isn't live-updated until the next
-  // page load/refresh, not a data loss.
+  // "fleet-positions:*" broadcast listener) — a plain Realtime Broadcast
+  // message, not tied to any table, so this needs no table
+  // publication/postgres_changes setup (unlike a postgres_changes
+  // subscription, which was considered and rejected as overbuilt for this)
+  // — it DOES need the realtime.messages RLS policy in
+  // fleet_positions_realtime_authorization.sql, since these are now private,
+  // authorized channels rather than one open global one. httpSend() posts
+  // over REST without holding a WebSocket open, which is what makes this
+  // safe to call from a single, short-lived function invocation. Scoped to
+  // "position" only — the map marker is the only thing this drives;
+  // online/trip_detected/etc. stay on the existing once-per-session fetch.
+  // Best-effort: a failure here is logged, never turned into a failed
+  // response to 2hire — the vehicle_signals write above already persisted
+  // the real state, so a missed broadcast just means the map isn't
+  // live-updated until the next page load/refresh, not a data loss.
   if (signal === "position") {
     try {
-      const channel = admin.channel("fleet-positions");
-      await channel.httpSend("position", {
+      const { data: vehicle, error: vehicleError } = await admin
+        .from("vehicle_profiles")
+        .select("costumer_id")
+        .eq("vehicle_id", vehicleId)
+        .maybeSingle<{ costumer_id: string | null }>();
+      if (vehicleError) throw new Error(`Kunne ikke slå køretøjets kunde op: ${vehicleError.message}`);
+
+      const positionPayload = {
         vehicleId,
         lat: Number(body.payload.data.latitude),
         lng: Number(body.payload.data.longitude),
-      });
-      await admin.removeChannel(channel);
+      };
+
+      // Every costumer's own topic, plus the fixed FLEETii-admin one (always
+      // sent regardless of costumer_id, so a FLEETii admin keeps seeing
+      // every vehicle move) — see this function's own header comment.
+      const topics = ["fleet-positions:fleetii-admin"];
+      if (vehicle?.costumer_id) topics.push(`fleet-positions:${vehicle.costumer_id}`);
+
+      for (const topic of topics) {
+        const channel = admin.channel(topic);
+        await channel.httpSend("position", positionPayload);
+        await admin.removeChannel(channel);
+      }
     } catch (broadcastError) {
       console.error("[2hire-webhook] failed to broadcast live position:", broadcastError);
     }

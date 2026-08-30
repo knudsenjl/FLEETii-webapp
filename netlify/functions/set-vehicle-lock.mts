@@ -17,23 +17,34 @@
 // INSERT/UPDATE RLS policy (see vehicle_signals_table.sql) — same
 // "service-role writes only" pattern as netlify/functions/2hire-webhook.mts.
 //
-// Does NOT re-validate the three button-activation rules server-side (see
-// src/lib/bookings.ts's computeLockButtonState) — it trusts the calling UI's
-// disabled-button state, matching this codebase's existing trust level
-// elsewhere (e.g. booking deletion's permission check is also client-side
-// only).
+// Re-validates authorization server-side rather than trusting the calling
+// UI's disabled-button state: a FLEETii admin may act on any vehicle; a
+// regular "admin" only on their own costumer's vehicles (same scoping
+// VehiclesPage.tsx already applies to what an admin can even see); a regular
+// user only if one of their OWN bookings on this vehicle currently has the
+// requested action enabled, per the exact same three rules the button uses
+// (see src/lib/bookings.ts's computeLockButtonState/findAdjacentBookings —
+// reused here, not reimplemented, so the two can't drift apart). A regular
+// user also can't supply a `command` override — that's the admin-only Bloker/
+// Frigiv path (VehicleDetailsPage.tsx), which physically locks/unlocks
+// independent of the persisted `locked` flag; forcing the default mapping
+// for non-admins closes the gap where an authorized `locked: true` request
+// could otherwise sneak through `command: "start"` (a real unlock).
 //
 // Per the "per-costumer 2hire credentials" plan: the credential used to
 // authenticate the real 2hire command is resolved from the TARGET vehicle's
 // costumer_id (not the caller's own — a FLEETii admin has none) plus whether
 // the caller is a FLEETii admin, same as every other function this plan
-// touches. That lookup needs the service-role client, so it's built before
-// the sendGenericCommand call now instead of after it.
+// touches.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
+import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireUser } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isFleetiiAdminRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+
+/** A vehicle's booking, as needed to re-run computeLockButtonState/findAdjacentBookings server-side. */
+type VehicleBooking = { booking_id: string; start: string; end: string | null; user_id: string | null };
 
 // `command`, if present, overrides which real 2hire generic command is sent
 // (default: `locked ? "stop" : "start"`) while `locked` still controls what
@@ -78,8 +89,84 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "command skal være start eller stop." }), { status: 400 });
   }
   const locked = body.locked;
-  const command = body.command ?? (locked ? "stop" : "start");
 
+  const [
+    { data: vehicle, error: vehicleError },
+    { data: caller, error: callerError },
+    { data: signal, error: signalError },
+    { data: bookings, error: bookingsError },
+  ] = await Promise.all([
+    admin
+      .from("vehicle_profiles")
+      .select("costumer_id")
+      .eq("vehicle_id", vehicleId)
+      .maybeSingle<{ costumer_id: string | null }>(),
+    admin
+      .from("user_profiles")
+      .select("role, costumer_id")
+      .eq("user_id", authResult.userId)
+      .maybeSingle<{ role: string; costumer_id: string | null }>(),
+    admin.from("vehicle_signals").select("locked").eq("vehicle_id", vehicleId).maybeSingle<{ locked: boolean }>(),
+    admin
+      .from("bookings")
+      .select("booking_id, start, end, user_id")
+      .eq("vehicle_id", vehicleId)
+      .returns<VehicleBooking[]>(),
+  ]);
+  if (vehicleError) {
+    return new Response(JSON.stringify({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }), { status: 500 });
+  }
+  if (callerError) {
+    return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), { status: 500 });
+  }
+  if (signalError) {
+    return new Response(JSON.stringify({ error: `Kunne ikke slå lås-status op: ${signalError.message}` }), { status: 500 });
+  }
+  if (bookingsError) {
+    return new Response(JSON.stringify({ error: `Kunne ikke slå reservationer op: ${bookingsError.message}` }), { status: 500 });
+  }
+  if (!vehicle) {
+    return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
+  }
+
+  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  const isAdmin = isAnyAdminRole(caller?.role);
+
+  let command = body.command ?? (locked ? "stop" : "start");
+
+  if (isFleetiiAdmin) {
+    // full access, any vehicle
+  } else if (isAdmin) {
+    if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
+      return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+    }
+  } else {
+    // Regular user: only the admin-only Bloker/Frigiv flow ever needs a
+    // command that diverges from the plain locked->command mapping — force
+    // it back to the default so an authorized `locked` value can't be paired
+    // with a physically opposite `command` (see this file's header comment).
+    command = locked ? "stop" : "start";
+
+    const currentLocked = signal?.locked ?? true;
+    const ownBookings = (bookings ?? []).filter((b) => b.user_id === authResult.userId);
+    const requiredFlag = locked ? "lockEnabled" : "unlockEnabled";
+    const authorized = ownBookings.some((booking) => {
+      const { previous, next } = findAdjacentBookings(bookings ?? [], booking.booking_id);
+      const state = computeLockButtonState(
+        nowIsoString(),
+        { start: booking.start, end: booking.end },
+        previous ? { end: previous.end } : null,
+        next ? { start: next.start } : null,
+        currentLocked,
+      );
+      return state[requiredFlag];
+    });
+    if (!authorized) {
+      return new Response(JSON.stringify({ error: "Du har ikke adgang til at låse/låse op for dette køretøj lige nu." }), {
+        status: 403,
+      });
+    }
+  }
 
   // Real 2hire command first — the vehicle_signals write below only happens
   // if this actually succeeds, so "locked" always reflects a confirmed real
@@ -88,25 +175,9 @@ export default async (req: Request) => {
   // surfaced as a normal error, not swallowed, since a regular user pressing
   // Lås/Lås op needs to know the vehicle didn't actually respond.
   try {
-    const [{ data: vehicle, error: vehicleError }, { data: caller, error: callerError }] = await Promise.all([
-      admin
-        .from("vehicle_profiles")
-        .select("costumer_id")
-        .eq("vehicle_id", vehicleId)
-        .maybeSingle<{ costumer_id: string | null }>(),
-      admin
-        .from("user_profiles")
-        .select("role")
-        .eq("user_id", authResult.userId)
-        .maybeSingle<{ role: string }>(),
-    ]);
-    if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
-    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
-
-    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, {
       isFleetiiAdmin,
-      costumerId: vehicle?.costumer_id ?? null,
+      costumerId: vehicle.costumer_id,
     });
 
     await sendGenericCommand(vehicleId, command, credentials);
