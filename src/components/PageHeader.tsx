@@ -95,7 +95,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
     }
   };
 
-  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above) to populate every department with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. */
+  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above — and FLEETii-admin only, since it fabricates bookings across EVERY costumer's departments, not just the caller's own; the function re-checks both server-side) to populate every department with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. */
   const handleSeedTestBookings = async () => {
     setSeedingBookings(true);
     try {
@@ -134,7 +134,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
       <div className="flex items-center justify-between gap-3">
         <FleetiiLogo className={compact ? "h-6 w-auto shrink-0" : "h-8 w-auto shrink-0"} linkToHome />
         <div className="flex items-center justify-end gap-3">
-          {isFullyAuthenticated && isTestMode && (
+          {isFullyAuthenticated && isTestMode && isFleetiiAdmin(profile?.role) && (
             <div className="relative">
               <button
                 type="button"

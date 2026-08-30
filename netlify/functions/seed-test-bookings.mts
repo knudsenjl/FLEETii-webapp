@@ -20,8 +20,11 @@
 // session — bookings_insert_own_department.sql's RLS policy only allows
 // inserting into the CALLER's own current department, which would make
 // seeding every department impossible without switching department
-// repeatedly; requireUser() below still verifies the caller is a real
-// logged-in user first.
+// repeatedly. requireFleetiiAdmin() below restricts this to a FLEETii admin
+// (not just any logged-in user, and not merely any admin, since this writes
+// fabricated bookings across EVERY costumer's departments, not just the
+// caller's own) — PageHeader.tsx's own icon is hidden the same way, but this
+// server-side check is the actual boundary, not that visibility gate.
 //
 // Bookings has a genuine EXCLUDE USING gist (vehicle_id WITH =,
 // tstzrange(start, "end") WITH &&) constraint (see
@@ -34,7 +37,7 @@
 // be double-booked.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
-import { requireUser } from "./_shared/serverAuth.js";
+import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 
 const MIN_BOOKINGS_PER_DEPARTMENT = 3;
 const MAX_BOOKINGS_PER_DEPARTMENT = 7;
@@ -71,7 +74,7 @@ export default async (req: Request) => {
     );
   }
 
-  const authResult = await requireUser(req);
+  const authResult = await requireFleetiiAdmin(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
