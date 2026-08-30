@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
-import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import { formatKilometerstand, shortSignalTimestamp } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -55,6 +55,15 @@ export function TwoHireTestPage() {
   const position = gpsPositions.find((p) => p.vehicleId === TEST_VEHICLE_ID);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Always the same fixed test vehicle, so no per-vehicle scoping is needed here (unlike BookingDetailsPage.tsx/VehicleDetailsPage.tsx's own use of this hook). */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot("2hire-test-map");
+  /** "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking). No role check needed here (unlike BookingDetailsPage.tsx/VehicleDetailsPage.tsx's own use of this) since this whole route is already requireAdmin-gated (see App.tsx). Not persisted across a refresh — see VehicleDetailsPage.tsx's identical comment for why. */
+  const [liveEnabled, setLiveEnabled] = useState(false);
+  const setLiveTracking = useSetLiveTracking();
+  const refreshVehicles = useRefreshVehicles();
+  useEffect(() => {
+    setLiveTracking(liveEnabled);
+    if (liveEnabled) void refreshVehicles();
+    return () => setLiveTracking(false);
+  }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
   const authHeaders: Record<string, string> = session?.access_token
     ? { Authorization: `Bearer ${session.access_token}` }
@@ -223,6 +232,7 @@ export function TwoHireTestPage() {
                   showMarker={Boolean(position)}
                   markerTooltip={twoHireVehicle?.plate ?? TEST_VEHICLE_ID}
                   className="absolute inset-0"
+                  liveToggle={{ active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) }}
                 />
                 {!position && (
                   <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">

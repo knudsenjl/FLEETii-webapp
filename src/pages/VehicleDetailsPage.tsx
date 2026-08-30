@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
-import { use2hireGPS, use2hireVehicle, useVehiclesLoading } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -115,6 +115,15 @@ export function VehicleDetailsPage() {
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this vehicle so refreshing on a different vehicle's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`vehicle-details-map:${vehicle?.vehicleId ?? ""}`);
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Not persisted across a refresh (unlike FleetManagementPage's) — a single-vehicle map re-opting-in each visit is a small enough ask, and much simpler than replicating that page's sessionStorage snapshot here too. */
+  const [liveEnabled, setLiveEnabled] = useState(false);
+  const setLiveTracking = useSetLiveTracking();
+  const refreshVehicles = useRefreshVehicles();
+  useEffect(() => {
+    setLiveTracking(liveEnabled);
+    if (liveEnabled) void refreshVehicles();
+    return () => setLiveTracking(false);
+  }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -601,6 +610,7 @@ export function VehicleDetailsPage() {
                       showMarker={Boolean(position)}
                       markerTooltip={vehicle.plate}
                       className="absolute inset-0"
+                      liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
                     />
                     {!position && (
                       <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
