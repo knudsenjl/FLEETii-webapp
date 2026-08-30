@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin } from "../lib/roles";
-import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
   BOOKING_ID_COLUMN,
   BOOKINGS_SELECT_COLUMNS,
@@ -99,6 +99,15 @@ export function BookingDetailsPage() {
   const { address, addressLoading } = useReverseGeocode(position, mapVisible);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-details-map:${booking?.vehicle ?? ""}`);
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Not persisted across a refresh, unlike FleetManagementPage's own toggle — see VehicleDetailsPage.tsx's identical comment for why. */
+  const [liveEnabled, setLiveEnabled] = useState(false);
+  const setLiveTracking = useSetLiveTracking();
+  const refreshVehicles = useRefreshVehicles();
+  useEffect(() => {
+    setLiveTracking(liveEnabled);
+    if (liveEnabled) void refreshVehicles();
+    return () => setLiveTracking(false);
+  }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
   const {
     twoHireVehicle,
@@ -348,6 +357,7 @@ export function BookingDetailsPage() {
                       markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
                       onMarkerClick={goToVehicleDetails}
                       className="absolute inset-0"
+                      liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
                     />
                     {!position && (
                       <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
