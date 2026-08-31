@@ -6,7 +6,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
-import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
+import { isAnyAdmin, isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
@@ -95,7 +95,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
     }
   };
 
-  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above — and FLEETii-admin only, since it fabricates bookings across EVERY costumer's departments, not just the caller's own; the function re-checks both server-side) to populate every department with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. */
+  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above — and admin/FLEETii-admin only, both re-checked server-side) to populate departments with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. A regular admin only seeds departments under their own costumer; a FLEETii admin seeds every costumer's departments — see seed-test-bookings.mts. */
   const handleSeedTestBookings = async () => {
     setSeedingBookings(true);
     try {
@@ -134,7 +134,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
       <div className="flex items-center justify-between gap-3">
         <FleetiiLogo className={compact ? "h-6 w-auto shrink-0" : "h-8 w-auto shrink-0"} linkToHome />
         <div className="flex items-center justify-end gap-3">
-          {isFullyAuthenticated && isTestMode && isFleetiiAdmin(profile?.role) && (
+          {isFullyAuthenticated && isTestMode && isAnyAdmin(profile?.role) && (
             <div className="relative">
               <button
                 type="button"
