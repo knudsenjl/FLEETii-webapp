@@ -2,9 +2,14 @@
 // internal only (see requireFleetiiAdmin below), reached from
 // VehicleDeletePage.tsx once staff have confirmed the physical 2hire device
 // has been removed (costumer_orders.device_removed on the "Nedlæg" order —
-// see costumer_orders_merge_deletion_requests.sql). Best-effort deregisters
-// the vehicle from 2hire, then deletes it from our own DB via the
-// delete_vehicle() SQL function (SECURITY DEFINER, execute revoked from
+// see costumer_orders_merge_deletion_requests.sql). Re-verifies that
+// server-side (order_type === "Nedlæg", vehicle_id === the target vehicle,
+// device_removed === true) before touching anything — requireFleetiiAdmin()
+// alone only proves a trusted caller, not that THIS orderId actually names a
+// confirmed deletion request for THIS vehicle, and the client-supplied
+// orderId/vehicleId pairing was otherwise never cross-checked. Best-effort
+// deregisters the vehicle from 2hire, then deletes it from our own DB via
+// the delete_vehicle() SQL function (SECURITY DEFINER, execute revoked from
 // anon/authenticated), called via the service-role client exactly like
 // delete-costumer.mts calls purge_costumer: no ownership check inside the
 // SQL function itself, since the caller is fully trusted at this point.
@@ -64,6 +69,38 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "vehicleId og orderId er påkrævet." }), { status: 400 });
   }
 
+  // Confirms orderId is actually THE fulfilled deletion request for
+  // vehicleId before anything irreversible happens (deregistering from
+  // 2hire, then deleting the vehicle) — not just before the final
+  // costumer_orders delete below. Without this, a mistaken or crafted
+  // orderId (e.g. a copy-paste error, or a stale value from a different
+  // vehicle's page) would delete whichever unrelated Opret/Nedlæg order it
+  // happens to name, silently destroying a legitimate pending request while
+  // leaving the REAL deletion request for the now-gone vehicle orphaned
+  // forever (its own vehicle_id no longer exists to retry against). Checks
+  // all three of order_type/vehicle_id/device_removed — see
+  // costumer_orders_merge_deletion_requests.sql for why exactly these three
+  // columns mean "this order is a confirmed, fulfilled Nedlæg for THIS
+  // vehicle": device_removed is what VehicleDeletePage.tsx's own confirm
+  // step sets, and is the actual "staff has physically removed the 2hire
+  // device" signal this whole flow exists to gate on.
+  const { data: order, error: orderError } = await admin
+    .from("costumer_orders")
+    .select("order_type, vehicle_id, device_removed")
+    .eq("order_id", orderId)
+    .maybeSingle<{ order_type: string; vehicle_id: string | null; device_removed: boolean }>();
+  if (orderError) {
+    return new Response(JSON.stringify({ error: orderError.message }), { status: 500 });
+  }
+  if (!order) {
+    return new Response(JSON.stringify({ error: "Ordren findes ikke." }), { status: 404 });
+  }
+  if (order.order_type !== "Nedlæg" || order.vehicle_id !== vehicleId) {
+    return new Response(JSON.stringify({ error: "Ordren er ikke en nedlæggelsesordre for dette køretøj." }), { status: 400 });
+  }
+  if (!order.device_removed) {
+    return new Response(JSON.stringify({ error: "Fjernelse af enheden er endnu ikke bekræftet for denne ordre." }), { status: 409 });
+  }
 
   let deregisterWarning: string | null = null;
   try {

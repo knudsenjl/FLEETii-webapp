@@ -1,30 +1,49 @@
-// Netlify Function: "test mode" utility that seeds every department in the
-// system with a handful of realistic-looking bookings, so a manual
+// Netlify Function: "test mode" utility that seeds departments (every
+// department system-wide for a FLEETii admin, or just the caller's own
+// costumer's for a regular admin — see the costumerId scoping below) with a
+// handful of realistic-looking bookings, so a manual
 // interface test isn't staring at empty tables. Reached from the round test
-// icon in PageHeader.tsx, which only shows when VITE_DATA_SOURCE isn't
-// "2hire-production-adaptor" (see twoHireClient.ts's own reading of the same
-// var for the same reasoning) — this function refuses outright if it is,
-// as defense-in-depth against ever writing fabricated bookings into a real
-// production fleet.
+// icon in PageHeader.tsx, whose own visibility (VITE_DATA_SOURCE-based) is
+// just a UX convenience — the actual boundary against ever writing
+// fabricated bookings into real production data is the two checks below,
+// neither of which the icon knows about:
+//   1. ALLOW_TEST_BOOKING_SEED === "true" — a server-only (never
+//      VITE_-prefixed) explicit opt-in, defaulting to DISABLED. Unset,
+//      misspelled, wrong-case, or any value other than exactly "true" means
+//      disabled — this fails CLOSED, unlike a check that only blocks when a
+//      var equals a specific "production" marker (which fails OPEN the
+//      instant that marker is ever missing/mistyped on the real production
+//      site — this function used to do exactly that, keyed off
+//      VITE_DATA_SOURCE, see git history).
+//   2. process.env.SITE_ID === PRODUCTION_SITE_ID below — an unbypassable
+//      backstop. Netlify injects SITE_ID into every Function invocation at
+//      runtime automatically (confirmed via `netlify sites:list`), for
+//      whichever site is actually running — there is nothing to configure,
+//      so unlike (1) this can never be "forgotten." Hardcoded rather than
+//      another env var: changing which site counts as "production" should
+//      require an explicit code change and review, not silent drift.
+// Both must pass for the function to even reach requireAdmin() below — no
+// single check here is "the" boundary on its own.
 //
-// For each department (system-wide — every costumer, not just the caller's
-// own): picks a random count in [3, 7], creates that many bookings using a
-// random vehicle (from vehicle_departments) and a random user (from
-// user_departments) belonging to that department, with a random start
-// within the next 72 hours and a random 30min-4h duration, PLUS one more
-// booking with no end time (open-ended). A department with no vehicles or
-// no users is skipped (nothing meaningful to book) rather than fabricating
-// either.
+// For each department — every costumer's for a FLEETii admin, or only the
+// caller's OWN costumer's for a regular admin (see the costumerId scoping
+// below; requireAdmin() lets either role trigger this at all, once the two
+// env checks above have already allowed it to run): picks a random count in
+// [3, 7], creates that many bookings using a random vehicle (from
+// vehicle_departments) and a random user (from user_departments) belonging
+// to that department, with a random start within the next 72 hours and a
+// random 30min-4h duration, PLUS one more booking with no end time
+// (open-ended). A department with no vehicles or no users is skipped
+// (nothing meaningful to book) rather than fabricating either.
 //
 // Uses the service-role client throughout rather than the caller's own
 // session — bookings_insert_own_department.sql's RLS policy only allows
 // inserting into the CALLER's own current department, which would make
 // seeding every department impossible without switching department
-// repeatedly. requireFleetiiAdmin() below restricts this to a FLEETii admin
-// (not just any logged-in user, and not merely any admin, since this writes
-// fabricated bookings across EVERY costumer's departments, not just the
-// caller's own) — PageHeader.tsx's own icon is hidden the same way, but this
-// server-side check is the actual boundary, not that visibility gate.
+// repeatedly. Since the service-role client bypasses RLS entirely, the
+// costumerId scoping below is what stands in for it here: a regular admin
+// must never be able to fabricate bookings in another costumer's
+// departments just because this route doesn't run under their own session.
 //
 // Bookings has a genuine EXCLUDE USING gist (vehicle_id WITH =,
 // tstzrange(start, "end") WITH &&) constraint (see
@@ -37,7 +56,10 @@
 // be double-booked.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+
+/** Netlify's own permanent, runtime-injected site identifier for the real production deployment (app.fleetii.dk) — confirmed via `netlify sites:list`. Hardcoded, not another env var: unlike a config value, process.env.SITE_ID can't be missing or misspelled (Netlify populates it for every Function invocation automatically), so this can never silently fail to trigger. Changing which site counts as "production" requires an explicit code change here. */
+const PRODUCTION_SITE_ID = "ae77d3e5-f334-44f1-aa47-d33cd231681b";
 
 const MIN_BOOKINGS_PER_DEPARTMENT = 3;
 const MAX_BOOKINGS_PER_DEPARTMENT = 7;
@@ -67,14 +89,21 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  if (process.env.VITE_DATA_SOURCE === "2hire-production-adaptor") {
+  if (process.env.ALLOW_TEST_BOOKING_SEED !== "true") {
+    return new Response(
+      JSON.stringify({ error: "Testdata-seeding er ikke aktiveret på denne server." }),
+      { status: 403 },
+    );
+  }
+
+  if (process.env.SITE_ID === PRODUCTION_SITE_ID) {
     return new Response(
       JSON.stringify({ error: "Denne funktion kan ikke køre mod produktionsdata." }),
       { status: 403 },
     );
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireAdmin(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
@@ -85,8 +114,35 @@ export default async (req: Request) => {
   }
   const { admin } = adminClientResult;
 
+  const { data: caller, error: callerError } = await admin
+    .from("user_profiles")
+    .select("role, costumer_id")
+    .eq("user_id", authResult.userId)
+    .maybeSingle<{ role: string; costumer_id: string | null }>();
+  if (callerError) {
+    return new Response(JSON.stringify({ error: callerError.message }), { status: 500 });
+  }
+
+  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  // A regular admin only seeds their OWN costumer's departments — a
+  // FLEETii admin (no costumer of their own) still seeds every department
+  // system-wide, unchanged from before this scoping was added.
+  if (!isFleetiiAdmin && !caller?.costumer_id) {
+    return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
+  }
+
+  // .eq() (a PostgrestFilterBuilder method) has to be applied before
+  // .returns<>() (which narrows to a PostgrestTransformBuilder that no
+  // longer has .eq()) — so the conditional lives inside the query
+  // construction itself rather than reassigning a .returns()-typed variable.
+  const departmentsQuery = (
+    !isFleetiiAdmin && caller?.costumer_id
+      ? admin.from("departments").select("department_id, name").eq("costumer_id", caller.costumer_id)
+      : admin.from("departments").select("department_id, name")
+  ).returns<DepartmentRow[]>();
+
   const [departmentsResult, vehicleDepartmentsResult, userDepartmentsResult, anvendelseResult] = await Promise.all([
-    admin.from("departments").select("department_id, name").returns<DepartmentRow[]>(),
+    departmentsQuery,
     admin.from("vehicle_departments").select("vehicle_id, department_id").returns<VehicleDepartmentRow[]>(),
     admin.from("user_departments").select("user_id, department_id").returns<UserDepartmentRow[]>(),
     admin

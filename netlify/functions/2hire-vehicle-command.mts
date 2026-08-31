@@ -131,7 +131,21 @@ export default async (req: Request) => {
       costumerId: vehicle?.costumer_id ?? null,
     });
 
-    await sendGenericCommand(vehicleId, command as TwoHireGenericCommand, credentials);
+    try {
+      await sendGenericCommand(vehicleId, command as TwoHireGenericCommand, credentials);
+    } catch (error) {
+      // 2hire's own error for "locate" is a raw MISSING_CONFIGURATION cause
+      // (see sendGenericCommand) — it means this specific vehicle's 2hire
+      // device isn't configured to support remote locate/blink at all, not
+      // a transient failure worth retrying. Only intercepted for "locate":
+      // "start"/"stop" surface whatever cause 2hire returns unchanged, since
+      // that limitation hasn't been observed for those commands.
+      if (command === "locate" && error instanceof Error && error.message.includes("MISSING_CONFIGURATION")) {
+        return new Response(JSON.stringify({ error: "Dette køretøj tillader ikke remote blink." }), { status: 400 });
+      }
+      throw error;
+    }
+
     return new Response(JSON.stringify({ ok: true }), {
       status: 200,
       headers: { "Content-Type": "application/json" },

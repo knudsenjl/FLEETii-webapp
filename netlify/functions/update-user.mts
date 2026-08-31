@@ -113,6 +113,20 @@ export default async (req: Request) => {
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
   const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  // A regular admin must never be able to touch a FLEETii admin's account —
+  // in particular never change their login email (see the updateUserById
+  // call below) — regardless of whether the costumer-scoping check below
+  // would otherwise pass. It normally wouldn't (a FLEETii admin has no
+  // costumer of their own), EXCEPT while that FLEETii admin has switched
+  // their own active department/costumer via switch-department.mts to
+  // browse a specific costumer — at that moment their costumer_id
+  // temporarily equals a regular admin's own, which would otherwise let
+  // that admin pass the check below and take over the platform admin's
+  // account (change their email, then reset the password). Checked before
+  // any mutation, including the email/role change further down.
+  if (!isFleetiiAdmin && isFleetiiAdminRole(target.role)) {
+    return new Response(JSON.stringify({ error: "Du kan ikke opdatere en FLEETii-administrator." }), { status: 403 });
+  }
   if (!isFleetiiAdmin) {
     if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
       return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });

@@ -52,10 +52,8 @@ export function LoginPage() {
   /** Toggles the anti-cloning clause popup below the copyright line — see ANTI_CLONING_NOTICE's own comment for why this same clause is shared with AboutPage.tsx's identical copyright line. */
   const [showCopyrightNotice, setShowCopyrightNotice] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  /** The real signInWithPassword error's own message — null unless this is at least the SECOND consecutive failed attempt (see handleCredentialsSubmit). The generic error text above never reveals whether a failure is genuinely bad credentials or something else (network/CORS/the getSession()-race above); surfacing the raw detail on a repeat failure lets that be diagnosed straight from the UI, without needing devtools open to read the console.error below. */
+  /** The real signInWithPassword error's own message, shown alongside the generic text above on EVERY failed attempt (including the first — see handleCredentialsSubmit; this used to wait for a second consecutive failure, but that hid the very first occurrence of an intermittent fault, which is exactly the data point needed to spot a pattern). The generic error text never reveals whether a failure is genuinely bad credentials or something else (network/CORS/the getSession()-race above); surfacing the raw detail lets that be diagnosed straight from the UI, without needing devtools open to read the console.error below. */
   const [errorDetail, setErrorDetail] = useState<string | null>(null);
-  /** Consecutive failed sign-in attempts since the last success — drives errorDetail above. Intentionally never reset on input change: a difference in WHAT was typed doesn't change whether repeat failures are worth surfacing raw detail for. */
-  const [failedAttempts, setFailedAttempts] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [resetMessage, setResetMessage] = useState<string | null>(null);
   const [resetSubmitting, setResetSubmitting] = useState(false);
@@ -141,19 +139,15 @@ export function LoginPage() {
         // (network/CORS issue, restricted browser environment, etc.) is
         // distinguishable in devtools — the message shown to the user is
         // always the same generic Danish text regardless of the real cause,
-        // EXCEPT from the second consecutive failure onward, where the raw
-        // message is also surfaced inline (errorDetail) — see its own
-        // comment above for why.
+        // but the raw message is also surfaced inline (errorDetail) on
+        // every attempt, including the first — see its own comment above
+        // for why.
         console.error("[login] signInWithPassword failed:", signInError);
-        const nextFailedAttempts = failedAttempts + 1;
-        setFailedAttempts(nextFailedAttempts);
-        setErrorDetail(nextFailedAttempts >= 2 ? signInError.message : null);
+        setErrorDetail(signInError.message);
         setError(CREDENTIALS_ERROR_MESSAGE);
         setSubmitting(false);
         return;
       }
-
-      setFailedAttempts(0);
 
       // Checked here, right after sign-in, rather than relying solely on
       // AuthContext's own async profile load (below) — that load races

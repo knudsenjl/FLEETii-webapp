@@ -577,19 +577,26 @@ describe("computeLockButtonState", () => {
     });
   });
 
-  it("keeps lock enabled after this reservation expires when the next reservation hasn't begun", () => {
+  it("keeps lock enabled after this reservation expires when the next reservation hasn't begun, but disables unlock immediately on expiry regardless", () => {
     const next = { start: "2026-07-09T14:00:00" };
     expect(computeLockButtonState("2026-07-09T13:00:00", booking, null, next, true)).toEqual({
       lockEnabled: true,
-      unlockEnabled: true,
+      unlockEnabled: false,
     });
   });
 
-  it("disables lock once this reservation has expired and the next reservation has begun", () => {
+  it("disables lock once this reservation has expired and the next reservation has begun (unlock already off since expiry)", () => {
     const next = { start: "2026-07-09T12:00:00" };
     expect(computeLockButtonState("2026-07-09T12:30:00", booking, null, next, true)).toEqual({
       lockEnabled: false,
-      unlockEnabled: true,
+      unlockEnabled: false,
+    });
+  });
+
+  it("disables unlock the instant this reservation expires, even with no next reservation at all (former booking holder can't reclaim the vehicle)", () => {
+    expect(computeLockButtonState("2026-07-09T12:00:00", booking, null, null, true)).toEqual({
+      lockEnabled: true,
+      unlockEnabled: false,
     });
   });
 
