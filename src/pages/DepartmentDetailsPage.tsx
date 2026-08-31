@@ -545,32 +545,35 @@ export function DepartmentDetailsPage() {
 
             {!departmentsLoading && !departmentsError && departments.length > 0 && (
               <>
-                {/* Only shown when the Opret/Slet afdeling block above actually rendered (isFleetiiAdmin) — separates that block from this grid; a regular admin never sees that block, so no divider is needed here for them either. */}
+                {/* Only shown when the Opret/Slet afdeling block above actually rendered (isFleetiiAdmin) — separates that block from Flådestyring below; a regular admin never sees that block, so no divider is needed here for them either. */}
                 {isFleetiiAdmin && <hr className="border-brand-200" />}
 
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/fleet-map", {
+                      state: {
+                        filters: {
+                          costumerId: costumerId ?? "",
+                          department: selectedDepartmentId ?? "",
+                          plate: "",
+                          status: "",
+                        },
+                      },
+                    })
+                  }
+                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                >
+                  Flådestyring
+                </button>
+
+                <hr className="border-brand-200" />
+
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                  {/* Was a plain <h3> label above the grid — now a row inside it (like Flådestyring just below), same width/centering, just a slightly darker background (bg-brand-100 vs the buttons' bg-brand-50) and no hover/click affordance, since it's a status label, not an action. */}
+                  {/* Was a plain <h3> label above the grid — now a row inside it, same width/centering, just a slightly darker background (bg-brand-100 vs the buttons' bg-brand-50) and no hover/click affordance, since it's a status label, not an action. */}
                   <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
                     {selectedDepartment ? (selectedDepartment.name ?? "—") : "Ingen afdeling valgt"}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate("/fleet-map", {
-                        state: {
-                          filters: {
-                            costumerId: costumerId ?? "",
-                            department: selectedDepartmentId ?? "",
-                            plate: "",
-                            status: "",
-                          },
-                        },
-                      })
-                    }
-                    className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    Flådestyring
-                  </button>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"

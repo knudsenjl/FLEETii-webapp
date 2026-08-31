@@ -669,24 +669,23 @@ export function CostumerDetailsPage() {
 
                 <hr className="border-brand-200" />
 
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigate("/fleet-map", {
+                      state: {
+                        filters: { costumerId: costumer.costumer_id, department: "", plate: "", status: "" },
+                      },
+                    })
+                  }
+                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                >
+                  Flådestyring
+                </button>
+
+                <hr className="border-brand-200" />
+
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                  {/* Same grid-header treatment as DepartmentDetailsPage's own "Valgt afdeling" row — a status label, not an action, hence the darker background (bg-brand-100 vs the buttons' bg-brand-50) and no hover/click affordance. */}
-                  <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
-                    {costumer.name ?? "—"}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      navigate("/fleet-map", {
-                        state: {
-                          filters: { costumerId: costumer.costumer_id, department: "", plate: "", status: "" },
-                        },
-                      })
-                    }
-                    className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    Flådestyring
-                  </button>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
