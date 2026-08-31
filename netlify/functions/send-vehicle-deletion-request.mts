@@ -18,7 +18,7 @@
 // snapshot fields, both resolved server-side rather than trusted from the
 // request body.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleDeletionRequestBody = { vehicleId?: string };
@@ -73,11 +73,12 @@ function buildHtmlBody(fields: {
 
 /**
  * POST { vehicleId } as an authenticated admin (see requireAdmin). Resolves
- * the caller's own costumer_id/department_id/contact info AND the target
- * vehicle's snapshot fields server-side, rejects if the vehicle doesn't
- * belong to the caller's own costumer, inserts a matching costumer_orders
- * row (order_type "Nedlæg"), then emails the request to MAIL_RECIEVER
- * — via SMTP, see sendMail.
+ * the caller's own contact info AND the target vehicle's own costumer_id/
+ * department_id/snapshot fields server-side; a regular admin is rejected if
+ * the vehicle doesn't belong to their own costumer, a FLEETii admin (no
+ * "home" costumer of their own) may request deletion for any costumer's
+ * vehicle. Inserts a matching costumer_orders row (order_type "Nedlæg"),
+ * then emails the request to MAIL_RECIEVER — via SMTP, see sendMail.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -118,9 +119,10 @@ export default async (req: Request) => {
   const [{ data: caller }, { data: vehicle }] = await Promise.all([
     admin
       .from("user_profiles")
-      .select("costumer_id, department_id, full_name, email, phone")
+      .select("role, costumer_id, department_id, full_name, email, phone")
       .eq("user_id", authResult.userId)
       .maybeSingle<{
+        role: string;
         costumer_id: string | null;
         department_id: string | null;
         full_name: string | null;
@@ -129,7 +131,7 @@ export default async (req: Request) => {
       }>(),
     admin
       .from("vehicle_profiles")
-      .select("number_plate, brand, model, model_year, costumer_id")
+      .select("number_plate, brand, model, model_year, costumer_id, department_id")
       .eq("vehicle_id", vehicleId)
       .maybeSingle<{
         number_plate: string | null;
@@ -137,30 +139,50 @@ export default async (req: Request) => {
         model: string | null;
         model_year: string | null;
         costumer_id: string | null;
+        department_id: string | null;
       }>(),
   ]);
 
-  if (!caller?.costumer_id) {
-    return new Response(
-      JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde — kan ikke oprette anmodningen." }),
-      { status: 403 },
-    );
+  if (!caller) {
+    return new Response(JSON.stringify({ error: "Kunne ikke slå din brugerprofil op." }), { status: 500 });
   }
   if (!vehicle) {
     return new Response(JSON.stringify({ error: "Køretøjet findes ikke." }), { status: 404 });
   }
-  if (vehicle.costumer_id !== caller.costumer_id) {
-    return new Response(
-      JSON.stringify({ error: "Du kan kun anmode om sletning af køretøjer i din egen flåde." }),
-      { status: 403 },
-    );
+
+  // A FLEETii admin has no "home" costumer of their own (see isFleetiiAdmin
+  // elsewhere in this codebase) — unlike a regular admin, who's always
+  // scoped to their own costumer's vehicles, they may request deletion for
+  // ANY costumer's vehicle, so neither of the two checks below applies to
+  // them. The costumer_id/department_id used for the request itself always
+  // come from the VEHICLE's own row (not the caller's), which is correct
+  // either way: for a regular admin those already match their own costumer/
+  // department (enforced by the check below), and for a FLEETii admin
+  // they're the only correct source at all.
+  const callerIsFleetiiAdmin = isFleetiiAdminRole(caller.role);
+  if (!callerIsFleetiiAdmin) {
+    if (!caller.costumer_id) {
+      return new Response(
+        JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde — kan ikke oprette anmodningen." }),
+        { status: 403 },
+      );
+    }
+    if (vehicle.costumer_id !== caller.costumer_id) {
+      return new Response(
+        JSON.stringify({ error: "Du kan kun anmode om sletning af køretøjer i din egen flåde." }),
+        { status: 403 },
+      );
+    }
+  }
+  if (!vehicle.costumer_id) {
+    return new Response(JSON.stringify({ error: "Køretøjet er ikke tilknyttet en kunde." }), { status: 400 });
   }
 
   // customer/department are likewise independent of each other.
   const [{ data: customer }, { data: department }] = await Promise.all([
-    admin.from("costumers").select("name").eq("costumer_id", caller.costumer_id).maybeSingle<{ name: string | null }>(),
-    caller.department_id
-      ? admin.from("departments").select("name").eq("department_id", caller.department_id).maybeSingle<{ name: string | null }>()
+    admin.from("costumers").select("name").eq("costumer_id", vehicle.costumer_id).maybeSingle<{ name: string | null }>(),
+    vehicle.department_id
+      ? admin.from("departments").select("name").eq("department_id", vehicle.department_id).maybeSingle<{ name: string | null }>()
       : Promise.resolve({ data: null }),
   ]);
   const customerName = customer?.name ?? "—";
@@ -173,8 +195,8 @@ export default async (req: Request) => {
     .insert({
       order_type: "Nedlæg",
       vehicle_id: vehicleId,
-      costumer_id: caller.costumer_id,
-      department_id: caller.department_id,
+      costumer_id: vehicle.costumer_id,
+      department_id: vehicle.department_id,
       number_plate: vehicle.number_plate ?? "—",
       brand: vehicle.brand ?? "—",
       model: vehicle.model ?? "—",
