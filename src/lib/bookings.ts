@@ -444,19 +444,26 @@ export type LockButtonState = { lockEnabled: boolean; unlockEnabled: boolean };
  * Computes Lås/Lås op button activation for a regular user's own
  * reservation, per three rules:
  * 1) both buttons are only active from the reservation's start time,
- * 2) unlock is only active once the previous reservation (if any) has
- *    expired AND the vehicle is currently locked,
+ * 2) unlock is only active while THIS reservation is still current (started
+ *    and not yet expired) AND the previous reservation (if any) has expired
+ *    AND the vehicle is currently locked — once this reservation itself has
+ *    expired, unlock turns off immediately regardless of whether a next
+ *    reservation has begun yet, so a former booking holder can't reclaim
+ *    (unlock/locate) the vehicle after their own window closes,
  * 3) lock stops being active once this reservation has expired AND the next
- *    reservation (if any) has begun.
+ *    reservation (if any) has begun — deliberately more lenient than
+ *    unlock's own expiry cutoff, since securing an available vehicle after
+ *    your booking ends (before the next renter's window opens) isn't a
+ *    security concern the way unlocking one is.
  * `now` should come from nowIsoString() so it compares consistently with
  * `booking`/`previous`/`next` (all raw, Supabase-round-tripped ISO values)
  * via isoPrefix — see that function's doc comment for why plain Date parsing
  * would silently misalign the comparison. An open-ended `booking` (end:
- * null) never expires, so rule 3 can never disable Lock. An open-ended
- * `previous` never expires either, so it permanently blocks Unlock (rule 2)
- * — this shouldn't occur in practice (an open-ended booking should make it
- * impossible to create a later one for the same vehicle), but is handled
- * safely rather than assumed away.
+ * null) never expires, so rules 2/3 can never disable Unlock/Lock. An
+ * open-ended `previous` never expires either, so it permanently blocks
+ * Unlock (rule 2) — this shouldn't occur in practice (an open-ended booking
+ * should make it impossible to create a later one for the same vehicle),
+ * but is handled safely rather than assumed away.
  */
 export function computeLockButtonState(
   now: string,
@@ -473,7 +480,7 @@ export function computeLockButtonState(
 
   return {
     lockEnabled: started && !(expired && nextBegun),
-    unlockEnabled: started && previousExpired && vehicleLocked,
+    unlockEnabled: started && !expired && previousExpired && vehicleLocked,
   };
 }
 
