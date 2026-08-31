@@ -131,10 +131,15 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
   }
 
-  let departmentsQuery = admin.from("departments").select("department_id, name").returns<DepartmentRow[]>();
-  if (!isFleetiiAdmin && caller?.costumer_id) {
-    departmentsQuery = departmentsQuery.eq("costumer_id", caller.costumer_id);
-  }
+  // .eq() (a PostgrestFilterBuilder method) has to be applied before
+  // .returns<>() (which narrows to a PostgrestTransformBuilder that no
+  // longer has .eq()) — so the conditional lives inside the query
+  // construction itself rather than reassigning a .returns()-typed variable.
+  const departmentsQuery = (
+    !isFleetiiAdmin && caller?.costumer_id
+      ? admin.from("departments").select("department_id, name").eq("costumer_id", caller.costumer_id)
+      : admin.from("departments").select("department_id, name")
+  ).returns<DepartmentRow[]>();
 
   const [departmentsResult, vehicleDepartmentsResult, userDepartmentsResult, anvendelseResult] = await Promise.all([
     departmentsQuery,
