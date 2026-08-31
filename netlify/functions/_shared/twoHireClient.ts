@@ -84,13 +84,18 @@ export async function getTwoHireAccessToken(credentials: TwoHireCredentials): Pr
 }
 
 /**
- * Subscribes to every generic signal (online, position, distance_covered,
- * autonomy_percentage, ...) for every vehicle in one call, via 2hire's
- * wildcard topic "vehicle:*:generic:*". 2hire will first GET `callbackUrl`
- * with a `hub.challenge` to confirm it (see 2hire-webhook.mts), then POST
- * signed signal updates to it going forward.
+ * Subscribes `callbackUrl` to one of 2hire's wildcard webhook topics (e.g.
+ * "vehicle:*:generic:*" or "vehicle:*:specific:*") for every vehicle in one
+ * call. 2hire will first GET `callbackUrl` with a `hub.challenge` to confirm
+ * it (see 2hire-webhook.mts), then POST signed signal updates to it going
+ * forward. Shared by subscribeToGenericSignals/subscribeToSpecificSignals
+ * below — same request shape, only the topic differs.
  */
-export async function subscribeToGenericSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
+async function subscribeToWebhookTopic(
+  topic: string,
+  callbackUrl: string,
+  credentials: TwoHireCredentials,
+): Promise<void> {
   const secret = process.env.TWOHIRE_WEBHOOK_SECRET;
   if (!secret) {
     throw new Error("Serveren mangler TWOHIRE_WEBHOOK_SECRET.");
@@ -105,7 +110,7 @@ export async function subscribeToGenericSignals(callbackUrl: string, credentials
     },
     body: JSON.stringify({
       "hub.mode": "subscribe",
-      "hub.topic": "vehicle:*:generic:*",
+      "hub.topic": topic,
       "hub.callback": callbackUrl,
       "hub.secret": secret,
     }),
@@ -114,6 +119,16 @@ export async function subscribeToGenericSignals(callbackUrl: string, credentials
   if (!response.ok) {
     throw new Error(`2hire webhook-abonnement fejlede (${response.status}): ${await response.text()}`);
   }
+}
+
+/** Subscribes to every generic signal (online, position, distance_covered, autonomy_percentage, ...) for every vehicle — see subscribeToWebhookTopic. */
+export async function subscribeToGenericSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
+  return subscribeToWebhookTopic("vehicle:*:generic:*", callbackUrl, credentials);
+}
+
+/** Subscribes to every model/OEM-specific signal for every vehicle (2hire's "vehicle:*:specific:*" topic — signal names and payload shapes vary by vehicle profile, unlike the fixed generic vocabulary) — see subscribeToWebhookTopic and 2hire-webhook.mts's handling of the "specific" topic kind. */
+export async function subscribeToSpecificSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
+  return subscribeToWebhookTopic("vehicle:*:specific:*", callbackUrl, credentials);
 }
 
 /**

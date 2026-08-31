@@ -1,7 +1,7 @@
 // Netlify Function: admin-triggered setup action that subscribes this
-// deployment's 2hire-webhook.mts URL to a vehicle's generic signals (see
-// _shared/twoHireClient.ts). Two modes, selected by an optional costumerId
-// in the POST body:
+// deployment's 2hire-webhook.mts URL to a vehicle's generic AND specific
+// signals (see _shared/twoHireClient.ts). Two modes, selected by an
+// optional costumerId in the POST body:
 //   - costumerId present: subscribes JUST that one costumer's own
 //     twohire_client_id/twohire_client_secret — the new path, called from
 //     CostumerDetailsPage.tsx right after a FLEETii admin saves a new
@@ -37,7 +37,12 @@
 // rather than aborting the whole run because one credential is bad.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
-import { getGlobalCredentials, subscribeToGenericSignals, type TwoHireCredentials } from "./_shared/twoHireClient.js";
+import {
+  getGlobalCredentials,
+  subscribeToGenericSignals,
+  subscribeToSpecificSignals,
+  type TwoHireCredentials,
+} from "./_shared/twoHireClient.js";
 
 type SubscribeBody = { costumerId?: string };
 
@@ -122,14 +127,28 @@ export default async (req: Request) => {
     ];
   }
 
+  // Each subscription needs both wildcard topics registered separately —
+  // 2hire treats "generic" and "specific" as independent subscriptions, so
+  // one succeeding doesn't imply the other did. Both attempted regardless
+  // (same "keep going, surface what failed" pattern as the outer loop).
+  const topics: { label: string; subscribe: typeof subscribeToGenericSignals }[] = [
+    { label: "generic", subscribe: subscribeToGenericSignals },
+    { label: "specific", subscribe: subscribeToSpecificSignals },
+  ];
+
   const failures: { label: string; error: string }[] = [];
   for (const subscription of subscriptions) {
-    try {
-      await subscribeToGenericSignals(callbackUrl, subscription.credentials);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Ukendt fejl.";
-      console.warn(`[2hire-subscribe] subscribeToGenericSignals failed for ${subscription.label}:`, message);
-      failures.push({ label: subscription.label, error: message });
+    for (const topic of topics) {
+      try {
+        await topic.subscribe(callbackUrl, subscription.credentials);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Ukendt fejl.";
+        console.warn(
+          `[2hire-subscribe] subscribeTo${topic.label === "generic" ? "Generic" : "Specific"}Signals failed for ${subscription.label}:`,
+          message,
+        );
+        failures.push({ label: `${subscription.label} (${topic.label})`, error: message });
+      }
     }
   }
 

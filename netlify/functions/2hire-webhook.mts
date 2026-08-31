@@ -1,8 +1,9 @@
-// Netlify Function: public webhook callback for 2hire's generic vehicle
-// signals, subscribed to via 2hire-subscribe.mts. Every delivery — known or
-// not — is recorded into `vehicle_signal_history` (append-only, service-
-// role write, see vehicle_signal_history_table.sql), so nothing 2hire sends
-// is ever silently lost. On top of that, the four signals this app actually
+// Netlify Function: public webhook callback for 2hire's generic AND
+// specific vehicle signals (both topic kinds, subscribed to via
+// 2hire-subscribe.mts). Every delivery — known or not — is recorded into
+// `vehicle_signal_history` (append-only, service-role write, see
+// vehicle_signal_history_table.sql), so nothing 2hire sends is ever
+// silently lost. On top of that, the four GENERIC signals this app actually
 // tracks live (online, position, distance_covered, autonomy_percentage)
 // ALSO update the `vehicle_signals` "current state" table (service-role
 // write — there is no SQL INSERT/UPDATE policy for this table, see
@@ -10,6 +11,11 @@
 // (RLS-gated, authenticated users only) to serve VehicleGPS2Hire data. These
 // two writes are deliberately independent: an unrecognized signal still
 // gets a history row even though it has no live-state column to update yet.
+// "Specific" signals (model/OEM-specific — names and payload shapes vary by
+// vehicle profile, unlike the fixed generic vocabulary) only ever get the
+// history row for the same reason: toColumnUpdate()'s mapping is written
+// against the generic vocabulary and isn't safe to apply to an arbitrary
+// specific-signal name.
 // A "position" signal additionally pushes a Realtime Broadcast message
 // (see the bottom of the handler below) straight to any browser currently
 // watching FleetManagementPage.tsx's "Live" toggle — see
@@ -29,7 +35,7 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isWebhookSignatureValid } from "./_shared/webhookSignature.js";
 
-const TOPIC_PATTERN = /^vehicle:([^:]+):generic:([a-z_]+)$/;
+const TOPIC_PATTERN = /^vehicle:([^:]+):(generic|specific):([a-z_]+)$/;
 
 type SignalPayload = { timestamp: number; data: Record<string, unknown> };
 type WebhookBody = { topic: string; payload: SignalPayload };
@@ -112,19 +118,19 @@ export default async (req: Request) => {
 
   const topicMatch = TOPIC_PATTERN.exec(body.topic);
   if (!topicMatch) {
-    // Not a shape we recognize (e.g. a "specific" signal) — acknowledge so
-    // 2hire doesn't retry, but do nothing with it. Unlike an unrecognized
-    // GENERIC signal below, there's no vehicle_id/signal name to record
-    // here at all, so there's nothing meaningful to put in the history
-    // table either.
+    // Not a shape we recognize at all — acknowledge so 2hire doesn't retry,
+    // but do nothing with it. There's no vehicle_id/signal name to record
+    // here, so there's nothing meaningful to put in the history table
+    // either.
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
-  const [, vehicleId, signal] = topicMatch;
+  const [, vehicleId, topicKind, signal] = topicMatch;
 
 
-  // Every generic signal gets a history row — known or not, see this
-  // file's own header comment and vehicle_signal_history_table.sql.
+  // Every signal delivery gets a history row — generic or specific, known
+  // or not, see this file's own header comment and
+  // vehicle_signal_history_table.sql.
   const { error: historyError } = await admin.from("vehicle_signal_history").insert({
     vehicle_id: vehicleId,
     signal_type: signal,
@@ -136,10 +142,14 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: historyError.message }), { status: 500 });
   }
 
-  // Only the signals this app actually tracks live update vehicle_signals —
-  // an unrecognized one is already preserved in the history insert above,
-  // so there's nothing lost by leaving it out of "current state" here.
-  const columnUpdate = toColumnUpdate(signal, body.payload);
+  // Only known GENERIC signals update vehicle_signals "current state" —
+  // toColumnUpdate()'s mapping is written against the fixed generic
+  // vocabulary, so it's never applied to a "specific" signal (whose names
+  // vary by vehicle profile and could coincidentally collide with a
+  // generic one, e.g. some OEM's own "online"). Already preserved in the
+  // history insert above either way, so there's nothing lost by leaving a
+  // specific/unrecognized signal out of "current state" here.
+  const columnUpdate = topicKind === "generic" ? toColumnUpdate(signal, body.payload) : null;
   if (columnUpdate) {
     const { error } = await admin.from("vehicle_signals").upsert({ vehicle_id: vehicleId, ...columnUpdate });
     if (error) {
@@ -165,7 +175,7 @@ export default async (req: Request) => {
   // response to 2hire — the vehicle_signals write above already persisted
   // the real state, so a missed broadcast just means the map isn't
   // live-updated until the next page load/refresh, not a data loss.
-  if (signal === "position") {
+  if (topicKind === "generic" && signal === "position") {
     try {
       const { data: vehicle, error: vehicleError } = await admin
         .from("vehicle_profiles")
