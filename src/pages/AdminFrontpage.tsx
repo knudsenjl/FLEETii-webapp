@@ -181,13 +181,16 @@ export function AdminFrontpage() {
                   Reservationer
                 </button>
                 {!isDepartmentAdmin(profile?.role) && (
-                  <button
-                    type="button"
-                    onClick={() => navigate("/fleet-map")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    Flådestyring
-                  </button>
+                  <>
+                    <hr className="border-brand-200" />
+                    <button
+                      type="button"
+                      onClick={() => navigate("/fleet-map")}
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    >
+                      Flådestyring
+                    </button>
+                  </>
                 )}
               </div>
 
@@ -253,105 +256,111 @@ export function AdminFrontpage() {
               )}
 
               {isFleetiiAdmin(profile?.role) && (
-                <>
+                <div className="flex flex-col gap-3">
                   <hr className="border-brand-200" />
 
-                  <div className="flex flex-col gap-3">
-                    <button
-                      type="button"
-                      onClick={() => navigate("/fleetii-admin-installations")}
-                      className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                    >
-                      INSTALLATIONER
-                      {Boolean(pendingInstallationsCount) && (
-                        <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
-                          {pendingInstallationsCount}
-                        </span>
-                      )}
-                    </button>
-
-                    <hr className="border-brand-200" />
-
-                    <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                      <table className="w-full border-collapse text-[0.7rem]">
-                        <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                  <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
+                    <table className="w-full border-collapse text-[0.7rem]">
+                      <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                        <tr>
+                          <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm">Kunde</span>
+                              <button
+                                type="button"
+                                onClick={() => navigate("/costumer-new")}
+                                aria-label="Opret kunde"
+                                title="Opret kunde"
+                                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-100"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                                  <path d="M12 5v14" />
+                                  <path d="M5 12h14" />
+                                </svg>
+                              </button>
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-100 bg-white">
+                        {costumersLoading && (
                           <tr>
-                            <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Kunde</th>
+                            <td className="px-2 py-3 text-center text-brand-500">Indlæser kunder…</td>
                           </tr>
-                        </thead>
-                        <tbody className="divide-y divide-brand-100 bg-white">
-                          {costumersLoading && (
-                            <tr>
-                              <td className="px-2 py-3 text-center text-brand-500">Indlæser kunder…</td>
-                            </tr>
-                          )}
-                          {!costumersLoading && costumersError && (
-                            <tr>
-                              <td className="px-2 py-3 text-center text-red-600">{costumersError}</td>
-                            </tr>
-                          )}
-                          {!costumersLoading && !costumersError && costumers.length === 0 && (
-                            <tr>
-                              <td className="px-2 py-3 text-center text-brand-500">Ingen kunder fundet.</td>
-                            </tr>
-                          )}
-                          {!costumersLoading &&
-                            !costumersError &&
-                            costumers.map((costumer, index) => {
-                              const isAlternate = index % 2 === 1;
-                              const goToCostumer = () =>
-                                navigate(`/costumer-details/${costumer.costumer_id}`, { state: { costumer } });
-                              return (
-                                <tr
-                                  key={costumer.costumer_id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={goToCostumer}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                      e.preventDefault();
-                                      goToCostumer();
-                                    }
-                                  }}
-                                  className={`cursor-pointer transition ${
-                                    isAlternate
-                                      ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                      : "bg-white text-brand-700 hover:bg-brand-50"
-                                  }`}
-                                >
-                                  <td className="whitespace-nowrap px-2 py-0.5 font-medium">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span>{costumer.name ?? "—"}</span>
-                                      <div className="flex shrink-0 items-center gap-2">
-                                        {costumer.deactivated_at && (
-                                          <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                            Adgang blokeret
-                                          </span>
-                                        )}
-                                        {!costumer.has_twohire_credentials && (
-                                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
-                                            Mangler 2hire registrering
-                                          </span>
-                                        )}
-                                      </div>
+                        )}
+                        {!costumersLoading && costumersError && (
+                          <tr>
+                            <td className="px-2 py-3 text-center text-red-600">{costumersError}</td>
+                          </tr>
+                        )}
+                        {!costumersLoading && !costumersError && costumers.length === 0 && (
+                          <tr>
+                            <td className="px-2 py-3 text-center text-brand-500">Ingen kunder fundet.</td>
+                          </tr>
+                        )}
+                        {!costumersLoading &&
+                          !costumersError &&
+                          costumers.map((costumer, index) => {
+                            const isAlternate = index % 2 === 1;
+                            const goToCostumer = () =>
+                              navigate(`/costumer-details/${costumer.costumer_id}`, { state: { costumer } });
+                            return (
+                              <tr
+                                key={costumer.costumer_id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={goToCostumer}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    goToCostumer();
+                                  }
+                                }}
+                                className={`cursor-pointer transition ${
+                                  isAlternate
+                                    ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                    : "bg-white text-brand-700 hover:bg-brand-50"
+                                }`}
+                              >
+                                <td className="whitespace-nowrap px-2 py-0.5 font-medium">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span>{costumer.name ?? "—"}</span>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      {costumer.deactivated_at && (
+                                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
+                                          Adgang blokeret
+                                        </span>
+                                      )}
+                                      {!costumer.has_twohire_credentials && (
+                                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
+                                          Mangler 2hire registrering
+                                        </span>
+                                      )}
                                     </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    <button
-                      type="button"
-                      onClick={() => navigate("/costumer-new")}
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                    >
-                      Opret kunde
-                    </button>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
                   </div>
-                </>
+
+                  <hr className="border-brand-200" />
+
+                  <button
+                    type="button"
+                    onClick={() => navigate("/fleetii-admin-installations")}
+                    className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  >
+                    INSTALLATIONER
+                    {Boolean(pendingInstallationsCount) && (
+                      <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
+                        {pendingInstallationsCount}
+                      </span>
+                    )}
+                  </button>
+                </div>
               )}
             </div>
           </section>

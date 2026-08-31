@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel } from "../lib/bookings";
@@ -58,11 +59,15 @@ type VehicleDeletionOrderQueryRow = {
  * a resolvable :orderId — or an order that isn't actually order_type
  * "Nedlæg" (a stale/mistyped link to what's really a creation order) —
  * redirects back to "/fleetii-admin-installations". Shows what the customer
- * admin's "Slet køretøj"
- * request carries, a real step toggle for confirming the physical 2hire
- * device has been removed, and a final action that actually deregisters the
- * vehicle from 2hire and deletes it from our own DB (delete-vehicle.mts) —
- * gated on the device having been confirmed removed first.
+ * admin's "Slet køretøj" request carries, plus a single "Afregistrer 2hire
+ * device og slet køretøjet" action gated behind a Fortryd/Ja ConfirmDialog
+ * whose own message asks staff to confirm the physical device is actually
+ * out — confirming persists device_removed: true (still re-verified
+ * server-side by delete-vehicle.mts before anything irreversible happens)
+ * and, in the same action, deregisters the vehicle from 2hire and deletes it
+ * from our own DB. Was previously a separate persisted toggle step ahead of
+ * the delete button; folded into the confirmation dialog itself since both
+ * steps always happened together in practice.
  */
 export function VehicleDeletePage() {
   const { session } = useAuth();
@@ -88,10 +93,7 @@ export function VehicleDeletePage() {
   /** The real vehicle_profiles.vehicle_ident for order.vehicle_id (always set for a resolved "Nedlæg" order — see send-vehicle-deletion-request.mts, which never populates costumer_orders.vehicle_ident itself for a deletion request, unlike NewVehiclePage.tsx's creation flow) — fetched fresh from the actual vehicle rather than trusting the order snapshot. Falls back to order.number_plate, same convention as everywhere else. */
   const [vehicleIdent, setVehicleIdent] = useState<string | null>(null);
 
-  const [deviceRemoved, setDeviceRemoved] = useState(order?.device_removed ?? false);
-  const [deviceRemovedPending, setDeviceRemovedPending] = useState(false);
-  const [deviceRemovedError, setDeviceRemovedError] = useState<string | null>(null);
-
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deregisterWarning, setDeregisterWarning] = useState<string | null>(null);
@@ -153,14 +155,6 @@ export function VehicleDeletePage() {
     }
   }, [order, orderLoading, navigate]);
 
-  // Populates deviceRemoved once `order` resolves asynchronously (the
-  // fetch-by-id path) — the useState initializer above only runs on the very
-  // first render, before that fetch can possibly have completed.
-  useEffect(() => {
-    if (!order) return;
-    setDeviceRemoved(order.device_removed);
-  }, [order]);
-
   /** Fetches the real vehicle_ident for order.vehicle_id — see vehicleIdent's own doc comment above. */
   useEffect(() => {
     if (!order?.vehicle_id) {
@@ -194,30 +188,30 @@ export function VehicleDeletePage() {
     return null;
   }
 
-  /** Toggles device_removed — a real, persisted step (unlike VehicleCreatePage.tsx's placeholder steps), gating the final delete action below. */
-  const handleToggleDeviceRemoved = async () => {
-    const next = !deviceRemoved;
-    setDeviceRemovedPending(true);
-    setDeviceRemovedError(null);
-
-    const { error } = await supabase
-      .from("costumer_orders")
-      .update({ device_removed: next })
-      .eq("order_id", order.order_id);
-
-    setDeviceRemovedPending(false);
-    if (error) {
-      setDeviceRemovedError(error.message);
-      return;
-    }
-    setDeviceRemoved(next);
-  };
-
-  /** The real, terminal action — deregisters the vehicle from 2hire (best-effort) and deletes it from our own DB via delete-vehicle.mts. */
+  /**
+   * The real, terminal action — triggered from the Ja/Fortryd confirmation
+   * dialog below, whose message itself IS the "have you physically removed
+   * the device" question (replacing the old, separate persisted toggle
+   * step). Persists device_removed: true first (delete-vehicle.mts
+   * re-verifies this server-side before doing anything irreversible — see
+   * its own doc comment — so this write has to land before that call, not
+   * just be implied by the user clicking "Ja"), then deregisters the
+   * vehicle from 2hire (best-effort) and deletes it from our own DB.
+   */
   const handleDeleteVehicle = async () => {
     if (!order.vehicle_id) return;
     setIsDeleting(true);
     setDeleteError(null);
+
+    const { error: deviceRemovedError } = await supabase
+      .from("costumer_orders")
+      .update({ device_removed: true })
+      .eq("order_id", order.order_id);
+    if (deviceRemovedError) {
+      setDeleteError(deviceRemovedError.message);
+      setIsDeleting(false);
+      return;
+    }
 
     try {
       const response = await fetch("/.netlify/functions/delete-vehicle", {
@@ -245,6 +239,7 @@ export function VehicleDeletePage() {
     }
 
     setIsDeleting(false);
+    setShowDeleteConfirm(false);
     setDeleted(true);
   };
 
@@ -314,30 +309,26 @@ export function VehicleDeletePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {deviceRemovedError && <p className="text-sm text-red-600">{deviceRemovedError}</p>}
                 <button
                   type="button"
-                  disabled={deviceRemovedPending}
-                  onClick={() => void handleToggleDeviceRemoved()}
-                  className={`w-full rounded-lg border-2 bg-white px-2 py-1.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                    deviceRemoved
-                      ? "border-green-600 text-green-600 hover:bg-green-50"
-                      : "border-brand-600 text-brand-600 hover:bg-brand-50"
-                  }`}
-                >
-                  {deviceRemoved ? "✓ " : ""}Fysisk 2hire-device fjernet
-                </button>
-
-                {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
-                <button
-                  type="button"
-                  disabled={!deviceRemoved || isDeleting}
-                  onClick={() => void handleDeleteVehicle()}
+                  disabled={isDeleting}
+                  onClick={() => setShowDeleteConfirm(true)}
                   className="w-full rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  {isDeleting ? "Sletter…" : "Slet køretøj i FLEETii og 2hire"}
+                  Afregistrer 2hire device og slet køretøjet
                 </button>
               </div>
+            )}
+
+            {showDeleteConfirm && (
+              <ConfirmDialog
+                message="Har du fjernet 2hire device, og ønsker du at nedlægge køretøjet - BEMÆRK, at dette også vil fjerne al historik omkring dette køretøj - kan IKKE reetableres  efterfølgende"
+                error={deleteError}
+                onCancel={() => setShowDeleteConfirm(false)}
+                onConfirm={() => void handleDeleteVehicle()}
+                isPending={isDeleting}
+                confirmPendingLabel="Sletter…"
+              />
             )}
           </section>
         </motion.main>
