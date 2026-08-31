@@ -77,10 +77,23 @@ export default async (req: Request) => {
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
+  const callerIsFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  // A regular admin must never be able to archive a FLEETii admin's
+  // account — regardless of whether the department-match check below would
+  // otherwise pass. It normally wouldn't (a FLEETii admin has no
+  // department of their own), EXCEPT while that FLEETii admin has switched
+  // their own active department via switch-department.mts to browse a
+  // specific department — at that moment their department_id temporarily
+  // equals a regular admin's own, which would otherwise let that admin ban
+  // the platform admin's login and archive their profile. Checked before
+  // any mutation.
+  if (!callerIsFleetiiAdmin && isFleetiiAdminRole(target.role)) {
+    return new Response(JSON.stringify({ error: "Du kan ikke slette en FLEETii-administrator." }), { status: 403 });
+  }
   // A FLEETii admin isn't scoped to one department — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
-  if (!caller || (caller.role !== "FLEETii admin" && caller.department_id !== target.department_id)) {
+  if (!caller || (!callerIsFleetiiAdmin && caller.department_id !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
   }
   if (target.deleted_at) {

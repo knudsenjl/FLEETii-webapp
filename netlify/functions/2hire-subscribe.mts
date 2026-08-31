@@ -16,7 +16,11 @@
 //     environment, or if 2hire ever requires re-subscription — their docs
 //     don't document a lease/expiry, so this stays a manual, repeatable
 //     action rather than something run automatically on every deploy).
-//     Kept at the broader requireAdmin for this existing path.
+//     Requires FLEETii admin, same as the single-costumer path — this loop
+//     touches EVERY costumer's own 2hire subscription, so a regular
+//     costumer admin (who only ever administers their own costumer
+//     elsewhere in this app) must never be able to trigger it just by
+//     POSTing with no body.
 //
 // Per the "per-costumer 2hire credentials" plan: under per-sub-account
 // credentials, one subscribe call only covers whatever account authenticated
@@ -32,7 +36,7 @@
 // failed" pattern as FleetiiAdministrationPage.tsx's bulk-migration loop)
 // rather than aborting the whole run because one credential is bad.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { requireAdmin, requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
 import { getGlobalCredentials, subscribeToGenericSignals, type TwoHireCredentials } from "./_shared/twoHireClient.js";
 
 type SubscribeBody = { costumerId?: string };
@@ -56,7 +60,11 @@ export default async (req: Request) => {
   const body = await parseBody(req);
   const targetCostumerId = body.costumerId?.trim() || null;
 
-  const authResult = targetCostumerId ? await requireFleetiiAdmin(req) : await requireAdmin(req);
+  // FLEETii admin either way — the single-costumer path is admin-management
+  // tooling (CostumerDetailsPage), and the full-fan-out path touches EVERY
+  // costumer's own 2hire subscription, so neither should be reachable by a
+  // regular costumer admin.
+  const authResult = await requireFleetiiAdmin(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }

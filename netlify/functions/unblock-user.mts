@@ -14,7 +14,7 @@
 // costumers_add_deactivated_at.sql) — a costumer's deactivated_at is just a
 // row flag, nothing in auth.users to touch.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { requireAdmin } from "./_shared/serverAuth.js";
+import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type UnblockUserBody = { userId?: string };
 
@@ -55,17 +55,27 @@ export default async (req: Request) => {
       .maybeSingle<{ department_id: string | null; role: string }>(),
     admin
       .from("user_profiles")
-      .select("department_id, deleted_at")
+      .select("department_id, role, deleted_at")
       .eq("user_id", targetUserId)
-      .maybeSingle<{ department_id: string | null; deleted_at: string | null }>(),
+      .maybeSingle<{ department_id: string | null; role: string; deleted_at: string | null }>(),
   ]);
 
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
+  const callerIsFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  // A regular admin must never be able to act on a FLEETii admin's account
+  // — same reasoning as delete-user.mts (this endpoint's exact reverse):
+  // department_id can temporarily coincide with a regular admin's own while
+  // that FLEETii admin has switched into their department via
+  // switch-department.mts, which would otherwise let the department-match
+  // check below pass. Checked before any mutation.
+  if (!callerIsFleetiiAdmin && isFleetiiAdminRole(target.role)) {
+    return new Response(JSON.stringify({ error: "Du kan ikke genetablere en FLEETii-administrator." }), { status: 403 });
+  }
   // A FLEETii admin isn't scoped to one department — same platform-wide
   // exception as delete-user.mts.
-  if (!caller || (caller.role !== "FLEETii admin" && caller.department_id !== target.department_id)) {
+  if (!caller || (!callerIsFleetiiAdmin && caller.department_id !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun genetablere brugere i din egen afdeling." }), {
       status: 403,
     });
