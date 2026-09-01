@@ -347,6 +347,16 @@ export function FleetManagementPage() {
                                 onChange={(e) => {
                                   setFilterCostumerId(e.target.value);
                                   setFilterDepartment("");
+                                  // A previously-picked Køretøj almost
+                                  // certainly belongs to the OLD Kunde, not
+                                  // the new one — same inconsistency class
+                                  // as Afdeling above (and the reverse of
+                                  // Køretøj's own onChange, which syncs
+                                  // Afdeling/Kunde TO match the vehicle
+                                  // picked); left alone, filterPlate would
+                                  // keep excluding every vehicle in the new
+                                  // scope.
+                                  setFilterPlate("");
                                 }}
                                 className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                               >
@@ -382,6 +392,12 @@ export function FleetManagementPage() {
                                   const department = departmentOptions.find((d) => d.department_id === departmentId);
                                   if (department) setFilterCostumerId(department.costumer_id);
                                 }
+                                // Same reasoning as Kunde's own onChange
+                                // above — a previously-picked Køretøj may
+                                // not belong to the newly-picked Afdeling,
+                                // and would otherwise keep excluding every
+                                // vehicle in the new scope.
+                                setFilterPlate("");
                               }}
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
