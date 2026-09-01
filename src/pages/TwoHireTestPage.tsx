@@ -13,6 +13,7 @@ import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
+import { useReloadPersistedBoolean } from "../hooks/useReloadPersistedBoolean";
 
 /**
  * Dedicated vehicle_profiles.vehicle_id for a copy of WB20418 (see
@@ -55,8 +56,8 @@ export function TwoHireTestPage() {
   const position = gpsPositions.find((p) => p.vehicleId === TEST_VEHICLE_ID);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Always the same fixed test vehicle, so no per-vehicle scoping is needed here (unlike BookingDetailsPage.tsx/VehicleDetailsPage.tsx's own use of this hook). */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot("2hire-test-map");
-  /** "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking). No role check needed here (unlike BookingDetailsPage.tsx/VehicleDetailsPage.tsx's own use of this) since this whole route is already requireAdmin-gated (see App.tsx). Not persisted across a refresh — see VehicleDetailsPage.tsx's identical comment for why. */
-  const [liveEnabled, setLiveEnabled] = useState(false);
+  /** "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking). No role check needed here (unlike BookingDetailsPage.tsx/VehicleDetailsPage.tsx's own use of this) since this whole route is already requireAdmin-gated (see App.tsx). Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — always the same fixed test vehicle, so no per-vehicle scoping is needed here. */
+  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean("2hire-test-live", false);
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
   useEffect(() => {

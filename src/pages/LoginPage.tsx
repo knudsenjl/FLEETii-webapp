@@ -292,7 +292,6 @@ export function LoginPage() {
                     autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
                     className="rounded-lg border border-brand-200 bg-brand-50/50 px-3.5 py-2.5 text-[16px] text-brand-900 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/30"
                   />
                 </label>

@@ -15,6 +15,7 @@ import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
+import { useReloadPersistedBoolean } from "../hooks/useReloadPersistedBoolean";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
@@ -115,8 +116,8 @@ export function VehicleDetailsPage() {
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this vehicle so refreshing on a different vehicle's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`vehicle-details-map:${vehicle?.vehicleId ?? ""}`);
-  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Not persisted across a refresh (unlike FleetManagementPage's) — a single-vehicle map re-opting-in each visit is a small enough ask, and much simpler than replicating that page's sessionStorage snapshot here too. */
-  const [liveEnabled, setLiveEnabled] = useState(false);
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this vehicle so refreshing on a different vehicle's page never inherits a stale on/off state. */
+  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(`vehicle-details-live:${vehicle?.vehicleId ?? ""}`, false);
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
   useEffect(() => {
