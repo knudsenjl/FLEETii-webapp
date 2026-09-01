@@ -36,18 +36,30 @@ type Vehicle = DisplayVehicle;
  * destination for a button whose badge already promised "every vehicle
  * here".
  *
- * Reaching this page with neither a costumerId a FLEETii admin could resolve
- * nor one of their own (a regular admin always has one) redirects back to
- * "/admin" below. Clicking a row navigates straight to VehicleDetailsPage
- * (editing/deleting a vehicle both live there too), or create a new one via
- * NewVehiclePage.
+ * ALL-COSTUMERS (FLEETii admin only, no costumerId AND no departmentId —
+ * FleetManagementPage.tsx's own "Administration af køretøjer" button when
+ * its Kunde filter is "Alle"): a variant of UNLOCKED with no costumer to
+ * narrow to at all, listing every vehicle platform-wide. Reuses the exact
+ * same departmentOptions-loading effect below — fetchDepartmentOptions(null)
+ * is documented to mean "every department platform-wide" for this reason
+ * (same cross-costumer fallback FleetManagementPage.tsx's own "Alle" already
+ * relies on), so no separate code path is needed for the vehicle list
+ * itself. "Opret køretøj" is disabled in this mode instead (see below) since
+ * NewVehiclePage.tsx has no equivalent "Alle" fallback of its own — creating
+ * a vehicle always needs exactly one costumer to attach it to.
+ *
+ * Before this mode existed, a FLEETii admin reaching this page with no
+ * costumerId (e.g. exactly this route) redirected straight back to "/admin"
+ * — confusing, since the button that got them here promised a vehicle list.
+ * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
+ * a vehicle both live there too), or create a new one via NewVehiclePage.
  */
 export function VehiclesPage() {
   const { costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state. */
+  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
   const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
 
   const state = location.state as
@@ -55,19 +67,12 @@ export function VehiclesPage() {
     | null;
   const targetCostumerId = state?.costumerId ?? costumerId;
   const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
-  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
+  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable) or, for a FLEETii admin with no targetCostumerId either, ALL-COSTUMERS. */
   const targetDepartmentId = state?.departmentId ?? null;
   const targetDepartmentName = state?.departmentName ?? null;
 
-  /** Redirects back to "/admin" if a FLEETii admin reaches this page without even a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
-  useEffect(() => {
-    if (isFleetiiAdmin && !targetCostumerId) {
-      navigate("/admin", { replace: true });
-    }
-  }, [isFleetiiAdmin, targetCostumerId, navigate]);
-
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  /** UNLOCKED mode only (see this component's own doc comment) — the target costumer's own departments, both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
+  /** UNLOCKED/ALL-COSTUMERS modes only (see this component's own doc comment) — the target costumer's own departments (or, in ALL-COSTUMERS mode, every department platform-wide), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   /** Which of the listed vehicles are currently locked (vehicle_signals.locked — see useVehicleLockState's own doc comment for why it's virtual, not a real 2hire signal), keyed by vehicleId, for the Lås column below. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
   const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
@@ -106,9 +111,9 @@ export function VehiclesPage() {
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
-  /** UNLOCKED mode only — loads the target costumer's own departments, both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Skipped entirely in LOCKED mode (targetDepartmentId set), which doesn't need the whole costumer's department list at all. */
+  /** UNLOCKED/ALL-COSTUMERS modes only — loads the target costumer's own departments (or, with no targetCostumerId at all, every department platform-wide — only reachable by a FLEETii admin, see fetchDepartmentOptions' own doc comment), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Skipped entirely in LOCKED mode (targetDepartmentId set), which doesn't need any department list at all, and for a regular admin with no targetCostumerId (can't happen — they always have their own). */
   useEffect(() => {
-    if (targetDepartmentId || !targetCostumerId) {
+    if (targetDepartmentId || (!targetCostumerId && !isFleetiiAdmin)) {
       setDepartmentOptions([]);
       return;
     }
@@ -121,7 +126,7 @@ export function VehiclesPage() {
     return () => {
       cancelled = true;
     };
-  }, [targetCostumerId, targetDepartmentId]);
+  }, [targetCostumerId, targetDepartmentId, isFleetiiAdmin]);
 
   /** LOCKED mode: scopes vehicles straight to targetDepartmentId's own membership (vehicle_departments, via departmentIds — see liveVehicleDataSource.ts). UNLOCKED mode: every vehicle whose departmentIds intersects ANY of the target costumer's own departments (departmentOptions above) — the whole-costumer set the KØRETØJER button's own count badge already promised, further narrowed by filterDepartment above if picked. */
   useEffect(() => {
@@ -320,7 +325,7 @@ export function VehiclesPage() {
                     {filteredVehicles.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {!targetCostumerId
+                          {!targetCostumerId && !isFleetiiAdmin
                             ? "Ingen kunde valgt."
                             : filterPlate || filterStatus || filterDepartment
                               ? "Ingen køretøjer matcher filteret."
@@ -379,10 +384,12 @@ export function VehiclesPage() {
               <div className="flex gap-3">
                 <button
                   type="button"
+                  disabled={!targetCostumerId}
+                  title={!targetCostumerId ? "Vælg en kunde for at oprette et køretøj" : undefined}
                   onClick={() =>
                     navigate("/new-vehicle", { state: { costumerId: targetCostumerId, costumerName: targetCostumerName } })
                   }
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-50"
                 >
                   Opret køretøj
                 </button>

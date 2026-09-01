@@ -363,7 +363,26 @@ export function FleetManagementPage() {
                             Afdeling
                             <select
                               value={filterDepartment}
-                              onChange={(e) => setFilterDepartment(e.target.value)}
+                              onChange={(e) => {
+                                const departmentId = e.target.value;
+                                setFilterDepartment(departmentId);
+                                // While Kunde is still "Alle" (isFleetiiAdmin
+                                // only — departmentOptions spans every
+                                // costumer in that state, see
+                                // fetchDepartmentOptions' own doc comment),
+                                // picking one specific department left Kunde
+                                // stuck on "Alle" — confusing downstream,
+                                // e.g. "Administration af køretøjer" would
+                                // land on VehiclesPage locked to this one
+                                // department but showing no costumer name at
+                                // all. Auto-promote Kunde to that
+                                // department's own costumer instead, same as
+                                // if the admin had picked it there first.
+                                if (isFleetiiAdmin && !filterCostumerId && departmentId) {
+                                  const department = departmentOptions.find((d) => d.department_id === departmentId);
+                                  if (department) setFilterCostumerId(department.costumer_id);
+                                }
+                              }}
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
                               <option value="">Alle</option>
@@ -378,7 +397,35 @@ export function FleetManagementPage() {
                             Køretøj
                             <select
                               value={filterPlate}
-                              onChange={(e) => setFilterPlate(e.target.value)}
+                              onChange={(e) => {
+                                const plate = e.target.value;
+                                setFilterPlate(plate);
+                                // Picking one specific vehicle is more
+                                // specific than either Afdeling or Kunde —
+                                // sync both to match it (unconditionally,
+                                // not just when they're still "Alle"),
+                                // otherwise picking a vehicle outside
+                                // whatever Afdeling happens to already be
+                                // selected would silently zero out the list
+                                // (filterDepartment excludes it) instead of
+                                // showing the vehicle just picked. `vehicles`
+                                // here is only scoped by Kunde, not Afdeling
+                                // (see its own doc comment above), so this
+                                // is the one case an already-picked Afdeling
+                                // can disagree with a Køretøj choice. Same
+                                // "Alle Kunde" auto-promote as the Afdeling
+                                // select's own onChange, just always applied
+                                // rather than only when Kunde is unset.
+                                if (!plate) return;
+                                const vehicle = vehicles.find((v) => v.plate === plate);
+                                const departmentId = vehicle?.departmentIds[0];
+                                if (!departmentId) return;
+                                setFilterDepartment(departmentId);
+                                if (isFleetiiAdmin) {
+                                  const department = departmentOptions.find((d) => d.department_id === departmentId);
+                                  if (department) setFilterCostumerId(department.costumer_id);
+                                }
+                              }}
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
                               <option value="">Alle</option>
@@ -474,14 +521,18 @@ export function FleetManagementPage() {
                 onClick={() =>
                   navigate("/fleet-table", {
                     state: {
+                      // targetCostumerId is null when this map's own Kunde
+                      // filter is "Alle" (FLEETii admin only) — VehiclesPage
+                      // now has a matching ALL-COSTUMERS mode for exactly
+                      // that case instead of redirecting away, see its own
+                      // doc comment.
                       costumerId: targetCostumerId,
                       costumerName: targetCostumerName,
-                      // VehiclesPage now always requires a single department to
-                      // lock to (see its own doc comment on "filtering by
-                      // navigation") — only set when this map's own Afdeling
-                      // filter has one picked, same as filterDepartment itself.
-                      // Left unset ("Alle") just redirects to "/admin" there,
-                      // same as reaching it any other way without one.
+                      // Locks VehiclesPage to one department (its own LOCKED
+                      // mode) only when this map's own Afdeling filter has
+                      // one picked, same as filterDepartment itself — left
+                      // unset ("Alle") lands in VehiclesPage's UNLOCKED (or
+                      // ALL-COSTUMERS) mode instead, filterable in-page.
                       departmentId: filterDepartment || undefined,
                       departmentName: departmentOptions.find((d) => d.department_id === filterDepartment)?.name,
                     },
