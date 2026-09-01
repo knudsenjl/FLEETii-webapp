@@ -30,6 +30,7 @@ import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingLifecycle";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
+import { useReloadPersistedBoolean } from "../hooks/useReloadPersistedBoolean";
 import { supabase } from "../lib/supabase";
 import { useReverseGeocode } from "../lib/geocode";
 
@@ -99,8 +100,8 @@ export function BookingDetailsPage() {
   const { address, addressLoading } = useReverseGeocode(position, mapVisible);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-details-map:${booking?.vehicle ?? ""}`);
-  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Not persisted across a refresh, unlike FleetManagementPage's own toggle — see VehicleDetailsPage.tsx's identical comment for why. */
-  const [liveEnabled, setLiveEnabled] = useState(false);
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this booking's vehicle so refreshing on a different booking's page never inherits a stale on/off state. */
+  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(`booking-details-live:${booking?.vehicle ?? ""}`, false);
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
   useEffect(() => {
