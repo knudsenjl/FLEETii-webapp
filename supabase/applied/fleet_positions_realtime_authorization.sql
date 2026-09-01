@@ -19,8 +19,12 @@
 -- and any channel (private or not) stays openly joinable regardless of this
 -- policy.
 --
--- Applied to FLEETii-DB-Staging on 2026-08-30. Safe to re-run: policy
--- dropped before recreated.
+-- Applied to FLEETii-DB-Staging on 2026-08-30; production had drifted
+-- (this policy was missing there, which silently blocked the fleet-map
+-- Live toggle from ever receiving a broadcast on app.fleetii.dk -- no
+-- error surfaced anywhere, since VehicleContext.tsx's .subscribe() call
+-- doesn't check its status) until also applied to FLEETii-DB-Production
+-- on 2026-09-01. Safe to re-run: policy dropped before recreated.
 
 drop policy if exists "fleet_positions_receive_own_costumer" on "realtime"."messages";
 create policy "fleet_positions_receive_own_costumer"

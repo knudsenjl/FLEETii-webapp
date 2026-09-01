@@ -9,7 +9,8 @@
 // each page still owns that.
 import { supabase } from "./supabase";
 
-export type DepartmentOption = { department_id: string; name: string };
+/** costumer_id is included so a cross-costumer caller (FleetManagementPage.tsx's own "Alle" Kunde filter — the only case where a returned option's costumer isn't already known from the request) can tell which costumer a given department belongs to, e.g. to auto-select that costumer once one of its departments is picked. */
+export type DepartmentOption = { department_id: string; name: string; costumer_id: string };
 
 /**
  * Fetches every department for `costumerId`, ordered by name — or, when
@@ -20,7 +21,7 @@ export type DepartmentOption = { department_id: string; name: string };
  * error, just show nothing" behavior.
  */
 export async function fetchDepartmentOptions(costumerId?: string | null): Promise<DepartmentOption[]> {
-  const query = supabase.from("departments").select("department_id, name").order("name", { ascending: true });
+  const query = supabase.from("departments").select("department_id, name, costumer_id").order("name", { ascending: true });
   const { data } = await (costumerId ? query.eq("costumer_id", costumerId) : query).returns<DepartmentOption[]>();
   return data ?? [];
 }
