@@ -171,32 +171,38 @@ export function BookingsPage() {
 
         <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Dine reservationer</h2>
 
-        <div className="flex min-h-0 flex-1 flex-col gap-2.5 overflow-y-auto pb-4">
-          {loading && <p className="py-3 text-center text-sm text-brand-500">Indlæser reservationer…</p>}
-          {!loading && error && <p className="py-3 text-center text-sm text-red-600">{error}</p>}
-          {!loading && !error && departmentBookings.length === 0 && (
-            <p className="py-3 text-center text-sm text-brand-500">
-              {canShowNewBookingButton ? "Ingen kommende reservation." : "Anmod administratoren om at lave en reservation til dig."}
-            </p>
-          )}
-          {!loading &&
-            !error &&
-            departmentBookings.map((booking) =>
-              renderBookingCard(booking, () => navigate(`/booking-details/${booking.id}`, { state: { booking } })),
+        <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
+          <div className="flex flex-col gap-2.5 pb-4">
+            {loading && <p className="py-3 text-center text-sm text-brand-500">Indlæser reservationer…</p>}
+            {!loading && error && <p className="py-3 text-center text-sm text-red-600">{error}</p>}
+            {!loading && !error && departmentBookings.length === 0 && (
+              <p className="py-3 text-center text-sm text-brand-500">
+                {canShowNewBookingButton ? "Ingen kommende reservation." : "Anmod administratoren om at lave en reservation til dig."}
+              </p>
             )}
-        </div>
-
-        {canShowNewBookingButton && (
-          <div className="shrink-0 border-t border-brand-100 pb-5 pt-3">
-            <button
-              type="button"
-              onClick={() => navigate("/reservation")}
-              className="w-full rounded-full border border-brand-200 bg-white px-2 py-2.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50"
-            >
-              Opret reservation
-            </button>
+            {!loading &&
+              !error &&
+              departmentBookings.map((booking) =>
+                renderBookingCard(booking, () => navigate(`/booking-details/${booking.id}`, { state: { booking } })),
+              )}
           </div>
-        )}
+
+          {canShowNewBookingButton && (
+            // sticky (not shrink-0 outside the scroller): sits right after the list
+            // when everything fits, but pins to the viewport bottom — bg-brand-50
+            // matching the page background masks list items scrolling underneath —
+            // once the list overflows, so only the list itself scrolls.
+            <div className="sticky bottom-0 border-t border-brand-100 bg-brand-50 pb-5 pt-3">
+              <button
+                type="button"
+                onClick={() => navigate("/reservation")}
+                className="w-full rounded-full border border-brand-200 bg-white px-2 py-2.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50"
+              >
+                Opret reservation
+              </button>
+            </div>
+          )}
+        </div>
       </motion.div>
     </div>
   );

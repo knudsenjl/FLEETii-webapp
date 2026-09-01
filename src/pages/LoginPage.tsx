@@ -297,25 +297,15 @@ export function LoginPage() {
                   />
                 </label>
 
-                <div className="flex items-center justify-between gap-3">
-                  <label className="flex items-center gap-2 text-sm font-medium text-brand-700">
-                    <input
-                      type="checkbox"
-                      checked={rememberMe}
-                      onChange={(e) => setRememberMeState(e.target.checked)}
-                      className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-2 focus:ring-accent-500/30"
-                    />
-                    Husk mig
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => void handleForgotPassword()}
-                    disabled={resetSubmitting}
-                    className="text-sm font-medium text-brand-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {resetSubmitting ? "Sender…" : "Skift adgangskode"}
-                  </button>
-                </div>
+                <label className="flex items-center gap-2 text-sm font-medium text-brand-700">
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMeState(e.target.checked)}
+                    className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-2 focus:ring-accent-500/30"
+                  />
+                  Husk mig
+                </label>
 
                 {error && (
                   <p
@@ -344,6 +334,23 @@ export function LoginPage() {
                   className="mt-2 inline-flex items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {submitting ? "Logger ind…" : loading ? "Indlæser…" : "Log ind"}
+                </button>
+
+                {/* Deliberately placed AFTER the submit button (and as a plain
+                    text link, not a bordered button) rather than beside the
+                    password field — some password-manager auto-login features
+                    (e.g. True Key) locate "the button to click" after
+                    autofilling credentials by scanning for the first
+                    button-like element below the password field, which used
+                    to be this one instead of the real submit button, silently
+                    firing a password-reset email on every autofilled login. */}
+                <button
+                  type="button"
+                  onClick={() => void handleForgotPassword()}
+                  disabled={resetSubmitting}
+                  className="text-center text-sm font-medium text-brand-600 hover:underline disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {resetSubmitting ? "Sender…" : "Skift adgangskode"}
                 </button>
               </motion.form>
             )}
