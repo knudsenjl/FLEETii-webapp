@@ -7,9 +7,11 @@ import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
+import { EyeGlyph } from "../components/EyeGlyph";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
+import { useTimedFlag } from "../hooks/useTimedFlag";
 
 /** The costumer row, as passed in via router state from CostumerAdministrationPage. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
@@ -25,8 +27,6 @@ type Costumer = {
   email: string | null;
   /** Generated column (twohire_client_id/twohire_client_secret both set — see supabase/applied/costumers_add_has_twohire_credentials.sql). Never exposes the raw credential values, only whether they're both present — drives the view-mode "2hire:" summary row. */
   has_twohire_credentials: boolean | null;
-  /** The RAW client ID (see supabase/applied/costumers_expose_twohire_client_id.sql) — unlike the secret, an OAuth2 client_id is treated as a semi-public identifier, not a secret, so it's readable and shown directly in the edit form's own row rather than behind a boolean. */
-  twohire_client_id: string | null;
   /** Presence-only companion for the SECRET (see supabase/applied/costumers_add_has_twohire_client_id_and_secret.sql) — the raw value itself stays SELECT-revoked (it's the actual credential), so this is all the edit form's own row can show: whether one is set, never what it is. */
   has_twohire_client_secret: boolean | null;
 };
@@ -141,10 +141,14 @@ export function CostumerDetailsPage() {
   const [purgeConfirmText, setPurgeConfirmText] = useState("");
   /** Whether the RAPPORTER button's "not implemented yet" InlinePopup is open — a plain click-to-toggle rather than a `title` tooltip, since hover has no equivalent on iOS/touch (see this project's own outline-button/InlinePopup conventions elsewhere, e.g. NewVehiclePage.tsx's "?" info popovers). */
   const [showRapporterInfo, setShowRapporterInfo] = useState(false);
+  /** Drives the "2hire client ID" row's reveal-on-click: masked by default, the eye button triggers "client-id" to show the real value for 5s before it auto-re-masks. Shared self-dismissing-flag hook — see useTimedFlag.ts. */
+  const { activeKey: revealedField, trigger: triggerReveal } = useTimedFlag(5000);
   /** Row counts for the AFDELINGER/KØRETØJER/BRUGERE buttons' own tables, scoped to this costumer — drives each button's green corner CountBadge. null until loaded (no badge yet). */
   const [departmentsCount, setDepartmentsCount] = useState<number | null>(null);
   const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
   const [usersCount, setUsersCount] = useState<number | null>(null);
+  /** The RAW 2hire client ID, fetched separately via the get_twohire_client_id() RPC rather than the costumer select above — see costumers_scope_twohire_client_id_to_fleetii_admin.sql: the column's SELECT grant was revoked table-wide (an OAuth2 client_id is semi-public in general, but this app scopes it to FLEETii admin specifically, not "any of this costumer's own users"), so the RPC re-checks is_fleetii_admin() itself and returns null for anyone else regardless of this page's own route gate. null while loading or genuinely unset — both render the same empty `<input>` below. */
+  const [twoHireClientId, setTwoHireClientId] = useState<string | null>(null);
 
   const canSubmitEdit =
     editName.trim().length > 0 &&
@@ -164,7 +168,7 @@ export function CostumerDetailsPage() {
     void supabase
       .from("costumers")
       .select(
-        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email, has_twohire_credentials, twohire_client_id, has_twohire_client_secret",
+        "costumer_id, name, deactivated_at, cvr, address_street, address_postal_city, address_country, contact_person, phone, email, has_twohire_credentials, has_twohire_client_secret",
       )
       .eq("costumer_id", costumerId)
       .maybeSingle<Costumer>()
@@ -233,6 +237,24 @@ export function CostumerDetailsPage() {
       .eq("costumer_id", targetCostumerId)
       .then(({ count }) => {
         if (!cancelled) setUsersCount(count ?? 0);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [costumer?.costumer_id]);
+
+  // The RAW 2hire client ID — see twoHireClientId's own comment above for
+  // why this is a separate RPC call rather than part of the costumer select.
+  useEffect(() => {
+    const targetCostumerId = costumer?.costumer_id;
+    if (!targetCostumerId) return;
+
+    let cancelled = false;
+    void supabase
+      .rpc("get_twohire_client_id", { p_costumer_id: targetCostumerId })
+      .then(({ data }) => {
+        if (!cancelled) setTwoHireClientId(data ?? null);
       });
 
     return () => {
@@ -485,10 +507,20 @@ export function CostumerDetailsPage() {
                     <RequiredFieldRow label="E-mail:" value={editEmail} onChange={setEditEmail} type="email" />
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">2hire client ID:</label>
-                      {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, see costumers_expose_twohire_client_id.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. */}
-                      {costumer.twohire_client_id ? (
-                        <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
-                          {costumer.twohire_client_id}
+                      {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, but is scoped to FLEETii admin only, see costumers_scope_twohire_client_id_to_fleetii_admin.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. twoHireClientId comes from a separate RPC (see its own state comment above), so this briefly shows the empty <input> while that resolves even for an already-configured costumer. Masked by default (fixed-length, same as the client secret row below) with a right-aligned eye button that reveals the real value for 5s — see useTimedFlag above. */}
+                      {twoHireClientId ? (
+                        <span className="relative flex items-center rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
+                          <span className="truncate pr-6">
+                            {revealedField === "client-id" ? twoHireClientId : "**********"}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => triggerReveal("client-id")}
+                            aria-label={revealedField === "client-id" ? "2hire client ID vist" : "Vis 2hire client ID"}
+                            className="absolute right-1 flex h-6 w-6 items-center justify-center rounded text-brand-500 transition hover:text-brand-700"
+                          >
+                            <EyeGlyph className="h-4 w-4" />
+                          </button>
                         </span>
                       ) : (
                         <input
