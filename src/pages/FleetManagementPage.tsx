@@ -141,6 +141,9 @@ export function FleetManagementPage() {
   const [filterStatus, setFilterStatus] = useState(savedSnapshot?.filters?.status ?? "");
   const [filterDepartment, setFilterDepartment] = useState(savedSnapshot?.filters?.department ?? "");
   const filterRef = useRef<HTMLDivElement>(null);
+  /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern as the filter popup above, own state/ref since the two popups are independent. */
+  const [noGpsOpen, setNoGpsOpen] = useState(false);
+  const noGpsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -154,6 +157,19 @@ export function FleetManagementPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterOpen]);
+
+  useEffect(() => {
+    if (!noGpsOpen) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (noGpsRef.current && !noGpsRef.current.contains(event.target as Node)) {
+        setNoGpsOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [noGpsOpen]);
 
   /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Same "Alle" cross-costumer fallback for a FLEETii admin as VehiclesPage.tsx's own identical effect — see its own doc comment for why that's a real, RLS-permitted query rather than a mistake. */
   useEffect(() => {
@@ -191,6 +207,10 @@ export function FleetManagementPage() {
   const departmentGpsPositions = gpsPositions
     .filter((g) => filteredVehicleIds.has(g.vehicleId))
     .sort((a, b) => a.vehicleId.localeCompare(b.vehicleId));
+  /** Vehicles in scope (post-filter) that have never reported a GPS position — no vehicle_signals row/lat/lng yet, typically a just-registered vehicle nobody has driven since (see getGpsPositions' own not-null lat/lng filter). These can never get a map marker, so the "Uden lokation" button surfaces them explicitly instead of just silently vanishing off the map with no explanation. */
+  const gpsVehicleIds = new Set(gpsPositions.map((g) => g.vehicleId));
+  const vehiclesWithoutGps = filteredVehicles.filter((v) => !gpsVehicleIds.has(v.vehicleId));
+
   const [primary, ...rest] = departmentGpsPositions;
   /** The primary vehicle's OWN, always-current position — feeds the marker (via markerLat/markerLng below) and the tooltip/showMarker checks, and updates on every Live-toggle poll. Deliberately NOT used for the map's own center — see stableCenter below. */
   const center = primary ?? DENMARK_CENTER;
@@ -317,6 +337,35 @@ export function FleetManagementPage() {
                   Flådestyring{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                 </h2>
                 <div className="flex shrink-0 items-center gap-2">
+                  {vehiclesWithoutGps.length > 0 && (
+                    // Same z-[1001]-on-wrapper reasoning as the filter button below.
+                    <div className="relative z-[1001]" ref={noGpsRef}>
+                      <button
+                        type="button"
+                        onClick={() => setNoGpsOpen((prev) => !prev)}
+                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
+                      >
+                        Uden lokation
+                      </button>
+                      <InlinePopup
+                        visible={noGpsOpen}
+                        align="right"
+                        message={
+                          <>
+                            <p className="mb-2">
+                              Disse køretøjer vises ikke, da de ikke har nogen GPS positioner endnu — vil blive
+                              opdateret når du har været ude at køre første gang:
+                            </p>
+                            <ul className="list-inside list-disc">
+                              {vehiclesWithoutGps.map((v) => (
+                                <li key={v.vehicleId}>{v.plate}</li>
+                              ))}
+                            </ul>
+                          </>
+                        }
+                      />
+                    </div>
+                  )}
                   {/* z-[1001] on this wrapper (not just InlinePopup's own z-20) — Leaflet's own controls/panes below reach z-index 1000 (see the empty-notice's z-[1000] further down), and this div has no z-index of its own otherwise, so its z-20 popup would be compared directly against Leaflet's much higher values in the shared ambient stacking context and lose, rendering underneath the map. */}
                   <div className="relative z-[1001]" ref={filterRef}>
                     <button
@@ -382,7 +431,7 @@ export function FleetManagementPage() {
                                 // fetchDepartmentOptions' own doc comment),
                                 // picking one specific department left Kunde
                                 // stuck on "Alle" — confusing downstream,
-                                // e.g. "Administration af køretøjer" would
+                                // e.g. "Liste af køretøjer" would
                                 // land on VehiclesPage locked to this one
                                 // department but showing no costumer name at
                                 // all. Auto-promote Kunde to that
@@ -524,9 +573,18 @@ export function FleetManagementPage() {
                 {showEmptyNotice && (
                   <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
                     <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                      {filterPlate || filterStatus || filterDepartment || filterCostumerId
-                        ? "Ingen køretøjer matcher filteret"
-                        : "Der er ingen køretøjer i afdelingen"}
+                      {filteredVehicles.length === 0
+                        ? filterPlate || filterStatus || filterDepartment || filterCostumerId
+                          ? "Ingen køretøjer matcher filteret"
+                          : "Der er ingen køretøjer i afdelingen"
+                        : // filteredVehicles.length > 0 but departmentGpsPositions is
+                          // still empty (the actual trigger for showEmptyNotice, see
+                          // its own effect above) — real vehicles ARE in scope, they
+                          // just haven't reported a single 2hire signal yet (brand new,
+                          // never driven/connected), so there's no lat/lng to plot.
+                          // Distinguishing this from "no vehicles" avoids the map
+                          // wrongly claiming a just-created vehicle doesn't exist.
+                          "Ingen af køretøjerne har endnu en GPS-position"}
                     </div>
                   </div>
                 )}
@@ -556,7 +614,7 @@ export function FleetManagementPage() {
                 }
                 className="mt-4 w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
               >
-                Administration af køretøjer
+                Liste af køretøjer
               </button>
             </section>
           </motion.main>
