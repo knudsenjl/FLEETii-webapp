@@ -33,7 +33,7 @@ type Costumer = {
 
 /**
  * Costumer view — "/costumer-details/:costumerId", reachable only by role
- * "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in
+ * "sysadm" (see ProtectedRoute requireRole="sysadm" in
  * App.tsx). Reads an existing costumer when reached with one pre-filled via
  * router state (CostumerAdministrationPage's row click, which skips a
  * round-trip); a direct URL/refresh/bookmark (no router state) falls back
@@ -147,7 +147,7 @@ export function CostumerDetailsPage() {
   const [departmentsCount, setDepartmentsCount] = useState<number | null>(null);
   const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
   const [usersCount, setUsersCount] = useState<number | null>(null);
-  /** The RAW 2hire client ID, fetched separately via the get_twohire_client_id() RPC rather than the costumer select above — see costumers_scope_twohire_client_id_to_fleetii_admin.sql: the column's SELECT grant was revoked table-wide (an OAuth2 client_id is semi-public in general, but this app scopes it to FLEETii admin specifically, not "any of this costumer's own users"), so the RPC re-checks is_fleetii_admin() itself and returns null for anyone else regardless of this page's own route gate. null while loading or genuinely unset — both render the same empty `<input>` below. */
+  /** The RAW 2hire client ID, fetched separately via the get_twohire_client_id() RPC rather than the costumer select above — see costumers_scope_twohire_client_id_to_fleetii_admin.sql: the column's SELECT grant was revoked table-wide (an OAuth2 client_id is semi-public in general, but this app scopes it to sysadm specifically, not "any of this costumer's own users"), so the RPC re-checks is_sysadm() itself and returns null for anyone else regardless of this page's own route gate. null while loading or genuinely unset — both render the same empty `<input>` below. */
   const [twoHireClientId, setTwoHireClientId] = useState<string | null>(null);
 
   const canSubmitEdit =
@@ -201,7 +201,7 @@ export function CostumerDetailsPage() {
     setEditEmail(costumer.email ?? "");
   }, [costumer]);
 
-  // Redirects back to the FLEETii-admin costumer list if the requested
+  // Redirects back to the sysadm costumer list if the requested
   // costumer couldn't be loaded — mirrors BookingDetailsPage/
   // VehicleDetailsPage/UserDetailsPage's same redirect-on-missing-data
   // pattern.
@@ -385,7 +385,7 @@ export function CostumerDetailsPage() {
     navigate("/costumers", { replace: true });
   };
 
-  /** Blocks login for every user under this costumer (see costumers_add_deactivated_at.sql — is_admin()/current_department_id()/current_costumer_id() also stop resolving for them, and AuthContext/LoginPage force a sign-out/refuse sign-in client-side). Reversible via handleReactivate. Plain client-side update — costumers_update_fleetii_admin already covers any column, no new RLS policy needed. */
+  /** Blocks login for every user under this costumer (see costumers_add_deactivated_at.sql — is_admin()/current_department_id()/current_costumer_id() also stop resolving for them, and AuthContext/LoginPage force a sign-out/refuse sign-in client-side). Reversible via handleReactivate. Plain client-side update — costumers_update_sysadm already covers any column, no new RLS policy needed. */
   const handleDeactivate = async () => {
     if (!costumer) return;
 
@@ -507,7 +507,7 @@ export function CostumerDetailsPage() {
                     <RequiredFieldRow label="E-mail:" value={editEmail} onChange={setEditEmail} type="email" />
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">2hire client ID:</label>
-                      {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, but is scoped to FLEETii admin only, see costumers_scope_twohire_client_id_to_fleetii_admin.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. twoHireClientId comes from a separate RPC (see its own state comment above), so this briefly shows the empty <input> while that resolves even for an already-configured costumer. Masked by default (fixed-length, same as the client secret row below) with a right-aligned eye button that reveals the real value for 5s — see useTimedFlag above. */}
+                      {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, but is scoped to sysadm only, see costumers_scope_twohire_client_id_to_fleetii_admin.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. twoHireClientId comes from a separate RPC (see its own state comment above), so this briefly shows the empty <input> while that resolves even for an already-configured costumer. Masked by default (fixed-length, same as the client secret row below) with a right-aligned eye button that reveals the real value for 5s — see useTimedFlag above. */}
                       {twoHireClientId ? (
                         <span className="relative flex items-center rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                           <span className="truncate pr-6">

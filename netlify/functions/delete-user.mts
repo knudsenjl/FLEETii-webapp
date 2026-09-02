@@ -28,7 +28,7 @@
 // one able to manage that department's users at all, since only an admin
 // can create another admin.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isAnyAdminRole, isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type DeleteUserBody = { userId?: string };
 
@@ -77,23 +77,23 @@ export default async (req: Request) => {
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
-  const callerIsFleetiiAdmin = isFleetiiAdminRole(caller?.role);
-  // A regular admin must never be able to archive a FLEETii admin's
+  const callerIsSysadm = isSysadmRole(caller?.role);
+  // A regular admin must never be able to archive a sysadm's
   // account — regardless of whether the department-match check below would
-  // otherwise pass. It normally wouldn't (a FLEETii admin has no
-  // department of their own), EXCEPT while that FLEETii admin has switched
+  // otherwise pass. It normally wouldn't (a sysadm has no
+  // department of their own), EXCEPT while that sysadm has switched
   // their own active department via switch-department.mts to browse a
   // specific department — at that moment their department_id temporarily
   // equals a regular admin's own, which would otherwise let that admin ban
   // the platform admin's login and archive their profile. Checked before
   // any mutation.
-  if (!callerIsFleetiiAdmin && isFleetiiAdminRole(target.role)) {
-    return new Response(JSON.stringify({ error: "Du kan ikke slette en FLEETii-administrator." }), { status: 403 });
+  if (!callerIsSysadm && isSysadmRole(target.role)) {
+    return new Response(JSON.stringify({ error: "Du kan ikke slette en sysadm." }), { status: 403 });
   }
-  // A FLEETii admin isn't scoped to one department — same platform-wide
+  // A sysadm isn't scoped to one department — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
-  if (!caller || (!callerIsFleetiiAdmin && caller.department_id !== target.department_id)) {
+  if (!caller || (!callerIsSysadm && caller.department_id !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
   }
   if (target.deleted_at) {
@@ -107,11 +107,11 @@ export default async (req: Request) => {
   // admin). Excludes already-archived admins from the count — a banned,
   // archived admin doesn't actually cover the department anymore.
   //
-  // Same protection for "FLEETii admin", platform-wide rather than
+  // Same protection for "sysadm", platform-wide rather than
   // per-department (see the same exception above): unlike "admin", it
   // can't be recreated through create-user.mts/bulk-import-users.mts at all
   // (see ALLOWED_ROLES in _shared/userAccount.ts) — losing the last one
-  // would lock the whole platform out of every FLEETii-admin-only function
+  // would lock the whole platform out of every sysadm-only function
   // (e.g. delete-costumer.mts) with no recovery path whatsoever.
   if (isAnyAdminRole(target.role)) {
     let adminCountQuery = admin
@@ -120,7 +120,7 @@ export default async (req: Request) => {
       .eq("role", target.role)
       .is("deleted_at", null)
       .neq("user_id", targetUserId);
-    if (!isFleetiiAdminRole(target.role)) {
+    if (!isSysadmRole(target.role)) {
       adminCountQuery =
         target.department_id === null
           ? adminCountQuery.is("department_id", null)
@@ -132,8 +132,8 @@ export default async (req: Request) => {
       return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
     }
     if (!otherAdminCount) {
-      const message = isFleetiiAdminRole(target.role)
-        ? "Kan ikke slette den sidste FLEETii-administrator."
+      const message = isSysadmRole(target.role)
+        ? "Kan ikke slette den sidste sysadm."
         : "Kan ikke slette den sidste administrator i afdelingen.";
       return new Response(JSON.stringify({ error: message }), { status: 409 });
     }

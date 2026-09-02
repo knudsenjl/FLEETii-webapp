@@ -9,7 +9,7 @@
 // check below is this function's actual authorization boundary.
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isAnyAdminRole, isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type UpdateUserBody = {
   userId?: string;
@@ -109,25 +109,25 @@ export default async (req: Request) => {
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
-  // A FLEETii admin isn't scoped to one costumer — same platform-wide
+  // A sysadm isn't scoped to one costumer — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
-  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
-  // A regular admin must never be able to touch a FLEETii admin's account —
+  const isSysadm = isSysadmRole(caller?.role);
+  // A regular admin must never be able to touch a sysadm's account —
   // in particular never change their login email (see the updateUserById
   // call below) — regardless of whether the costumer-scoping check below
-  // would otherwise pass. It normally wouldn't (a FLEETii admin has no
-  // costumer of their own), EXCEPT while that FLEETii admin has switched
+  // would otherwise pass. It normally wouldn't (a sysadm has no
+  // costumer of their own), EXCEPT while that sysadm has switched
   // their own active department/costumer via switch-department.mts to
   // browse a specific costumer — at that moment their costumer_id
   // temporarily equals a regular admin's own, which would otherwise let
   // that admin pass the check below and take over the platform admin's
   // account (change their email, then reset the password). Checked before
   // any mutation, including the email/role change further down.
-  if (!isFleetiiAdmin && isFleetiiAdminRole(target.role)) {
-    return new Response(JSON.stringify({ error: "Du kan ikke opdatere en FLEETii-administrator." }), { status: 403 });
+  if (!isSysadm && isSysadmRole(target.role)) {
+    return new Response(JSON.stringify({ error: "Du kan ikke opdatere en sysadm." }), { status: 403 });
   }
-  if (!isFleetiiAdmin) {
+  if (!isSysadm) {
     if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
       return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });
     }
@@ -156,10 +156,10 @@ export default async (req: Request) => {
   }
 
   // Refuse to demote the last remaining non-archived admin in a department,
-  // or the last remaining "FLEETii admin" platform-wide, out of that role —
+  // or the last remaining "sysadm" platform-wide, out of that role —
   // same "no one left to manage users" hole delete-user.mts already guards
   // against for archiving, and role changes go through this endpoint too.
-  // Only ever fires as a demotion AWAY from "FLEETii admin", never a
+  // Only ever fires as a demotion AWAY from "sysadm", never a
   // reassignment INTO it — ALLOWED_ROLES above never offers it as a value
   // this form can set. Excludes already-archived holders from the count,
   // same reasoning as delete-user.mts.
@@ -170,7 +170,7 @@ export default async (req: Request) => {
       .eq("role", target.role)
       .is("deleted_at", null)
       .neq("user_id", targetUserId);
-    if (!isFleetiiAdminRole(target.role)) {
+    if (!isSysadmRole(target.role)) {
       adminCountQuery =
         target.department_id === null
           ? adminCountQuery.is("department_id", null)
@@ -182,8 +182,8 @@ export default async (req: Request) => {
       return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
     }
     if (!otherAdminCount) {
-      const message = isFleetiiAdminRole(target.role)
-        ? "Kan ikke ændre rollen for den sidste FLEETii-administrator."
+      const message = isSysadmRole(target.role)
+        ? "Kan ikke ændre rollen for den sidste sysadm."
         : "Kan ikke ændre rollen for den sidste administrator i afdelingen.";
       return new Response(JSON.stringify({ error: message }), { status: 409 });
     }
@@ -199,7 +199,7 @@ export default async (req: Request) => {
       department_id: requestedDepartmentId,
       // The requested department's own costumer_id is authoritative — for a
       // regular admin this is always target.costumer_id unchanged (the
-      // check above already enforced that match), but a FLEETii admin can
+      // check above already enforced that match), but a sysadm can
       // move a user to a department under a DIFFERENT costumer, which must
       // update costumer_id to match or it'd go stale relative to
       // department_id.

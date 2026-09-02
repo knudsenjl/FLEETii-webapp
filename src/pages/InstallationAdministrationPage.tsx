@@ -1,4 +1,4 @@
-// "Administration af installationer" ("/fleetii-admin-installations") —
+// "Administration af installationer" ("/sysadm-installations") —
 // reached via AdminFrontpage.tsx's own "INSTALLATIONER" button (below the
 // divider, alongside the embedded costumers table). Lists every
 // costumer_orders row; clicking one opens VehicleCreatePage.tsx ("Opret"
@@ -85,7 +85,7 @@ type CostumerOrderQueryRow = {
   departments: { name: string | null } | null;
 };
 
-/** FLEETii admin's installation-order list. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
+/** sysadm's installation-order list. Reachable only by role "sysadm" (see ProtectedRoute requireRole="sysadm" in App.tsx) — plain "admin" does not get in. */
 export function InstallationAdministrationPage() {
   const navigate = useNavigate();
 

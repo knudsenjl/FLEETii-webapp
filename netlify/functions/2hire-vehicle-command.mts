@@ -15,7 +15,7 @@
 // two can't drift apart). "start"/"stop" (raw lock/unlock, bypassing those
 // enablement rules entirely) stay admin-only — TwoHireTestPage.tsx's direct
 // testing flow is the only caller of those today. A regular ("admin", not
-// "FLEETii admin") caller is additionally scoped to their OWN costumer's
+// "sysadm") caller is additionally scoped to their OWN costumer's
 // vehicles for every command — same scoping VehiclesPage.tsx already applies
 // to what an admin can even see — since requireAdmin()/requireUser() on
 // their own only prove SOME caller is authenticated, not that they
@@ -23,12 +23,12 @@
 //
 // Per the "per-costumer 2hire credentials" plan: which 2hire credential
 // authenticates this command depends on the TARGET vehicle's costumer (not
-// the caller's own costumer_id, which a FLEETii admin doesn't have) and
-// whether the caller is a FLEETii admin — resolved fresh via a service-role
+// the caller's own costumer_id, which a sysadm doesn't have) and
+// whether the caller is a sysadm — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
 import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isAnyAdminRole, isFleetiiAdminRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -82,10 +82,10 @@ export default async (req: Request) => {
     if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+    const isSysadm = isSysadmRole(caller?.role);
     const isAdmin = isAnyAdminRole(caller?.role);
 
-    if (!isFleetiiAdmin) {
+    if (!isSysadm) {
       if (isAdmin) {
         if (!caller?.costumer_id || caller.costumer_id !== vehicle?.costumer_id) {
           return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
@@ -127,7 +127,7 @@ export default async (req: Request) => {
     }
 
     const credentials = await resolveTwoHireCredentials(admin, {
-      isFleetiiAdmin,
+      isSysadm,
       costumerId: vehicle?.costumer_id ?? null,
     });
 

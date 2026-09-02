@@ -21,7 +21,7 @@
 // from UserDetailsPage.tsx.
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import {
   buildWelcomeEmailHtml,
@@ -118,12 +118,12 @@ export default async (req: Request) => {
   ]);
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
 
-  // A FLEETii admin isn't scoped to one costumer — same platform-wide
+  // A sysadm isn't scoped to one costumer — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql) —
   // they just need the requested department to actually exist.
-  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
-  if (isFleetiiAdmin) {
+  const isSysadm = isSysadmRole(caller?.role);
+  if (isSysadm) {
     if (!requestedDepartmentRow) {
       return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
     }
@@ -162,7 +162,7 @@ export default async (req: Request) => {
     user_ident: asTrimmedString(body.user_ident) || null,
     department_id: requestedDepartmentId,
     // The requested department's own costumer_id is authoritative (matters
-    // for a FLEETii admin, whose own costumer_id — if they even have one —
+    // for a sysadm, whose own costumer_id — if they even have one —
     // may differ from the department they're assigning); falls back to the
     // caller's own only if somehow no department resolved.
     costumer_id: requestedDepartmentRow?.costumer_id ?? caller?.costumer_id ?? null,

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin } from "../lib/roles";
+import { isSysadm } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -56,7 +56,7 @@ function isSameDate(a: Date, b: Date): boolean {
  *
  * targetDepartmentId is what actually scopes availableVehicles — afdelingId
  * directly for a regular admin, or state.departmentId (ReservationPage's own
- * "Kunde/afdeling" pick) for a FLEETii admin, who has no afdelingId of their
+ * "Kunde/afdeling" pick) for a sysadm, who has no afdelingId of their
  * own. Carried through to ConfirmPage unchanged, which writes it as the
  * booking's department_id.
  */
@@ -73,7 +73,7 @@ export function AvailablePage() {
         end?: string;
         editingBookingId?: string;
         editingVehicleId?: string;
-        /** The RESOLVED target department from ReservationPage — the FLEETii-admin-only "Kunde/afdeling" pick, or just afdelingId unchanged for every other role (see ReservationPage's own doc comment). Scopes availableVehicles below, and is carried through unchanged to ConfirmPage, which writes it as the booking's department_id. */
+        /** The RESOLVED target department from ReservationPage — the sysadm-only "Kunde/afdeling" pick, or just afdelingId unchanged for every other role (see ReservationPage's own doc comment). Scopes availableVehicles below, and is carried through unchanged to ConfirmPage, which writes it as the booking's department_id. */
         departmentId?: string | null;
         /** Display-ready counterpart to departmentId — ConfirmPage's read-only "Kunde/afdeling" summary row. Purely pass-through here, same as userLabel. */
         departmentLabel?: string;
@@ -87,8 +87,8 @@ export function AvailablePage() {
   const editingBookingId = state?.editingBookingId;
   const reservationStart = state?.start ? new Date(state.start) : null;
   const reservationEnd = state?.end ? new Date(state.end) : null;
-  /** For a FLEETii admin, state.departmentId (ReservationPage's own "Kunde/afdeling" pick) is authoritative — they have no afdelingId of their own. Every other role keeps using afdelingId directly, unchanged. */
-  const targetDepartmentId = isFleetiiAdmin(profile?.role) ? (state?.departmentId ?? null) : afdelingId;
+  /** For a sysadm, state.departmentId (ReservationPage's own "Kunde/afdeling" pick) is authoritative — they have no afdelingId of their own. Every other role keeps using afdelingId directly, unchanged. */
+  const targetDepartmentId = isSysadm(profile?.role) ? (state?.departmentId ?? null) : afdelingId;
 
   const [bookings, setBookings] = useState<BookingWindow[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(true);

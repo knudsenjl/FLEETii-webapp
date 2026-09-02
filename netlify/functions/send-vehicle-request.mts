@@ -19,12 +19,12 @@
 // recipient (FLEETii staff) — unrelated to who create-user.mts emails.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
-  /** FLEETii-admin-only (see NewVehiclePage.tsx's Kunde/Afdeling picker, isFleetiiAdmin branch) — a regular admin has no need for this (their own profile's department_id is used instead, same as before this field existed) and it's IGNORED unless the caller's own role is genuinely "FLEETii admin" (checked server-side below, never trusted from the body alone). When present, this — not afdeling's display name, nor the caller's own profile — is what actually determines the inserted row's costumer_id/department_id (departments.costumer_id is looked up from it). */
+  /** sysadm-only (see NewVehiclePage.tsx's Kunde/Afdeling picker, isSysadm branch) — a regular admin has no need for this (their own profile's department_id is used instead, same as before this field existed) and it's IGNORED unless the caller's own role is genuinely "sysadm" (checked server-side below, never trusted from the body alone). When present, this — not afdeling's display name, nor the caller's own profile — is what actually determines the inserted row's costumer_id/department_id (departments.costumer_id is looked up from it). */
   departmentId?: string | null;
   /** Company-wide "Køretøj-ID" identifier — optional, see costumer_orders_add_vehicle_ident.sql. */
   vehicleIdent?: string | null;
@@ -103,7 +103,7 @@ function buildHtmlBody(fields: {
     <a href="${fields.baseUrl}/vehicle-create/${fields.orderId}">${fields.baseUrl}/vehicle-create</a></p>
 
     <p>For at oprette køretøjet i FLEETii skal du logge ind på FLEETii med en
-    FLEETii admin-bruger.</p>
+    sysadm-bruger.</p>
     `;
 }
 
@@ -112,13 +112,13 @@ function buildHtmlBody(fields: {
  * drivmiddel?, needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
  * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false, plus
- * departmentId when the caller is a FLEETii admin — see the departmentId
+ * departmentId when the caller is a sysadm — see the departmentId
  * resolution below) — brand/maerke/aargang/fuelLevel/mileage are all
  * optional, not always known at request time (brand/model/model_year can be
  * filled in later on VehicleCreatePage.tsx, see
  * costumer_orders_brand_model_year_nullable.sql). Inserts a matching
  * costumer_orders row (costumer_id/department_id from the caller's own
- * profile, or from the resolved departmentId for a FLEETii admin — see
+ * profile, or from the resolved departmentId for a sysadm — see
  * below), then emails the request to MAIL_RECIEVER — via SMTP or Resend, see
  * sendMail.
  */
@@ -190,8 +190,8 @@ export default async (req: Request) => {
     .eq("user_id", authResult.userId)
     .maybeSingle<{ role: string; costumer_id: string | null; department_id: string | null }>();
 
-  // A FLEETii admin isn't scoped to one costumer (platform-wide role — same
-  // exception as create-user.mts's own isFleetiiAdmin branch), so their own
+  // A sysadm isn't scoped to one costumer (platform-wide role — same
+  // exception as create-user.mts's own isSysadm branch), so their own
   // profile's costumer_id/department_id can't be relied on here — the
   // Kunde/Afdeling picker they used (NewVehiclePage.tsx) supplies
   // departmentId instead, resolved to its OWN costumer_id below rather than
@@ -199,7 +199,7 @@ export default async (req: Request) => {
   // module comment up top.
   let costumerId: string | null;
   let departmentId: string | null;
-  if (isFleetiiAdminRole(caller?.role)) {
+  if (isSysadmRole(caller?.role)) {
     const requestedDepartmentId = asTrimmedString(body.departmentId);
     if (!requestedDepartmentId) {
       return new Response(JSON.stringify({ error: "Kunde og afdeling er påkrævet." }), { status: 400 });

@@ -38,14 +38,14 @@ type ReservationVehicle = {
  *
  * departmentId (state) is the RESOLVED target department, already picked on
  * ReservationPage and carried through AvailablePage unchanged — for a
- * regular admin it's just their own afdelingId; for a FLEETii admin (no
+ * regular admin it's just their own afdelingId; for a sysadm (no
  * afdelingId of their own) it's whatever they chose in ReservationPage's
  * own "Kunde/afdeling" row. This page has no department picker of its own —
  * it just writes whatever arrives here as the booking's department_id.
  * departmentLabel (its display-ready counterpart) is shown as the summary's
  * very first row, a final read-only "security check" so whoever's
  * confirming can double-check the department before "Bekræft" actually
- * writes it — most useful for a FLEETii admin picking among many, but shown
+ * writes it — most useful for a sysadm picking among many, but shown
  * for every role.
  */
 export function ConfirmPage() {
@@ -138,7 +138,7 @@ export function ConfirmPage() {
     }
 
     // Already resolved on ReservationPage (own afdelingId for a regular
-    // admin, the "Kunde/afdeling" pick for a FLEETii admin) and carried
+    // admin, the "Kunde/afdeling" pick for a sysadm) and carried
     // through AvailablePage unchanged — this is just a defensive backstop
     // for reaching this page some other way (a raw refresh/bookmark, no
     // router state at all).

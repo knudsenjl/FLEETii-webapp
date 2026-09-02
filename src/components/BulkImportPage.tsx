@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "./PageHeader";
 import { supabase } from "../lib/supabase";
 
@@ -57,7 +57,7 @@ export type BulkImportPageProps = {
 
 /**
  * Renders a bulk-import page: intro copy with CSV/JSON/README template
- * links, a FLEETii-admin-only Kunde picker (bulk-import-*.mts both require
+ * links, a sysadm-only Kunde picker (bulk-import-*.mts both require
  * one to be chosen explicitly for a platform-wide role — same pattern as
  * UserDetailsPage.tsx's "Ny bruger" form), two file-picker buttons (JSON/
  * CSV), and a per-row success/failure summary once the import completes.
@@ -77,28 +77,28 @@ export function BulkImportPage({
   const [requestError, setRequestError] = useState<string | null>(null);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
 
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — the target function requires one to be chosen explicitly for them. Not shown for a regular admin, who always imports into their own costumerId. */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  /** A sysadm has no costumerId of their own (platform-wide role) — the target function requires one to be chosen explicitly for them. Not shown for a regular admin, who always imports into their own costumerId. */
+  const isSysadm = isSysadmRole(profile?.role);
   const [filterCostumerId, setFilterCostumerId] = useState("");
   const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
 
-  /** Loads every costumer for the Kunde picker — FLEETii admin only. */
+  /** Loads every costumer for the Kunde picker — sysadm only. */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (!isSysadm) return;
     void supabase
       .from("costumers")
       .select("costumer_id, name")
       .order("name", { ascending: true })
       .returns<{ costumer_id: string; name: string }[]>()
       .then(({ data }) => setCostumerOptions(data ?? []));
-  }, [isFleetiiAdmin]);
+  }, [isSysadm]);
 
-  /** The costumer this import actually targets — the chosen Kunde for a FLEETii admin (null until one's picked), otherwise the viewing admin's own costumerId. */
-  const targetCostumerId = isFleetiiAdmin ? filterCostumerId || null : costumerId;
+  /** The costumer this import actually targets — the chosen Kunde for a sysadm (null until one's picked), otherwise the viewing admin's own costumerId. */
+  const targetCostumerId = isSysadm ? filterCostumerId || null : costumerId;
 
   /**
    * Reads `file` and POSTs it to `endpoint`. costumerId is only consulted
-   * server-side for a "FLEETii admin" caller (a regular admin always
+   * server-side for a "sysadm" caller (a regular admin always
    * imports into their own costumer regardless of what's sent).
    */
   const handleFileChosen = async (file: File, format: "csv" | "json") => {
@@ -181,8 +181,8 @@ export function BulkImportPage({
             </p>
             {introExtra}
 
-            {isFleetiiAdmin && (
-              // FLEETii-admin-only Kunde picker — the two import buttons
+            {isSysadm && (
+              // sysadm-only Kunde picker — the two import buttons
               // below stay disabled until one's chosen: there's no
               // meaningful default costumer for a platform-wide role.
               <div className="grid grid-cols-2 items-center gap-2 p-0.5">

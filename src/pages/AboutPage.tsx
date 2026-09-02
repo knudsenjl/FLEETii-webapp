@@ -1,7 +1,7 @@
 // The only deliberately public page ("/about" — reachable both from
 // LoginPage before signing in and from every other page's "i" header
 // button). Static company/product info plus links to the three role manuals
-// (Bruger, Administrator, FLEETii-administrator) and contact details;
+// (Bruger, Administrator, Sysadm) and contact details;
 // PageHeader itself handles showing/hiding "Log ud" and the role/afdeling
 // row based on whether the visitor is actually logged in.
 import { useState } from "react";
@@ -9,12 +9,12 @@ import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
-import { isAnyAdmin, isFleetiiAdmin } from "../lib/roles";
+import { isAnyAdmin, isSysadm } from "../lib/roles";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
 
 /**
  * Static "About FLEETii" page: product description, Brugerguide/
- * Administratormanual/FLEETii-administratormanual links, and contact info.
+ * Administratormanual/Sysadm-manual links, and contact info.
  * Content is static Danish copy — no data fetching. Each manual link comes
  * from its own env var (VITE_BRUGERMANUAL_URL/VITE_ADMINMANUAL_URL/
  * VITE_FLEETIIMANUAL_URL, same VITE_ convention as VITE_SUPABASE_URL — see
@@ -33,14 +33,18 @@ import { ANTI_CLONING_NOTICE } from "../lib/legal";
  * VITE_BRUGERMANUAL_URL is shared with create-user.mts's welcome-email
  * link — same manual, one source of truth.
  *
- * Administratormanual/FLEETii-administratormanual are further gated by the
- * viewer's role (profile?.role from useAuth()) — irrelevant to a regular
- * Bruger, and profile is null for an anonymous visitor reaching this page
- * from LoginPage, so both stay hidden for them too. Administratormanual
- * shows for "admin" AND "FLEETii admin" (a FLEETii admin is a superset of
- * admin and still administers departments day-to-day); FLEETii-administrator-
- * manual shows only for "FLEETii admin". Brugerguide has no such gate; every
- * role may want it.
+ * Administratormanual/Sysadm-manual are further gated by the viewer's role
+ * (profile?.role from useAuth()) — irrelevant to a regular Bruger, and
+ * profile is null for an anonymous visitor reaching this page from
+ * LoginPage, so both stay hidden for them too. Administratormanual shows
+ * for "admin" AND "sysadm" (a sysadm is a superset of admin and still
+ * administers departments day-to-day); Sysadm-manual shows only for
+ * "sysadm". Brugerguide has no such gate; every role may want it.
+ *
+ * fleetiiAdministratormanualUrl/VITE_FLEETIIMANUAL_URL keep their original
+ * names (matching the untouched public/manualer/ filename) even though the
+ * role and its button text are now "sysadm" — only the visible label
+ * changed, not this asset's identity.
  */
 export function AboutPage() {
   const { profile } = useAuth();
@@ -91,14 +95,14 @@ export function AboutPage() {
                       Administratormanual
                     </a>
                   )}
-                  {fleetiiAdministratormanualUrl && isFleetiiAdmin(profile?.role) && (
+                  {fleetiiAdministratormanualUrl && isSysadm(profile?.role) && (
                     <a
                       href={fleetiiAdministratormanualUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-center text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
-                      FLEETii-administratormanual
+                      Sysadm-manual
                     </a>
                   )}
                 </div>

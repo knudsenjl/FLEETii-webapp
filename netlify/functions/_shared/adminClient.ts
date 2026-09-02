@@ -13,7 +13,7 @@ export type AdminClientResult = { ok: true; admin: SupabaseClient } | { ok: fals
  * Reads SUPABASE_URL (falling back to VITE_SUPABASE_URL) and
  * SUPABASE_SERVICE_ROLE_KEY and returns a service-role client — bypasses
  * RLS entirely, so callers must have already established their own
- * authorization boundary (requireAdmin/requireFleetiiAdmin plus any
+ * authorization boundary (requireAdmin/requireSysadm plus any
  * function-specific scoping check) before using it — or, if either var is
  * missing, the ready-to-return 500 Response's error/status. createClient()
  * itself is a pure local object construction (no network call), so building

@@ -1,6 +1,6 @@
 // The admin home page ("/admin" — where RootRoute sends an admin after
 // login). Pure navigation hub: no data fetching beyond the on-demand
-// departments fetch and the FLEETii-admin-only costumers/installations
+// departments fetch and the sysadm-only costumers/installations
 // fetches below, just links to every other admin-only section of the app.
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
@@ -9,7 +9,7 @@ import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
-import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
+import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `costumers` table, for the embedded list below — same fields CostumerAdministrationPage.tsx's own full-page version fetches, so the object handed to CostumerDetailsPage via router state already has everything it displays. */
@@ -32,14 +32,14 @@ type Costumer = {
  * Admin dashboard: a list of buttons linking to reservation, fleet, and
  * user-management pages, plus (below a divider) a role-specific 2x2 grid of
  * big square buttons. Admin-only (see ProtectedRoute requireAdmin in
- * App.tsx). A "FLEETii admin" also lands here after login now (same as a
+ * App.tsx). A "sysadm" also lands here after login now (same as a
  * regular admin — see App.tsx's RootRoute); for that role, the grid area
  * instead shows an "INSTALLATIONER" button plus the costumer list embedded
  * directly (same table CostumerAdministrationPage.tsx's own full-page
  * version shows, "Kunde" as its own column header), with an "Opret kunde"
  * button below it (straight to CostumerNewPage.tsx, same as
  * CostumerAdministrationPage.tsx's own) — no separate hub page needed for
- * either, so a FLEETii admin sees the actual customer list, and can start
+ * either, so a sysadm sees the actual customer list, and can start
  * creating a new one, the moment they land here rather than one more click
  * away. Per-costumer management (afdelinger/køretøjer/brugere) lives on
  * CostumerDetailsPage.tsx instead, reached by clicking a row here.
@@ -47,7 +47,7 @@ type Costumer = {
  * KØRETØJER, BRUGERE, RAPPORTER (disabled, not implemented yet) — same
  * layout/labels as CostumerDetailsPage.tsx's own grid, since a regular
  * admin has no "home" costumer's worth of separate customer navigation to
- * go through first; a FLEETii admin has no "home" costumer of their own at
+ * go through first; a sysadm has no "home" costumer of their own at
  * all, so manages any given costumer's equivalents through
  * CostumerDetailsPage instead. AFDELINGER jumps straight to
  * DepartmentDetailsPage.tsx (see handleOpenDepartments below), which now
@@ -56,7 +56,7 @@ type Costumer = {
 export function AdminFrontpage() {
   const navigate = useNavigate();
   const { profile, costumerId, costumerName } = useAuth();
-  /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. FLEETii-admin only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
+  /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. sysadm only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
   const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
   const [costumers, setCostumers] = useState<Costumer[]>([]);
   const [costumersLoading, setCostumersLoading] = useState(false);
@@ -100,7 +100,7 @@ export function AdminFrontpage() {
   }, [profile?.role, costumerId]);
 
   useEffect(() => {
-    if (!isFleetiiAdmin(profile?.role)) return;
+    if (!isSysadm(profile?.role)) return;
 
     let cancelled = false;
     void supabase
@@ -255,7 +255,7 @@ export function AdminFrontpage() {
                 </>
               )}
 
-              {isFleetiiAdmin(profile?.role) && (
+              {isSysadm(profile?.role) && (
                 <div className="flex flex-col gap-3">
                   <hr className="border-brand-200" />
 
@@ -350,7 +350,7 @@ export function AdminFrontpage() {
 
                   <button
                     type="button"
-                    onClick={() => navigate("/fleetii-admin-installations")}
+                    onClick={() => navigate("/sysadm-installations")}
                     className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     INSTALLATIONER

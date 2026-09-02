@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isAnyAdmin, isDepartmentAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -23,7 +23,7 @@ type ProfileRow = {
   /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, shown/edited separately from E-mail. */
   user_ident: string | null;
   department_name: string | null;
-  /** This user's own home department/costumer (user_profiles.department_id/costumer_id) — used to scope the departments-loading effect and the isLastAdmin pre-check to the EDITED user's own costumer/department rather than the viewing admin's, so a FLEETii admin (no costumer of their own) can still edit a user belonging to any costumer. */
+  /** This user's own home department/costumer (user_profiles.department_id/costumer_id) — used to scope the departments-loading effect and the isLastAdmin pre-check to the EDITED user's own costumer/department rather than the viewing admin's, so a sysadm (no costumer of their own) can still edit a user belonging to any costumer. */
   department_id: string | null;
   costumer_id: string | null;
   role: string;
@@ -48,7 +48,7 @@ type ProfileRow = {
  *
  * Whenever the LOGGED-IN admin's own role (profile.role, not the role
  * being assigned to whichever user this form is creating/editing) is
- * "admin" or "FLEETii admin" — i.e. whenever this route's own requireAdmin
+ * "admin" or "sysadm" — i.e. whenever this route's own requireAdmin
  * guard (see App.tsx's ProtectedRoute) let them in at all — the Afdelinger
  * checkbox table (mirroring HandleVehiclePage.tsx's Afdeling(er)/
  * vehicle_departments pattern) is shown, for both the "Ny bruger" creation
@@ -65,7 +65,7 @@ type ProfileRow = {
  * creation, whatever's in userDepartmentIds (at least the chosen home
  * department, thanks to that self-heal) is inserted for the new user_id.
  *
- * A FLEETii admin has no costumerId of their own, so creating a brand-new
+ * A sysadm has no costumerId of their own, so creating a brand-new
  * user (never editing an existing one — see targetCostumerId) requires
  * costumerId/costumerName arriving via router state (DepartmentPage's own
  * "Opret bruger" button — "filtering by navigation" same as
@@ -141,7 +141,7 @@ export function UserDetailsPage() {
   /** Which (if either) of the Afdeling(er)/Hjemmeafdeling "?" info popovers is open — plain toggle state, not useTimedFlag, since these should stay open for as long as the admin needs to read them rather than auto-closing after a few seconds. Closes on toggling the same one again, opening the other, or clicking anywhere outside (see the fixed inset-0 overlay rendered alongside each). */
   const [openInfoPopover, setOpenInfoPopover] = useState<"afdelinger" | "hjemmeafdeling" | null>(null);
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/user-details/:userId" (no router state) — skipped entirely when stateUser is already present. Includes blocked users (deleted_at set) — unlike DepartmentPage's own list, this page needs to reach them so "Genetabler brugers adgang" is reachable — and is naturally scoped to the admin's own department (or any, for a FLEETii admin) by user_profiles' SELECT RLS policy — a userId outside it just resolves to null, same as "not found". */
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/user-details/:userId" (no router state) — skipped entirely when stateUser is already present. Includes blocked users (deleted_at set) — unlike DepartmentPage's own list, this page needs to reach them so "Genetabler brugers adgang" is reachable — and is naturally scoped to the admin's own department (or any, for a sysadm) by user_profiles' SELECT RLS policy — a userId outside it just resolves to null, same as "not found". */
   useEffect(() => {
     if (stateUser || !userId) return;
 
@@ -226,22 +226,22 @@ export function UserDetailsPage() {
   const [grantsLoading, setGrantsLoading] = useState(true);
   const [grantsError, setGrantsError] = useState<string | null>(null);
 
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
-  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), router state's costumerId when a FLEETii admin is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
-  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isFleetiiAdmin ? (navState?.costumerId ?? null) : costumerId;
-  const targetCostumerName = user ? null : isFleetiiAdmin ? (navState?.costumerName ?? null) : null;
+  /** A sysadm has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
+  const isSysadm = isSysadmRole(profile?.role);
+  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), router state's costumerId when a sysadm is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
+  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isSysadm ? (navState?.costumerId ?? null) : costumerId;
+  const targetCostumerName = user ? null : isSysadm ? (navState?.costumerName ?? null) : null;
 
-  /** Redirects back to "/admin" if a FLEETii admin reaches the CREATE form (no :userId — editing an existing user always has its own costumer_id, see targetCostumerId above) without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this form has no "pick a costumer here" fallback left (see this component's own doc comment). A regular admin always has their own costumerId regardless, and editing an existing user always resolves targetCostumerId from that user's own record, so this never fires for either of those cases. */
+  /** Redirects back to "/admin" if a sysadm reaches the CREATE form (no :userId — editing an existing user always has its own costumer_id, see targetCostumerId above) without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this form has no "pick a costumer here" fallback left (see this component's own doc comment). A regular admin always has their own costumerId regardless, and editing an existing user always resolves targetCostumerId from that user's own record, so this never fires for either of those cases. */
   useEffect(() => {
-    if (!userId && isFleetiiAdmin && !navState?.costumerId) {
+    if (!userId && isSysadm && !navState?.costumerId) {
       navigate("/admin", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isFleetiiAdmin, navState?.costumerId]);
+  }, [userId, isSysadm, navState?.costumerId]);
 
   // Scoped to targetCostumerId, NOT the viewing admin's own costumerId —
-  // otherwise a FLEETii admin editing a user in some other costumer (or
+  // otherwise a sysadm editing a user in some other costumer (or
   // creating one for the costumer they navigated in for, see targetCostumerId
   // above) would see either the wrong departments or none at all.
   useEffect(() => {
@@ -322,7 +322,7 @@ export function UserDetailsPage() {
 
   // Pre-checks whether this user is the last remaining admin in THEIR OWN
   // department (user.department_id, not the viewing admin's own afdelingId —
-  // a FLEETii admin viewing/archiving a user outside their own former
+  // a sysadm viewing/archiving a user outside their own former
   // department has afdelingId === null, which would otherwise always read
   // as "not the last admin" regardless of the target's real situation), so
   // clicking "Arkiver bruger" can show a warning popup instead of "Er du
@@ -386,17 +386,17 @@ export function UserDetailsPage() {
     PHONE_PATTERN.test(phone.trim()) &&
     department.trim().length > 0 &&
     role.trim().length > 0 &&
-    // A brand-new user created by a FLEETii admin needs a real
+    // A brand-new user created by a sysadm needs a real
     // targetCostumerId (from router state — see this component's own doc
     // comment) — there's no viewer-own costumer to fall back to, and
     // missing one must block submission rather than silently creating the
     // user with no departmentOptions at all. In practice the redirect
     // effect above already sends them to "/admin" before this would ever
     // matter, but this stays as a defensive belt-and-braces check.
-    (user || !isFleetiiAdmin || Boolean(targetCostumerId));
+    (user || !isSysadm || Boolean(targetCostumerId));
 
   const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
-  /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a FLEETii admin editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
+  /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a sysadm editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
   const { useUserIdent } = useIdentSettings(homeDepartmentId ?? null);
   /** The one department checked "Tilladt" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
   const soleCheckedDepartment =
@@ -703,8 +703,8 @@ export function UserDetailsPage() {
                     descendants — aren't clipped when they overflow this
                     box's edge (same fix as RettighederSettings.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
-                  {!user && isFleetiiAdmin && (
-                    // FLEETii-admin-only "Ny bruger" Kunde row — read-only
+                  {!user && isSysadm && (
+                    // sysadm-only "Ny bruger" Kunde row — read-only
                     // display, not a picker: targetCostumerId already came
                     // from router state (DepartmentPage's own "Opret ny
                     // bruger" button), "filtering by navigation" same as

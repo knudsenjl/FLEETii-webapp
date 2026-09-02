@@ -91,7 +91,7 @@ export type MappedBooking = {
  * this booking's own current vehicle bypass the department filter (see
  * AvailablePage's availableVehicles) even if it isn't in the vehicle list
  * the editing admin would otherwise see. userLabel is display-only.
- * departmentId pre-fills ConfirmPage's FLEETii-admin-only "Kunde/afdeling"
+ * departmentId pre-fills ConfirmPage's sysadm-only "Kunde/afdeling"
  * picker with this booking's own current department, rather than forcing a
  * re-pick from the full platform-wide list on every edit.
  */

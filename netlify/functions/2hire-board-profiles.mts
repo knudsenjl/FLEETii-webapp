@@ -1,20 +1,20 @@
 // Netlify Function: lists 2hire's own reusable vehicle-configuration
 // profiles (see _shared/twoHireClient.ts's getTwoHireBoardProfiles) so
 // VehicleCreatePage.tsx can offer a profile picker for the "Registrér
-// køretøj i 2hire" step (registerVehicle needs a profileId). FLEETii-admin
+// køretøj i 2hire" step (registerVehicle needs a profileId). sysadm
 // gated — same access level as the rest of that page (see App.tsx's
-// requireRole="FLEETii admin" on /vehicle-create).
+// requireRole="sysadm" on /vehicle-create).
 //
 // Per the "per-costumer 2hire credentials" plan: which 2hire account's
 // profile catalog this lists depends on a credential, resolved the same way
 // as every other function this plan touches — requires the caller to send
 // ?costumerId=... (VehicleCreatePage.tsx already has order.costumer_id in
-// scope where this is called) even though this route stays FLEETii-admin-only
+// scope where this is called) even though this route stays sysadm-only
 // (always resolves to the global credential in practice — see
 // delete-vehicle.mts's identical reasoning for resolving fresh rather than
 // hardcoding).
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
 import { getTwoHireBoardProfiles } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -23,7 +23,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
@@ -47,8 +47,8 @@ export default async (req: Request) => {
       .maybeSingle<{ role: string }>();
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
-    const credentials = await resolveTwoHireCredentials(admin, { isFleetiiAdmin, costumerId });
+    const isSysadm = isSysadmRole(caller?.role);
+    const credentials = await resolveTwoHireCredentials(admin, { isSysadm, costumerId });
 
     const profiles = await getTwoHireBoardProfiles(credentials);
     return new Response(JSON.stringify({ profiles }), {

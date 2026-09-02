@@ -18,7 +18,7 @@
 // snapshot fields, both resolved server-side rather than trusted from the
 // request body.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 
 type SendVehicleDeletionRequestBody = { vehicleId?: string };
@@ -67,7 +67,7 @@ function buildHtmlBody(fields: {
     <a href="${fields.baseUrl}/vehicle-delete/${fields.orderId}">${fields.baseUrl}/vehicle-delete/${fields.orderId}</a></p>
 
     <p>For at gennemføre sletningen skal du logge ind på FLEETii med en
-    FLEETii admin-bruger.</p>
+    sysadm-bruger.</p>
     `;
 }
 
@@ -75,7 +75,7 @@ function buildHtmlBody(fields: {
  * POST { vehicleId } as an authenticated admin (see requireAdmin). Resolves
  * the caller's own contact info AND the target vehicle's own costumer_id/
  * department_id/snapshot fields server-side; a regular admin is rejected if
- * the vehicle doesn't belong to their own costumer, a FLEETii admin (no
+ * the vehicle doesn't belong to their own costumer, a sysadm (no
  * "home" costumer of their own) may request deletion for any costumer's
  * vehicle. Inserts a matching costumer_orders row (order_type "Nedlæg"),
  * then emails the request to MAIL_RECIEVER — via SMTP, see sendMail.
@@ -150,17 +150,17 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Køretøjet findes ikke." }), { status: 404 });
   }
 
-  // A FLEETii admin has no "home" costumer of their own (see isFleetiiAdmin
+  // A sysadm has no "home" costumer of their own (see isSysadm
   // elsewhere in this codebase) — unlike a regular admin, who's always
   // scoped to their own costumer's vehicles, they may request deletion for
   // ANY costumer's vehicle, so neither of the two checks below applies to
   // them. The costumer_id/department_id used for the request itself always
   // come from the VEHICLE's own row (not the caller's), which is correct
   // either way: for a regular admin those already match their own costumer/
-  // department (enforced by the check below), and for a FLEETii admin
+  // department (enforced by the check below), and for a sysadm
   // they're the only correct source at all.
-  const callerIsFleetiiAdmin = isFleetiiAdminRole(caller.role);
-  if (!callerIsFleetiiAdmin) {
+  const callerIsSysadm = isSysadmRole(caller.role);
+  if (!callerIsSysadm) {
     if (!caller.costumer_id) {
       return new Response(
         JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde — kan ikke oprette anmodningen." }),

@@ -22,7 +22,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
 import { buildWelcomeEmailHtml, createAuthUserWithRetry, type Role } from "./_shared/userAccount.js";
@@ -30,7 +30,7 @@ import { buildWelcomeEmailHtml, createAuthUserWithRetry, type Role } from "./_sh
 type BulkImportUsersBody = {
   format?: "csv" | "json";
   fileContent?: string;
-  /** Only consulted for a caller with role "FLEETii admin" — a regular admin always imports into their own costumer (see below), same anti-tampering reasoning as create-user.mts's department check. */
+  /** Only consulted for a caller with role "sysadm" — a regular admin always imports into their own costumer (see below), same anti-tampering reasoning as create-user.mts's department check. */
   costumerId?: string;
 };
 
@@ -52,7 +52,7 @@ function normalizeRole(value: string | undefined): Role | null {
  * public/templates/bulk-import/brugere-template.csv, also linked from
  * ImportUsersPage.tsx), resolves the batch's target
  * costumer (own costumer for a regular admin, required costumerId for a
- * FLEETii admin), then creates one auth user + user_profiles row +
+ * sysadm), then creates one auth user + user_profiles row +
  * user_departments grant per row, continuing past individual row failures.
  */
 export default async (req: Request) => {
@@ -112,12 +112,12 @@ export default async (req: Request) => {
     .eq("user_id", authResult.userId)
     .maybeSingle<{ costumer_id: string | null; role: string }>();
 
-  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  const isSysadm = isSysadmRole(caller?.role);
   let costumerId: string;
-  if (isFleetiiAdmin) {
+  if (isSysadm) {
     const requested = asTrimmedString(body.costumerId);
     if (!requested) {
-      return new Response(JSON.stringify({ error: "costumerId er påkrævet for FLEETii-administratorer." }), { status: 400 });
+      return new Response(JSON.stringify({ error: "costumerId er påkrævet for sysadm." }), { status: 400 });
     }
     const { data: costumerRow } = await admin
       .from("costumers")

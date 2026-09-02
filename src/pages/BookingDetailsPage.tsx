@@ -52,7 +52,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * of its last known position — for a regular user, only shown from 15
  * minutes before the booking's start to 15 minutes after its end (see
  * isMapVisible; outside that window it's not rendered at all), but always
- * shown to admin/FLEETii admin regardless of that window — a "Slet
+ * shown to admin/sysadm regardless of that window — a "Slet
  * reservation" cancel flow,
  * an "Afslut reservation" flow (enabled only within the booking's own
  * period — locks the vehicle and shortens the booking to end now, without
@@ -94,7 +94,7 @@ export function BookingDetailsPage() {
   const gpsPositions = use2hireGPS();
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   const isAdmin = isAnyAdmin(profile?.role);
-  /** admin/FLEETii admin always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. */
+  /** admin/sysadm always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. */
   const mapVisible = isAdmin || (booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false);
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. Not admin-gated, unlike VehicleDetailsPage's own use of this hook: the map itself is shown to a regular user for their own booking, so the address is too. */
   const { address, addressLoading } = useReverseGeocode(position, mapVisible);
@@ -140,7 +140,7 @@ export function BookingDetailsPage() {
     handleLocate,
     handleHonk,
   } = useBookingLifecycle(booking, {
-    // admin/FLEETii admin always get both Lås/Lås op buttons enabled,
+    // admin/sysadm always get both Lås/Lås op buttons enabled,
     // regardless of the booking's own window — unlike BookingPage.tsx
     // (role "user" only), which never sets this.
     isAdminLock: isAdmin,
@@ -299,7 +299,7 @@ export function BookingDetailsPage() {
                       )}
                     </span>
                   </div>
-                  {/* Kilometerstand and Status are only shown to admin/FLEETii admin — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
+                  {/* Kilometerstand and Status are only shown to admin/sysadm — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>

@@ -14,7 +14,7 @@
 // authenticates now takes a TwoHireCredentials parameter instead of reading
 // process.env directly — WHICH credential to pass is decided one layer up,
 // by _shared/twoHireCredentials.ts's resolveTwoHireCredentials() (costumer
-// sub-account vs. the global/FLEETii-admin credential vs. test mode).
+// sub-account vs. the global/sysadm credential vs. test mode).
 // getDeviceState() at the bottom of this file is the one exception — it has
 // no per-costumer concept at all (test tooling only) and always uses
 // getGlobalCredentials() itself.
@@ -29,7 +29,7 @@ export function getTwoHireBaseUrl(): string {
 /** One 2hire sub-account's (or the global FLEETii account's) client_id/client_secret — see resolveTwoHireCredentials() in _shared/twoHireCredentials.ts for how the right one gets picked for a given operation. */
 export type TwoHireCredentials = { clientId: string; clientSecret: string };
 
-/** The single global/FLEETii-admin credential, read from TWOHIRE_CLIENT_ID/SECRET — used directly in test mode (everyone shares it) and, in production, only for a FLEETii-admin-initiated operation (see resolveTwoHireCredentials). This is the ONLY remaining place in the codebase that reads these two env vars. */
+/** The single global/sysadm credential, read from TWOHIRE_CLIENT_ID/SECRET — used directly in test mode (everyone shares it) and, in production, only for a sysadm-initiated operation (see resolveTwoHireCredentials). This is the ONLY remaining place in the codebase that reads these two env vars. */
 export function getGlobalCredentials(): TwoHireCredentials {
   const clientId = process.env.TWOHIRE_CLIENT_ID;
   const clientSecret = process.env.TWOHIRE_CLIENT_SECRET;

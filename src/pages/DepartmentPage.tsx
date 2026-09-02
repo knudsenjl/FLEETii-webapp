@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -17,7 +17,7 @@ type ProfileRow = {
   /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional, edited on UserDetailsPage. */
   user_ident: string | null;
   department_id: string | null;
-  /** Fed through to UserDetailsPage via router state so its own targetCostumerId can resolve to this user's OWN costumer (not the viewing admin's) when editing — needed for a FLEETii admin editing a user outside their (former) home costumer. */
+  /** Fed through to UserDetailsPage via router state so its own targetCostumerId can resolve to this user's OWN costumer (not the viewing admin's) when editing — needed for a sysadm editing a user outside their (former) home costumer. */
   costumer_id: string | null;
   department_name: string | null;
   role: string;
@@ -64,7 +64,7 @@ type ProfileQueryRow = {
  * itself enforces that regardless of mode — see user_profiles_select_admin_own_department),
  * so none of this distinction is visible to them in practice.
  *
- * Reaching this page with neither a costumerId a FLEETii admin could resolve
+ * Reaching this page with neither a costumerId a sysadm could resolve
  * nor one of their own (a regular admin always has one) redirects back to
  * "/admin" below. Click a row to open it in UserDetailsPage, which handles
  * editing (via update-user.mts, including that user's Rettigheder
@@ -86,10 +86,10 @@ export function DepartmentPage() {
   /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
   const columnCount = 4;
 
-  /** A FLEETii admin has no costumer of their own — for them, targetCostumerId only ever comes from router state. */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  /** A sysadm has no costumer of their own — for them, targetCostumerId only ever comes from router state. */
+  const isSysadm = isSysadmRole(profile?.role);
   const targetCostumerId = state?.costumerId ?? costumerId;
-  const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
+  const targetCostumerName = isSysadm ? (state?.costumerName ?? null) : null;
   /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
   const targetDepartmentId = state?.departmentId ?? null;
   const targetDepartmentName = state?.departmentName ?? null;
@@ -97,19 +97,19 @@ export function DepartmentPage() {
   /** Whether targetDepartmentId's OWN department_settings shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — deliberately the LISTED department's own setting, not the viewing admin's currently-active one. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears, only its value source swaps. UNLOCKED mode (targetDepartmentId null) has no single department's setting to apply across users from several departments at once, so useIdentSettings' own fail-closed default (plain E-mail) applies uniformly there instead. */
   const { useUserIdent } = useIdentSettings(targetDepartmentId);
 
-  /** Redirects back to "/admin" if a FLEETii admin reaches this page without even a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
+  /** Redirects back to "/admin" if a sysadm reaches this page without even a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this page has no "every costumer" fallback. A regular admin always has their own costumerId regardless of router state, so this never actually fires for them. */
   useEffect(() => {
-    if (isFleetiiAdmin && !targetCostumerId) {
+    if (isSysadm && !targetCostumerId) {
       navigate("/admin", { replace: true });
     }
-  }, [isFleetiiAdmin, targetCostumerId, navigate]);
+  }, [isSysadm, targetCostumerId, navigate]);
 
   const [users, setUsers] = useState<ProfileRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isFleetiiAdmin && !targetCostumerId) return;
+    if (isSysadm && !targetCostumerId) return;
 
     async function loadUsers() {
       setLoading(true);
@@ -128,7 +128,7 @@ export function DepartmentPage() {
         .order("full_name", { ascending: true });
       // LOCKED mode: scope straight to targetDepartmentId (a department_id
       // already determines its own costumer, so no separate costumer_id
-      // filter is needed there). UNLOCKED mode, FLEETii admin: scope to the
+      // filter is needed there). UNLOCKED mode, sysadm: scope to the
       // whole target costumer instead — RLS already lets that role read any
       // costumer, so without this the query would otherwise pull every user
       // platform-wide just to show one costumer's worth. UNLOCKED mode,
@@ -137,7 +137,7 @@ export function DepartmentPage() {
       // their own current department regardless of what's asked for here.
       if (targetDepartmentId) {
         query = query.eq("department_id", targetDepartmentId);
-      } else if (isFleetiiAdmin && targetCostumerId) {
+      } else if (isSysadm && targetCostumerId) {
         query = query.eq("costumer_id", targetCostumerId);
       }
 
@@ -159,7 +159,7 @@ export function DepartmentPage() {
     // Re-fetches whenever the target scope itself changes (a different
     // department/costumer selected without a full remount, e.g. via browser
     // back/forward).
-  }, [targetDepartmentId, targetCostumerId, isFleetiiAdmin]);
+  }, [targetDepartmentId, targetCostumerId, isSysadm]);
 
   // Server-side filtering above already scopes `users` to the right set for
   // either mode — kept as its own name (rather than using `users` directly

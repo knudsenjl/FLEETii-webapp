@@ -50,11 +50,11 @@ import { SetPasswordPage } from "./pages/SetPasswordPage";
  * to their role's home page instead of showing the login form again: role
  * "user" lands on "/booking" (their current/next booking, with a "Next"
  * button through to the full list — see BookingPage.tsx's own doc
- * comment), admin/FLEETii admin land on "/admin". A "FLEETii admin" role
+ * comment), admin/sysadm land on "/admin". A "sysadm" role
  * lands on "/admin" too, same as a regular admin (it's a superset of "admin"
  * — see ProtectedRoute's requireAdmin check) — AdminFrontpage.tsx shows them
  * a costumers table and an "INSTALLATIONER" button (onward to
- * "/fleetii-admin-installations") directly, below a divider, rather than a
+ * "/sysadm-installations") directly, below a divider, rather than a
  * separate hub page.
  * Renders LoginPage while loading or once it's confirmed there's no session.
  */
@@ -176,15 +176,15 @@ function App() {
           <Route
             path="/costumers"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <CostumerAdministrationPage />
               </ProtectedRoute>
             }
           />
           <Route
-            path="/fleetii-admin-installations"
+            path="/sysadm-installations"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <InstallationAdministrationPage />
               </ProtectedRoute>
             }
@@ -192,7 +192,7 @@ function App() {
           <Route
             path="/costumer-new"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <CostumerNewPage />
               </ProtectedRoute>
             }
@@ -200,7 +200,7 @@ function App() {
           <Route
             path="/costumer-details/:costumerId"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <CostumerDetailsPage />
               </ProtectedRoute>
             }
@@ -216,7 +216,7 @@ function App() {
           <Route
             path="/vehicle-create"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <VehicleCreatePage />
               </ProtectedRoute>
             }
@@ -224,7 +224,7 @@ function App() {
           <Route
             path="/vehicle-create/:orderId"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <VehicleCreatePage />
               </ProtectedRoute>
             }
@@ -232,7 +232,7 @@ function App() {
           <Route
             path="/vehicle-delete"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <VehicleDeletePage />
               </ProtectedRoute>
             }
@@ -240,7 +240,7 @@ function App() {
           <Route
             path="/vehicle-delete/:orderId"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <VehicleDeletePage />
               </ProtectedRoute>
             }
@@ -336,7 +336,7 @@ function App() {
           <Route
             path="/settings-superadmin"
             element={
-              <ProtectedRoute requireRole="FLEETii admin">
+              <ProtectedRoute requireRole="sysadm">
                 <SettingsSuperadminPage />
               </ProtectedRoute>
             }

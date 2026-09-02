@@ -4,10 +4,10 @@
 // optional costumerId in the POST body:
 //   - costumerId present: subscribes JUST that one costumer's own
 //     twohire_client_id/twohire_client_secret — the new path, called from
-//     CostumerDetailsPage.tsx right after a FLEETii admin saves a new
+//     CostumerDetailsPage.tsx right after a sysadm saves a new
 //     costumer's 2hire credentials (see its pendingTwoHireRegistration
 //     flow), so onboarding doesn't need a developer's manual console call.
-//     Requires FLEETii admin specifically (requireFleetiiAdmin), not just
+//     Requires sysadm specifically (requireSysadm), not just
 //     any admin, since that's the only caller.
 //   - costumerId absent: unchanged full-fan-out behavior — every costumer
 //     with credentials configured, plus the global credential. Still
@@ -16,7 +16,7 @@
 //     environment, or if 2hire ever requires re-subscription — their docs
 //     don't document a lease/expiry, so this stays a manual, repeatable
 //     action rather than something run automatically on every deploy).
-//     Requires FLEETii admin, same as the single-costumer path — this loop
+//     Requires sysadm, same as the single-costumer path — this loop
 //     touches EVERY costumer's own 2hire subscription, so a regular
 //     costumer admin (who only ever administers their own costumer
 //     elsewhere in this app) must never be able to trigger it just by
@@ -26,7 +26,7 @@
 // credentials, one subscribe call only covers whatever account authenticated
 // it — the full-fan-out mode is a LOOP, one call per costumer that has its
 // own credentials configured, plus one more using the global credential
-// (covers FLEETii admin's own sub-account, and is also what test mode always
+// (covers sysadm's own sub-account, and is also what test mode always
 // resolves to regardless of which costumer's row is being iterated — see
 // getGlobalCredentials/resolveTwoHireCredentials). The webhook secret/
 // callback URL stay single and shared across every subscription (see
@@ -36,7 +36,7 @@
 // failed" pattern as FleetiiAdministrationPage.tsx's bulk-migration loop)
 // rather than aborting the whole run because one credential is bad.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { requireSysadm } from "./_shared/serverAuth.js";
 import {
   getGlobalCredentials,
   subscribeToGenericSignals,
@@ -65,11 +65,11 @@ export default async (req: Request) => {
   const body = await parseBody(req);
   const targetCostumerId = body.costumerId?.trim() || null;
 
-  // FLEETii admin either way — the single-costumer path is admin-management
+  // sysadm either way — the single-costumer path is admin-management
   // tooling (CostumerDetailsPage), and the full-fan-out path touches EVERY
   // costumer's own 2hire subscription, so neither should be reachable by a
   // regular costumer admin.
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
@@ -119,7 +119,7 @@ export default async (req: Request) => {
     }
 
     subscriptions = [
-      { label: "FLEETii admin (global)", credentials: getGlobalCredentials() },
+      { label: "sysadm (global)", credentials: getGlobalCredentials() },
       ...(costumers ?? []).map((costumer) => ({
         label: costumer.name ?? costumer.costumer_id,
         credentials: { clientId: costumer.twohire_client_id, clientSecret: costumer.twohire_client_secret },

@@ -70,15 +70,15 @@ type CostumerOrderQueryRow = {
 };
 
 /**
- * "Opret køretøj" page — FLEETii-admin only (see ProtectedRoute
- * requireRole="FLEETii admin" in App.tsx — there's no reason for a
+ * "Opret køretøj" page — sysadm only (see ProtectedRoute
+ * requireRole="sysadm" in App.tsx — there's no reason for a
  * customer's own admin to see this, mirroring VehicleDeletePage.tsx's own
  * gating). Reachable at plain "/vehicle-create" (order passed via router
  * state — InstallationAdministrationPage's "Administration af installationer"
  * table row click) or "/vehicle-create/:orderId" (fetches the order by id —
  * a direct URL/refresh/bookmark with no router state, mirroring
  * UserDetailsPage.tsx's own fetch-by-id fallback). Missing both state and a
- * resolvable :orderId redirects back to "/fleetii-admin-installations". Shows everything
+ * resolvable :orderId redirects back to "/sysadm-installations". Shows everything
  * the admin submitted via NewVehiclePage.tsx's "Ny bestilling" so FLEETii
  * staff can see what needs provisioning, plus:
  *   - "Registrér køretøj i 2hire": the real action — takes the physical
@@ -91,7 +91,7 @@ type CostumerOrderQueryRow = {
  *     associated when it's registered. On success, this ALSO deletes this
  *     order's own costumer_orders row (its job is finished — the vehicle
  *     itself lives on in vehicle_profiles) and returns to
- *     "/fleetii-admin-installations", folding in what used to be a
+ *     "/sysadm-installations", folding in what used to be a
  *     separate manual "Installation afsluttet - slettes" step: there was
  *     nothing left to actually confirm once registration itself succeeded.
  *     If registration succeeds but that cleanup delete itself fails, the
@@ -120,7 +120,7 @@ export function VehicleCreatePage() {
   /** Whether this order's own department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(order?.department_id ?? null);
 
-  /** Always (re)fetches the order by id — even when router state already has one, since that state can be stale (see fetchedOrder's own comment above). stateOrder still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. Naturally scoped to a FLEETii admin (any costumer) by costumer_orders' SELECT RLS policy — an orderId outside it just resolves to null, same as "not found". */
+  /** Always (re)fetches the order by id — even when router state already has one, since that state can be stale (see fetchedOrder's own comment above). stateOrder still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. Naturally scoped to a sysadm (any costumer) by costumer_orders' SELECT RLS policy — an orderId outside it just resolves to null, same as "not found". */
   useEffect(() => {
     if (!orderId) return;
 
@@ -173,7 +173,7 @@ export function VehicleCreatePage() {
   // or outside RLS) once the fetch has finished.
   useEffect(() => {
     if (!order && !orderLoading) {
-      navigate("/fleetii-admin-installations", { replace: true });
+      navigate("/sysadm-installations", { replace: true });
     }
   }, [order, orderLoading, navigate]);
 
@@ -490,7 +490,7 @@ export function VehicleCreatePage() {
 
   // Only while a SPECIFIC order is being fetched by id (:orderId present, no
   // router state yet) — without this guard, the page would flash-redirect
-  // toward "/fleetii-admin-installations" for a moment before the fetch resolves.
+  // toward "/sysadm-installations" for a moment before the fetch resolves.
   if (orderId && !order && orderLoading) {
     return (
       <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser bestilling…</div>
@@ -501,7 +501,7 @@ export function VehicleCreatePage() {
     return null;
   }
 
-  /** The real fulfillment action — registers the physical device with 2hire, inserts the resulting vehicle into vehicle_profiles/vehicle_departments (see 2hire-register-vehicle.mts's own doc comment for the full sequence), then deletes this order's own costumer_orders row now that its job is finished (the vehicle itself lives on in vehicle_profiles) and returns to "/fleetii-admin-installations" — folding in what used to be a separate manual "Installation afsluttet - slettes" step, since there was nothing left to actually confirm once registration itself succeeded. If registration succeeds but that cleanup delete fails, stays on this page (now showing the registered-vehicle state below) with the error surfaced, rather than pretending registration itself failed. */
+  /** The real fulfillment action — registers the physical device with 2hire, inserts the resulting vehicle into vehicle_profiles/vehicle_departments (see 2hire-register-vehicle.mts's own doc comment for the full sequence), then deletes this order's own costumer_orders row now that its job is finished (the vehicle itself lives on in vehicle_profiles) and returns to "/sysadm-installations" — folding in what used to be a separate manual "Installation afsluttet - slettes" step, since there was nothing left to actually confirm once registration itself succeeded. If registration succeeds but that cleanup delete fails, stays on this page (now showing the registered-vehicle state below) with the error surfaced, rather than pretending registration itself failed. */
   const handleRegisterVehicle = async () => {
     setIsRegistering(true);
     setRegisterError(null);
@@ -552,7 +552,7 @@ export function VehicleCreatePage() {
       return;
     }
 
-    navigate("/fleetii-admin-installations", { replace: true });
+    navigate("/sysadm-installations", { replace: true });
   };
 
   /**
@@ -607,7 +607,7 @@ export function VehicleCreatePage() {
       }
     }
 
-    navigate("/fleetii-admin-installations", { replace: true });
+    navigate("/sysadm-installations", { replace: true });
   };
 
   const rows: [string, string][] = [

@@ -1,4 +1,4 @@
-// The "FLEETii admin" settings page ("/settings-superadmin" — reached via
+// The "sysadm" settings page ("/settings-superadmin" — reached via
 // the round settings button in PageHeader.tsx, only for role "FLEETii
 // admin"; see SettingsAdminPage.tsx/SettingsUserPage.tsx for the other two
 // roles' variants). Empty shell for now, same page frame as
@@ -6,7 +6,7 @@
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
 
-/** Settings page for role "FLEETii admin". */
+/** Settings page for role "sysadm". */
 export function SettingsSuperadminPage() {
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">

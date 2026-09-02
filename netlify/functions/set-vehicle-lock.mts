@@ -18,7 +18,7 @@
 // "service-role writes only" pattern as netlify/functions/2hire-webhook.mts.
 //
 // Re-validates authorization server-side rather than trusting the calling
-// UI's disabled-button state: a FLEETii admin may act on any vehicle; a
+// UI's disabled-button state: a sysadm may act on any vehicle; a
 // regular "admin" only on their own costumer's vehicles (same scoping
 // VehiclesPage.tsx already applies to what an admin can even see); a regular
 // user only if one of their OWN bookings on this vehicle currently has the
@@ -33,13 +33,13 @@
 //
 // Per the "per-costumer 2hire credentials" plan: the credential used to
 // authenticate the real 2hire command is resolved from the TARGET vehicle's
-// costumer_id (not the caller's own — a FLEETii admin has none) plus whether
-// the caller is a FLEETii admin, same as every other function this plan
+// costumer_id (not the caller's own — a sysadm has none) plus whether
+// the caller is a sysadm, same as every other function this plan
 // touches.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isAnyAdminRole, isFleetiiAdminRole, requireUser } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -129,12 +129,12 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
   }
 
-  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  const isSysadm = isSysadmRole(caller?.role);
   const isAdmin = isAnyAdminRole(caller?.role);
 
   let command = body.command ?? (locked ? "stop" : "start");
 
-  if (isFleetiiAdmin) {
+  if (isSysadm) {
     // full access, any vehicle
   } else if (isAdmin) {
     if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
@@ -176,7 +176,7 @@ export default async (req: Request) => {
   // Lås/Lås op needs to know the vehicle didn't actually respond.
   try {
     const credentials = await resolveTwoHireCredentials(admin, {
-      isFleetiiAdmin,
+      isSysadm,
       costumerId: vehicle.costumer_id,
     });
 
