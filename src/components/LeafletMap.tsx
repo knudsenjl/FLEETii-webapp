@@ -149,7 +149,7 @@ export function LeafletMap({
   // (simplest way to keep marker/cluster/tooltip rendering in sync — see the
   // effect's own dependency array), which would normally also reset pan/zoom
   // back to the lat/lng/zoom props on every single one of those changes —
-  // e.g. FleetManagementPage's "Vis enkeltvis"/"Saml køretøjer" toggle only
+  // e.g. FleetManagementPage's "Vis alle"/"Saml køretøjer" toggle only
   // changes `cluster`, not where the admin was actually looking, so
   // rebuilding from the props alone would zoom back out to all of Denmark
   // every time it's pressed. These two refs let the effect tell "the center/
