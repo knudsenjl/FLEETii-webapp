@@ -30,8 +30,12 @@
 -- add_vehicle_profiles_costumer_and_department_fk.sql), so this join isn't
 -- expected to silently exclude any real vehicle.
 --
--- Applied to FLEETii-DB-Staging on 2026-08-30. Safe to re-run: policies
--- dropped before recreated.
+-- Applied to FLEETii-DB-Staging on 2026-08-30; confirmed also present on
+-- FLEETii-DB-Production as of 2026-09-02 (verified directly via pg_policies
+-- while investigating an unrelated "new vehicles not visible on fleet-map"
+-- report -- that turned out to be vehicles with no vehicle_signals row yet,
+-- not an RLS/schema-drift gap, see FleetManagementPage.tsx's showEmptyNotice
+-- message fix). Safe to re-run: policies dropped before recreated.
 
 drop policy if exists "vehicle_profiles_select_authenticated" on public.vehicle_profiles;
 create policy "vehicle_profiles_select_authenticated"

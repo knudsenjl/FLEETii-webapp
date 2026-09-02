@@ -14,9 +14,10 @@ import { fetchDepartmentOptions, type DepartmentOption } from "../lib/department
 type Vehicle = DisplayVehicle;
 
 /**
- * Admin "Administration af køretøjer" page ("/fleet-table"): two modes,
- * both scoped to a target costumer (costumerId/costumerName via router
- * state, or the viewer's own costumerId for a regular admin).
+ * Admin "Administration af køretøjer" page ("/fleet-table", reached via
+ * FleetManagementPage.tsx's "Liste af køretøjer" button, among others): two
+ * modes, both scoped to a target costumer (costumerId/costumerName via
+ * router state, or the viewer's own costumerId for a regular admin).
  *
  * LOCKED (departmentId also given — DepartmentDetailsPage's own KØRETØJER
  * button, a department row already selected there): lists just that ONE
@@ -37,8 +38,8 @@ type Vehicle = DisplayVehicle;
  * here".
  *
  * ALL-COSTUMERS (FLEETii admin only, no costumerId AND no departmentId —
- * FleetManagementPage.tsx's own "Administration af køretøjer" button when
- * its Kunde filter is "Alle"): a variant of UNLOCKED with no costumer to
+ * FleetManagementPage.tsx's own "Liste af køretøjer" button when its Kunde
+ * filter is "Alle"): a variant of UNLOCKED with no costumer to
  * narrow to at all, listing every vehicle platform-wide. Reuses the exact
  * same departmentOptions-loading effect below — fetchDepartmentOptions(null)
  * is documented to mean "every department platform-wide" for this reason
@@ -53,6 +54,17 @@ type Vehicle = DisplayVehicle;
  * — confusing, since the button that got them here promised a vehicle list.
  * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
  * a vehicle both live there too), or create a new one via NewVehiclePage.
+ *
+ * FLEETii-admin-only "Kunde" filter (hidden in LOCKED mode, same as
+ * Afdeling — a locked department already implies one exact costumer): lets
+ * a FLEETii admin switch which costumer's vehicles are shown without
+ * leaving the page, same in-page filter FleetManagementPage.tsx's "Liste af
+ * køretøjer" button offers on its own map. Kunde/Afdeling/Køretøj sync to
+ * stay mutually consistent exactly like that page's own filters do (picking
+ * a department while Kunde is "Alle" promotes Kunde to its costumer;
+ * picking a vehicle syncs both; changing Kunde or Afdeling clears Køretøj)
+ * — see FleetManagementPage.tsx's own filter onChange handlers for the
+ * identical logic and reasoning.
  */
 export function VehiclesPage() {
   const { costumerId, profile } = useAuth();
@@ -65,11 +77,35 @@ export function VehiclesPage() {
   const state = location.state as
     | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
     | null;
-  const targetCostumerId = state?.costumerId ?? costumerId;
-  const targetCostumerName = isFleetiiAdmin ? (state?.costumerName ?? null) : null;
+  /** FLEETii-admin-only "Kunde" filter ("" = "Alle", every costumer) — same seeding/meaning as FleetManagementPage.tsx's own filterCostumerId, just seeded from router state instead of a saved sessionStorage snapshot. Stays "" (unused) for a regular admin, who is always scoped to their own costumerId below regardless. */
+  const [filterCostumerId, setFilterCostumerId] = useState(isFleetiiAdmin ? (state?.costumerId ?? "") : "");
+  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  const targetCostumerId = isFleetiiAdmin ? filterCostumerId || null : costumerId;
+  const targetCostumerName = isFleetiiAdmin
+    ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? null)
+    : null;
   /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable) or, for a FLEETii admin with no targetCostumerId either, ALL-COSTUMERS. */
   const targetDepartmentId = state?.departmentId ?? null;
   const targetDepartmentName = state?.departmentName ?? null;
+
+  /** Loads every costumer for the Kunde filter dropdown — FLEETii admin only, since a regular admin is always scoped to their own single costumer. Same query as FleetManagementPage.tsx's own. */
+  useEffect(() => {
+    if (!isFleetiiAdmin) return;
+
+    let cancelled = false;
+    void supabase
+      .from("costumers")
+      .select("costumer_id, name")
+      .order("name")
+      .returns<{ costumer_id: string; name: string }[]>()
+      .then(({ data }) => {
+        if (!cancelled) setCostumerOptions(data ?? []);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isFleetiiAdmin]);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   /** UNLOCKED/ALL-COSTUMERS modes only (see this component's own doc comment) — the target costumer's own departments (or, in ALL-COSTUMERS mode, every department platform-wide), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
@@ -85,6 +121,8 @@ export function VehiclesPage() {
   /** UNLOCKED mode only — narrows the whole-costumer vehicle list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
   const [filterDepartment, setFilterDepartment] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
+  /** Whether Kunde counts as an active/resettable filter — false in LOCKED mode even though filterCostumerId itself is non-empty there (seeded once from the department's own costumer, not user-editable — the Kunde select isn't even rendered, see this component's own doc comment), so the filter badge/reset button don't react to it and "Nulstil filter" doesn't clobber the locked costumer out from under "Opret køretøj"'s disabled check. */
+  const costumerFilterActive = isFleetiiAdmin && !targetDepartmentId && Boolean(filterCostumerId);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -232,7 +270,7 @@ export function VehiclesPage() {
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate || filterStatus || filterDepartment
+                      filterPlate || filterStatus || filterDepartment || costumerFilterActive
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -247,13 +285,61 @@ export function VehiclesPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                        {/* LOCKED mode (targetDepartmentId set) hides this entirely — nothing to widen back out to from in-page, see this component's own doc comment. */}
+                        {/* LOCKED mode (targetDepartmentId set) hides both Kunde and Afdeling entirely — a locked department already implies one exact costumer, nothing to widen back out to from in-page, see this component's own doc comment. */}
+                        {isFleetiiAdmin && !targetDepartmentId && (
+                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                            Kunde
+                            <select
+                              value={filterCostumerId}
+                              onChange={(e) => {
+                                setFilterCostumerId(e.target.value);
+                                setFilterDepartment("");
+                                // A previously-picked Køretøj almost certainly
+                                // belongs to the OLD Kunde, not the new one —
+                                // same inconsistency class as Afdeling above
+                                // (and the reverse of Køretøj's own onChange,
+                                // which syncs Afdeling/Kunde TO match the
+                                // vehicle picked). See
+                                // FleetManagementPage.tsx's identical onChange
+                                // for the full reasoning.
+                                setFilterPlate("");
+                              }}
+                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            >
+                              <option value="">Alle</option>
+                              {costumerOptions.map((costumer) => (
+                                <option key={costumer.costumer_id} value={costumer.costumer_id}>
+                                  {costumer.name}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        )}
                         {!targetDepartmentId && (
                           <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                             Afdeling
                             <select
                               value={filterDepartment}
-                              onChange={(e) => setFilterDepartment(e.target.value)}
+                              onChange={(e) => {
+                                const departmentId = e.target.value;
+                                setFilterDepartment(departmentId);
+                                // While Kunde is still "Alle" (isFleetiiAdmin
+                                // only — departmentOptions spans every
+                                // costumer in that state), picking one
+                                // specific department left Kunde stuck on
+                                // "Alle" — auto-promote it to that
+                                // department's own costumer instead, same as
+                                // FleetManagementPage.tsx's identical
+                                // onChange.
+                                if (isFleetiiAdmin && !filterCostumerId && departmentId) {
+                                  const department = departmentOptions.find((d) => d.department_id === departmentId);
+                                  if (department) setFilterCostumerId(department.costumer_id);
+                                }
+                                // Same reasoning as Kunde's own onChange
+                                // above — a previously-picked Køretøj may not
+                                // belong to the newly-picked Afdeling.
+                                setFilterPlate("");
+                              }}
                               className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                             >
                               <option value="">Alle</option>
@@ -269,7 +355,24 @@ export function VehiclesPage() {
                           Køretøj
                           <select
                             value={filterPlate}
-                            onChange={(e) => setFilterPlate(e.target.value)}
+                            onChange={(e) => {
+                              const plate = e.target.value;
+                              setFilterPlate(plate);
+                              // Picking one specific vehicle is more specific
+                              // than either Afdeling or Kunde — sync both to
+                              // match it (unconditionally), same reasoning
+                              // and logic as FleetManagementPage.tsx's
+                              // identical onChange.
+                              if (!plate) return;
+                              const vehicle = vehicles.find((v) => v.plate === plate);
+                              const departmentId = vehicle?.departmentIds[0];
+                              if (!departmentId) return;
+                              setFilterDepartment(departmentId);
+                              if (isFleetiiAdmin) {
+                                const department = departmentOptions.find((d) => d.department_id === departmentId);
+                                if (department) setFilterCostumerId(department.costumer_id);
+                              }
+                            }}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                           >
                             <option value="">Alle</option>
@@ -292,13 +395,19 @@ export function VehiclesPage() {
                             <option value="Offline">Offline</option>
                           </select>
                         </label>
-                        {(filterPlate || filterStatus || filterDepartment) && (
+                        {(filterPlate || filterStatus || filterDepartment || costumerFilterActive) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFilterPlate("");
                               setFilterStatus("");
                               setFilterDepartment("");
+                              // Only in the modes where Kunde is actually an
+                              // editable filter (see costumerFilterActive's
+                              // own doc comment) — in LOCKED mode this would
+                              // otherwise wipe out the department's own
+                              // costumer, which "Opret køretøj" needs.
+                              if (!targetDepartmentId) setFilterCostumerId("");
                             }}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
                           >
