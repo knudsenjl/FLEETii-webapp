@@ -185,7 +185,7 @@ export default async (req: Request) => {
   // credentials on some other way.
   const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
   // VITE_BRUGERMANUAL_URL is a site-relative path (e.g.
-  // "/manualer/fleetii-brugermanual-bruger.html"), not an absolute URL —
+  // "/manualer/fleetii-manual-bruger.html"), not an absolute URL —
   // needs loginUrl to become one for the email; omitted if either is unset.
   const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
   const emailResult = await sendMail({

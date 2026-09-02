@@ -22,7 +22,7 @@ import { ANTI_CLONING_NOTICE } from "../lib/legal";
  * when its var is unset instead of linking to a placeholder.
  *
  * Each var is a SITE-RELATIVE path to a self-hosted static file under
- * public/manualer/ (e.g. "/manualer/fleetii-brugermanual-bruger.html"), NOT
+ * public/manualer/ (e.g. "/manualer/fleetii-manual-bruger.html"), NOT
  * an external link — switched away from claude.ai artifact URLs since
  * published artifacts start private and aren't reliably viewable by a real
  * customer who isn't logged into the account that created them. A relative
