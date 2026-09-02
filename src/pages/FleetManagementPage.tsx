@@ -343,17 +343,8 @@ export function FleetManagementPage() {
                       <button
                         type="button"
                         onClick={() => setNoGpsOpen((prev) => !prev)}
-                        className="flex items-center gap-1.5 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
+                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
                       >
-                        {/* Scattered-dots-in-a-circle glyph — a "group of vehicles with no fixed position" reads naturally as a cluster of points with no ring/grid structure to them, unlike a loading spinner's evenly-spaced dots. */}
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5} className="h-4 w-4 shrink-0">
-                          <circle cx="12" cy="12" r="9" />
-                          <circle cx="9" cy="8" r="1.3" fill="currentColor" stroke="none" />
-                          <circle cx="15.5" cy="9.5" r="1.3" fill="currentColor" stroke="none" />
-                          <circle cx="16" cy="15" r="1.3" fill="currentColor" stroke="none" />
-                          <circle cx="10.5" cy="15.5" r="1.3" fill="currentColor" stroke="none" />
-                          <circle cx="8" cy="12.5" r="1.3" fill="currentColor" stroke="none" />
-                        </svg>
                         Uden lokation
                       </button>
                       <InlinePopup
