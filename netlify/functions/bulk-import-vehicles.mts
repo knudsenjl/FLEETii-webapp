@@ -30,13 +30,13 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
 
 type BulkImportVehiclesBody = {
   format?: "csv" | "json";
   fileContent?: string;
-  /** Only consulted for a caller with role "FLEETii admin" — a regular admin always imports into their own costumer, same as bulk-import-users.mts. */
+  /** Only consulted for a caller with role "sysadm" — a regular admin always imports into their own costumer, same as bulk-import-users.mts. */
   costumerId?: string;
   /** Whole-batch contact fields — see file header. Default to the caller's own user_profiles row if omitted. */
   contactperson?: string;
@@ -110,12 +110,12 @@ export default async (req: Request) => {
     .eq("user_id", authResult.userId)
     .maybeSingle<{ costumer_id: string | null; role: string; full_name: string | null; email: string | null; phone: string | null }>();
 
-  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  const isSysadm = isSysadmRole(caller?.role);
   let costumerId: string;
-  if (isFleetiiAdmin) {
+  if (isSysadm) {
     const requested = asTrimmedString(body.costumerId);
     if (!requested) {
-      return new Response(JSON.stringify({ error: "costumerId er påkrævet for FLEETii-administratorer." }), { status: 400 });
+      return new Response(JSON.stringify({ error: "costumerId er påkrævet for sysadm." }), { status: 400 });
     }
     const { data: costumerRow } = await admin
       .from("costumers")

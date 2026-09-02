@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
@@ -21,7 +21,7 @@ import { fetchDepartmentOptions, type DepartmentOption } from "../lib/department
  * admin — see netlify/functions/_shared/serverAuth.ts), who create the
  * vehicle and arrange device installation manually.
  *
- * A FLEETii admin has no costumer/department of their own — for them,
+ * A sysadm has no costumer/department of their own — for them,
  * selectedCostumerId comes strictly from router state (VehiclesPage.tsx's
  * own "Opret køretøj" button — the only real entry point onto this
  * page — "filtering by navigation" same as VehiclesPage.tsx/
@@ -36,26 +36,26 @@ export function NewVehiclePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as { costumerId?: string; costumerName?: string } | null;
-  /** A FLEETii admin has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from router state rather than a picker. */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
-  const selectedCostumerId = isFleetiiAdmin ? (state?.costumerId ?? "") : "";
+  /** A sysadm has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from router state rather than a picker. */
+  const isSysadm = isSysadmRole(profile?.role);
+  const selectedCostumerId = isSysadm ? (state?.costumerId ?? "") : "";
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
-  /** Whichever department's "Køretøj-ID:" gate applies — the FLEETii admin's own pick when relevant, otherwise the viewing admin's own fixed afdelingId (unchanged from before this page had a picker at all). */
-  const identGateDepartmentId = isFleetiiAdmin ? selectedDepartmentId || null : afdelingId;
+  /** Whichever department's "Køretøj-ID:" gate applies — the sysadm's own pick when relevant, otherwise the viewing admin's own fixed afdelingId (unchanged from before this page had a picker at all). */
+  const identGateDepartmentId = isSysadm ? selectedDepartmentId || null : afdelingId;
   /** Whether identGateDepartmentId's department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identGateDepartmentId);
 
-  /** Redirects back to "/admin" if a FLEETii admin reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — see this component's own doc comment. A regular admin always has their own costumerId/afdelingId regardless, so this never fires for them. */
+  /** Redirects back to "/admin" if a sysadm reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — see this component's own doc comment. A regular admin always has their own costumerId/afdelingId regardless, so this never fires for them. */
   useEffect(() => {
-    if (isFleetiiAdmin && !selectedCostumerId) {
+    if (isSysadm && !selectedCostumerId) {
       navigate("/admin", { replace: true });
     }
-  }, [isFleetiiAdmin, selectedCostumerId, navigate]);
+  }, [isSysadm, selectedCostumerId, navigate]);
 
-  /** Loads the departments under the target Kunde — FLEETii admin only, mirrors UserDetailsPage.tsx's identical effect. */
+  /** Loads the departments under the target Kunde — sysadm only, mirrors UserDetailsPage.tsx's identical effect. */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (!isSysadm) return;
     setSelectedDepartmentId("");
     if (!selectedCostumerId) {
       setDepartmentOptions([]);
@@ -71,7 +71,7 @@ export function NewVehiclePage() {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isFleetiiAdmin, selectedCostumerId]);
+  }, [isSysadm, selectedCostumerId]);
 
   // A costumer with only one department has no real choice to make — force
   // it and lock the field, same as UserDetailsPage.tsx's identical case.
@@ -196,10 +196,10 @@ export function NewVehiclePage() {
     kontaktperson.trim().length > 0 &&
     EMAIL_PATTERN.test(kontaktemail.trim()) &&
     PHONE_PATTERN.test(kontaktnummer.trim()) &&
-    // A FLEETii admin has no viewer-own costumer/department to fall back to
+    // A sysadm has no viewer-own costumer/department to fall back to
     // — both picks are required before the request means anything (see the
     // Kunde/Afdeling rows below).
-    (!isFleetiiAdmin || (selectedCostumerId.length > 0 && selectedDepartmentId.length > 0)) &&
+    (!isSysadm || (selectedCostumerId.length > 0 && selectedDepartmentId.length > 0)) &&
     !isSending;
 
   /** Posts the vehicle-request form to send-vehicle-request, authenticated with the current session's access token. Shows a server-supplied error message (or a generic connection-failure one) inline on failure. */
@@ -216,7 +216,7 @@ export function NewVehiclePage() {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
         body: JSON.stringify({
-          afdeling: isFleetiiAdmin
+          afdeling: isSysadm
             ? (departmentOptions.find((d) => d.department_id === selectedDepartmentId)?.name ?? null)
             : afdeling,
           // Only meaningful (and only trusted server-side) for a FLEETii
@@ -224,7 +224,7 @@ export function NewVehiclePage() {
           // which re-derives costumer_id/department_id from THIS id rather
           // than trusting afdeling's display name for anything but the
           // email text.
-          departmentId: isFleetiiAdmin ? selectedDepartmentId : null,
+          departmentId: isSysadm ? selectedDepartmentId : null,
           vehicleIdent: vehicleIdent.trim() || null,
           parking: parking.trim() || null,
           nummerplade,
@@ -285,9 +285,9 @@ export function NewVehiclePage() {
                     aren't clipped when they overflow this box's edge (same
                     fix as RettighederSettings.tsx/UserDetailsPage.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
-                  {isFleetiiAdmin ? (
+                  {isSysadm ? (
                     <>
-                      {/* FLEETii-admin-only Kunde (read-only, from router state — see this component's own doc comment) / Afdeling (a real required select — see canSend/handleSend above) rows. */}
+                      {/* sysadm-only Kunde (read-only, from router state — see this component's own doc comment) / Afdeling (a real required select — see canSend/handleSend above) rows. */}
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
                         <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">

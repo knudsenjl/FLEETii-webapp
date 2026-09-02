@@ -49,8 +49,8 @@ type VehicleDeletionOrderQueryRow = {
 };
 
 /**
- * "Slet køretøj" fulfillment page — FLEETii admin only (see ProtectedRoute
- * requireRole="FLEETii admin" in App.tsx; there's no reason for a customer's
+ * "Slet køretøj" fulfillment page — sysadm only (see ProtectedRoute
+ * requireRole="sysadm" in App.tsx; there's no reason for a customer's
  * own admin to see this, unlike VehicleCreatePage.tsx's looser gating).
  * Reachable at plain "/vehicle-delete" (order passed via router state —
  * InstallationAdministrationPage's "Administration af installationer" table
@@ -58,7 +58,7 @@ type VehicleDeletionOrderQueryRow = {
  * link in send-vehicle-deletion-request.mts's email). Missing both state and
  * a resolvable :orderId — or an order that isn't actually order_type
  * "Nedlæg" (a stale/mistyped link to what's really a creation order) —
- * redirects back to "/fleetii-admin-installations". Shows what the customer
+ * redirects back to "/sysadm-installations". Shows what the customer
  * admin's "Slet køretøj" request carries, plus a single "Afregistrer 2hire
  * device og slet køretøjet" action gated behind a Fortryd/Ja ConfirmDialog
  * whose own message asks staff to confirm the physical device is actually
@@ -80,7 +80,7 @@ export function VehicleDeletePage() {
   // (orderId present, no stateOrder yet) — same reasoning as
   // VehicleCreatePage.tsx's orderLoading: starting this false would race the
   // redirect effect below, which would see the original (false) value and
-  // bounce back to "/fleetii-admin-installations" before the fetch had a
+  // bounce back to "/sysadm-installations" before the fetch had a
   // chance to resolve.
   const [orderLoading, setOrderLoading] = useState(() => Boolean(orderId) && !stateOrder);
   const rawOrder = stateOrder ?? fetchedOrder;
@@ -99,7 +99,7 @@ export function VehicleDeletePage() {
   const [deregisterWarning, setDeregisterWarning] = useState<string | null>(null);
   const [deleted, setDeleted] = useState(false);
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/vehicle-delete/:orderId" (no router state) — skipped entirely when stateOrder is already present. Naturally scoped to the caller's own costumer (or any, for a FLEETii admin) by costumer_orders' SELECT RLS policy. */
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/vehicle-delete/:orderId" (no router state) — skipped entirely when stateOrder is already present. Naturally scoped to the caller's own costumer (or any, for a sysadm) by costumer_orders' SELECT RLS policy. */
   useEffect(() => {
     if (stateOrder || !orderId) return;
 
@@ -151,7 +151,7 @@ export function VehicleDeletePage() {
   // turned out to be order_type "Opret" (not this page's job).
   useEffect(() => {
     if (!order && !orderLoading) {
-      navigate("/fleetii-admin-installations", { replace: true });
+      navigate("/sysadm-installations", { replace: true });
     }
   }, [order, orderLoading, navigate]);
 
@@ -301,7 +301,7 @@ export function VehicleDeletePage() {
                 )}
                 <button
                   type="button"
-                  onClick={() => navigate("/fleetii-admin-installations", { replace: true })}
+                  onClick={() => navigate("/sysadm-installations", { replace: true })}
                   className="w-full rounded-lg border border-brand-200 bg-white px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
                 >
                   Tilbage til oversigt

@@ -1,5 +1,5 @@
 // Netlify Function: "test mode" utility that seeds departments (every
-// department system-wide for a FLEETii admin, or just the caller's own
+// department system-wide for a sysadm, or just the caller's own
 // costumer's for a regular admin — see the costumerId scoping below) with a
 // handful of realistic-looking bookings, so a manual
 // interface test isn't staring at empty tables. Reached from the round test
@@ -25,7 +25,7 @@
 // Both must pass for the function to even reach requireAdmin() below — no
 // single check here is "the" boundary on its own.
 //
-// For each department — every costumer's for a FLEETii admin, or only the
+// For each department — every costumer's for a sysadm, or only the
 // caller's OWN costumer's for a regular admin (see the costumerId scoping
 // below; requireAdmin() lets either role trigger this at all, once the two
 // env checks above have already allowed it to run): picks a random count in
@@ -56,7 +56,7 @@
 // be double-booked.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 /** Netlify's own permanent, runtime-injected site identifier for the real production deployment (app.fleetii.dk) — confirmed via `netlify sites:list`. Hardcoded, not another env var: unlike a config value, process.env.SITE_ID can't be missing or misspelled (Netlify populates it for every Function invocation automatically), so this can never silently fail to trigger. Changing which site counts as "production" requires an explicit code change here. */
 const PRODUCTION_SITE_ID = "ae77d3e5-f334-44f1-aa47-d33cd231681b";
@@ -123,11 +123,11 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: callerError.message }), { status: 500 });
   }
 
-  const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+  const isSysadm = isSysadmRole(caller?.role);
   // A regular admin only seeds their OWN costumer's departments — a
-  // FLEETii admin (no costumer of their own) still seeds every department
+  // sysadm (no costumer of their own) still seeds every department
   // system-wide, unchanged from before this scoping was added.
-  if (!isFleetiiAdmin && !caller?.costumer_id) {
+  if (!isSysadm && !caller?.costumer_id) {
     return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
   }
 
@@ -136,7 +136,7 @@ export default async (req: Request) => {
   // longer has .eq()) — so the conditional lives inside the query
   // construction itself rather than reassigning a .returns()-typed variable.
   const departmentsQuery = (
-    !isFleetiiAdmin && caller?.costumer_id
+    !isSysadm && caller?.costumer_id
       ? admin.from("departments").select("department_id, name").eq("costumer_id", caller.costumer_id)
       : admin.from("departments").select("department_id, name")
   ).returns<DepartmentRow[]>();

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
@@ -63,7 +63,7 @@ function isPageReload(): boolean {
  * InlinePopup layout, same filter state shape — so an admin can narrow the
  * map down (e.g. to a single vehicle, or a department other than their own
  * currently-active one) without needing to "Skift afdeling" first, and a
- * FLEETii admin (who has no department/costumer of their own) can pick a
+ * sysadm (who has no department/costumer of their own) can pick a
  * Kunde to scope to instead of always seeing every vehicle platform-wide.
  * Defaults to the viewer's own active department (afdelingId) — see the
  * sync effects below — matching this page's previous fixed, unfilterable
@@ -73,7 +73,7 @@ export function FleetManagementPage() {
   const { afdelingId, costumerId, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  const isSysadm = isSysadmRole(profile?.role);
   /** router-state snapshot — either the full one goToVehicleDetails stamps right before navigating to VehicleDetailsPage (present on the history entry a browser-back actually lands back on — NOT a reload, so storedSnapshot below is never in play there and this is the only source anyway), or the PARTIAL one CostumerDetailsPage.tsx's/DepartmentDetailsPage.tsx's own "Flådestyring" button passes (just `filters`, for a fresh costumer/department-scoped visit — no mapView/clusterMarkers/liveEnabled at all, and frozen at whatever it was on that one navigation — the browser preserves it verbatim across a later reload, unlike sessionStorage below, which keeps getting overwritten as the admin actually interacts). */
   const routerSnapshot = (location.state as FleetMapSnapshot | null) ?? null;
   /** The sessionStorage snapshot (see readStoredSnapshot/isPageReload above), consulted only on a genuine browser refresh — router state alone doesn't survive that, only browser-back does. */
@@ -108,17 +108,17 @@ export function FleetManagementPage() {
     return () => setLiveTracking(false);
   }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
-  /** FLEETii-admin-only "Kunde" filter — same seeding/meaning as VehiclesPage.tsx's own filterCostumerId ("" = "Alle", every costumer). Restored from savedSnapshot.filters first (a browser-back should land back on exactly the scope the admin had picked), then the admin's own costumerId if their account happens to carry one, otherwise "". */
+  /** sysadm-only "Kunde" filter — same seeding/meaning as VehiclesPage.tsx's own filterCostumerId ("" = "Alle", every costumer). Restored from savedSnapshot.filters first (a browser-back should land back on exactly the scope the admin had picked), then the admin's own costumerId if their account happens to carry one, otherwise "". */
   const [filterCostumerId, setFilterCostumerId] = useState(savedSnapshot?.filters?.costumerId ?? costumerId ?? "");
   const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
-  const targetCostumerId = isFleetiiAdmin ? filterCostumerId || null : costumerId;
-  const targetCostumerName = isFleetiiAdmin
+  const targetCostumerId = isSysadm ? filterCostumerId || null : costumerId;
+  const targetCostumerName = isSysadm
     ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? null)
     : null;
 
-  /** Loads every costumer for the Kunde filter dropdown — FLEETii admin only, since a regular admin is always scoped to their own single costumer. Same query as VehiclesPage.tsx's own. */
+  /** Loads every costumer for the Kunde filter dropdown — sysadm only, since a regular admin is always scoped to their own single costumer. Same query as VehiclesPage.tsx's own. */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (!isSysadm) return;
 
     let cancelled = false;
     void supabase
@@ -133,7 +133,7 @@ export function FleetManagementPage() {
     return () => {
       cancelled = true;
     };
-  }, [isFleetiiAdmin]);
+  }, [isSysadm]);
 
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -171,9 +171,9 @@ export function FleetManagementPage() {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [noGpsOpen]);
 
-  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Same "Alle" cross-costumer fallback for a FLEETii admin as VehiclesPage.tsx's own identical effect — see its own doc comment for why that's a real, RLS-permitted query rather than a mistake. */
+  /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Same "Alle" cross-costumer fallback for a sysadm as VehiclesPage.tsx's own identical effect — see its own doc comment for why that's a real, RLS-permitted query rather than a mistake. */
   useEffect(() => {
-    if (!targetCostumerId && !isFleetiiAdmin) {
+    if (!targetCostumerId && !isSysadm) {
       setDepartmentOptions([]);
       return;
     }
@@ -186,7 +186,7 @@ export function FleetManagementPage() {
     return () => {
       cancelled = true;
     };
-  }, [targetCostumerId, isFleetiiAdmin]);
+  }, [targetCostumerId, isSysadm]);
 
   /** Every vehicle belonging to the target costumer (by departmentIds intersecting departmentOptions) — same scoping approach as VehiclesPage.tsx's own `vehicles`, computed directly (not via its own state/effect) since gpsPositions/twoHireVehicles are already live context values, not something this page fetches itself. */
   const costumerDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
@@ -263,21 +263,21 @@ export function FleetManagementPage() {
     }
     if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
       setFilterDepartment(afdelingId);
-    } else if (isFleetiiAdmin) {
+    } else if (isSysadm) {
       setFilterDepartment("");
     }
-  }, [afdelingId, departmentOptions, isFleetiiAdmin]);
+  }, [afdelingId, departmentOptions, isSysadm]);
 
-  /** FLEETii-admin-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Same pattern as VehiclesPage.tsx's own identical effect, INCLUDING skipping its own first run (see costumerSyncSkippedFirstRun below) — this one would otherwise clobber savedSnapshot's own restored Kunde filter (a browser-back from VehicleDetailsPage) back to the viewer's own costumerId — usually null, meaning "Alle" — the moment this page remounts, defeating the whole point of restoring it. The initial useState above already seeds the correct value either way, so skipping the first run changes nothing for a plain, snapshot-less visit. */
+  /** sysadm-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Same pattern as VehiclesPage.tsx's own identical effect, INCLUDING skipping its own first run (see costumerSyncSkippedFirstRun below) — this one would otherwise clobber savedSnapshot's own restored Kunde filter (a browser-back from VehicleDetailsPage) back to the viewer's own costumerId — usually null, meaning "Alle" — the moment this page remounts, defeating the whole point of restoring it. The initial useState above already seeds the correct value either way, so skipping the first run changes nothing for a plain, snapshot-less visit. */
   const costumerSyncSkippedFirstRun = useRef(false);
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (!isSysadm) return;
     if (!costumerSyncSkippedFirstRun.current) {
       costumerSyncSkippedFirstRun.current = true;
       return;
     }
     setFilterCostumerId(costumerId ?? "");
-  }, [isFleetiiAdmin, costumerId]);
+  }, [isSysadm, costumerId]);
 
   /** Persists clusterMarkers/filters to sessionStorage on every change — together with the mapView write in onViewChange above, this is what lets a genuine browser refresh (see isPageReload) restore the map the same way browser-back already does via router state alone. */
   useEffect(() => {
@@ -388,7 +388,7 @@ export function FleetManagementPage() {
                       message={
                         <>
                           <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                          {isFleetiiAdmin && (
+                          {isSysadm && (
                             <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                               Kunde
                               <select
@@ -425,7 +425,7 @@ export function FleetManagementPage() {
                               onChange={(e) => {
                                 const departmentId = e.target.value;
                                 setFilterDepartment(departmentId);
-                                // While Kunde is still "Alle" (isFleetiiAdmin
+                                // While Kunde is still "Alle" (isSysadm
                                 // only — departmentOptions spans every
                                 // costumer in that state, see
                                 // fetchDepartmentOptions' own doc comment),
@@ -437,7 +437,7 @@ export function FleetManagementPage() {
                                 // all. Auto-promote Kunde to that
                                 // department's own costumer instead, same as
                                 // if the admin had picked it there first.
-                                if (isFleetiiAdmin && !filterCostumerId && departmentId) {
+                                if (isSysadm && !filterCostumerId && departmentId) {
                                   const department = departmentOptions.find((d) => d.department_id === departmentId);
                                   if (department) setFilterCostumerId(department.costumer_id);
                                 }
@@ -486,7 +486,7 @@ export function FleetManagementPage() {
                                 const departmentId = vehicle?.departmentIds[0];
                                 if (!departmentId) return;
                                 setFilterDepartment(departmentId);
-                                if (isFleetiiAdmin) {
+                                if (isSysadm) {
                                   const department = departmentOptions.find((d) => d.department_id === departmentId);
                                   if (department) setFilterCostumerId(department.costumer_id);
                                 }
@@ -596,7 +596,7 @@ export function FleetManagementPage() {
                   navigate("/fleet-table", {
                     state: {
                       // targetCostumerId is null when this map's own Kunde
-                      // filter is "Alle" (FLEETii admin only) — VehiclesPage
+                      // filter is "Alle" (sysadm only) — VehiclesPage
                       // now has a matching ALL-COSTUMERS mode for exactly
                       // that case instead of redirecting away, see its own
                       // doc comment.

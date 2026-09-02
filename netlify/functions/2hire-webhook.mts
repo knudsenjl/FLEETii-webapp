@@ -23,8 +23,8 @@
 // map marker moves the instant 2hire reports it, instead of that page
 // having to poll for changes. Sent to TWO topics: the vehicle's own
 // "fleet-positions:<costumerId>" (what that costumer's own users/admins
-// subscribe to) AND the fixed "fleet-positions:fleetii-admin" (what a
-// FLEETii admin subscribes to instead, since they need every costumer's
+// subscribe to) AND the fixed "fleet-positions:sysadm" (what a
+// sysadm subscribes to instead, since they need every costumer's
 // positions at once, e.g. FleetManagementPage's "Alle" filter) — see
 // fleet_positions_realtime_authorization.sql's RLS policy on
 // realtime.messages, which is what actually restricts who may receive each
@@ -190,10 +190,10 @@ export default async (req: Request) => {
         lng: Number(body.payload.data.longitude),
       };
 
-      // Every costumer's own topic, plus the fixed FLEETii-admin one (always
-      // sent regardless of costumer_id, so a FLEETii admin keeps seeing
+      // Every costumer's own topic, plus the fixed sysadm one (always
+      // sent regardless of costumer_id, so a sysadm keeps seeing
       // every vehicle move) — see this function's own header comment.
-      const topics = ["fleet-positions:fleetii-admin"];
+      const topics = ["fleet-positions:sysadm"];
       if (vehicle?.costumer_id) topics.push(`fleet-positions:${vehicle.costumer_id}`);
 
       for (const topic of topics) {

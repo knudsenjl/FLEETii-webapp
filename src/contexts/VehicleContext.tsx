@@ -9,7 +9,7 @@ import { useAuth } from "./AuthContext";
 import { getVehicleDataSource } from "../lib/vehicleDataSource";
 import type { Vehicle2Hire, VehicleGPS2Hire } from "../lib/vehicleDataSource";
 import { supabase } from "../lib/supabase";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 
 export type { Vehicle2Hire, VehicleGPS2Hire } from "../lib/vehicleDataSource";
 
@@ -30,9 +30,9 @@ type PositionBroadcastPayload = { vehicleId: string; lat: number; lng: number };
  */
 export function VehicleProvider({ children }: { children: ReactNode }) {
   const { isFullyAuthenticated, costumerId, profile } = useAuth();
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
-  /** Which "fleet-positions:*" Realtime topic this session may subscribe to — see fleet_positions_realtime_authorization.sql's RLS policy on realtime.messages, which enforces the exact same rule server-side (this is just what to ask for, not the actual authorization). A FLEETii admin (no costumer of their own) gets the platform-wide topic; everyone else gets their own costumer's. Null while the profile hasn't resolved yet (costumerId/role both still unknown) — no channel is opened until then. */
-  const positionsTopic = isFleetiiAdmin ? "fleet-positions:fleetii-admin" : costumerId ? `fleet-positions:${costumerId}` : null;
+  const isSysadm = isSysadmRole(profile?.role);
+  /** Which "fleet-positions:*" Realtime topic this session may subscribe to — see fleet_positions_realtime_authorization.sql's RLS policy on realtime.messages, which enforces the exact same rule server-side (this is just what to ask for, not the actual authorization). A sysadm (no costumer of their own) gets the platform-wide topic; everyone else gets their own costumer's. Null while the profile hasn't resolved yet (costumerId/role both still unknown) — no channel is opened until then. */
+  const positionsTopic = isSysadm ? "fleet-positions:sysadm" : costumerId ? `fleet-positions:${costumerId}` : null;
   const [vehicles, setVehicles] = useState<Vehicle2Hire[]>([]);
   const [gpsPositions, setGpsPositions] = useState<VehicleGPS2Hire[]>([]);
   // True until the initial fetch resolves — VehicleDetailsPage's fetch-by-id

@@ -30,7 +30,7 @@
 // a Netlify Function rather than a plain client-side .delete() call — same
 // reason delete-costumer.mts itself is a Function and not a client call.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { requireSysadm } from "./_shared/serverAuth.js";
 
 type DeleteDraftCostumerBody = { costumerId?: string };
 
@@ -39,7 +39,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }

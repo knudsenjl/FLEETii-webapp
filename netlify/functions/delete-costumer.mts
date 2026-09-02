@@ -25,7 +25,7 @@
 // just leaves harmless orphaned auth.users rows with no matching profile,
 // recoverable from costumer_purge_log if it ever matters).
 import { getAdminClient } from "./_shared/adminClient.js";
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { requireSysadm } from "./_shared/serverAuth.js";
 
 type DeleteCostumerBody = { costumerId?: string; confirmName?: string };
 
@@ -34,7 +34,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }

@@ -17,7 +17,7 @@ export function ImportVehiclesPage() {
       nounPlural="Køretøjer"
       introExtra={
         <p className="text-sm text-brand-800">
-          Hvert køretøj oprettes som en afventende bestilling, ligesom "Opret køretøj" — en FLEETii administrator
+          Hvert køretøj oprettes som en afventende bestilling, ligesom "Opret køretøj" — en sysadm
           skal stadig registrere hvert køretøj enkeltvis, da det kræver speciel konfigurering af hvert køretøj.
         </p>
       }

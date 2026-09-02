@@ -15,7 +15,7 @@ export type DepartmentOption = { department_id: string; name: string; costumer_i
 /**
  * Fetches every department for `costumerId`, ordered by name — or, when
  * `costumerId` is null/empty, every department platform-wide (only
- * meaningful for a FLEETii admin's unscoped "Alle" view, see
+ * meaningful for a sysadm's unscoped "Alle" view, see
  * FleetManagementPage.tsx's own use). Returns [] (never throws) on a
  * Supabase error, matching every existing call site's own "ignore the
  * error, just show nothing" behavior.

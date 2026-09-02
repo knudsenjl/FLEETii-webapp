@@ -8,9 +8,9 @@
 // older vehicle may lack environment/equipment data, or MotorAPI may 404
 // just one of the three), so one endpoint failing doesn't fail the whole
 // request — its own error is embedded in that section of the response
-// instead. Admin-gated (requireAdmin, not requireFleetiiAdmin) — regular
-// admins reach this via NewVehiclePage.tsx (requireAdmin, not FLEETii-admin
-// only, see App.tsx's /new-vehicle route), not just FLEETii admins.
+// instead. Admin-gated (requireAdmin, not requireSysadm) — regular
+// admins reach this via NewVehiclePage.tsx (requireAdmin, not sysadm
+// only, see App.tsx's /new-vehicle route), not just sysadms.
 import { requireAdmin } from "./_shared/serverAuth.js";
 import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
 
@@ -40,7 +40,7 @@ async function fetchMotorApiSection(path: string, token: string): Promise<MotorA
 }
 
 /**
- * GET ?regNo=<registration number or VIN>, as a logged-in admin or FLEETii admin.
+ * GET ?regNo=<registration number or VIN>, as a logged-in admin or sysadm.
  * Returns { vehicle, environment, equipment }, each independently either
  * { data } or { error } — see fetchMotorApiSection.
  */

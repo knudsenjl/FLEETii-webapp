@@ -5,7 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
@@ -43,7 +43,7 @@ type VehicleProfileRow = {
   department_id: string | null;
   costumer_id: string | null;
   drivmiddel: string;
-  /** The 2hire-board device's own identifier (its QR code, as scanned at registration — see 2hire-register-vehicle.mts). Editable here, FLEETii-admin only — see the "QR-kode/2hire-profil" section below. */
+  /** The 2hire-board device's own identifier (its QR code, as scanned at registration — see 2hire-register-vehicle.mts). Editable here, sysadm only — see the "QR-kode/2hire-profil" section below. */
   iot_id: string | null;
   /** The human-readable label of the 2hire vehicle-configuration profile picked at registration (see vehicle_profiles_add_twohire_profile.sql) — a plain free-text label, not a live 2hire association, so editing it here only corrects OUR OWN record, it doesn't re-associate anything with 2hire itself. */
   twohire_profile: string | null;
@@ -57,7 +57,7 @@ type VehicleProfileRow = {
  * actually manages) — loaded fresh from vehicle_profiles by vehicle_id on mount, then
  * saved back via an UPDATE (see supabase/applied/vehicle_profiles_update_policy.sql
  * and vehicle_profiles_update_allow_fleetii_admin.sql for the RLS scoping:
- * admin + vehicle in one of their own departments, or FLEETii admin +
+ * admin + vehicle in one of their own departments, or sysadm +
  * any vehicle).
  * Kilometerstand/Drivmiddelniveau/Status stay read-only since they're live
  * telemetry written by the 2hire webhook — editing them wouldn't persist
@@ -75,7 +75,7 @@ export function HandleVehiclePage() {
   const refreshVehicles = useRefreshVehicles();
   const { profile, session } = useAuth();
   /** Gates the "QR-kode"/"2hire-profil" section below — 2hire-board device internals, not something a regular admin manages. */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  const isSysadm = isSysadmRole(profile?.role);
   const state = location.state as { vehicle?: Vehicle } | null;
   const vehicle = state?.vehicle ?? null;
 
@@ -86,7 +86,7 @@ export function HandleVehiclePage() {
   const [model, setModel] = useState("");
   const [year, setYear] = useState("");
   const [drivmiddel, setDrivmiddel] = useState<string>("Benzin");
-  /** vehicle_profiles.iot_id/twohire_profile — FLEETii-admin-only editable fields, see the section near the bottom of the form below. */
+  /** vehicle_profiles.iot_id/twohire_profile — sysadm-only editable fields, see the section near the bottom of the form below. */
   const [iotId, setIotId] = useState("");
   /** The raw label as currently stored in vehicle_profiles.twohire_profile, fetched once on load — used only as a fallback in handleSave (see profileLabel there) when the picker below couldn't resolve a selection back to a live profile, so an untouched or unmatched value round-trips unchanged rather than being silently cleared. */
   const [twohireProfileOriginal, setTwohireProfileOriginal] = useState("");
@@ -107,7 +107,7 @@ export function HandleVehiclePage() {
 
   /** The vehicle's own "home" department (vehicle_profiles.department_id — see supabase/applied/add_vehicle_profiles_costumer_and_department_fk.sql), selectable via a <select> filtered to departmentOptions the vehicle is actually assigned to (selectedDepartmentIds) below. Null while still loading. */
   const [homeDepartmentId, setHomeDepartmentId] = useState<string | null>(null);
-  /** The vehicle's own current costumer_id (vehicle_profiles.costumer_id), fetched alongside its other fields — the departments-loading effect and handleSave's own update both key off this, NOT the viewer's own costumer, so a FLEETii admin (no costumer of their own) can still edit a vehicle belonging to any costumer without silently reassigning it. Null while still loading. */
+  /** The vehicle's own current costumer_id (vehicle_profiles.costumer_id), fetched alongside its other fields — the departments-loading effect and handleSave's own update both key off this, NOT the viewer's own costumer, so a sysadm (no costumer of their own) can still edit a vehicle belonging to any costumer without silently reassigning it. Null while still loading. */
   const [vehicleCostumerId, setVehicleCostumerId] = useState<string | null>(null);
   /** Whether this vehicle's own home department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(homeDepartmentId);
@@ -203,9 +203,9 @@ export function HandleVehiclePage() {
     };
   }, [vehicle, vehicleCostumerId]);
 
-  /** Loads 2hire's own board profiles for the picker below — same endpoint/shape as VehicleCreatePage.tsx's own effect, scoped to THIS vehicle's own costumer (vehicleCostumerId) rather than the viewer's, and gated client-side on isFleetiiAdmin since the section is hidden entirely for a regular admin. */
+  /** Loads 2hire's own board profiles for the picker below — same endpoint/shape as VehicleCreatePage.tsx's own effect, scoped to THIS vehicle's own costumer (vehicleCostumerId) rather than the viewer's, and gated client-side on isSysadm since the section is hidden entirely for a regular admin. */
   useEffect(() => {
-    if (!isFleetiiAdmin || !vehicleCostumerId) return;
+    if (!isSysadm || !vehicleCostumerId) return;
 
     let cancelled = false;
     setProfilesLoading(true);
@@ -233,7 +233,7 @@ export function HandleVehiclePage() {
     return () => {
       cancelled = true;
     };
-  }, [isFleetiiAdmin, vehicleCostumerId, session]);
+  }, [isSysadm, vehicleCostumerId, session]);
 
   /** Closes the profile-JSON popup on an outside click — same pattern as VehicleCreatePage.tsx's own. */
   useEffect(() => {
@@ -383,7 +383,7 @@ export function HandleVehiclePage() {
     const trimmedModel = model.trim();
     const trimmedYear = year.trim();
     // Round-trips unchanged for a regular admin (the fields are loaded
-    // regardless of role, just not shown/editable unless isFleetiiAdmin —
+    // regardless of role, just not shown/editable unless isSysadm —
     // see the section near the bottom of the form below), so it's safe to
     // always include these two rather than branching the update payload.
     const trimmedIotId = iotId.trim();
@@ -691,8 +691,8 @@ export function HandleVehiclePage() {
                         </div>
                       </div>
                     </div>
-                    {/* FLEETii-admin-only — 2hire-board device internals, not fleet-management info a regular admin manages. Same box/picker as VehicleCreatePage.tsx's own "Registrér køretøj i 2hire" QR-kode/2hire-profil section (incl. the same QrScanButton and live 2hire-board-profiles fetch), but purely to correct OUR OWN already-stored twohire_profile label — saving via "Gem ændringer" never calls 2hire itself (see vehicle_profiles_add_twohire_profile.sql), it doesn't re-associate anything with 2hire. The "Registrér køretøj i 2hire" button below is a deliberate placeholder, not wired to any action yet — a REAL re-registration would call 2hire's registerVehicle again, which returns a brand-new vehicleId distinct from this vehicle's existing one (vehicle_profiles.vehicle_id IS 2hire's own real vehicleId, used everywhere — bookings, lock/unlock, webhook signals — and must never be regenerated independently of an actual 2hire registration), so what should happen to the vehicle's identity on a real re-registration needs resolving with 2hire first before this can be implemented. */}
-                    {isFleetiiAdmin && (
+                    {/* sysadm-only — 2hire-board device internals, not fleet-management info a regular admin manages. Same box/picker as VehicleCreatePage.tsx's own "Registrér køretøj i 2hire" QR-kode/2hire-profil section (incl. the same QrScanButton and live 2hire-board-profiles fetch), but purely to correct OUR OWN already-stored twohire_profile label — saving via "Gem ændringer" never calls 2hire itself (see vehicle_profiles_add_twohire_profile.sql), it doesn't re-associate anything with 2hire. The "Registrér køretøj i 2hire" button below is a deliberate placeholder, not wired to any action yet — a REAL re-registration would call 2hire's registerVehicle again, which returns a brand-new vehicleId distinct from this vehicle's existing one (vehicle_profiles.vehicle_id IS 2hire's own real vehicleId, used everywhere — bookings, lock/unlock, webhook signals — and must never be regenerated independently of an actual 2hire registration), so what should happen to the vehicle's identity on a real re-registration needs resolving with 2hire first before this can be implemented. */}
+                    {isSysadm && (
                       <div className="rounded-none border border-brand-100 bg-brand-50/40">
                         <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
                           <span className="flex items-center justify-between gap-2 border-r border-brand-100 pr-1">

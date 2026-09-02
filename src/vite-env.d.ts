@@ -7,7 +7,7 @@ interface ImportMetaEnv {
   readonly VITE_BRUGERMANUAL_URL?: string;
   /** AboutPage.tsx's "Administratormanual" button — optional, button omitted when unset. */
   readonly VITE_ADMINMANUAL_URL?: string;
-  /** AboutPage.tsx's "FLEETii-administratormanual" button — optional, button omitted when unset. */
+  /** AboutPage.tsx's "Sysadm-manual" button — optional, button omitted when unset. */
   readonly VITE_FLEETIIMANUAL_URL?: string;
 }
 

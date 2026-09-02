@@ -14,7 +14,7 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { isPasswordRecoveryCallback, supabase } from "../lib/supabase";
 import { fetchSettingText } from "../lib/settings";
-import { isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
+import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 
 /** localStorage key for the idle-timeout tracker below — deliberately plain localStorage regardless of "remember me" (lib/supabase.ts's rememberAwareStorage), since it needs to survive a full browser/VS Code restart to catch "closed overnight" — a non-sensitive timestamp, not the session itself. */
 const LAST_ACTIVITY_KEY = "fleetii_last_activity";
@@ -53,7 +53,7 @@ type ProfileRow = {
   departments: { name: string; costumers: { name: string; deactivated_at: string | null } | null } | null;
 };
 
-/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). For a FLEETii admin, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName is only ever populated on that branch, letting PageHeader.tsx disambiguate same-named departments across different costumers. */
+/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). For a sysadm, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName is only ever populated on that branch, letting PageHeader.tsx disambiguate same-named departments across different costumers. */
 export interface DepartmentOption {
   department_id: string;
   name: string;
@@ -66,7 +66,7 @@ type UserDepartmentRow = {
   departments: { name: string } | null;
 };
 
-/** Raw shape of a departments row as selected by loadAvailableDepartments' FLEETii-admin branch, with its costumer's name embedded via FK. */
+/** Raw shape of a departments row as selected by loadAvailableDepartments' sysadm branch, with its costumer's name embedded via FK. */
 type AllDepartmentsRow = {
   department_id: string;
   name: string;
@@ -88,7 +88,7 @@ interface AuthContextValue {
   costumerId: string | null;
   /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by "Skift afdeling" (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
   availableDepartments: DepartmentOption[];
-  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A FLEETii admin may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (PageHeader.tsx never offers an "Alle" entry to switch to for them). */
+  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A sysadm may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (PageHeader.tsx never offers an "Alle" entry to switch to for them). */
   switchDepartment: (departmentId: string | null) => Promise<string | null>;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
@@ -112,15 +112,15 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
 }
 
-/** Renders a role string as the Danish label shown in page headers ("FLEETii Administrator" / "Administrator" / "Bruger"). Any value other than "admin"/"FLEETii admin" (including null/undefined) is treated as a regular user. */
+/** Renders a role string as the Danish label shown in page headers ("Sysadm" / "Administrator" / "Bruger"). Any value other than "admin"/"sysadm" (including null/undefined) is treated as a regular user. */
 export function formatRoleLabel(role?: string | null): string {
-  if (isFleetiiAdmin(role)) return "FLEETii Administrator";
+  if (isSysadm(role)) return "Sysadm";
   return isDepartmentAdmin(role) ? "Administrator" : "Bruger";
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-/** Standalone (usable outside the provider) check for whether the given user's costumer is currently deactivated — LoginPage.tsx calls this right after signInWithPassword, since waiting on the provider's own async onAuthStateChange-driven profile load would race against LoginPage's post-login navigation. Always returns null for role "FLEETii admin" — costumers_add_deactivated_at.sql deliberately leaves is_fleetii_admin() unaffected by deactivation so a FLEETii admin can keep managing a deactivated costumer's data (to reactivate or purge it); this client-side check must mirror that exemption, or a FLEETii admin account that happens to have a department_id/costumer_id under a deactivated costumer would get locked out entirely. Returns null (and logs) on any Supabase error, treated as "not deactivated" so a transient DB hiccup doesn't block a legitimate login. */
+/** Standalone (usable outside the provider) check for whether the given user's costumer is currently deactivated — LoginPage.tsx calls this right after signInWithPassword, since waiting on the provider's own async onAuthStateChange-driven profile load would race against LoginPage's post-login navigation. Always returns null for role "sysadm" — costumers_add_deactivated_at.sql deliberately leaves is_sysadm() unaffected by deactivation so a sysadm can keep managing a deactivated costumer's data (to reactivate or purge it); this client-side check must mirror that exemption, or a sysadm account that happens to have a department_id/costumer_id under a deactivated costumer would get locked out entirely. Returns null (and logs) on any Supabase error, treated as "not deactivated" so a transient DB hiccup doesn't block a legitimate login. */
 export async function fetchCostumerDeactivatedAt(userId: string): Promise<string | null> {
   const { data, error } = await supabase
     .from("user_profiles")
@@ -131,7 +131,7 @@ export async function fetchCostumerDeactivatedAt(userId: string): Promise<string
     console.error("[AuthContext] fetchCostumerDeactivatedAt failed:", error);
     return null;
   }
-  if (isFleetiiAdmin(data?.role)) return null;
+  if (isSysadm(data?.role)) return null;
   return data?.departments?.costumers?.deactivated_at ?? null;
 }
 
@@ -189,17 +189,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile: profileFields,
       afdeling: departments?.name ?? null,
       costumerName: departments?.costumers?.name ?? null,
-      // "FLEETii admin" is exempt from the deactivation lockout, mirroring
-      // is_fleetii_admin() being left untouched by costumers_add_
+      // "sysadm" is exempt from the deactivation lockout, mirroring
+      // is_sysadm() being left untouched by costumers_add_
       // deactivated_at.sql — see fetchCostumerDeactivatedAt's doc comment
       // for why.
-      costumerDeactivatedAt: isFleetiiAdmin(profileFields.role) ? null : (departments?.costumers?.deactivated_at ?? null),
+      costumerDeactivatedAt: isSysadm(profileFields.role) ? null : (departments?.costumers?.deactivated_at ?? null),
     };
   };
 
-  /** Fetches the departments the given user is allowed to switch into. A FLEETii admin has no personal user_departments grants (platform-wide role, intentionally cleared — see the "let FLEETii admin operate unscoped" work) — for them alone, this returns EVERY department platform-wide instead, each carrying its own costumer's name (PageHeader.tsx shows "Kunde / Afdeling" for these, disambiguating same-named departments across costumers); switching into one of these goes through switch-department.mts rather than the direct update every other role uses (see switchDepartment below), since the column-scoped GRANT backing that direct update can never touch costumer_id. Returns [] (and logs) on any Supabase error, same degrade-gracefully approach as loadProfile. */
+  /** Fetches the departments the given user is allowed to switch into. A sysadm has no personal user_departments grants (platform-wide role, intentionally cleared — see the "let sysadm operate unscoped" work) — for them alone, this returns EVERY department platform-wide instead, each carrying its own costumer's name (PageHeader.tsx shows "Kunde / Afdeling" for these, disambiguating same-named departments across costumers); switching into one of these goes through switch-department.mts rather than the direct update every other role uses (see switchDepartment below), since the column-scoped GRANT backing that direct update can never touch costumer_id. Returns [] (and logs) on any Supabase error, same degrade-gracefully approach as loadProfile. */
   const loadAvailableDepartments = async (userId: string, role: string | null): Promise<DepartmentOption[]> => {
-    if (isFleetiiAdmin(role)) {
+    if (isSysadm(role)) {
       const { data, error } = await supabase
         .from("departments")
         .select("department_id, name, costumers(name)")
@@ -471,16 +471,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   /**
-   * Switches the user's active department. A FLEETii admin goes through
+   * Switches the user's active department. A sysadm goes through
    * switch-department.mts (a service-role-backed Netlify Function) instead
    * of the direct update below — that function also updates costumer_id to
-   * match the target department's own, which a FLEETii admin genuinely
+   * match the target department's own, which a sysadm genuinely
    * needs (they may switch into a department under a completely different
    * costumer) but the direct path below structurally cannot do (its GRANT
    * only ever covers the department_id column — see
    * user_profiles_update_own_department.sql) and which no user_departments
-   * grant exists for anyway (a FLEETii admin's grants are intentionally
-   * empty — see the "let FLEETii admin operate unscoped" work). A FLEETii
+   * grant exists for anyway (a sysadm's grants are intentionally
+   * empty — see the "let sysadm operate unscoped" work). A FLEETii
    * admin may also pass departmentId as null — "Alle" (PageHeader.tsx's own
    * pseudo-entry) — which the function treats as "clear back to unscoped"
    * rather than a specific department; every other role keeps updating
@@ -489,14 +489,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * user_departments grants — see user_profiles_update_own_department.sql
    * — so an already-revoked or foreign department_id is rejected
    * server-side, not just skipped client-side; null is never passed on this
-   * path since PageHeader never offers "Alle" to a non-FLEETii-admin).
+   * path since PageHeader never offers "Alle" to a non-sysadm).
    * Re-loads profile/afdeling/costumerName on success either way, so
    * PageHeader and every afdelingId comparison update immediately.
    */
   const switchDepartment = async (departmentId: string | null): Promise<string | null> => {
     if (!session) return "Ikke logget ind.";
 
-    if (isFleetiiAdmin(profile?.role)) {
+    if (isSysadm(profile?.role)) {
       try {
         const response = await fetch("/.netlify/functions/switch-department", {
           method: "POST",

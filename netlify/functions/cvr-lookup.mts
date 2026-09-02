@@ -3,9 +3,9 @@
 // CostumerNewPage.tsx's "Slå op i CVR-registret" button to auto-fill
 // Navn/Vej og husnr./Postnr. og by from a typed-in CVR number, the same
 // "external lookup fills in the form" shape as motorapi-vehicle-lookup.mts.
-// FLEETii-admin gated, same access level as the rest of CostumerNewPage.tsx
-// (see App.tsx's requireRole="FLEETii admin" on /costumer-new).
-import { requireFleetiiAdmin } from "./_shared/serverAuth.js";
+// sysadm gated, same access level as the rest of CostumerNewPage.tsx
+// (see App.tsx's requireRole="sysadm" on /costumer-new).
+import { requireSysadm } from "./_shared/serverAuth.js";
 import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
 
 const CVRAPI_BASE_URL = "https://cvrapi.dk/api";
@@ -18,7 +18,7 @@ const CVRAPI_BASE_URL = "https://cvrapi.dk/api";
  * than inventing one. */
 const CVRAPI_USER_AGENT = "FLEETii - Kundeoprettelse (https://fleetii.dk)";
 
-/** cvrapi.dk's documented error codes, translated to a Danish message a FLEETii admin can act on — see https://cvrapi.dk/documentation. */
+/** cvrapi.dk's documented error codes, translated to a Danish message a sysadm can act on — see https://cvrapi.dk/documentation. */
 function friendlyCvrApiError(code: string | undefined, message: string | undefined): string {
   switch (code) {
     case "NOT_FOUND":
@@ -46,7 +46,7 @@ type CvrLookupResult = {
 };
 
 /**
- * GET ?cvr=<8-digit CVR number>, as a logged-in FLEETii admin. Returns
+ * GET ?cvr=<8-digit CVR number>, as a logged-in sysadm. Returns
  * { vat, name, address, zipcode, city, cityname } on success (see
  * CvrLookupResult), or { error } with a Danish message on failure.
  */
@@ -55,7 +55,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }

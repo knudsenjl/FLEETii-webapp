@@ -47,7 +47,7 @@ type Booking = {
  * page is the full list reached from there via its "Alle" button, not a
  * replacement for it. AllBookingsPage is the separate admin-only
  * cross-department equivalent (still the original table layout) —
- * admin/FLEETii admin are routed there instead (see ConfirmPage.tsx), never
+ * admin/sysadm are routed there instead (see ConfirmPage.tsx), never
  * here, so this page no longer needs its own admin branch.
  */
 export function BookingsPage() {

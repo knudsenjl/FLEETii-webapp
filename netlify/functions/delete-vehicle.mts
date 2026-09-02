@@ -1,10 +1,10 @@
 // Netlify Function: the real, terminal step of "Slet køretøj" — FLEETii-
-// internal only (see requireFleetiiAdmin below), reached from
+// internal only (see requireSysadm below), reached from
 // VehicleDeletePage.tsx once staff have confirmed the physical 2hire device
 // has been removed (costumer_orders.device_removed on the "Nedlæg" order —
 // see costumer_orders_merge_deletion_requests.sql). Re-verifies that
 // server-side (order_type === "Nedlæg", vehicle_id === the target vehicle,
-// device_removed === true) before touching anything — requireFleetiiAdmin()
+// device_removed === true) before touching anything — requireSysadm()
 // alone only proves a trusted caller, not that THIS orderId actually names a
 // confirmed deletion request for THIS vehicle, and the client-supplied
 // orderId/vehicleId pairing was otherwise never cross-checked. Best-effort
@@ -17,19 +17,19 @@
 // Per the "per-costumer 2hire credentials" plan: deregisterVehicle needs the
 // TARGET vehicle's own credential (its costumer's sub-account, not
 // necessarily the global one) even though this route is itself
-// FLEETii-admin-gated — resolveTwoHireCredentials always resolves the
-// caller's role fresh rather than assuming "FLEETii-admin route therefore
+// sysadm-gated — resolveTwoHireCredentials always resolves the
+// caller's role fresh rather than assuming "sysadm route therefore
 // always global", so the logic stays correct if this route's access ever
 // widens.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
 import { deregisterVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
 type DeleteVehicleBody = { vehicleId?: string; orderId?: string };
 
 /**
- * POST { vehicleId, orderId } as a FLEETii admin. Best-effort deregisters
+ * POST { vehicleId, orderId } as a sysadm. Best-effort deregisters
  * vehicleId from 2hire (most vehicles were never actually registered there,
  * so a failure here is expected, not fatal), calls delete_vehicle(vehicleId)
  * to actually remove the vehicle_departments/vehicle_signals/vehicle_profiles
@@ -45,7 +45,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
@@ -119,9 +119,9 @@ export default async (req: Request) => {
     if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
     if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
+    const isSysadm = isSysadmRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, {
-      isFleetiiAdmin,
+      isSysadm,
       costumerId: vehicle?.costumer_id ?? null,
     });
 

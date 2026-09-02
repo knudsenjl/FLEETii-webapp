@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isAnyAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -57,9 +57,9 @@ type VehicleProfilePlateRow = {
   drivmiddel: string | null;
   parking: string | null;
   blocked_at: string | null;
-  /** The 2hire-board device's own identifier (its QR code, as scanned at registration — see 2hire-register-vehicle.mts) — shown in the "QR-kode:" row below, FLEETii-admin only. */
+  /** The 2hire-board device's own identifier (its QR code, as scanned at registration — see 2hire-register-vehicle.mts) — shown in the "QR-kode:" row below, sysadm only. */
   iot_id: string | null;
-  /** The human-readable label of the 2hire vehicle-configuration profile picked at registration (see vehicle_profiles_add_twohire_profile.sql) — shown in the "2hire-profil:" row below, FLEETii-admin only. */
+  /** The human-readable label of the 2hire vehicle-configuration profile picked at registration (see vehicle_profiles_add_twohire_profile.sql) — shown in the "2hire-profil:" row below, sysadm only. */
   twohire_profile: string | null;
 };
 
@@ -92,13 +92,13 @@ export function VehicleDetailsPage() {
   const location = useLocation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
   const { profile, session } = useAuth();
-  // "admin OR FLEETii admin" — same superset convention as ProtectedRoute's
+  // "admin OR sysadm" — same superset convention as ProtectedRoute's
   // own requireAdmin (App.tsx) and the server-side requireAdmin() helper;
   // this page has no requireAdmin route gate of its own (see doc comment
   // above), so it has to make this check itself.
   const isAdmin = isAnyAdmin(profile?.role);
   /** Stricter than isAdmin — gates the "QR-kode:"/"2hire-profil:" rows below, which a regular admin has no reason to see (2hire-board device internals, not fleet-management info). */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  const isSysadm = isSysadmRole(profile?.role);
   const state = location.state as { vehicle?: Vehicle; booking?: RouterBooking } | null;
   const stateVehicle = state?.vehicle ?? null;
   const booking = state?.booking ?? null;
@@ -154,9 +154,9 @@ export function VehicleDetailsPage() {
   const [parking, setParking] = useState<string | null>(null);
   /** vehicle_profiles.blocked_at — fetched alongside numberPlate below, non-null once "Bloker køretøj" has been used (see handleBlockVehicle). Drives the "Blokeret" badge next to the "Køretøj:" row. */
   const [blockedAt, setBlockedAt] = useState<string | null>(null);
-  /** vehicle_profiles.iot_id — fetched alongside numberPlate below, shown in the FLEETii-admin-only "QR-kode:" row. */
+  /** vehicle_profiles.iot_id — fetched alongside numberPlate below, shown in the sysadm-only "QR-kode:" row. */
   const [iotId, setIotId] = useState<string | null>(null);
-  /** vehicle_profiles.twohire_profile — fetched alongside numberPlate below, shown in the FLEETii-admin-only "2hire-profil:" row. */
+  /** vehicle_profiles.twohire_profile — fetched alongside numberPlate below, shown in the sysadm-only "2hire-profil:" row. */
   const [twohireProfile, setTwohireProfile] = useState<string | null>(null);
   /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. */
   const { address, addressLoading } = useReverseGeocode(position, isAdmin);
@@ -490,7 +490,7 @@ export function VehicleDetailsPage() {
                       {vehicle.version ? `${vehicle.vehicle} - årgang: ${vehicle.version}` : vehicle.vehicle}
                     </span>
                   </div>
-                  {/* Kilometerstand and Status are only shown to admin/FLEETii admin — same gating as BookingDetailsPage.tsx's identical rows. */}
+                  {/* Kilometerstand and Status are only shown to admin/sysadm — same gating as BookingDetailsPage.tsx's identical rows. */}
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
@@ -578,8 +578,8 @@ export function VehicleDetailsPage() {
                       </div>
                     </>
                   )}
-                  {/* FLEETii-admin-only — 2hire-board device internals, not fleet-management info a regular admin has any reason to see. See vehicle_profiles_add_twohire_profile.sql / 2hire-register-vehicle.mts for where these two are set. */}
-                  {isFleetiiAdmin && (
+                  {/* sysadm-only — 2hire-board device internals, not fleet-management info a regular admin has any reason to see. See vehicle_profiles_add_twohire_profile.sql / 2hire-register-vehicle.mts for where these two are set. */}
+                  {isSysadm && (
                     <>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">QR-kode:</label>

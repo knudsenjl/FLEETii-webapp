@@ -29,7 +29,7 @@ type Costumer = {
   has_twohire_credentials: boolean | null;
 };
 
-/** FLEETii admin's costumer list. Reachable only by role "FLEETii admin" (see ProtectedRoute requireRole="FLEETii admin" in App.tsx) — plain "admin" does not get in. */
+/** sysadm's costumer list. Reachable only by role "sysadm" (see ProtectedRoute requireRole="sysadm" in App.tsx) — plain "admin" does not get in. */
 export function CostumerAdministrationPage() {
   const navigate = useNavigate();
 
@@ -82,7 +82,7 @@ export function CostumerAdministrationPage() {
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
 
-            {/* TEMP: CarGlyph evaluation preview — remove before shipping. FLEETii-admin-only page, purely to judge the shape at intended sizes/colors before wiring it into a real table. */}
+            {/* TEMP: CarGlyph evaluation preview — remove before shipping. sysadm-only page, purely to judge the shape at intended sizes/colors before wiring it into a real table. */}
             <div className="flex flex-wrap items-center gap-6 rounded-lg border border-dashed border-brand-300 bg-brand-50/60 p-3">
               <span className="text-[0.7rem] font-medium text-brand-500">CarGlyph-evaluering:</span>
               <CarGlyph className="h-4 w-6 text-brand-800" title="Køretøj i bevægelse" />

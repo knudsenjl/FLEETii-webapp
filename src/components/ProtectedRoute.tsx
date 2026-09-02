@@ -1,10 +1,10 @@
 // Route guard used in App.tsx's route table: gates every non-public route
 // behind "must be logged in", "must have set a real password" (not still on
 // the shared default from create-user.mts), and, for admin-only routes,
-// "must have role admin or FLEETii admin" (requireAdmin) or, for a route
+// "must have role admin or sysadm" (requireAdmin) or, for a route
 // restricted to one exact role (the three per-role settings pages, the
-// FLEETii-admin dashboard), "must have exactly this role" (requireRole —
-// unlike requireAdmin, "FLEETii admin" does NOT satisfy requireRole="admin",
+// sysadm dashboard), "must have exactly this role" (requireRole —
+// unlike requireAdmin, "sysadm" does NOT satisfy requireRole="admin",
 // and vice versa). This is the app's client-side authorization boundary —
 // the corresponding server-side boundary is Supabase RLS
 // (supabase/rls_policies.sql) plus the requireAdmin() check in
@@ -17,7 +17,7 @@ import { isAnyAdmin } from "../lib/roles";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { Modal } from "./Modal";
 
-/** Shown when a user's role doesn't satisfy a route's requireAdmin/requireRole check. Auto-redirects to "/" after 5 seconds. Deliberately role-agnostic wording — this guards routes restricted to admins, to "FLEETii admin" exactly, and (for the per-role settings pages) to "user" exactly, so it can't claim the page is "for administrators" when that isn't always true. */
+/** Shown when a user's role doesn't satisfy a route's requireAdmin/requireRole check. Auto-redirects to "/" after 5 seconds. Deliberately role-agnostic wording — this guards routes restricted to admins, to "sysadm" exactly, and (for the per-role settings pages) to "user" exactly, so it can't claim the page is "for administrators" when that isn't always true. */
 function ForbiddenNotice() {
   const navigate = useNavigate();
 
@@ -42,10 +42,10 @@ function ForbiddenNotice() {
  * link (isPasswordRecovery — see AuthContext.tsx) to "/set-password" (before
  * anything else, including admin routes), shows ForbiddenNotice if
  * `requireAdmin` is set and the user's profile role isn't "admin" or
- * "FLEETii admin" (the latter is a superset of "admin" — see App.tsx's
+ * "sysadm" (the latter is a superset of "admin" — see App.tsx's
  * RootRoute) — or if `requireRole` is set and the role isn't exactly that
  * value (unlike requireAdmin, no superset here — e.g. requireRole="admin"
- * rejects "FLEETii admin" too) — and otherwise renders `children` normally.
+ * rejects "sysadm" too) — and otherwise renders `children` normally.
  */
 export function ProtectedRoute({
   children,

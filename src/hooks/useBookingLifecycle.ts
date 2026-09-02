@@ -55,7 +55,7 @@ export type VehicleIdentInfo = {
 export function useBookingLifecycle(
   booking: LifecycleBooking | null,
   opts: {
-    /** Passed straight through to useVehicleLockState — true unlocks both Lås/Lås op buttons regardless of the booking's own window (admin/FLEETii admin on BookingDetailsPage); always false on BookingPage (role "user" only, no admin override to make there). */
+    /** Passed straight through to useVehicleLockState — true unlocks both Lås/Lås op buttons regardless of the booking's own window (admin/sysadm on BookingDetailsPage); always false on BookingPage (role "user" only, no admin override to make there). */
     isAdminLock: boolean;
     /** Whether to use userAnsatId(booking) instead of booking.userEmail as goToEditBooking's userLabel prefill — see useIdentSettings' own doc comment. */
     useUserIdent: boolean;

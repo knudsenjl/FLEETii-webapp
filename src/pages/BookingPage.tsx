@@ -58,7 +58,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * Periode/Anvendelse are compact chips below, then the map, then
  * Afslut/Rediger/Slet as plain ghost links rather than full buttons — this
  * page's information hierarchy deliberately differs from
- * BookingDetailsPage.tsx (admin/FLEETii admin's equivalent view of a single
+ * BookingDetailsPage.tsx (admin/sysadm's equivalent view of a single
  * booking, still the original table layout), not an oversight to reconcile
  * — the two DO share their underlying actions/handlers, via
  * useBookingLifecycle.

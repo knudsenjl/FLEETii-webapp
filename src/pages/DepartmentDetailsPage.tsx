@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -57,7 +57,7 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
 /**
  * "Afdelinger hos {costumer}" page ("/department-details") — reachable by
  * any admin (see ProtectedRoute requireAdmin in App.tsx: "admin" and
- * "FLEETii admin" both reach this page now), from CostumerDetailsPage's
+ * "sysadm" both reach this page now), from CostumerDetailsPage's
  * "Administration af afdelinger" button, AdminFrontpage's own AFDELINGER
  * button, or KØRETØJER/BRUGERE's own fallback when the target costumer has
  * more than one department to pick from (costumerId/costumerName passed via
@@ -78,14 +78,14 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
  * edit icon (right-aligned) is clicked, which turns just that row's two
  * fields into inputs and swaps the icon to a save icon — clicking THAT
  * writes the row's name/address straight to the DB
- * (departments_update_policy_allow_admin_own_costumer.sql — FLEETii admin:
+ * (departments_update_policy_allow_admin_own_costumer.sql — sysadm:
  * any costumer, admin: their own costumer_id only) and flips the row back to
  * plain text. Only one row is ever mid-edit at a time. Both roles get this
- * view/rename capability — create/delete stays FLEETii-admin-only below
+ * view/rename capability — create/delete stays sysadm-only below
  * (gated on profile.role, not the route itself, since a regular admin still
  * needs the same route for renaming their own costumer's departments), same
  * boundary the old two-page split enforced via DepartmentDetailsPage's own
- * FLEETii-admin-only route gate.
+ * sysadm-only route gate.
  *
  * Clicking anywhere else on a row (not the icon) selects it
  * (selectedDepartmentId) — besides gating "Slet afdeling" below, this also
@@ -103,7 +103,7 @@ export function DepartmentDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { profile } = useAuth();
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  const isSysadm = isSysadmRole(profile?.role);
   const state = location.state as { costumerId?: string; costumerName?: string } | null;
   const costumerId = state?.costumerId ?? null;
   const costumerName = state?.costumerName ?? null;
@@ -483,8 +483,8 @@ export function DepartmentDetailsPage() {
 
             {rowUpdateError && <p className="text-sm text-red-600">{rowUpdateError}</p>}
 
-            {/* Create/delete stays FLEETii-admin-only — same boundary the old two-page split enforced via this page's own former FLEETii-admin-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). Moved directly under the table (rather than after the KØRETØJER/BRUGERE/Flådestyring grid) at the user's request 2026-08-28, so creating/deleting departments doesn't require scrolling past the quick-nav grid first — no divider directly above it any more (it now sits right under the table), its own former leading divider moved below it instead, see the grid section's own comment below. */}
-            {isFleetiiAdmin && (
+            {/* Create/delete stays sysadm-only — same boundary the old two-page split enforced via this page's own former sysadm-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). Moved directly under the table (rather than after the KØRETØJER/BRUGERE/Flådestyring grid) at the user's request 2026-08-28, so creating/deleting departments doesn't require scrolling past the quick-nav grid first — no divider directly above it any more (it now sits right under the table), its own former leading divider moved below it instead, see the grid section's own comment below. */}
+            {isSysadm && (
               <>
                 {isAddingDepartment && (
                   <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
@@ -545,8 +545,8 @@ export function DepartmentDetailsPage() {
 
             {!departmentsLoading && !departmentsError && departments.length > 0 && (
               <>
-                {/* Only shown when the Opret/Slet afdeling block above actually rendered (isFleetiiAdmin) — separates that block from Flådestyring below; a regular admin never sees that block, so no divider is needed here for them either. */}
-                {isFleetiiAdmin && <hr className="border-brand-200" />}
+                {/* Only shown when the Opret/Slet afdeling block above actually rendered (isSysadm) — separates that block from Flådestyring below; a regular admin never sees that block, so no divider is needed here for them either. */}
+                {isSysadm && <hr className="border-brand-200" />}
 
                 <button
                   type="button"

@@ -1,7 +1,7 @@
 // Netlify Function: reverses delete-user.mts — lifts the Auth ban (so the
 // user can log in again) and clears `user_profiles.deleted_at`. Mirrors
 // delete-user.mts's own auth/scope checks exactly (requireAdmin, caller/
-// target department match with the FLEETii-admin bypass), since the same
+// target department match with the sysadm bypass), since the same
 // question — "is this caller allowed to manage this particular user?" —
 // applies in both directions. No "last remaining admin" check here, unlike
 // delete-user.mts: restoring access can only ever ADD admin coverage back to
@@ -14,7 +14,7 @@
 // costumers_add_deactivated_at.sql) — a costumer's deactivated_at is just a
 // row flag, nothing in auth.users to touch.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type UnblockUserBody = { userId?: string };
 
@@ -63,19 +63,19 @@ export default async (req: Request) => {
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
   }
-  const callerIsFleetiiAdmin = isFleetiiAdminRole(caller?.role);
-  // A regular admin must never be able to act on a FLEETii admin's account
+  const callerIsSysadm = isSysadmRole(caller?.role);
+  // A regular admin must never be able to act on a sysadm's account
   // — same reasoning as delete-user.mts (this endpoint's exact reverse):
   // department_id can temporarily coincide with a regular admin's own while
-  // that FLEETii admin has switched into their department via
+  // that sysadm has switched into their department via
   // switch-department.mts, which would otherwise let the department-match
   // check below pass. Checked before any mutation.
-  if (!callerIsFleetiiAdmin && isFleetiiAdminRole(target.role)) {
-    return new Response(JSON.stringify({ error: "Du kan ikke genetablere en FLEETii-administrator." }), { status: 403 });
+  if (!callerIsSysadm && isSysadmRole(target.role)) {
+    return new Response(JSON.stringify({ error: "Du kan ikke genetablere en sysadm." }), { status: 403 });
   }
-  // A FLEETii admin isn't scoped to one department — same platform-wide
+  // A sysadm isn't scoped to one department — same platform-wide
   // exception as delete-user.mts.
-  if (!caller || (!callerIsFleetiiAdmin && caller.department_id !== target.department_id)) {
+  if (!caller || (!callerIsSysadm && caller.department_id !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun genetablere brugere i din egen afdeling." }), {
       status: 403,
     });

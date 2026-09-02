@@ -1,10 +1,10 @@
 // The PERSONAL settings page ("/settings-user" — reached via the round
 // settings button in PageHeader.tsx; open to every role, not just "user" —
-// an admin/FLEETii admin has their own personal overrides (e.g. their own
+// an admin/sysadm has their own personal overrides (e.g. their own
 // "Login timeout") too, and previously had no way to reach this page at all
 // (ProtectedRoute required role==="user" exactly). For role "user" the
 // settings button navigates straight here (their only settings page); for
-// admin/FLEETii admin it opens a small menu offering this page ALONGSIDE
+// admin/sysadm it opens a small menu offering this page ALONGSIDE
 // their department/FLEETii-wide settings page (SettingsAdminPage.tsx/
 // SettingsSuperadminPage.tsx). Everything lives in ONE "Indstillinger" table
 // now (per user request, merged from what used to be 3 separate

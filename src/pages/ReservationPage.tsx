@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isAnyAdmin, isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
@@ -118,7 +118,7 @@ function ceilToInterval(date: Date, intervalMinutes: number): Date {
  * reachable for reselection) and "Fortryd" (abandons the edit, no DB
  * changes, back to the booking's detail page).
  *
- * For a FLEETii admin (no department of their own — see isFleetiiAdmin), an
+ * For a sysadm (no department of their own — see isSysadm), an
  * extra required "Kunde/afdeling" row comes first, letting them pick which
  * department platform-wide this booking belongs to — every department,
  * shown as "Kunde / Afdeling" (departmentOptions), same convention as
@@ -145,8 +145,8 @@ export function ReservationPage() {
   /** Present only when this page was reached via a browser back-navigation from AvailablePage — see ReservationFormSnapshot's own doc comment. Wins over every other default below, but never over editing's OWN fields where a snapshot field is itself blank (e.g. anvendelseCustom empty) — see each initializer. */
   const formSnapshot = (location.state as { formSnapshot?: ReservationFormSnapshot } | null)?.formSnapshot ?? null;
   const isAdmin = isAnyAdmin(profile?.role);
-  /** A FLEETii admin has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  /** A sysadm has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
+  const isSysadm = isSysadmRole(profile?.role);
   /** Pre-fills to the booking being edited's own current department (see EditingBooking's departmentId) — otherwise unset, requiring an explicit pick, same as bruger's own editing?.userId prefill just below. */
   const [selectedDepartmentId, setSelectedDepartmentId] = useState(
     formSnapshot?.selectedDepartmentId ?? editing?.departmentId ?? "",
@@ -196,9 +196,9 @@ export function ReservationPage() {
       });
   }, [afdelingId]);
 
-  /** Loads EVERY department platform-wide, each carrying its own costumer's name, for the "Kunde/afdeling" row's select — FLEETii-admin only, same query/shape as AuthContext's loadAvailableDepartments/ConfirmPage's own former version of this effect (departments' and costumers' SELECT RLS are both unrestricted for any authenticated user). */
+  /** Loads EVERY department platform-wide, each carrying its own costumer's name, for the "Kunde/afdeling" row's select — sysadm only, same query/shape as AuthContext's loadAvailableDepartments/ConfirmPage's own former version of this effect (departments' and costumers' SELECT RLS are both unrestricted for any authenticated user). */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (!isSysadm) return;
 
     let cancelled = false;
     void supabase
@@ -220,9 +220,9 @@ export function ReservationPage() {
     return () => {
       cancelled = true;
     };
-  }, [isFleetiiAdmin]);
+  }, [isSysadm]);
 
-  /** Loads the "Anvendelse" dropdown's options as the union of the user's own department's list (department_settings) and their personal extra options (user_settings) — see fetchSettingUnion. ANDET_VALUE is guaranteed present here even if it's missing from BOTH fetched rows (a department created before backfill_and_seed_default_anvendelse.sql, or afdelingId === null — a FLEETii admin sitting on "Alle", see the "let FLEETii admin operate unscoped" work — never resolves a department_settings row to seed it from at all) — the option to type a free-text reason must always exist, not just whenever the DB happens to have been seeded. Always sorted to the end, regardless of where it sits (or whether it was just appended). */
+  /** Loads the "Anvendelse" dropdown's options as the union of the user's own department's list (department_settings) and their personal extra options (user_settings) — see fetchSettingUnion. ANDET_VALUE is guaranteed present here even if it's missing from BOTH fetched rows (a department created before backfill_and_seed_default_anvendelse.sql, or afdelingId === null — a sysadm sitting on "Alle", see the "let sysadm operate unscoped" work — never resolves a department_settings row to seed it from at all) — the option to type a free-text reason must always exist, not just whenever the DB happens to have been seeded. Always sorted to the end, regardless of where it sits (or whether it was just appended). */
   useEffect(() => {
     void fetchSettingUnion("Anvendelse", profile?.user_id, afdelingId)
       .then((values) => (values.includes(ANDET_VALUE) ? values : [...values, ANDET_VALUE]))
@@ -272,7 +272,7 @@ export function ReservationPage() {
     }
   }, [editing, anvendelseOptions]);
 
-  // A FLEETii admin has no department of their own, so "Bruger" is scoped to
+  // A sysadm has no department of their own, so "Bruger" is scoped to
   // whichever department they picked in "Kunde/afdeling" instead of
   // afdelingId — empty (and the Bruger select disabled, see above) until
   // one is chosen, never "every user platform-wide": picking a department
@@ -287,7 +287,7 @@ export function ReservationPage() {
   // afdelingId. Their own row is always RLS-visible regardless (see
   // user_profiles_select_own), so `users` already has it — just add it
   // back in here instead of letting the department filter drop it.
-  const departmentUsers = isFleetiiAdmin
+  const departmentUsers = isSysadm
     ? users.filter((u) => u.department_id === selectedDepartmentId)
     : users.filter((u) => u.department_id === afdelingId || u.user_id === session?.user.id);
 
@@ -523,8 +523,8 @@ export function ReservationPage() {
     return { start, end, brugerLabel };
   };
 
-  /** Display-ready "Kunde/afdeling" label matching the resolved departmentId below — the picked department's own "Kunde / Afdeling" for a FLEETii admin, or the viewer's own afdeling (with costumerName, when set) for every other role. Same "Kunde / Afdeling" (space-slash-space) format as PageHeader's "Skift afdeling" dropdown and this page's own Kunde/afdeling select just below — not PageHeader's OTHER, no-space "Afdeling:" summary line convention. Resolved here (not re-fetched on ConfirmPage) same as brugerLabel above — passed through router state all the way to ConfirmPage, which shows it as a final, read-only "security check" row before the booking is actually written. */
-  const departmentLabel = isFleetiiAdmin
+  /** Display-ready "Kunde/afdeling" label matching the resolved departmentId below — the picked department's own "Kunde / Afdeling" for a sysadm, or the viewer's own afdeling (with costumerName, when set) for every other role. Same "Kunde / Afdeling" (space-slash-space) format as PageHeader's "Skift afdeling" dropdown and this page's own Kunde/afdeling select just below — not PageHeader's OTHER, no-space "Afdeling:" summary line convention. Resolved here (not re-fetched on ConfirmPage) same as brugerLabel above — passed through router state all the way to ConfirmPage, which shows it as a final, read-only "security check" row before the booking is actually written. */
+  const departmentLabel = isSysadm
     ? (() => {
         const selected = departmentOptions.find((d) => d.department_id === selectedDepartmentId);
         return selected ? (selected.costumerName ? `${selected.costumerName} / ${selected.name}` : selected.name) : "";
@@ -533,7 +533,7 @@ export function ReservationPage() {
       ? `${costumerName} / ${afdeling ?? ""}`
       : (afdeling ?? "");
 
-  /** Not editing: the plain "Find ledigt køretøj" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. departmentId is the RESOLVED target department — the "Kunde/afdeling" pick for a FLEETii admin (validated below, required), or just afdelingId unchanged for every other role — carried all the way through AvailablePage (which scopes its own vehicle list to it) to ConfirmPage (which writes it as the booking's department_id). departmentLabel is its display-ready counterpart, for ConfirmPage's read-only summary row. */
+  /** Not editing: the plain "Find ledigt køretøj" flow. When editing, "Skift køretøj" reuses this same helper — the only difference is which fields (editingBookingId/editingVehicleId) get carried along, so AvailablePage can exclude this booking's own slot from the conflict check and let its current vehicle bypass the department filter. Nothing is deleted here — the row is only ever changed by ConfirmPage's own update on confirm. departmentId is the RESOLVED target department — the "Kunde/afdeling" pick for a sysadm (validated below, required), or just afdelingId unchanged for every other role — carried all the way through AvailablePage (which scopes its own vehicle list to it) to ConfirmPage (which writes it as the booking's department_id). departmentLabel is its display-ready counterpart, for ConfirmPage's read-only summary row. */
   const handleFindAvailable = () => {
     const { start, end, brugerLabel } = currentPeriod();
 
@@ -569,7 +569,7 @@ export function ReservationPage() {
         end,
         editingBookingId: editing?.bookingId,
         editingVehicleId: editing?.vehicleId,
-        departmentId: isFleetiiAdmin ? selectedDepartmentId || null : afdelingId,
+        departmentId: isSysadm ? selectedDepartmentId || null : afdelingId,
         departmentLabel,
       },
     });
@@ -606,8 +606,8 @@ export function ReservationPage() {
               {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
               <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  {isFleetiiAdmin && (
-                    // FLEETii-admin-only — a FLEETii admin has no department
+                  {isSysadm && (
+                    // sysadm-only — a sysadm has no department
                     // of their own, so this booking's target department must
                     // be picked explicitly before AvailablePage can even show
                     // a scoped vehicle list.
@@ -646,10 +646,10 @@ export function ReservationPage() {
                       <select
                         value={bruger}
                         onChange={(e) => setBruger(e.target.value)}
-                        disabled={isFleetiiAdmin && !selectedDepartmentId}
+                        disabled={isSysadm && !selectedDepartmentId}
                         className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 disabled:cursor-not-allowed disabled:bg-brand-100"
                       >
-                        <option value="">{isFleetiiAdmin && !selectedDepartmentId ? "Vælg kunde/afdeling først" : "Vælg bruger"}</option>
+                        <option value="">{isSysadm && !selectedDepartmentId ? "Vælg kunde/afdeling først" : "Vælg bruger"}</option>
                         {departmentUsers.map((u) => (
                           <option key={u.user_id} value={u.user_id}>
                             {useUserIdent ? u.user_ident || u.email : u.email}
@@ -678,7 +678,7 @@ export function ReservationPage() {
                       <label className="flex items-center text-sm font-medium text-brand-700">
                         Anvendelse <span className="ml-0.5 text-red-600">*</span>
                       </label>
-                      {/* text-[16px], not text-sm — every role (incl. plain "user" on a phone) reaches this field, so it needs the same iOS-zoom-on-focus protection as LoginPage.tsx's own inputs (see its comment) — unlike the FLEETii-admin-only Kunde/afdeling and admin-only Bruger <select>s above, which stay text-sm since a Bruger never focuses those. */}
+                      {/* text-[16px], not text-sm — every role (incl. plain "user" on a phone) reaches this field, so it needs the same iOS-zoom-on-focus protection as LoginPage.tsx's own inputs (see its comment) — unlike the sysadm-only Kunde/afdeling and admin-only Bruger <select>s above, which stay text-sm since a Bruger never focuses those. */}
                       <select
                         required
                         aria-required="true"
@@ -807,7 +807,7 @@ export function ReservationPage() {
                   <button
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
+                    disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
                     className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Bekræft/skift køretøj
@@ -825,7 +825,7 @@ export function ReservationPage() {
                   <button
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={!bruger || !anvendelse.trim() || (isFleetiiAdmin && !selectedDepartmentId)}
+                    disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
                     className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Find ledigt køretøj

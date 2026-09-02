@@ -6,12 +6,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
-import { isAnyAdmin, isDepartmentAdmin, isFleetiiAdmin } from "../lib/roles";
+import { isAnyAdmin, isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
 
-/** One entry in the settings button's dropdown menu (admin/FLEETii admin only — see settingsMenuItemsForRole). */
+/** One entry in the settings button's dropdown menu (admin/sysadm only — see settingsMenuItemsForRole). */
 type SettingsMenuItem = { label: string; path: string };
 
 /** Marks the currently-active entry in the "Skift afdeling" dropdown below. */
@@ -25,16 +25,16 @@ function DepartmentCheckmark() {
 
 /**
  * The settings destination(s) for a given `user_profiles.role`. A plain
- * "user" (any non-"admin"/"FLEETii admin" role, including null/undefined,
+ * "user" (any non-"admin"/"sysadm" role, including null/undefined,
  * matching formatRoleLabel's convention) has only one settings page
  * (personal), so the settings button navigates straight there — no menu.
- * "admin"/"FLEETii admin" have TWO: their own personal settings (previously
+ * "admin"/"sysadm" have TWO: their own personal settings (previously
  * unreachable at all — "/settings-user" required role==="user" exactly,
  * see App.tsx) alongside their department/FLEETii-wide settings page —
  * hence a small menu instead of a single destination.
  */
 function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
-  if (isFleetiiAdmin(role)) {
+  if (isSysadm(role)) {
     return [
       { label: "Brugerindstillinger", path: "/settings-user" },
       { label: "FLEETii-indstillinger", path: "/settings-superadmin" },
@@ -52,7 +52,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"FLEETii admin" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a FLEETii admin, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -82,10 +82,10 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
-  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a FLEETii admin (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. */
-  const canSwitchToAll = isFleetiiAdmin(profile?.role);
+  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a sysadm (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. */
+  const canSwitchToAll = isSysadm(profile?.role);
 
-  /** departmentId null means "Alle" (see canSwitchToAll/AuthContext's switchDepartment) — the FLEETii admin's own default, unscoped state. */
+  /** departmentId null means "Alle" (see canSwitchToAll/AuthContext's switchDepartment) — the sysadm's own default, unscoped state. */
   const handleSwitch = async (departmentId: string | null) => {
     setSwitcherOpen(false);
     const error = await switchDepartment(departmentId);
@@ -95,7 +95,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
     }
   };
 
-  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above — and admin/FLEETii-admin only, both re-checked server-side) to populate departments with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. A regular admin only seeds departments under their own costumer; a FLEETii admin seeds every costumer's departments — see seed-test-bookings.mts. */
+  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above — and admin/sysadm only, both re-checked server-side) to populate departments with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. A regular admin only seeds departments under their own costumer; a sysadm seeds every costumer's departments — see seed-test-bookings.mts. */
   const handleSeedTestBookings = async () => {
     setSeedingBookings(true);
     try {
@@ -304,8 +304,8 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
             Afdeling: {costumerName ? `${costumerName}/` : ""}
-            {/* afdeling is only ever null for a FLEETii admin sitting on "Alle" (see PageHeader's own "Skift afdeling" pseudo-entry) — every other role always has a real department, so "—" (missing data) never actually applies to them. */}
-            {afdeling ?? (isFleetiiAdmin(profile?.role) ? "Alle" : "—")}
+            {/* afdeling is only ever null for a sysadm sitting on "Alle" (see PageHeader's own "Skift afdeling" pseudo-entry) — every other role always has a real department, so "—" (missing data) never actually applies to them. */}
+            {afdeling ?? (isSysadm(profile?.role) ? "Alle" : "—")}
           </p>
         </div>
       )}

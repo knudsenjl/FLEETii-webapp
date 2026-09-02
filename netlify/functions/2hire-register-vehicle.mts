@@ -18,7 +18,7 @@
 //      model_year/costumer_id/department_id snapshotted from the order,
 //      plus iot_id (the QR code itself) and twohire_profile (the profile's
 //      human-readable label, as picked in the UI — see
-//      vehicle_profiles_add_twohire_profile.sql) — both FLEETii-admin-only
+//      vehicle_profiles_add_twohire_profile.sql) — both sysadm-only
 //      read-only info on VehicleDetailsPage.tsx, editable on
 //      HandleVehiclePage.tsx)
 //   3. vehicle_departments upsert (if the order has a department_id)
@@ -45,10 +45,10 @@
 // Per the "per-costumer 2hire credentials" plan: registerVehicle authenticates
 // with the order's own costumer_id's sub-account credential (resolved fresh
 // via resolveTwoHireCredentials, not hardcoded to global) even though this
-// route is itself FLEETii-admin-gated — see delete-vehicle.mts's identical
+// route is itself sysadm-gated — see delete-vehicle.mts's identical
 // reasoning.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isFleetiiAdminRole, requireFleetiiAdmin } from "./_shared/serverAuth.js";
+import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
 import { registerVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -59,7 +59,7 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
-  const authResult = await requireFleetiiAdmin(req);
+  const authResult = await requireSysadm(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
@@ -188,8 +188,8 @@ export default async (req: Request) => {
         .maybeSingle<{ role: string }>();
       if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-      const isFleetiiAdmin = isFleetiiAdminRole(caller?.role);
-      const credentials = await resolveTwoHireCredentials(admin, { isFleetiiAdmin, costumerId: order.costumer_id });
+      const isSysadm = isSysadmRole(caller?.role);
+      const credentials = await resolveTwoHireCredentials(admin, { isSysadm, costumerId: order.costumer_id });
 
       const result = await registerVehicle({ qrCode, profileId }, credentials);
       vehicleId = result.vehicleId;

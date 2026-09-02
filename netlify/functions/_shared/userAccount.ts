@@ -10,7 +10,7 @@ import { escapeHtml } from "./mailer.js";
 export const ALLOWED_ROLES = ["user", "admin"] as const;
 export type Role = (typeof ALLOWED_ROLES)[number];
 
-/** True if `value` is exactly "user" or "admin" — the only valid `user_profiles.role` values a caller may assign via create-user.mts/bulk-import-users.mts ("FLEETii admin" is never assignable through either). */
+/** True if `value` is exactly "user" or "admin" — the only valid `user_profiles.role` values a caller may assign via create-user.mts/bulk-import-users.mts ("sysadm" is never assignable through either). */
 export function isAllowedRole(value: string): value is Role {
   return (ALLOWED_ROLES as readonly string[]).includes(value);
 }

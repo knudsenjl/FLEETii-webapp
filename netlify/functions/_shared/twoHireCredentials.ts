@@ -7,7 +7,7 @@
 // dependency at all.
 //
 // The rule, in order:
-//   1. A FLEETii-admin-initiated operation — always the global credential,
+//   1. A sysadm-initiated operation — always the global credential,
 //      in EVERY environment, regardless of which costumer's vehicle is
 //      being touched (2hire's own "best practice" pattern: one master
 //      account whose credential can reach every sub-account too).
@@ -35,7 +35,7 @@ function isProductionMode(): boolean {
 /**
  * Resolves the 2hire credential set for one operation. `costumerId` is the
  * TARGET costumer — the one whose vehicle/order/sub-account the operation is
- * actually about, not necessarily the caller's own (a FLEETii admin has
+ * actually about, not necessarily the caller's own (a sysadm has
  * none of their own, and even a regular admin's target costumer should
  * always be resolved from the actual vehicle/order being acted on, not
  * assumed from the caller's profile — see each calling Function's own
@@ -48,9 +48,9 @@ function isProductionMode(): boolean {
  */
 export async function resolveTwoHireCredentials(
   admin: SupabaseClient,
-  opts: { isFleetiiAdmin: boolean; costumerId: string | null },
+  opts: { isSysadm: boolean; costumerId: string | null },
 ): Promise<TwoHireCredentials> {
-  if (opts.isFleetiiAdmin) {
+  if (opts.isSysadm) {
     return getGlobalCredentials();
   }
 

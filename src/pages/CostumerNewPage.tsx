@@ -17,7 +17,7 @@ type NewCostumer = {
 };
 
 /**
- * "/costumer-new" — FLEETii-admin-only (see ProtectedRoute requireRole="FLEETii admin"
+ * "/costumer-new" — sysadm-only (see ProtectedRoute requireRole="sysadm"
  * in App.tsx). Costumer creation is two steps, both handled here, entirely
  * via local component state (deliberately NOT split across a route
  * transition with router-state flags the way an earlier version of this
@@ -32,7 +32,7 @@ type NewCostumer = {
  *
  * If "Fortryd" is chosen during the register step, the just-created row is
  * deleted again (delete-draft-costumer.mts) rather than left behind
- * half-configured. If a FLEETii admin instead navigates away some other way
+ * half-configured. If a sysadm instead navigates away some other way
  * (closes the tab, clicks a different link) mid-registration, the draft
  * costumer survives in the DB and shows up in CostumerAdministrationPage's
  * list with a "Mangler 2hire registrering" badge — reachable and finishable

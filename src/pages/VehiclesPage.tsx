@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { isFleetiiAdmin as isFleetiiAdminRole } from "../lib/roles";
+import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
@@ -37,7 +37,7 @@ type Vehicle = DisplayVehicle;
  * destination for a button whose badge already promised "every vehicle
  * here".
  *
- * ALL-COSTUMERS (FLEETii admin only, no costumerId AND no departmentId —
+ * ALL-COSTUMERS (sysadm only, no costumerId AND no departmentId —
  * FleetManagementPage.tsx's own "Liste af køretøjer" button when its Kunde
  * filter is "Alle"): a variant of UNLOCKED with no costumer to
  * narrow to at all, listing every vehicle platform-wide. Reuses the exact
@@ -49,15 +49,15 @@ type Vehicle = DisplayVehicle;
  * NewVehiclePage.tsx has no equivalent "Alle" fallback of its own — creating
  * a vehicle always needs exactly one costumer to attach it to.
  *
- * Before this mode existed, a FLEETii admin reaching this page with no
+ * Before this mode existed, a sysadm reaching this page with no
  * costumerId (e.g. exactly this route) redirected straight back to "/admin"
  * — confusing, since the button that got them here promised a vehicle list.
  * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
  * a vehicle both live there too), or create a new one via NewVehiclePage.
  *
- * FLEETii-admin-only "Kunde" filter (hidden in LOCKED mode, same as
+ * sysadm-only "Kunde" filter (hidden in LOCKED mode, same as
  * Afdeling — a locked department already implies one exact costumer): lets
- * a FLEETii admin switch which costumer's vehicles are shown without
+ * a sysadm switch which costumer's vehicles are shown without
  * leaving the page, same in-page filter FleetManagementPage.tsx's "Liste af
  * køretøjer" button offers on its own map. Kunde/Afdeling/Køretøj sync to
  * stay mutually consistent exactly like that page's own filters do (picking
@@ -71,26 +71,26 @@ export function VehiclesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
-  /** A FLEETii admin has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
-  const isFleetiiAdmin = isFleetiiAdminRole(profile?.role);
+  /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
+  const isSysadm = isSysadmRole(profile?.role);
 
   const state = location.state as
     | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
     | null;
-  /** FLEETii-admin-only "Kunde" filter ("" = "Alle", every costumer) — same seeding/meaning as FleetManagementPage.tsx's own filterCostumerId, just seeded from router state instead of a saved sessionStorage snapshot. Stays "" (unused) for a regular admin, who is always scoped to their own costumerId below regardless. */
-  const [filterCostumerId, setFilterCostumerId] = useState(isFleetiiAdmin ? (state?.costumerId ?? "") : "");
+  /** sysadm-only "Kunde" filter ("" = "Alle", every costumer) — same seeding/meaning as FleetManagementPage.tsx's own filterCostumerId, just seeded from router state instead of a saved sessionStorage snapshot. Stays "" (unused) for a regular admin, who is always scoped to their own costumerId below regardless. */
+  const [filterCostumerId, setFilterCostumerId] = useState(isSysadm ? (state?.costumerId ?? "") : "");
   const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
-  const targetCostumerId = isFleetiiAdmin ? filterCostumerId || null : costumerId;
-  const targetCostumerName = isFleetiiAdmin
+  const targetCostumerId = isSysadm ? filterCostumerId || null : costumerId;
+  const targetCostumerName = isSysadm
     ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? null)
     : null;
-  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable) or, for a FLEETii admin with no targetCostumerId either, ALL-COSTUMERS. */
+  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable) or, for a sysadm with no targetCostumerId either, ALL-COSTUMERS. */
   const targetDepartmentId = state?.departmentId ?? null;
   const targetDepartmentName = state?.departmentName ?? null;
 
-  /** Loads every costumer for the Kunde filter dropdown — FLEETii admin only, since a regular admin is always scoped to their own single costumer. Same query as FleetManagementPage.tsx's own. */
+  /** Loads every costumer for the Kunde filter dropdown — sysadm only, since a regular admin is always scoped to their own single costumer. Same query as FleetManagementPage.tsx's own. */
   useEffect(() => {
-    if (!isFleetiiAdmin) return;
+    if (!isSysadm) return;
 
     let cancelled = false;
     void supabase
@@ -105,7 +105,7 @@ export function VehiclesPage() {
     return () => {
       cancelled = true;
     };
-  }, [isFleetiiAdmin]);
+  }, [isSysadm]);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   /** UNLOCKED/ALL-COSTUMERS modes only (see this component's own doc comment) — the target costumer's own departments (or, in ALL-COSTUMERS mode, every department platform-wide), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
@@ -122,7 +122,7 @@ export function VehiclesPage() {
   const [filterDepartment, setFilterDepartment] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
   /** Whether Kunde counts as an active/resettable filter — false in LOCKED mode even though filterCostumerId itself is non-empty there (seeded once from the department's own costumer, not user-editable — the Kunde select isn't even rendered, see this component's own doc comment), so the filter badge/reset button don't react to it and "Nulstil filter" doesn't clobber the locked costumer out from under "Opret køretøj"'s disabled check. */
-  const costumerFilterActive = isFleetiiAdmin && !targetDepartmentId && Boolean(filterCostumerId);
+  const costumerFilterActive = isSysadm && !targetDepartmentId && Boolean(filterCostumerId);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -149,9 +149,9 @@ export function VehiclesPage() {
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
-  /** UNLOCKED/ALL-COSTUMERS modes only — loads the target costumer's own departments (or, with no targetCostumerId at all, every department platform-wide — only reachable by a FLEETii admin, see fetchDepartmentOptions' own doc comment), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Skipped entirely in LOCKED mode (targetDepartmentId set), which doesn't need any department list at all, and for a regular admin with no targetCostumerId (can't happen — they always have their own). */
+  /** UNLOCKED/ALL-COSTUMERS modes only — loads the target costumer's own departments (or, with no targetCostumerId at all, every department platform-wide — only reachable by a sysadm, see fetchDepartmentOptions' own doc comment), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Skipped entirely in LOCKED mode (targetDepartmentId set), which doesn't need any department list at all, and for a regular admin with no targetCostumerId (can't happen — they always have their own). */
   useEffect(() => {
-    if (targetDepartmentId || (!targetCostumerId && !isFleetiiAdmin)) {
+    if (targetDepartmentId || (!targetCostumerId && !isSysadm)) {
       setDepartmentOptions([]);
       return;
     }
@@ -164,7 +164,7 @@ export function VehiclesPage() {
     return () => {
       cancelled = true;
     };
-  }, [targetCostumerId, targetDepartmentId, isFleetiiAdmin]);
+  }, [targetCostumerId, targetDepartmentId, isSysadm]);
 
   /** LOCKED mode: scopes vehicles straight to targetDepartmentId's own membership (vehicle_departments, via departmentIds — see liveVehicleDataSource.ts). UNLOCKED mode: every vehicle whose departmentIds intersects ANY of the target costumer's own departments (departmentOptions above) — the whole-costumer set the KØRETØJER button's own count badge already promised, further narrowed by filterDepartment above if picked. */
   useEffect(() => {
@@ -286,7 +286,7 @@ export function VehiclesPage() {
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
                         {/* LOCKED mode (targetDepartmentId set) hides both Kunde and Afdeling entirely — a locked department already implies one exact costumer, nothing to widen back out to from in-page, see this component's own doc comment. */}
-                        {isFleetiiAdmin && !targetDepartmentId && (
+                        {isSysadm && !targetDepartmentId && (
                           <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                             Kunde
                             <select
@@ -323,7 +323,7 @@ export function VehiclesPage() {
                               onChange={(e) => {
                                 const departmentId = e.target.value;
                                 setFilterDepartment(departmentId);
-                                // While Kunde is still "Alle" (isFleetiiAdmin
+                                // While Kunde is still "Alle" (isSysadm
                                 // only — departmentOptions spans every
                                 // costumer in that state), picking one
                                 // specific department left Kunde stuck on
@@ -331,7 +331,7 @@ export function VehiclesPage() {
                                 // department's own costumer instead, same as
                                 // FleetManagementPage.tsx's identical
                                 // onChange.
-                                if (isFleetiiAdmin && !filterCostumerId && departmentId) {
+                                if (isSysadm && !filterCostumerId && departmentId) {
                                   const department = departmentOptions.find((d) => d.department_id === departmentId);
                                   if (department) setFilterCostumerId(department.costumer_id);
                                 }
@@ -368,7 +368,7 @@ export function VehiclesPage() {
                               const departmentId = vehicle?.departmentIds[0];
                               if (!departmentId) return;
                               setFilterDepartment(departmentId);
-                              if (isFleetiiAdmin) {
+                              if (isSysadm) {
                                 const department = departmentOptions.find((d) => d.department_id === departmentId);
                                 if (department) setFilterCostumerId(department.costumer_id);
                               }
@@ -434,7 +434,7 @@ export function VehiclesPage() {
                     {filteredVehicles.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {!targetCostumerId && !isFleetiiAdmin
+                          {!targetCostumerId && !isSysadm
                             ? "Ingen kunde valgt."
                             : filterPlate || filterStatus || filterDepartment
                               ? "Ingen køretøjer matcher filteret."

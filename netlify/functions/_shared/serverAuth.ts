@@ -10,7 +10,7 @@ export type UserCheckResult =
   | { ok: true; userId: string; client: SupabaseClient }
   | { ok: false; status: 401 | 500; error: string };
 
-/** Result of requireAdmin()/requireFleetiiAdmin(): either the verified caller's user id, or an HTTP status + Danish error message ready to return to the client as-is. */
+/** Result of requireAdmin()/requireSysadm(): either the verified caller's user id, or an HTTP status + Danish error message ready to return to the client as-is. */
 export type AdminCheckResult = { ok: true; userId: string } | { ok: false; status: 401 | 403 | 500; error: string };
 
 /**
@@ -47,7 +47,7 @@ export async function requireUser(req: Request): Promise<UserCheckResult> {
   return { ok: true, userId: userData.user.id, client };
 }
 
-/** Verifies the caller (via requireUser()) and additionally that their profile has one of the given roles and isn't archived (deleted_at is null — see supabase/applied/user_profiles_add_deleted_at.sql) — an archived caller's still-valid JWT shouldn't keep passing this check just because the ban hasn't fully propagated yet. Shared by requireAdmin/requireFleetiiAdmin below rather than duplicating the same query per role. */
+/** Verifies the caller (via requireUser()) and additionally that their profile has one of the given roles and isn't archived (deleted_at is null — see supabase/applied/user_profiles_add_deleted_at.sql) — an archived caller's still-valid JWT shouldn't keep passing this check just because the ban hasn't fully propagated yet. Shared by requireAdmin/requireSysadm below rather than duplicating the same query per role. */
 async function requireRole(req: Request, allowedRoles: string[], errorMessage: string): Promise<AdminCheckResult> {
   const userResult = await requireUser(req);
   if (!userResult.ok) {
@@ -68,20 +68,20 @@ async function requireRole(req: Request, allowedRoles: string[], errorMessage: s
   return { ok: true, userId: userResult.userId };
 }
 
-/** Verifies the caller has role "admin" OR "FLEETii admin" (a superset, same as ProtectedRoute.tsx's own client-side requireAdmin — see requireRole). */
+/** Verifies the caller has role "admin" OR "sysadm" (a superset, same as ProtectedRoute.tsx's own client-side requireAdmin — see requireRole). */
 export async function requireAdmin(req: Request): Promise<AdminCheckResult> {
-  return requireRole(req, ["admin", "FLEETii admin"], "Kun administratorer har adgang til denne handling.");
+  return requireRole(req, ["admin", "sysadm"], "Kun administratorer har adgang til denne handling.");
 }
 
-/** Verifies the caller has EXACTLY role "FLEETii admin" (no "admin" superset, unlike requireAdmin — see requireRole) — used by the costumer lifecycle functions (delete-costumer.mts), which only a FLEETii admin, not a regular department admin, may invoke. */
-export async function requireFleetiiAdmin(req: Request): Promise<AdminCheckResult> {
-  return requireRole(req, ["FLEETii admin"], "Kun FLEETii-administratorer har adgang til denne handling.");
+/** Verifies the caller has EXACTLY role "sysadm" (no "admin" superset, unlike requireAdmin — see requireRole) — used by the costumer lifecycle functions (delete-costumer.mts), which only a sysadm, not a regular department admin, may invoke. */
+export async function requireSysadm(req: Request): Promise<AdminCheckResult> {
+  return requireRole(req, ["sysadm"], "Kun sysadm har adgang til denne handling.");
 }
 
 /**
  * Shared `user_profiles.role` checks for a role value already fetched from
  * the DB (a `caller`/`target`'s own row) — distinct from requireAdmin/
- * requireFleetiiAdmin above, which authenticate the CALLER via their bearer
+ * requireSysadm above, which authenticate the CALLER via their bearer
  * token; these just answer "is this specific role value X?" for whichever
  * profile a function has already looked up (e.g. deciding costumer/
  * department scoping once the caller is known to be *some* kind of admin).
@@ -89,13 +89,14 @@ export async function requireFleetiiAdmin(req: Request): Promise<AdminCheckResul
  * comparison at its own call site (delete-user.mts/update-user.mts/
  * create-user.mts/bulk-import-*.mts and the 2hire-*.mts functions) —
  * centralizing here, same as src/lib/roles.ts on the client side, avoids the
- * literal drifting out of sync in one call site.
+ * literal drifting out of sync in one call site. (Renamed from "FLEETii
+ * admin" to "sysadm" 2026-09-02 — same role.)
  */
-export function isFleetiiAdminRole(role?: string | null): boolean {
-  return role === "FLEETii admin";
+export function isSysadmRole(role?: string | null): boolean {
+  return role === "sysadm";
 }
 
-/** True if `role` is either admin tier ("admin" or "FLEETii admin") — see isFleetiiAdminRole. */
+/** True if `role` is either admin tier ("admin" or "sysadm") — see isSysadmRole. */
 export function isAnyAdminRole(role?: string | null): boolean {
-  return role === "admin" || role === "FLEETii admin";
+  return role === "admin" || role === "sysadm";
 }
