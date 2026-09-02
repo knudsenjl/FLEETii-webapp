@@ -233,7 +233,7 @@ export function FleetManagementPage() {
     formatVehicleIdentLabel(identByVehicleId[vehicleId]?.vehicleIdent, identByVehicleId[vehicleId]?.numberPlate, useVehicleIdent) +
     (identByVehicleId[vehicleId]?.blocked ? " (Blokeret)" : "");
 
-  /** Whether nearby vehicles group into a single cluster marker (LeafletMap's own `cluster` prop) or each show individually — user-toggleable, defaults to clustered (the previous fixed behavior) unless restored from savedSnapshot (a browser-back from VehicleDetailsPage shouldn't silently re-cluster a map the admin had switched to "Vis enkeltvis"). */
+  /** Whether nearby vehicles group into a single cluster marker (LeafletMap's own `cluster` prop) or each show individually — user-toggleable, defaults to clustered (the previous fixed behavior) unless restored from savedSnapshot (a browser-back from VehicleDetailsPage shouldn't silently re-cluster a map the admin had switched to "Vis alle"). */
   const [clusterMarkers, setClusterMarkers] = useState(savedSnapshot?.clusterMarkers ?? true);
 
   // Shows immediately when the current filter scope has no vehicles, then
@@ -294,7 +294,7 @@ export function FleetManagementPage() {
     // toggle onto THIS page's own history entry (replace, not push) right
     // before navigating away — so a browser-back from VehicleDetailsPage
     // lands back on a "/fleet-map" entry that still remembers where the
-    // admin was looking, whether they'd switched to "Vis enkeltvis",
+    // admin was looking, whether they'd switched to "Vis alle",
     // whatever Kunde/Afdeling/Køretøj/Status they'd filtered to, and whether
     // Live polling was on, instead of resetting all of it to defaults. Same
     // formSnapshot-style pattern as
@@ -536,7 +536,7 @@ export function FleetManagementPage() {
                     onClick={() => setClusterMarkers((prev) => !prev)}
                     className="shrink-0 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1 text-xs font-semibold text-brand-700 shadow-sm transition hover:bg-brand-100"
                   >
-                    {clusterMarkers ? "Vis enkeltvis" : "Saml køretøjer"}
+                    {clusterMarkers ? "Vis alle" : "Saml køretøjer"}
                   </button>
                 </div>
               </div>
