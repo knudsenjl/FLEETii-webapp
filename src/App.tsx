@@ -39,6 +39,7 @@ import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
 import { SettingsAdminPage } from "./pages/SettingsAdminPage";
 import { SettingsUserPage } from "./pages/SettingsUserPage";
 import { SetPasswordPage } from "./pages/SetPasswordPage";
+import { TwoHireCommandPage } from "./pages/TwoHireCommandPage";
 
 /**
  * The "/" route. Once the initial auth check finishes, sends a signed-in
@@ -177,6 +178,14 @@ function App() {
             element={
               <ProtectedRoute requireRole="sysadm">
                 <InstallationAdministrationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/2hire-command"
+            element={
+              <ProtectedRoute requireRole="sysadm">
+                <TwoHireCommandPage />
               </ProtectedRoute>
             }
           />
