@@ -19,7 +19,7 @@ import { ANTI_CLONING_NOTICE } from "../lib/legal";
 /** Placeholder for a possible future multi-step login flow; today there's only one step. */
 type Step = { name: "credentials" };
 
-/** Shown for any signInWithPassword failure (wrong credentials, or — per the open "first attempt after a fresh page load sometimes fails, retry immediately succeeds" investigation — possibly a getSession()-race/timeout too, see errorDetail's own comment below). Deliberately generic regardless of the real cause, same reasoning as before this was pulled into a named constant. */
+/** Shown for any signInWithPassword failure (wrong credentials, or a supabase-js auth-lock race — see `loading`'s own comment below and AuthContext.tsx's `loading` field for the two such races now closed by disabling submit on `loading`; errorDetail below still surfaces the raw message in case a new one shows up). Deliberately generic regardless of the real cause, same reasoning as before this was pulled into a named constant. */
 const CREDENTIALS_ERROR_MESSAGE = "Login fejlede - tjek venligst brugernavn og adgangskode, og prøv igen";
 
 const stepVariants = {
@@ -35,15 +35,18 @@ export function LoginPage() {
   /** Present only when this page was reached via a browser back-navigation from AboutPage (the "i" button below) — see its own comment. Wins over the remembered-username effect just below, so credentials just typed aren't clobbered by whatever's in localStorage. */
   const formSnapshot = (location.state as { formSnapshot?: { username: string; password: string } } | null)?.formSnapshot ?? null;
   // `loading`: true until AuthContext's own initial supabase.auth.getSession()
-  // call (fired on mount, see AuthContext.tsx) resolves. Supabase-js
-  // serializes ALL auth calls (getSession, signInWithPassword, token
-  // refresh) behind an internal lock, so submitting while that first
-  // getSession() is still in flight — right after a cold page load, slower
-  // than usual — queues signInWithPassword behind it and can surface as a
-  // failure that isn't actually about the entered credentials (see the
-  // "first attempt after a fresh page load sometimes wrongly fails, retry
-  // immediately succeeds" investigation). Disabling submit until loading is
-  // false removes that race outright instead of working around its symptom.
+  // call (fired on mount, see AuthContext.tsx) resolves, AND while either of
+  // AuthContext's forced-sign-out paths (idle timeout, deactivated costumer)
+  // has its own supabase.auth.signOut() in flight. Supabase-js serializes
+  // ALL auth calls (getSession, signInWithPassword, signOut, token refresh)
+  // behind one internal lock, so submitting while any of those is still in
+  // flight — a cold page load slower than usual, or retyping credentials
+  // right after the idle-timeout message appears — queues signInWithPassword
+  // behind it and can surface as a failure that isn't actually about the
+  // entered credentials (this was the "first attempt after a fresh page load
+  // / after an idle-timeout sometimes wrongly fails, retry immediately
+  // succeeds" investigation). Disabling submit until loading is false closes
+  // that race outright instead of working around its symptom.
   const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage, loading } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState(formSnapshot?.username ?? "");

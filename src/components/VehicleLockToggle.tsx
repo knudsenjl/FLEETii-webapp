@@ -1,10 +1,10 @@
 // A single "Låst"/"Låst op" pill button, replacing the old two-button
-// (separate "Lås"/"Lås op" icon buttons) layout on VehicleDetailsPage,
-// BookingDetailsPage, and TwoHireTestPage. The two buttons used
-// near-identical padlock icons that were hard to tell apart at a glance;
-// this collapses them into one control whose color, icon, and label all
-// swap together based on state, so there's nothing to misread. No sliding
-// animation — the whole button just re-renders in one of two looks.
+// (separate "Lås"/"Lås op" icon buttons) layout on VehicleDetailsPage and
+// BookingDetailsPage. The two buttons used near-identical padlock icons that
+// were hard to tell apart at a glance; this collapses them into one control
+// whose color, icon, and label all swap together based on state, so there's
+// nothing to misread. No sliding animation — the whole button just
+// re-renders in one of two looks.
 import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { InlinePopup } from "./InlinePopup";

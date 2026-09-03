@@ -155,7 +155,25 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
           {isFullyAuthenticated && (
             <button
               type="button"
-              onClick={() => void signOut()}
+              onClick={() => {
+                // Every OTHER page redirects to "/" on its own the instant
+                // isFullyAuthenticated flips false (ProtectedRoute's own
+                // guard) — but AboutPage.tsx is the one deliberately public
+                // route with no such guard, so signing out from there left
+                // the admin stranded on /about, still logged out, with
+                // nothing moving them back to the login screen. Navigating
+                // explicitly here fixes that case without depending on
+                // whichever page happened to render this button. Awaited
+                // (not fire-and-forget) so isFullyAuthenticated has already
+                // flipped false by the time we land on "/" — otherwise
+                // RootRoute would see a still-authenticated profile there
+                // for one render and bounce straight back to /admin or
+                // /booking before the sign-out actually finished.
+                void (async () => {
+                  await signOut();
+                  navigate("/", { replace: true });
+                })();
+              }}
               aria-label="Log ud"
               title="Log ud"
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"

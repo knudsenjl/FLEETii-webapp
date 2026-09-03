@@ -106,6 +106,7 @@ interface AuthContextValue {
   idleTimeoutMessage: string | null;
   /** Clears idleTimeoutMessage — call after LoginPage.tsx has displayed it, so it doesn't reappear on a later, legitimate login. */
   clearIdleTimeoutMessage: () => void;
+  /** True during the initial supabase.auth.getSession() check on mount, AND while either forced-sign-out path below (idle timeout, deactivated costumer) has an in-flight supabase.auth.signOut() call — supabase-js serializes every auth call behind one internal lock, so a signInWithPassword() fired while an unrelated signOut() is still resolving would silently queue behind it and can surface as a spurious "wrong credentials" failure. LoginPage.tsx disables its submit button on this (and RootRoute keeps showing LoginPage instead of navigating away), which is what actually closes that race rather than just documenting it. */
   loading: boolean;
   signOut: () => Promise<void>;
   /** Refreshes the session and applies it to session/profile state directly (awaited), so it's safe to navigate immediately after — see the implementation's comment for why this exists instead of just calling supabase.auth.refreshSession(). */
@@ -271,7 +272,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } catch (_) {
           /* ignore storage errors */
         }
-        void supabase.auth.signOut();
+        // `loading` gates LoginPage's submit button (and keeps RootRoute
+        // showing LoginPage) for as long as this signOut() is actually in
+        // flight — see `loading`'s own doc comment above for why an
+        // unawaited call here would otherwise race a retried sign-in.
+        setLoading(true);
+        supabase.auth.signOut().finally(() => {
+          if (mounted) setLoading(false);
+        });
         return;
       }
       const departments = newSession ? await loadAvailableDepartments(newSession.user.id, next.profile?.role ?? null) : [];
@@ -382,7 +390,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch (_) {
         /* ignore storage errors */
       }
-      void supabase.auth.signOut();
+      // `loading` gates LoginPage's submit button (and keeps RootRoute
+      // showing LoginPage) for as long as this signOut() is actually in
+      // flight — see `loading`'s own doc comment above. Without this, a user
+      // who sees the idle-timeout message and immediately retypes their
+      // password can fire signInWithPassword() while this signOut() still
+      // holds supabase-js's internal auth lock; it silently queues behind
+      // it and can surface as a spurious "wrong credentials" failure on the
+      // first attempt, succeeding on an identical second one once the lock
+      // has cleared — this was reported as "logging in again right after an
+      // idle-timeout sometimes fails once, then works."
+      setLoading(true);
+      supabase.auth.signOut().finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     };
 
     void (async () => {

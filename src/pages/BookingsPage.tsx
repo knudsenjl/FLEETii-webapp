@@ -177,7 +177,15 @@ export function BookingsPage() {
             {!loading && error && <p className="py-3 text-center text-sm text-red-600">{error}</p>}
             {!loading && !error && departmentBookings.length === 0 && (
               <p className="py-3 text-center text-sm text-brand-500">
-                {canShowNewBookingButton ? "Ingen kommende reservation." : "Anmod administratoren om at lave en reservation til dig."}
+                {canShowNewBookingButton ? (
+                  "Ingen kommende reservation."
+                ) : (
+                  <>
+                    Du har ingen aktuelle eller kommende reservationer.
+                    <br />
+                    Anmod din administrator om at lave en reservation til dig.
+                  </>
+                )}
               </p>
             )}
             {!loading &&
