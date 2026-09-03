@@ -86,7 +86,14 @@ export default async (req: Request) => {
       { status: 400 },
     );
   }
-  const path = rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
+  // A full URL (e.g. the e2e/simulation host, https://e2e.adapter.2hire.io —
+  // see TWOHIRE_E2E_BASE_URL's own doc comment in twoHireClient.ts for why
+  // that's a SEPARATE host from getTwoHireBaseUrl()'s test/production one)
+  // is used as-is; a bare path is resolved against getTwoHireBaseUrl(). Only
+  // prepending the base URL for a bare path (not unconditionally) avoids
+  // mangling an already-absolute URL into "<base>/<absolute-url>".
+  const isAbsoluteUrl = /^https?:\/\//i.test(rawPath);
+  const path = isAbsoluteUrl ? rawPath : rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
@@ -95,11 +102,12 @@ export default async (req: Request) => {
 
   try {
     const resolvedPath = await resolvePlatePlaceholders(path, adminClientResult.admin);
+    const requestUrl = isAbsoluteUrl ? resolvedPath : `${getTwoHireBaseUrl()}${resolvedPath}`;
 
     const token = await getTwoHireAccessToken(getGlobalCredentials());
     const hasBody = method !== "GET" && method !== "DELETE" && requestBody?.body?.trim();
 
-    const response = await fetch(`${getTwoHireBaseUrl()}${resolvedPath}`, {
+    const response = await fetch(requestUrl, {
       method,
       headers: {
         Authorization: `${token.tokenType} ${token.value}`,
@@ -117,7 +125,7 @@ export default async (req: Request) => {
     }
 
     return new Response(
-      JSON.stringify({ requestUrl: `${getTwoHireBaseUrl()}${resolvedPath}`, status: response.status, ok: response.ok, result: parsed }),
+      JSON.stringify({ requestUrl, status: response.status, ok: response.ok, result: parsed }),
       { status: 200, headers: { "Content-Type": "application/json" } },
     );
   } catch (error) {

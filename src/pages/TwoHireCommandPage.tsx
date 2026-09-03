@@ -77,6 +77,9 @@ export function TwoHireCommandPage() {
                 Skriv en 2hire-forespørgsel som "METODE /sti", f.eks.{" "}
                 <code className="rounded bg-brand-50 px-1 py-0.5 text-xs">POST /api/v1/vehicle/{"{AB12345}"}/command/generic/locate</code>.
                 Nummerplader i tuborg-klammer ({"{...}"}) slås automatisk op og erstattes med køretøjets 2hire vehicle_id.
+                Stien behøver ikke starte med "/" — den lægges så oveni 2hires normale adapter-host. Skriv i stedet en
+                fuld URL (f.eks. <code className="rounded bg-brand-50 px-1 py-0.5 text-xs">https://e2e.adapter.2hire.io/devices</code>)
+                for at ramme et andet 2hire-host, f.eks. e2e/simulations-hosten.
               </p>
             </div>
 
