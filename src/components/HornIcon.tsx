@@ -1,6 +1,6 @@
 // Flat horn-with-sound-waves glyph for the "Horn" button (VehicleDetailsPage,
-// BookingDetailsPage, TwoHireTestPage) — decorative only, so it's always
-// aria-hidden; the button itself carries the label.
+// BookingDetailsPage) — decorative only, so it's always aria-hidden; the
+// button itself carries the label.
 interface HornIconProps {
   className?: string;
 }

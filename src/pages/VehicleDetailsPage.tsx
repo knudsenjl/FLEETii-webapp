@@ -361,7 +361,7 @@ export function VehicleDetailsPage() {
 
     const lockSuccess = await setLock(true);
     if (!lockSuccess) {
-      setBlockError("Kunne ikke låse køretøjet via 2hire. Prøv igen.");
+      setBlockError("Kunne ikke låse køretøjet via IoT device. Prøv igen.");
       setIsBlocking(false);
       return;
     }

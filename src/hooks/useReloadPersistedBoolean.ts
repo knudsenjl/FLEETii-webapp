@@ -1,11 +1,11 @@
 // Shared "remember this on/off toggle across a genuine browser refresh"
 // hook — same reload-only sessionStorage pattern as useMapViewSnapshot.ts,
 // but for a plain boolean. Used by VehicleDetailsPage.tsx/
-// BookingDetailsPage.tsx/TwoHireTestPage.tsx's single-vehicle-map "Live"
-// toggle, which previously reset to off (and visually to its "black"/
-// inactive state) on every reload — FleetManagementPage.tsx's own
-// liveEnabled already persisted this way as part of its bespoke
-// FleetMapSnapshot, this hook gives the single-vehicle pages the same
+// BookingDetailsPage.tsx's single-vehicle-map "Live" toggle, which
+// previously reset to off (and visually to its "black"/inactive state) on
+// every reload — FleetManagementPage.tsx's own liveEnabled already
+// persisted this way as part of its bespoke FleetMapSnapshot, this hook
+// gives the single-vehicle pages the same
 // behavior without each duplicating the sessionStorage/isPageReload
 // plumbing.
 import { useEffect, useState } from "react";

@@ -17,7 +17,6 @@ import { BookingsPage } from "./pages/BookingsPage";
 import { AllBookingsPage } from "./pages/AllBookingsPage";
 import { BookingDetailsPage } from "./pages/BookingDetailsPage";
 import { BookingPage } from "./pages/BookingPage";
-import { TwoHireTestPage } from "./pages/TwoHireTestPage";
 import { AdminFrontpage } from "./pages/AdminFrontpage";
 import { CostumerAdministrationPage } from "./pages/CostumerAdministrationPage";
 import { InstallationAdministrationPage } from "./pages/InstallationAdministrationPage";
@@ -40,6 +39,7 @@ import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
 import { SettingsAdminPage } from "./pages/SettingsAdminPage";
 import { SettingsUserPage } from "./pages/SettingsUserPage";
 import { SetPasswordPage } from "./pages/SetPasswordPage";
+import { TwoHireCommandPage } from "./pages/TwoHireCommandPage";
 
 /**
  * The "/" route. Once the initial auth check finishes, sends a signed-in
@@ -158,14 +158,6 @@ function App() {
             }
           />
           <Route
-            path="/2hire-test"
-            element={
-              <ProtectedRoute requireAdmin>
-                <TwoHireTestPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
             path="/admin"
             element={
               <ProtectedRoute requireAdmin>
@@ -186,6 +178,14 @@ function App() {
             element={
               <ProtectedRoute requireRole="sysadm">
                 <InstallationAdministrationPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/2hire-command"
+            element={
+              <ProtectedRoute requireRole="sysadm">
+                <TwoHireCommandPage />
               </ProtectedRoute>
             }
           />

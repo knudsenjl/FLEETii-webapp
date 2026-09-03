@@ -1,7 +1,7 @@
 // Small read-only closed/open padlock indicator — used in table cells
 // (VehiclesPage, AllBookingsPage) and the small "Køretøjet er låst" badge
 // next to the vehicle label (VehicleDetailsPage, BookingDetailsPage,
-// BookingPage, TwoHireTestPage). Wraps the shared PadlockGlyph shape
+// BookingPage). Wraps the shared PadlockGlyph shape
 // with red/green coloring so it always renders something for both states
 // (instead of the old inline svg, which rendered nothing at all for
 // "unlocked" — read as missing data rather than an actual state).
