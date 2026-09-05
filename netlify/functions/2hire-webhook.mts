@@ -13,7 +13,8 @@
 // gets a history row even though it has no live-state column to update yet.
 // "Specific" signals (model/OEM-specific — names and payload shapes vary by
 // vehicle profile, unlike the fixed generic vocabulary) only ever get the
-// history row for the same reason: toColumnUpdate()'s mapping is written
+// history row for the same reason: upsert_vehicle_signal_if_newer()'s
+// mapping (see vehicle_signals_upsert_if_newer_function.sql) is written
 // against the generic vocabulary and isn't safe to apply to an arbitrary
 // specific-signal name.
 // A "position" signal additionally pushes a Realtime Broadcast message
@@ -39,40 +40,6 @@ const TOPIC_PATTERN = /^vehicle:([^:]+):(generic|specific):([a-z_]+)$/;
 
 type SignalPayload = { timestamp: number; data: Record<string, unknown> };
 type WebhookBody = { topic: string; payload: SignalPayload };
-
-/** Maps one recognized 2hire generic signal to the `vehicle_signals` columns it updates. Unrecognized signals return null — that's fine for LIVE state (nothing in the UI has anywhere to show it yet), but it's still recorded into vehicle_signal_history regardless, see the handler below. */
-function toColumnUpdate(
-  signal: string,
-  payload: SignalPayload,
-): Record<string, string | number | boolean> | null {
-  const updatedAt = new Date(payload.timestamp).toISOString();
-
-  switch (signal) {
-    case "online":
-      return { online: Boolean(payload.data.online), online_updated_at: updatedAt };
-    case "position":
-      return {
-        lat: Number(payload.data.latitude),
-        lng: Number(payload.data.longitude),
-        position_updated_at: updatedAt,
-      };
-    case "distance_covered":
-      return { distance_covered_meters: Number(payload.data.meters), distance_covered_updated_at: updatedAt };
-    case "autonomy_percentage":
-      return { autonomy_percentage: Number(payload.data.percentage), autonomy_percentage_updated_at: updatedAt };
-    // See vehicle_signals_add_trip_detected.sql. The payload.data key is
-    // inferred as "trip_detected" (self-named, same convention as "online"'s
-    // own payload.data.online) — 2hire's docs for this specific signal
-    // weren't available while wiring this up; every delivery is preserved
-    // verbatim in vehicle_signal_history.signal_value regardless, so a wrong
-    // guess here is recoverable/verifiable from real delivered payloads
-    // without losing any data.
-    case "trip_detected":
-      return { trip_detected: Boolean(payload.data.trip_detected), trip_detected_updated_at: updatedAt };
-    default:
-      return null;
-  }
-}
 
 export default async (req: Request) => {
   const url = new URL(req.url);
@@ -142,20 +109,39 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: historyError.message }), { status: 500 });
   }
 
-  // Only known GENERIC signals update vehicle_signals "current state" —
-  // toColumnUpdate()'s mapping is written against the fixed generic
-  // vocabulary, so it's never applied to a "specific" signal (whose names
-  // vary by vehicle profile and could coincidentally collide with a
-  // generic one, e.g. some OEM's own "online"). Already preserved in the
-  // history insert above either way, so there's nothing lost by leaving a
-  // specific/unrecognized signal out of "current state" here.
-  const columnUpdate = topicKind === "generic" ? toColumnUpdate(signal, body.payload) : null;
-  if (columnUpdate) {
-    const { error } = await admin.from("vehicle_signals").upsert({ vehicle_id: vehicleId, ...columnUpdate });
+  // Only GENERIC signals update vehicle_signals "current state" — a
+  // "specific" signal's names vary by vehicle profile and could
+  // coincidentally collide with a generic one (e.g. some OEM's own
+  // "online"), so those are never passed here at all. Already preserved in
+  // the history insert above either way, so there's nothing lost by leaving
+  // a specific signal out of "current state".
+  //
+  // upsert_vehicle_signal_if_newer() (see
+  // vehicle_signals_upsert_if_newer_function.sql) is both the column
+  // mapping for every currently-recognized generic signal AND a guard
+  // against a stale, out-of-order delivery clobbering a fresher one already
+  // stored — a plain `.upsert()` here had neither check, so two concurrent
+  // deliveries for the same vehicle+signal could let whichever one
+  // committed LAST silently win regardless of which payload was actually
+  // newer. An unrecognized generic signal is still passed through — the
+  // function's own ELSE branch just does nothing for it, same as before.
+  // `signalApplied` (false for a rejected-as-stale or unrecognized signal)
+  // also gates the live position broadcast below, so a discarded stale
+  // delivery can't flash the map to a wrong position on its way to being
+  // correctly ignored here.
+  let signalApplied = false;
+  if (topicKind === "generic") {
+    const { data, error } = await admin.rpc("upsert_vehicle_signal_if_newer", {
+      p_vehicle_id: vehicleId,
+      p_signal: signal,
+      p_timestamp: new Date(body.payload.timestamp).toISOString(),
+      p_data: body.payload.data,
+    });
     if (error) {
       console.error("[2hire-webhook] failed to persist signal:", error);
       return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
+    signalApplied = Boolean(data);
   }
 
   // Pushes the new position straight to any browser currently watching
@@ -175,7 +161,7 @@ export default async (req: Request) => {
   // response to 2hire — the vehicle_signals write above already persisted
   // the real state, so a missed broadcast just means the map isn't
   // live-updated until the next page load/refresh, not a data loss.
-  if (topicKind === "generic" && signal === "position") {
+  if (topicKind === "generic" && signal === "position" && signalApplied) {
     try {
       const { data: vehicle, error: vehicleError } = await admin
         .from("vehicle_profiles")

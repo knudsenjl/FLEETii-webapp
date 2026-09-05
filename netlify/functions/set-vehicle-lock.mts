@@ -12,10 +12,11 @@
 // BookingDetailsPage.tsx and VehicleDetailsPage.tsx.
 //
 // requireUser-gated, not admin-only — a regular user needs to toggle the
-// lock on their own reservation. Uses the service-role key for the
-// vehicle_signals write, since that table deliberately has no client-side
-// INSERT/UPDATE RLS policy (see vehicle_signals_table.sql) — same
-// "service-role writes only" pattern as netlify/functions/2hire-webhook.mts.
+// lock on their own reservation. The vehicle_signals write goes through the
+// upsert_vehicle_signal_if_newer() RPC (SECURITY DEFINER, service-role
+// caller) — same "service-role writes only" pattern as
+// netlify/functions/2hire-webhook.mts, which every other signal on this
+// table also goes through.
 //
 // Re-validates authorization server-side rather than trusting the calling
 // UI's disabled-button state: a sysadm may act on any vehicle; a
@@ -206,10 +207,24 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Kunne ikke gemme lås-historik. Prøv igen." }), { status: 500 });
   }
 
-  // Upsert, not update: a vehicle may not have a vehicle_signals row yet
-  // (today only created by the 2hire webhook on its first signal) — a plain
-  // update would silently no-op in that case.
-  const { error } = await admin.from("vehicle_signals").upsert({ vehicle_id: vehicleId, locked });
+  // vehicle_signals is a compatibility VIEW over vehicle_signals_latest
+  // (see vehicle_signals_to_narrow_schema.sql) — a plain .upsert() no
+  // longer works against it (an aggregate view isn't directly writable).
+  // Goes through the same generic upsert_vehicle_signal_if_newer() RPC
+  // every real 2hire signal uses (see
+  // upsert_vehicle_signal_if_newer_generic.sql), keyed as signal_type
+  // 'locked'. This is the ONLY writer of 'locked' anywhere in the app, so
+  // there's never actually a race for the RPC's "reject if older" guard to
+  // protect against here — harmless, just pointless, kept only for
+  // consistency with every other signal sharing one write path. Reuses
+  // fulfilledAt (already computed above for the history insert) rather
+  // than reading the clock twice for one logical write.
+  const { error } = await admin.rpc("upsert_vehicle_signal_if_newer", {
+    p_vehicle_id: vehicleId,
+    p_signal: "locked",
+    p_timestamp: fulfilledAt,
+    p_data: { locked },
+  });
 
   if (error) {
     console.error("[set-vehicle-lock] upsert failed:", error);
