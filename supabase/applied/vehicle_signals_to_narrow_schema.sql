@@ -60,6 +60,19 @@
 
 begin;
 
+-- extra_float_digits defaults too low in at least one execution context
+-- this was actually run through (observed live on Production, 2026-09-05:
+-- jsonb_build_object('latitude', lat, ...) below silently dropped the last
+-- 1-2 significant digits of a double precision lat/lng for 2 of 28
+-- vehicles, a ~1e-14-degree/nanometer-scale discrepancy invisible in
+-- default text output but still a real bit-level difference caught by this
+-- migration's own row-for-row EXCEPT verification against a
+-- pre-migration snapshot). Forcing 3 here (Postgres's own
+-- "always use shortest round-trip representation" setting) guarantees the
+-- backfilled position jsonb is bit-exact to the source double, not just
+-- close enough to look right when printed.
+set local extra_float_digits = 3;
+
 -- STEP 1: create the new narrow "current state" table + its own RLS.
 create table public.vehicle_signals_latest (
   vehicle_id uuid not null references public.vehicle_profiles(vehicle_id),
