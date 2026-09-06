@@ -6,7 +6,6 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
-import { LockStatusIcon } from "../components/LockStatusIcon";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
@@ -70,8 +69,6 @@ export function AllBookingsPage() {
   const [users, setUsers] = useState<
     { user_id: string; email: string; user_ident: string | null; department_id: string | null }[]
   >([]);
-  /** Which of the listed bookings' vehicles are currently locked (vehicle_signals.locked), keyed by vehicleId — same bulk-fetch pattern as VehiclesPage.tsx's own Lås column. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
-  const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
@@ -228,30 +225,6 @@ export function AllBookingsPage() {
     void loadBookings();
   }, []);
 
-  /** Bulk-loads the Lås column's lock state for every distinct vehicle among the loaded bookings in one query, rather than one useVehicleLockState per row — see VehiclesPage.tsx's identical pattern. */
-  useEffect(() => {
-    const vehicleIds = Array.from(new Set(bookings.map((b) => b.vehicle)));
-    if (vehicleIds.length === 0) {
-      setLockedByVehicleId({});
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_signals")
-      .select("vehicle_id, locked")
-      .in("vehicle_id", vehicleIds)
-      .returns<{ vehicle_id: string; locked: boolean }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setLockedByVehicleId(Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.locked])));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [bookings]);
-
   /** The genuine Køretøj-ID/Reg.nr (number_plate) pair PLUS blocked-state per listed booking's vehicle, keyed by vehicleId — fetched straight from vehicle_profiles rather than reusing vehicle.plate (see liveVehicleDataSource.ts's toVehicle2Hire), since that field is an UNGATED vehicle_ident-or-number_plate fallback and the new first column below must respect useVehicleIdent. `blocked` (from blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") drives the "Blokeret" badge next to that column. */
   const identByVehicleId = useVehicleIdentLookup(bookings.map((b) => b.vehicle));
 
@@ -401,9 +374,9 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Not table-fixed: Bruger/Køretøj (or Reg.nr)/Periode/Lås/Online
+                {/* Not table-fixed: Bruger/Køretøj (or Reg.nr)/Periode/Online
                     are all w-px (shrink to their actual content, same trick as
-                    VehiclesPage.tsx's own Lås/Online columns — only
+                    VehiclesPage.tsx's own Online column — only
                     meaningful under table-layout:auto, table-fixed ignores
                     content entirely). Model has none of these — combined
                     with `truncate` (which exempts it from contributing its
@@ -417,24 +390,23 @@ export function AllBookingsPage() {
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={6} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={6} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={5} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
-                        <td colSpan={6} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">
                           {filterUser || filterVehicle || filterCostumerId || filterDepartment
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
@@ -491,9 +463,6 @@ export function AllBookingsPage() {
                             </td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right">
                               {formatBookingPeriod(booking, true)}
-                            </td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
-                              <LockStatusIcon locked={lockedByVehicleId[booking.vehicle] ?? true} className="mx-auto" />
                             </td>
                             <td className="whitespace-nowrap px-1 py-0.5 text-center">
                               <span

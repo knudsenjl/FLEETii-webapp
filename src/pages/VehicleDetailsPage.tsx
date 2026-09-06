@@ -10,7 +10,6 @@ import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
-import { LockStatusIcon } from "../components/LockStatusIcon";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -466,10 +465,7 @@ export function VehicleDetailsPage() {
                         separately-gated "Køretøj-ID:" row), so the "er låst"
                         indicator has one guaranteed-visible row to attach to
                         either way. */}
-                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                      Køretøj:
-                      {vehicleLocked !== null && <LockStatusIcon locked={vehicleLocked} />}
-                    </label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
                     <span className="text-sm text-brand-800">
                       {numberPlateLoading ? (
                         <span className="text-brand-500">Indlæser…</span>

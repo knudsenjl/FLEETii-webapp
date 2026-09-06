@@ -6,7 +6,6 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
-import { LockStatusIcon } from "../components/LockStatusIcon";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
@@ -110,9 +109,7 @@ export function VehiclesPage() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   /** UNLOCKED/ALL-COSTUMERS modes only (see this component's own doc comment) — the target costumer's own departments (or, in ALL-COSTUMERS mode, every department platform-wide), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
-  /** Which of the listed vehicles are currently locked (vehicle_signals.locked — see useVehicleLockState's own doc comment for why it's virtual, not a real 2hire signal), keyed by vehicleId, for the Lås column below. A vehicle absent from vehicle_signals entirely (no row yet) has no entry here — treated as locked by default, same fallback useVehicleLockState itself uses. */
-  const [lockedByVehicleId, setLockedByVehicleId] = useState<Record<string, boolean>>({});
-  /** Which of the listed vehicles are administratively blocked (vehicle_profiles.blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") — keyed by vehicleId, for the "Blokeret" badge next to the Køretøj cell below. Same bulk-fetch pattern as lockedByVehicleId. */
+  /** Which of the listed vehicles are administratively blocked (vehicle_profiles.blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") — keyed by vehicleId, for the "Blokeret" badge next to the Køretøj cell below. */
   const [blockedByVehicleId, setBlockedByVehicleId] = useState<Record<string, boolean>>({});
 
   const [filterOpen, setFilterOpen] = useState(false);
@@ -187,33 +184,7 @@ export function VehiclesPage() {
     );
   }, [twoHireVehicles, targetDepartmentId, departmentOptions]);
 
-  /** Bulk-loads the Lås column's lock state for every listed vehicle in one query, rather than one useVehicleLockState per row. */
-  useEffect(() => {
-    if (vehicles.length === 0) {
-      setLockedByVehicleId({});
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_signals")
-      .select("vehicle_id, locked")
-      .in(
-        "vehicle_id",
-        vehicles.map((v) => v.vehicleId),
-      )
-      .returns<{ vehicle_id: string; locked: boolean }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setLockedByVehicleId(Object.fromEntries((data ?? []).map((row) => [row.vehicle_id, row.locked])));
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [vehicles]);
-
-  /** Bulk-loads the "Blokeret" badge state for every listed vehicle in one query — same pattern as the Lås-column fetch above. */
+  /** Bulk-loads the "Blokeret" badge state for every listed vehicle in one query. */
   useEffect(() => {
     if (vehicles.length === 0) {
       setBlockedByVehicleId({});
@@ -426,14 +397,13 @@ export function VehiclesPage() {
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-1 py-0.5 text-center">Lås</th>
                       <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {filteredVehicles.length === 0 && (
                       <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
                           {!targetCostumerId && !isSysadm
                             ? "Ingen kunde valgt."
                             : filterPlate || filterStatus || filterDepartment
@@ -472,9 +442,6 @@ export function VehiclesPage() {
                             )}
                           </td>
                           <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{vehicle.vehicle}</td>
-                          <td className="w-px whitespace-nowrap border-r border-brand-100 px-1 py-0.5 text-center">
-                            <LockStatusIcon locked={lockedByVehicleId[vehicle.vehicleId] ?? true} className="mx-auto" />
-                          </td>
                           <td className="w-px whitespace-nowrap px-1 py-0.5 text-center">
                             <span
                               className={`mx-auto block h-2.5 w-2.5 rounded-full ${

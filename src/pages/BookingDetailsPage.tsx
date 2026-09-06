@@ -25,7 +25,6 @@ import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
-import { LockStatusIcon } from "../components/LockStatusIcon";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingLifecycle";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -276,10 +275,7 @@ export function BookingDetailsPage() {
                     <span className="text-sm text-brand-800">{booking.use}</span>
                   </div>
                   <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                      Køretøj:
-                      {vehicleLocked !== null && <LockStatusIcon locked={vehicleLocked} />}
-                    </label>
+                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
                     <span>
                       {twoHireVehicle ? (
                         <button
