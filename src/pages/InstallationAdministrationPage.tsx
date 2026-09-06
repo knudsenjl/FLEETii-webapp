@@ -47,6 +47,8 @@ type CostumerOrder = {
   contactperson: string;
   contactemail: string | null;
   contactnumber: string | null;
+  /** Free-text note to FLEETii re. the vehicle/installation — optional, see costumer_orders_add_comment.sql. Only meaningful for order_type "Opret"; carried through router state so VehicleCreatePage.tsx's own "Kommentarer:" row doesn't need a redundant fetch. */
+  comment: string | null;
   /** Whether each of VehicleCreatePage.tsx's three provisioning steps has been marked done — see costumer_orders_add_step_flags.sql. Only meaningful for order_type "Opret". */
   vehicle_registered: boolean;
   iot_device_associated: boolean;
@@ -76,6 +78,7 @@ type CostumerOrderQueryRow = {
   contactperson: string;
   contactemail: string | null;
   contactnumber: string | null;
+  comment: string | null;
   vehicle_registered: boolean;
   iot_device_associated: boolean;
   other_2hire_done: boolean;
@@ -101,7 +104,7 @@ export function InstallationAdministrationPage() {
       const { data, error: fetchError } = await supabase
         .from("costumer_orders")
         .select(
-          "order_id, order_type, vehicle_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, iot_device_associated, other_2hire_done, device_removed, created_at, costumers(name), departments(name)",
+          "order_id, order_type, vehicle_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, comment, vehicle_registered, iot_device_associated, other_2hire_done, device_removed, created_at, costumers(name), departments(name)",
         )
         .order("created_at", { ascending: true })
         .returns<CostumerOrderQueryRow[]>();

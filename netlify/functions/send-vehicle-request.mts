@@ -30,6 +30,8 @@ type SendVehicleRequestBody = {
   vehicleIdent?: string | null;
   /** Parking spot — optional free text, see costumer_orders_add_parking.sql. */
   parking?: string | null;
+  /** Free-text note to FLEETii re. the vehicle/installation — optional, see costumer_orders_add_comment.sql. */
+  comment?: string | null;
   nummerplade?: string;
   /** Optional as of costumer_orders_brand_model_year_nullable.sql — no longer required on NewVehiclePage.tsx, fillable later on VehicleCreatePage.tsx (incl. its MotorAPI fill button). */
   brand?: string | null;
@@ -57,6 +59,7 @@ function buildHtmlBody(fields: {
   afdeling: string;
   vehicleIdent: string;
   parking: string;
+  comment: string;
   nummerplade: string;
   brand: string;
   maerke: string;
@@ -97,8 +100,9 @@ function buildHtmlBody(fields: {
       ${row("Kontaktperson", fields.kontaktperson)}
       ${row("Kontakt e-mail", fields.kontaktemail)}
       ${row("Kontakt tlf.", fields.kontaktnummer)}
+      ${row("Kommentarer", fields.comment || "—")}
     </table>
-    
+
     <p>Du kan oprette køretøjet og registrere det i 2hire og FLEETii gennem flg. link:
     <a href="${fields.baseUrl}/vehicle-create/${fields.orderId}">${fields.baseUrl}/vehicle-create</a></p>
 
@@ -108,7 +112,7 @@ function buildHtmlBody(fields: {
 }
 
 /**
- * POST { afdeling?, departmentId?, vehicleIdent?, parking?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
+ * POST { afdeling?, departmentId?, vehicleIdent?, parking?, comment?, nummerplade, brand?, maerke?, aargang?, fuelLevel?, mileage?,
  * drivmiddel?, needsFleetiiDevice?, fleetiiDeviceId?, kontaktperson, kontaktemail,
  * kontaktnummer } as an authenticated admin (see requireAdmin). Validates every REQUIRED text field
  * is non-empty (plus fleetiiDeviceId when needsFleetiiDevice is false, plus
@@ -152,6 +156,7 @@ export default async (req: Request) => {
 
   const vehicleIdent = asTrimmedString(body.vehicleIdent);
   const parking = asTrimmedString(body.parking);
+  const comment = asTrimmedString(body.comment);
   const nummerplade = asNormalizedNumberString(body.nummerplade);
   const brand = asTrimmedString(body.brand);
   const maerke = asTrimmedString(body.maerke);
@@ -243,6 +248,7 @@ export default async (req: Request) => {
         department_id: departmentId,
         vehicle_ident: vehicleIdent || null,
         parking: parking || null,
+        comment: comment || null,
         number_plate: nummerplade,
         brand: brand || null,
         model: maerke || null,
@@ -283,6 +289,7 @@ export default async (req: Request) => {
       afdeling,
       vehicleIdent: vehicleIdent ?? "",
       parking: parking ?? "",
+      comment: comment ?? "",
       nummerplade,
       brand: brand ?? "",
       maerke: maerke ?? "",
