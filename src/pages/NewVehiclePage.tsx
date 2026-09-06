@@ -6,7 +6,9 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
+import { Modal } from "../components/Modal";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
 import { motorApiDrivmiddel, motorApiVehicleField } from "../lib/motorApi";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
@@ -98,9 +100,13 @@ export function NewVehiclePage() {
   const [kontaktperson, setKontaktperson] = useState("");
   const [kontaktemail, setKontaktemail] = useState("");
   const [kontaktnummer, setKontaktnummer] = useState("");
+  /** Free-text note to FLEETii re. the vehicle/installation — optional, see costumer_orders_add_comment.sql. Surfaced in the request email (send-vehicle-request.mts), not carried onto vehicle_profiles (unlike vehicleIdent/parking above — there's no equivalent column there). */
+  const [comment, setComment] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [sent, setSent] = useState(false);
+  /** Whether the "Dette køretøj er allerede registreret i FLEETii" popup (see handleSend's own duplicate-plate check below) is open — a plain alert, not a ConfirmDialog, since there's nothing to confirm: the send is already blocked, this just tells the admin why. */
+  const [duplicatePlateOpen, setDuplicatePlateOpen] = useState(false);
   /** Which (if either) of the FLEETii-device "?" info popovers is open — mirrors UserDetailsPage.tsx's own Afdeling(er)/Hjemmeafdeling popover pattern. */
   const [openInfoPopover, setOpenInfoPopover] = useState<"device" | "deviceId" | null>(null);
 
@@ -202,11 +208,32 @@ export function NewVehiclePage() {
     (!isSysadm || (selectedCostumerId.length > 0 && selectedDepartmentId.length > 0)) &&
     !isSending;
 
-  /** Posts the vehicle-request form to send-vehicle-request, authenticated with the current session's access token. Shows a server-supplied error message (or a generic connection-failure one) inline on failure. */
+  /** Posts the vehicle-request form to send-vehicle-request, authenticated with the current session's access token. Shows a server-supplied error message (or a generic connection-failure one) inline on failure. First checks vehicle_profiles for a vehicle already registered under this Nummerplade (RLS-scoped to the caller's own costumer, or every costumer for a sysadm — see vehicle_profiles_signals_departments_scope_costumer.sql) — a typo'd plate re-submitted as a "new" vehicle would otherwise silently create a duplicate order for an already-provisioned vehicle. Compared with stripNumberSpacing+uppercase on both sides, since a plate can be typed/stored with different spacing/casing. */
   const handleSend = async () => {
     setIsSending(true);
     setSendError(null);
     setSent(false);
+
+    const normalizedPlate = stripNumberSpacing(nummerplade).toUpperCase();
+    const { data: existingVehicles, error: duplicateCheckError } = await supabase
+      .from("vehicle_profiles")
+      .select("number_plate")
+      .not("number_plate", "is", null);
+
+    if (duplicateCheckError) {
+      setSendError(duplicateCheckError.message);
+      setIsSending(false);
+      return;
+    }
+
+    const isDuplicatePlate = (existingVehicles ?? []).some(
+      (vehicle) => stripNumberSpacing(vehicle.number_plate ?? "").toUpperCase() === normalizedPlate,
+    );
+    if (isDuplicatePlate) {
+      setIsSending(false);
+      setDuplicatePlateOpen(true);
+      return;
+    }
 
     try {
       const response = await fetch("/.netlify/functions/send-vehicle-request", {
@@ -227,6 +254,7 @@ export function NewVehiclePage() {
           departmentId: isSysadm ? selectedDepartmentId : null,
           vehicleIdent: vehicleIdent.trim() || null,
           parking: parking.trim() || null,
+          comment: comment.trim() || null,
           nummerplade,
           brand,
           maerke,
@@ -518,6 +546,20 @@ export function NewVehiclePage() {
                 <span className="text-red-600">*</span> Feltet skal udfyldes
               </p>
 
+              <div className="flex flex-col gap-1">
+                <label htmlFor="comment" className="text-sm font-medium text-brand-700">
+                  Kommentarer:
+                </label>
+                <textarea
+                  id="comment"
+                  rows={3}
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Evt. kommentarer til FLEETii vedr. køretøjet eller installationen."
+                  className="resize-none rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-sm text-brand-800 outline-none transition placeholder:text-brand-400 focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                />
+              </div>
+
               {sendError && <p className="text-sm text-red-600">{sendError}</p>}
 
               {sent ? (
@@ -564,6 +606,21 @@ export function NewVehiclePage() {
           </section>
         </motion.main>
       </div>
+
+      {duplicatePlateOpen && (
+        <Modal>
+          <p className="text-sm font-semibold text-red-600">
+            Dette køretøj er allerede registreret i FLEETii - check om nummerpladen er angivet korrekt
+          </p>
+          <button
+            type="button"
+            onClick={() => setDuplicatePlateOpen(false)}
+            className="mt-4 w-full rounded-lg border border-red-600 bg-red-50 px-2 py-1.5 text-sm font-semibold text-red-700 transition hover:bg-red-100"
+          >
+            OK
+          </button>
+        </Modal>
+      )}
     </div>
   );
 }

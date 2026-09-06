@@ -39,6 +39,8 @@ type CostumerOrder = {
   contactperson: string;
   contactemail: string | null;
   contactnumber: string;
+  /** Free-text note to FLEETii re. the vehicle/installation — optional, see costumer_orders_add_comment.sql. Not carried onto vehicle_profiles (no equivalent column there), shown purely for the sysadm reviewing this order. */
+  comment: string | null;
   vehicle_registered: boolean;
   /** The real 2hire vehicleId once registered (see 2hire-register-vehicle.mts) — null until vehicle_registered is true. */
   vehicle_id: string | null;
@@ -63,6 +65,7 @@ type CostumerOrderQueryRow = {
   contactperson: string;
   contactemail: string | null;
   contactnumber: string;
+  comment: string | null;
   vehicle_registered: boolean;
   vehicle_id: string | null;
   costumers: { name: string | null } | null;
@@ -129,7 +132,7 @@ export function VehicleCreatePage() {
     void supabase
       .from("costumer_orders")
       .select(
-        "order_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, vehicle_registered, vehicle_id, costumers(name), departments(name)",
+        "order_id, costumer_id, department_id, vehicle_ident, number_plate, brand, model, model_year, drivmiddel, needs_fleetii_device, fleetii_device_id, contactperson, contactemail, contactnumber, comment, vehicle_registered, vehicle_id, costumers(name), departments(name)",
       )
       .eq("order_id", orderId)
       .maybeSingle<CostumerOrderQueryRow>()
@@ -152,6 +155,7 @@ export function VehicleCreatePage() {
                 contactperson: data.contactperson,
                 contactemail: data.contactemail,
                 contactnumber: data.contactnumber,
+                comment: data.comment,
                 vehicle_registered: data.vehicle_registered,
                 vehicle_id: data.vehicle_id,
                 costumerName: data.costumers?.name ?? null,
@@ -631,6 +635,7 @@ export function VehicleCreatePage() {
       "FLEETii device:",
       needsFleetiiDeviceInput ? "Nyt device skal installeres" : `Eksisterende device (id: ${fleetiiDeviceIdInput || "—"})`,
     ],
+    ["Kommentarer:", order.comment || "—"],
     ...(registeredVehicleId ? ([["2hire vehicle-id:", registeredVehicleId]] as [string, string][]) : []),
   ];
 
@@ -848,8 +853,12 @@ export function VehicleCreatePage() {
                   ) : (
                     <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
-                      {/* Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left — same trick as CostumerDetailsPage's locked CVR row. */}
-                      <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
+                      {/* Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left — same trick as CostumerDetailsPage's locked CVR row. whitespace-pre-wrap on Kommentarer only, since that's the one multi-line free-text field here (NewVehiclePage.tsx's textarea) — collapsing its line breaks would run the note together. */}
+                      <span
+                        className={`rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800 ${label === "Kommentarer:" ? "whitespace-pre-wrap" : ""}`}
+                      >
+                        {value}
+                      </span>
                     </div>
                   );
                 })}
