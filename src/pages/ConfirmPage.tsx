@@ -157,9 +157,19 @@ export function ConfirmPage() {
       [DEPARTMENT_COLUMN]: state.departmentId,
     };
 
-    const { error: writeError } = editingBookingId
-      ? await supabase.from("bookings").update(bookingFields).eq(BOOKING_ID_COLUMN, editingBookingId)
-      : await supabase.from("bookings").insert(bookingFields);
+    let writeError: { code?: string; message: string } | null;
+    let newBookingId: string | null = null;
+    if (editingBookingId) {
+      ({ error: writeError } = await supabase.from("bookings").update(bookingFields).eq(BOOKING_ID_COLUMN, editingBookingId));
+    } else {
+      const { data: insertedBooking, error } = await supabase
+        .from("bookings")
+        .insert(bookingFields)
+        .select(BOOKING_ID_COLUMN)
+        .single<{ booking_id: string }>();
+      writeError = error;
+      newBookingId = insertedBooking?.booking_id ?? null;
+    }
 
     if (writeError) {
       // 23P01 = Postgres exclusion_violation — the DB-level overlap
@@ -174,6 +184,25 @@ export function ConfirmPage() {
       );
       setIsSubmitting(false);
       return;
+    }
+
+    // Best-effort — the booking itself is already written by this point, so
+    // a failure emailing the user it's for (missing SMTP config, etc.)
+    // shouldn't block navigation or surface as if the booking itself failed.
+    // Never fired for "Bekræft ændring" (editingBookingId set) — only a
+    // brand-new reservation notifies its user, see
+    // send-booking-confirmation.mts's own doc comment.
+    if (newBookingId) {
+      void fetch("/.netlify/functions/send-booking-confirmation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ bookingId: newBookingId }),
+      }).catch(() => {
+        // Ignored — see this block's own doc comment above.
+      });
     }
 
     navigate(isAnyAdmin(profile?.role) ? "/allbookings" : "/bookings", { replace: true });
