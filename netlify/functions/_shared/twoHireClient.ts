@@ -236,6 +236,62 @@ export async function deregisterVehicle(vehicleId: string, credentials: TwoHireC
   }
 }
 
+/** One point-in-time signal reading as 2hire's signal-read endpoints return it — same {data, timestamp} shape a webhook delivery's payload has (see 2hire-webhook.mts). */
+export type TwoHireSignalReading = { data: Record<string, unknown>; timestampMs: number };
+
+/**
+ * Reads one signal's current value directly (as opposed to waiting for a
+ * webhook delivery) — GET /api/v1/vehicle/{vehicleId}/signal/{generic|
+ * specific}/{signal}. Used right after 2hire-register-vehicle.mts registers
+ * a brand-new vehicle, to seed vehicle_signals_latest/vehicle_signal_history
+ * immediately instead of waiting for 2hire's first webhook delivery (which
+ * may not arrive until the vehicle actually moves/reports again). Returns
+ * null on a 404 — 2hire has no reading for this vehicle+signal yet, which is
+ * expected right after registration for signals like distance_covered that
+ * only get a value once the vehicle has actually driven.
+ */
+async function fetchVehicleSignal(
+  vehicleId: string,
+  kind: "generic" | "specific",
+  signal: string,
+  credentials: TwoHireCredentials,
+): Promise<TwoHireSignalReading | null> {
+  const token = await getTwoHireAccessToken(credentials);
+  const response = await fetch(
+    `${getTwoHireBaseUrl()}/api/v1/vehicle/${encodeURIComponent(vehicleId)}/signal/${kind}/${encodeURIComponent(signal)}`,
+    { headers: { Authorization: `${token.tokenType} ${token.value}` } },
+  );
+
+  if (response.status === 404) return null;
+  if (!response.ok) {
+    throw new Error(`2hire signal-opslag (${kind}/${signal}) fejlede (${response.status}): ${await response.text()}`);
+  }
+
+  const body = (await response.json()) as { data?: Record<string, unknown>; timestamp?: number };
+  if (!body.data || typeof body.timestamp !== "number") {
+    throw new Error(`Uventet svarformat fra 2hire for ${kind}/${signal}: ${JSON.stringify(body)}`);
+  }
+  return { data: body.data, timestampMs: body.timestamp };
+}
+
+/** Reads one GENERIC signal's current value directly — see fetchVehicleSignal. */
+export async function fetchGenericVehicleSignal(
+  vehicleId: string,
+  signal: string,
+  credentials: TwoHireCredentials,
+): Promise<TwoHireSignalReading | null> {
+  return fetchVehicleSignal(vehicleId, "generic", signal, credentials);
+}
+
+/** Reads one SPECIFIC (model/OEM-specific) signal's current value directly — see fetchVehicleSignal. */
+export async function fetchSpecificVehicleSignal(
+  vehicleId: string,
+  signal: string,
+  credentials: TwoHireCredentials,
+): Promise<TwoHireSignalReading | null> {
+  return fetchVehicleSignal(vehicleId, "specific", signal, credentials);
+}
+
 /**
  * The e2e/simulation-only host used by createvehicle (POST /devices) and
  * getDeviceState — distinct from getTwoHireBaseUrl()'s test/production
