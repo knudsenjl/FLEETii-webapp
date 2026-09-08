@@ -48,9 +48,15 @@
 // route is itself sysadm-gated — see delete-vehicle.mts's identical
 // reasoning.
 import { getAdminClient } from "./_shared/adminClient.js";
+import { persistVehicleSignal } from "./_shared/persistVehicleSignal.js";
 import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
-import { registerVehicle } from "./_shared/twoHireClient.js";
+import { fetchGenericVehicleSignal, fetchSpecificVehicleSignal, registerVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+
+/** The four GENERIC signals read back right after a successful registration — see the post-registration signal-seeding step at the bottom of this function. */
+const GENERIC_SIGNALS_TO_SEED = ["distance_covered", "autonomy_percentage", "position", "locked"] as const;
+/** trip_detected is 2hire's one SPECIFIC (not generic) signal this app tracks — see fetchSpecificVehicleSignal. */
+const SPECIFIC_SIGNALS_TO_SEED = ["trip_detected"] as const;
 
 type RegisterVehicleOrderBody = { orderId?: string; qrCode?: string; profileId?: string; profileLabel?: string | null };
 
@@ -129,6 +135,23 @@ export default async (req: Request) => {
     });
   }
 
+  // Resolved once here (not just inside the registerVehicle branch below) so
+  // it's also available for the post-registration signal fetch at the end of
+  // this function, on BOTH the first-time-registration path and the
+  // reuse-existing-vehicleId retry path.
+  const { data: caller, error: callerError } = await admin
+    .from("user_profiles")
+    .select("role")
+    .eq("user_id", authResult.userId)
+    .maybeSingle<{ role: string }>();
+  if (callerError) {
+    return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), {
+      status: 500,
+    });
+  }
+  const isSysadm = isSysadmRole(caller?.role);
+  const credentials = await resolveTwoHireCredentials(admin, { isSysadm, costumerId: order.costumer_id });
+
   let vehicleId: string;
   if (order.vehicle_id) {
     // A previous call already registered the real 2hire device and
@@ -181,16 +204,6 @@ export default async (req: Request) => {
     }
 
     try {
-      const { data: caller, error: callerError } = await admin
-        .from("user_profiles")
-        .select("role")
-        .eq("user_id", authResult.userId)
-        .maybeSingle<{ role: string }>();
-      if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
-
-      const isSysadm = isSysadmRole(caller?.role);
-      const credentials = await resolveTwoHireCredentials(admin, { isSysadm, costumerId: order.costumer_id });
-
       const result = await registerVehicle({ qrCode, profileId }, credentials);
       vehicleId = result.vehicleId;
     } catch (error) {
@@ -281,6 +294,33 @@ export default async (req: Request) => {
       }),
       { status: 500 },
     );
+  }
+
+  // Seed current-state signals right away instead of waiting for 2hire's
+  // first webhook delivery (which may not arrive until the vehicle actually
+  // drives/reports again) — best-effort: registration itself has already
+  // fully succeeded by this point (order.vehicle_registered is true), so a
+  // failure reading one signal here is logged and skipped rather than
+  // turned into a failed response — the admin doesn't need to retry the
+  // whole registration just because 2hire has no distance_covered reading
+  // yet for a car that hasn't moved. A 404 (fetch*VehicleSignal returning
+  // null) is the expected case for most of these on a just-registered
+  // vehicle, not an error.
+  for (const signal of GENERIC_SIGNALS_TO_SEED) {
+    try {
+      const reading = await fetchGenericVehicleSignal(vehicleId, signal, credentials);
+      if (reading) await persistVehicleSignal(admin, vehicleId, signal, reading);
+    } catch (error) {
+      console.error(`[2hire-register-vehicle] failed to seed generic signal "${signal}":`, error);
+    }
+  }
+  for (const signal of SPECIFIC_SIGNALS_TO_SEED) {
+    try {
+      const reading = await fetchSpecificVehicleSignal(vehicleId, signal, credentials);
+      if (reading) await persistVehicleSignal(admin, vehicleId, signal, reading);
+    } catch (error) {
+      console.error(`[2hire-register-vehicle] failed to seed specific signal "${signal}":`, error);
+    }
   }
 
   return new Response(JSON.stringify({ ok: true, vehicleId }), {
