@@ -53,8 +53,8 @@ import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
 import { fetchGenericVehicleSignal, fetchSpecificVehicleSignal, registerVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
-/** The four GENERIC signals read back right after a successful registration — see the post-registration signal-seeding step at the bottom of this function. */
-const GENERIC_SIGNALS_TO_SEED = ["distance_covered", "autonomy_percentage", "position", "locked"] as const;
+/** The GENERIC signals read back right after a successful registration — see the post-registration signal-seeding step at the bottom of this function. "locked" replaced with "online" (2026-09-08: "locked" doesn't actually resolve against 2hire's real API, confirmed via the /2hire-command console). */
+const GENERIC_SIGNALS_TO_SEED = ["distance_covered", "autonomy_percentage", "autonomy_meters", "position", "online"] as const;
 /** trip_detected is 2hire's one SPECIFIC (not generic) signal this app tracks — see fetchSpecificVehicleSignal. */
 const SPECIFIC_SIGNALS_TO_SEED = ["trip_detected"] as const;
 
