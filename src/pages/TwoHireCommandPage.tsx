@@ -19,6 +19,18 @@ import { PageHeader } from "../components/PageHeader";
 /** The shape 2hire-raw-command.mts always resolves to on a 200 — either this or {error} (see handleExecute). */
 type RawCommandResult = { requestUrl: string; status: number; ok: boolean; result: unknown };
 
+/** The shape 2hire-backfill-vehicle-signals.mts always resolves to on a 200 — either this or {error} (see handleBackfill). */
+type BackfillResult = {
+  dryRun: boolean;
+  totalVehicles: number;
+  signalsChecked: string[];
+  missingCount: number;
+  applied: number;
+  noData: number;
+  failedCount: number;
+  failures: { vehicleId: string; numberPlate: string | null; signal: string; error: string }[];
+};
+
 export function TwoHireCommandPage() {
   const { session } = useAuth();
   const [command, setCommand] = useState("POST /api/v1/vehicle/{AB12345}/command/generic/locate");
@@ -26,6 +38,10 @@ export function TwoHireCommandPage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RawCommandResult | null>(null);
+
+  const [isBackfilling, setIsBackfilling] = useState(false);
+  const [backfillError, setBackfillError] = useState<string | null>(null);
+  const [backfillResult, setBackfillResult] = useState<BackfillResult | null>(null);
 
   const handleExecute = async () => {
     setIsExecuting(true);
@@ -51,6 +67,36 @@ export function TwoHireCommandPage() {
       setError("Kunne ikke kontakte serveren. Prøv igen senere.");
     } finally {
       setIsExecuting(false);
+    }
+  };
+
+  /** Triggers the one-off signal-backfill Function (see 2hire-backfill-vehicle-signals.mts's own doc comment) — dryRun previews without writing, an explicit real run does. */
+  const handleBackfill = async (dryRun: boolean) => {
+    if (!dryRun && !window.confirm("Dette skriver rigtige signal-værdier for HELE flåden. Fortsæt?")) return;
+
+    setIsBackfilling(true);
+    setBackfillError(null);
+    setBackfillResult(null);
+
+    try {
+      const response = await fetch("/.netlify/functions/2hire-backfill-vehicle-signals", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ dryRun }),
+      });
+      if (!response.ok) {
+        const failure = (await response.json().catch(() => null)) as { error?: string } | null;
+        setBackfillError(failure?.error ?? "Backfill fejlede.");
+        return;
+      }
+      setBackfillResult((await response.json()) as BackfillResult);
+    } catch {
+      setBackfillError("Kunne ikke kontakte serveren. Prøv igen senere.");
+    } finally {
+      setIsBackfilling(false);
     }
   };
 
@@ -136,6 +182,59 @@ export function TwoHireCommandPage() {
                 </pre>
               </div>
             )}
+
+            <div className="mt-4 flex flex-col gap-4 border-t border-brand-100 pt-4">
+              <div>
+                <h2 className="text-xl font-semibold text-brand-800">Signal-backfill</h2>
+                <p className="mt-1 text-sm text-brand-600">
+                  Engangsopgave: henter distance_covered/autonomy_percentage/autonomy_meters/position/online
+                  (generic) og trip_detected (specific) direkte fra 2hire for ethvert køretøj, der endnu ikke har en
+                  vehicle_signals_latest-række for det pågældende signal, og gemmer i både vehicle_signal_history og
+                  vehicle_signals_latest. Kør altid "Preview" først.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={() => void handleBackfill(true)}
+                  disabled={isBackfilling}
+                  className="rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isBackfilling ? "Kører…" : "Preview (dry run)"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleBackfill(false)}
+                  disabled={isBackfilling}
+                  className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isBackfilling ? "Kører…" : "Kør for virkelig"}
+                </button>
+              </div>
+
+              {backfillError && <p className="text-sm text-red-600">{backfillError}</p>}
+
+              {backfillResult && (
+                <div className="flex flex-col gap-2">
+                  <p className="text-sm text-brand-600">
+                    <span
+                      className={backfillResult.dryRun ? "font-medium text-brand-700" : "font-medium text-green-700"}
+                    >
+                      {backfillResult.dryRun ? "DRY RUN — intet skrevet" : "Skrevet"}
+                    </span>{" "}
+                    · {backfillResult.totalVehicles} køretøjer · {backfillResult.missingCount} manglende signaler ·{" "}
+                    {backfillResult.applied} fundet · {backfillResult.noData} ingen data hos 2hire ·{" "}
+                    {backfillResult.failedCount} fejlede
+                  </p>
+                  {backfillResult.failures.length > 0 && (
+                    <pre className="max-h-64 overflow-auto rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs text-brand-900">
+                      {JSON.stringify(backfillResult.failures, null, 2)}
+                    </pre>
+                  )}
+                </div>
+              )}
+            </div>
           </section>
         </motion.main>
       </div>
