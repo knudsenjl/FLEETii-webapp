@@ -98,6 +98,7 @@ nothing about who's calling.
 | `set-vehicle-lock.mts` | Sends the real 2hire lock/unlock command *and* persists the resulting state |
 | `delete-vehicle.mts`, `delete-costumer.mts`, `send-vehicle-deletion-request.mts`, `send-vehicle-request.mts` | Vehicle/costumer lifecycle + the email-based request flow to FLEETii staff |
 | `motorapi-vehicle-lookup.mts` | Danish plate/stelnummer lookup via MotorAPI |
+| `geoapify-reverse-geocode.mts` | GPS position → human-readable address via Geoapify (worldwide, unlike DAWA's Danish-only coverage) |
 | `seed-test-bookings.mts` | Test-data seeding (non-production tooling) |
 
 `netlify/functions/_shared/` holds the reusable pieces:
