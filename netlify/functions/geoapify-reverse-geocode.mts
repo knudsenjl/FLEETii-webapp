@@ -14,6 +14,11 @@
 // used on BookingPage.tsx too, a role:"user"-only route (see that page's own
 // comment on its useReverseGeocode call) — any logged-in user needs to be
 // able to reach this, not just an admin.
+//
+// lang=da: this whole app is Danish-language (see CLAUDE.md's domain
+// glossary) — without it, a foreign-country result's country/region names
+// would come back in that country's own local language instead, which reads
+// as a bug in an otherwise all-Danish UI.
 import { requireUser } from "./_shared/serverAuth.js";
 
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
@@ -47,7 +52,7 @@ export default async (req: Request) => {
   let response: Response;
   try {
     response = await fetch(
-      `${GEOAPIFY_BASE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&format=json&apiKey=${apiKey}`,
+      `${GEOAPIFY_BASE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&lang=da&limit=1&format=json&apiKey=${apiKey}`,
     );
   } catch {
     return new Response(JSON.stringify({ error: "Kunne ikke kontakte Geoapify." }), { status: 502 });
