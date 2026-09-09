@@ -157,7 +157,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
   const [idleTimeoutMessage, setIdleTimeoutMessage] = useState<string | null>(null);
 
-  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name (and, nested one level further, its costumer's name/deactivated_at) via FKs in the same query (one round-trip instead of separate departments/costumers lookups). Returns nulls (and logs) on any Supabase error, so a temporary DB hiccup degrades to "no profile" rather than throwing. */
+  /** How long to wait before loadProfile's single retry below — long enough to clear a transient supabase-js auth-lock/token hiccup, short enough not to noticeably delay a real sign-in. */
+  const PROFILE_LOAD_RETRY_DELAY_MS = 400;
+
+  /** Fetches the `user_profiles` row for the given auth user id, embedding the department's name (and, nested one level further, its costumer's name/deactivated_at) via FKs in the same query (one round-trip instead of separate departments/costumers lookups). Retries once (after PROFILE_LOAD_RETRY_DELAY_MS) if the query itself errors — this was reported as a sysadm occasionally landing on "/booking" with the Forbidden notice right after a fresh sign-in: the session was valid (isFullyAuthenticated=true) but a transient query error here made profile come back null, and isAnyAdmin(null) routes as a non-admin. Retrying immediately fixed it every time, consistent with a transient hiccup rather than a real permissions problem, so one retry is attempted before genuinely giving up. Only retries on a query error, not on a legitimately-missing row (data null, no error) — that case retrying wouldn't fix. Returns nulls (and logs) if the retry also fails/errors, so a real DB outage still degrades to "no profile" rather than throwing. */
   const loadProfile = async (
     userId: string,
   ): Promise<{
@@ -166,20 +169,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     costumerName: string | null;
     costumerDeactivatedAt: string | null;
   }> => {
-    const { data, error } = await supabase
-      .from("user_profiles")
-      // Explicit !user_profiles_department_id_fkey disambiguates the embed:
-      // since user_departments_table.sql, PostgREST also sees an implicit
-      // many-to-many user_profiles<->departments relationship via
-      // user_departments, so a bare "departments(...)" is now ambiguous
-      // (PGRST201) and fails outright — this pins it to the direct FK.
-      .select(
-        "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
-      )
-      .eq("user_id", userId)
-      .maybeSingle<ProfileRow>();
+    const selectProfileRow = () =>
+      supabase
+        .from("user_profiles")
+        // Explicit !user_profiles_department_id_fkey disambiguates the embed:
+        // since user_departments_table.sql, PostgREST also sees an implicit
+        // many-to-many user_profiles<->departments relationship via
+        // user_departments, so a bare "departments(...)" is now ambiguous
+        // (PGRST201) and fails outright — this pins it to the direct FK.
+        .select(
+          "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
+        )
+        .eq("user_id", userId)
+        .maybeSingle<ProfileRow>();
+
+    let { data, error } = await selectProfileRow();
     if (error) {
-      console.error("[AuthContext] user_profiles select failed:", error);
+      console.error("[AuthContext] user_profiles select failed, retrying once:", error);
+      await new Promise((resolve) => setTimeout(resolve, PROFILE_LOAD_RETRY_DELAY_MS));
+      ({ data, error } = await selectProfileRow());
+    }
+    if (error) {
+      console.error("[AuthContext] user_profiles select failed again on retry:", error);
       return { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     }
     if (!data) {
@@ -307,6 +318,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // gets established later in the tab's lifetime instead of on load.
       if (event === "PASSWORD_RECOVERY") {
         setIsPasswordRecovery(true);
+      }
+      if (event === "SIGNED_IN") {
+        // Reset the idle-activity clock the instant a genuine new sign-in
+        // happens (as opposed to INITIAL_SESSION, fired when an existing
+        // session is merely resumed from storage on page load) — otherwise
+        // the idle-timeout effect below, which also runs the moment
+        // isFullyAuthenticated flips true, can compare "now" against a
+        // LAST_ACTIVITY_KEY timestamp left over from however this browser's
+        // previous session ended (closed without a clean sign-out, crashed,
+        // token simply expired — anything that skipped the removeItem every
+        // proper sign-out path does). A stale-enough leftover timestamp made
+        // a brand new, perfectly valid login immediately look idle and get
+        // force-signed back out — reported as a blank spinner (ProtectedRoute's
+        // loading placeholder, shown while forceSignOutForIdle's own signOut()
+        // is in flight) flashing right after logging in, then bouncing back
+        // to "/" with the idle-timeout message.
+        try {
+          localStorage.setItem(LAST_ACTIVITY_KEY, String(Date.now()));
+        } catch (_) {
+          /* ignore storage errors */
+        }
       }
       const requestId = ++latestRequestId;
       void applyAuthState(newSession, requestId);
