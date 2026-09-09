@@ -8,6 +8,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -156,6 +157,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
   const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
   const [idleTimeoutMessage, setIdleTimeoutMessage] = useState<string | null>(null);
+
+  /** True for the AuthProvider's actual mount lifetime (only flips false on real unmount, near the app root — practically never). Distinct from the idle-timeout effect's own per-run `cancelled` local below: forceSignOutForIdle's setIsFullyAuthenticated(false) call causes THAT effect to tear itself down and re-run (isFullyAuthenticated is one of its deps), which would set its `cancelled` local to true before its own in-flight signOut() resolves — silently swallowing the setLoading(false) that's supposed to clear the blank-logo loading screen, leaving it stuck forever until a manual refresh. This ref sidesteps that self-cancellation by tracking real unmount instead of "this particular effect run got superseded." */
+  const isMountedRef = useRef(true);
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   /** How long to wait before loadProfile's single retry below — long enough to clear a transient supabase-js auth-lock/token hiccup, short enough not to noticeably delay a real sign-in. */
   const PROFILE_LOAD_RETRY_DELAY_MS = 400;
@@ -433,8 +442,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // has cleared — this was reported as "logging in again right after an
       // idle-timeout sometimes fails once, then works."
       setLoading(true);
+      // Deliberately isMountedRef, NOT the `cancelled` local this effect's
+      // own cleanup sets — see isMountedRef's doc comment for why using
+      // `cancelled` here silently stuck ProtectedRoute's blank-logo loading
+      // screen forever (only a manual refresh recovered).
       supabase.auth.signOut().finally(() => {
-        if (!cancelled) setLoading(false);
+        if (isMountedRef.current) setLoading(false);
       });
     };
 
