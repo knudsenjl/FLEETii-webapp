@@ -49,21 +49,25 @@ export default async (req: Request) => {
   if (req.method === "GET") {
     const challenge = url.searchParams.get("hub.challenge");
     if (!challenge) {
+      console.warn("[2hire-webhook] GET with no hub.challenge — not a subscription confirmation we recognize.");
       return new Response("Missing hub.challenge", { status: 400 });
     }
     return new Response(challenge, { status: 200, headers: { "Content-Type": "text/plain" } });
   }
 
   if (req.method !== "POST") {
+    console.warn(`[2hire-webhook] rejected method: ${req.method}`);
     return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
   }
 
   const secret = process.env.TWOHIRE_WEBHOOK_SECRET;
   if (!secret) {
+    console.error("[2hire-webhook] TWOHIRE_WEBHOOK_SECRET is not set — cannot validate any delivery.");
     return new Response(JSON.stringify({ error: "Serveren mangler TWOHIRE_WEBHOOK_SECRET." }), { status: 500 });
   }
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
+    console.error("[2hire-webhook] getAdminClient() failed:", adminClientResult.error);
     return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
   const { admin } = adminClientResult;
@@ -73,6 +77,13 @@ export default async (req: Request) => {
   const rawBody = await req.text();
   const signatureHeader = req.headers.get("x-hub-signature") ?? "";
   if (!isWebhookSignatureValid(rawBody, secret, signatureHeader)) {
+    // Diagnostic-only: never logs the secret or the computed/expected
+    // signature, just enough to tell a genuinely bad/missing signature
+    // apart from e.g. 2hire silently changing their signing scheme —
+    // header PRESENCE and body LENGTH, nothing that could help forge one.
+    console.warn(
+      `[2hire-webhook] signature validation failed — x-hub-signature ${signatureHeader ? "present" : "MISSING"}, body length ${rawBody.length}.`,
+    );
     return new Response(JSON.stringify({ error: "Ugyldig signatur." }), { status: 401 });
   }
 
@@ -80,6 +91,7 @@ export default async (req: Request) => {
   try {
     body = JSON.parse(rawBody) as WebhookBody;
   } catch {
+    console.warn(`[2hire-webhook] body was not valid JSON (length ${rawBody.length}): ${rawBody.slice(0, 500)}`);
     return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
   }
 
@@ -88,12 +100,15 @@ export default async (req: Request) => {
     // Not a shape we recognize at all — acknowledge so 2hire doesn't retry,
     // but do nothing with it. There's no vehicle_id/signal name to record
     // here, so there's nothing meaningful to put in the history table
-    // either.
+    // either. Still worth a log line: this is otherwise a completely silent
+    // drop, and the exact raw topic string is the one thing that can tell
+    // us whether 2hire is sending something this regex just doesn't expect.
+    console.warn(`[2hire-webhook] topic did not match TOPIC_PATTERN, dropped: "${body.topic}"`);
     return new Response(JSON.stringify({ ok: true }), { status: 200 });
   }
 
   const [, vehicleId, topicKind, signal] = topicMatch;
-
+  console.log(`[2hire-webhook] received ${topicKind}/${signal} for vehicle ${vehicleId}, signal_timestamp ${new Date(body.payload.timestamp).toISOString()}`);
 
   // Every signal delivery gets a history row — generic or specific, known
   // or not, see this file's own header comment and
@@ -142,6 +157,9 @@ export default async (req: Request) => {
       return new Response(JSON.stringify({ error: error.message }), { status: 500 });
     }
     signalApplied = Boolean(data);
+    if (!signalApplied) {
+      console.log(`[2hire-webhook] ${signal} for vehicle ${vehicleId} was NOT applied to current state (stale/out-of-order delivery, per upsert_vehicle_signal_if_newer).`);
+    }
   }
 
   // Pushes the new position straight to any browser currently watching
