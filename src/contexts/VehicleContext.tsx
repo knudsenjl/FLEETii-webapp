@@ -91,7 +91,12 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
         setGpsPositions((prev) => {
           const index = prev.findIndex((g) => g.vehicleId === vehicleId);
           if (index !== -1 && prev[index].lat === lat && prev[index].lng === lng) return prev;
-          const patched = { vehicleId, lat, lng };
+          // The broadcast itself carries no timestamp (see
+          // PositionBroadcastPayload) — "now" is accurate enough here since
+          // this handler only ever fires the instant 2hire's webhook pushes
+          // a fresh position (see this effect's own doc comment), not on
+          // some delay that would make "now" meaningfully wrong.
+          const patched = { vehicleId, lat, lng, updatedAtIso: new Date().toISOString() };
           // A vehicle's very FIRST-ever position report has no existing
           // entry to patch — append it rather than silently dropping the
           // update, so it actually appears on the map instead of only
