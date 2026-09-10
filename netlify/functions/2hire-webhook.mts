@@ -3,8 +3,8 @@
 // 2hire-subscribe.mts). Every delivery — known or not — is recorded into
 // `vehicle_signal_history` (append-only, service-role write, see
 // vehicle_signal_history_table.sql), so nothing 2hire sends is ever
-// silently lost. On top of that, the four GENERIC signals this app actually
-// tracks live (online, position, distance_covered, autonomy_percentage)
+// silently lost. On top of that, the GENERIC signals this app actually
+// tracks live (online, position, distance_covered, autonomy_percentage, ...)
 // ALSO update the `vehicle_signals` "current state" table (service-role
 // write — there is no SQL INSERT/UPDATE policy for this table, see
 // vehicle_signals_table.sql), which liveVehicleDataSource.ts then reads
@@ -12,11 +12,16 @@
 // two writes are deliberately independent: an unrecognized signal still
 // gets a history row even though it has no live-state column to update yet.
 // "Specific" signals (model/OEM-specific — names and payload shapes vary by
-// vehicle profile, unlike the fixed generic vocabulary) only ever get the
-// history row for the same reason: upsert_vehicle_signal_if_newer()'s
-// mapping (see vehicle_signals_upsert_if_newer_function.sql) is written
-// against the generic vocabulary and isn't safe to apply to an arbitrary
-// specific-signal name.
+// vehicle profile, unlike the fixed generic vocabulary) only get the
+// history row UNLESS explicitly allowlisted in
+// SPECIFIC_SIGNALS_APPLIED_TO_CURRENT_STATE below — an arbitrary specific
+// name isn't safe to run through upsert_vehicle_signal_if_newer()'s generic
+// mapping (see vehicle_signals_upsert_if_newer_function.sql) since a
+// different OEM's own signal name could coincidentally collide with a real
+// generic one, but a deliberately named, known-safe exception (like
+// "trip_detected" — confirmed by 2hire to genuinely be a "specific" signal,
+// not generic as vehicle_signals_add_trip_detected.sql originally assumed)
+// is fine to apply the same way a generic signal would be.
 // A "position" signal additionally pushes a Realtime Broadcast message
 // (see the bottom of the handler below) straight to any browser currently
 // watching FleetManagementPage.tsx's "Live" toggle — see
@@ -37,6 +42,9 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { isWebhookSignatureValid } from "./_shared/webhookSignature.js";
 
 const TOPIC_PATTERN = /^vehicle:([^:]+):(generic|specific):([a-z_]+)$/;
+
+/** "Specific" signal names that ARE applied to vehicle_signals "current state" despite arriving under the "specific" topic kind — see this file's own header comment for why this needs to be an explicit, known-safe allowlist rather than every specific signal. */
+const SPECIFIC_SIGNALS_APPLIED_TO_CURRENT_STATE = new Set(["trip_detected"]);
 
 type SignalPayload = { timestamp: number; data: Record<string, unknown> };
 type WebhookBody = { topic: string; payload: SignalPayload };
@@ -137,12 +145,14 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: historyError.message }), { status: 500 });
   }
 
-  // Only GENERIC signals update vehicle_signals "current state" — a
-  // "specific" signal's names vary by vehicle profile and could
-  // coincidentally collide with a generic one (e.g. some OEM's own
-  // "online"), so those are never passed here at all. Already preserved in
-  // the history insert above either way, so there's nothing lost by leaving
-  // a specific signal out of "current state".
+  // GENERIC signals, plus the small explicit allowlist of "specific"
+  // signals in SPECIFIC_SIGNALS_APPLIED_TO_CURRENT_STATE above, update
+  // vehicle_signals "current state" — every OTHER "specific" signal's name
+  // varies by vehicle profile and could coincidentally collide with a
+  // generic one (e.g. some OEM's own "online"), so those are never passed
+  // here at all. Already preserved in the history insert above either way,
+  // so there's nothing lost by leaving an unlisted specific signal out of
+  // "current state".
   //
   // upsert_vehicle_signal_if_newer() (see
   // vehicle_signals_upsert_if_newer_function.sql) is both the column
@@ -158,7 +168,7 @@ export default async (req: Request) => {
   // delivery can't flash the map to a wrong position on its way to being
   // correctly ignored here.
   let signalApplied = false;
-  if (topicKind === "generic") {
+  if (topicKind === "generic" || SPECIFIC_SIGNALS_APPLIED_TO_CURRENT_STATE.has(signal)) {
     const { data, error } = await admin.rpc("upsert_vehicle_signal_if_newer", {
       p_vehicle_id: vehicleId,
       p_signal: signal,
