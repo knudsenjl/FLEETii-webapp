@@ -83,7 +83,7 @@ export function BookingPage() {
   /** Time-gated to the 15-minutes-before-start through 15-minutes-after-end window (see isMapVisible) — this page is role "user" only (requireRole in App.tsx), so there's no admin-always-visible override to make here, unlike BookingDetailsPage.tsx's own use of the same map. */
   const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. */
-  const { address, addressLoading } = useReverseGeocode(position, mapVisible);
+  const { address, addressLoading } = useReverseGeocode(booking?.vehicle, position, mapVisible);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-map:${booking?.vehicle ?? ""}`);
 
