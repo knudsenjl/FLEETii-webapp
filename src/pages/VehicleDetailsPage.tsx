@@ -158,7 +158,7 @@ export function VehicleDetailsPage() {
   /** vehicle_profiles.twohire_profile — fetched alongside numberPlate below, shown in the sysadm-only "2hire-profil:" row. */
   const [twohireProfile, setTwohireProfile] = useState<string | null>(null);
   /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. */
-  const { address, addressLoading } = useReverseGeocode(position, isAdmin);
+  const { address, addressLoading } = useReverseGeocode(vehicle?.vehicleId, position, isAdmin);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 

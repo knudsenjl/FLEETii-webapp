@@ -19,16 +19,26 @@ import { useAuth } from "../contexts/AuthContext";
 type ReverseGeocodeResponse = { address?: string | null; error?: string };
 
 /**
- * Reverse-geocodes the given GPS position into a human-readable address,
- * refetching whenever the coordinates change. Pass `enabled: false` to skip
- * fetching entirely and clear any previous address (e.g. while a page-level
- * gate like `isAdmin` or "map not currently visible" is active) — callers
- * don't need to null out `position` themselves for that. Keyed on the raw
+ * Reverse-geocodes the given vehicle's current GPS position into a
+ * human-readable address, refetching whenever the coordinates change. Pass
+ * `enabled: false` to skip fetching entirely and clear any previous address
+ * (e.g. while a page-level gate like `isAdmin` or "map not currently
+ * visible" is active) — callers don't need to null out `position`
+ * themselves for that.
+ *
+ * `position` is only used here to decide WHEN to refetch (keyed on the raw
  * lat/lng rather than the position object's own identity, so an unrelated
- * re-render that produces a new-but-equal position object doesn't refire
- * the fetch.
+ * re-render that produces a new-but-equal position object doesn't refire the
+ * fetch) — it is NOT sent to the server. geoapify-reverse-geocode.mts
+ * re-derives the authoritative position itself from vehicle_signals_latest
+ * and caches its result there too (a signal_type = 'address' row), only
+ * calling Geoapify when the vehicle has actually moved since the last
+ * lookup — see that Function's own doc comment for why. That server-side
+ * cache is what actually cuts Geoapify traffic; this hook's job is just to
+ * ask again whenever the visible position changes, same as before.
  */
 export function useReverseGeocode(
+  vehicleId: string | null | undefined,
   position: { lat: number; lng: number } | null | undefined,
   enabled: boolean,
 ): { address: string | null; addressLoading: boolean } {
@@ -37,7 +47,7 @@ export function useReverseGeocode(
   const [addressLoading, setAddressLoading] = useState(false);
 
   useEffect(() => {
-    if (!enabled || !position) {
+    if (!enabled || !position || !vehicleId) {
       setAddress(null);
       return;
     }
@@ -46,7 +56,7 @@ export function useReverseGeocode(
     setAddressLoading(true);
 
     void fetch(
-      `/.netlify/functions/geoapify-reverse-geocode?lat=${position.lat}&lng=${position.lng}`,
+      `/.netlify/functions/geoapify-reverse-geocode?vehicleId=${encodeURIComponent(vehicleId)}`,
       {
         headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
       },
@@ -67,7 +77,7 @@ export function useReverseGeocode(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, position?.lat, position?.lng, session?.access_token]);
+  }, [enabled, vehicleId, position?.lat, position?.lng, session?.access_token]);
 
   return { address, addressLoading };
 }
