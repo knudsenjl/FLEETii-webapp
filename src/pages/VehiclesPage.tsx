@@ -6,6 +6,7 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
@@ -112,8 +113,6 @@ export function VehiclesPage() {
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
-  /** vehicleId of the row whose "!" health popup is currently open, or null — a single piece of state (not per-row) since only one can sensibly be open at a time. */
-  const [openHealthVehicleId, setOpenHealthVehicleId] = useState<string | null>(null);
   /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
   const isSysadm = isSysadmRole(profile?.role);
 
@@ -177,20 +176,6 @@ export function VehiclesPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterOpen]);
-
-  /** Closes the currently-open health popup on an outside click — a data attribute marker (not a ref) since, unlike filterRef above, there's one popup anchor per table row rather than a single fixed one. */
-  useEffect(() => {
-    if (!openHealthVehicleId) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (!(event.target as HTMLElement).closest("[data-health-popup-anchor]")) {
-        setOpenHealthVehicleId(null);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [openHealthVehicleId]);
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter(
@@ -454,14 +439,13 @@ export function VehiclesPage() {
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
-                      <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
+                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Model</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {filteredVehicles.length === 0 && (
                       <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
                           {!targetCostumerId && !isSysadm
                             ? "Ingen kunde valgt."
                             : filterPlate || filterStatus || filterDepartment
@@ -502,50 +486,11 @@ export function VehiclesPage() {
                               </span>
                             )}
                           </td>
-                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
+                          <td className="whitespace-nowrap px-2 py-0.5">
                             <div className="flex items-center justify-between gap-2">
                               <span className="truncate">{vehicle.vehicle}</span>
-                              {healthIssues.length > 0 && (
-                                <span className="relative shrink-0" data-health-popup-anchor>
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setOpenHealthVehicleId((prev) => (prev === vehicle.vehicleId ? null : vehicle.vehicleId));
-                                    }}
-                                    aria-label={`Sundhedsproblem: mangler ${healthIssues.map((issue) => issue.label).join(", ")}`}
-                                    className="flex h-4 w-4 items-center justify-center rounded-full border border-red-500 bg-red-50 text-[0.65rem] font-bold leading-none text-red-600 transition hover:bg-red-100"
-                                  >
-                                    !
-                                  </button>
-                                  <InlinePopup
-                                    visible={openHealthVehicleId === vehicle.vehicleId}
-                                    align="right"
-                                    variant="warning"
-                                    message={
-                                      <ul className="space-y-1">
-                                        {healthIssues.map((issue) => (
-                                          <li key={issue.label}>
-                                            <span className="font-semibold">{issue.label}:</span>{" "}
-                                            {issue.lastReceivedIso
-                                              ? `sidst modtaget ${formatIsoShort(issue.lastReceivedIso)}`
-                                              : "aldrig modtaget"}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    }
-                                  />
-                                </span>
-                              )}
+                              <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
                             </div>
-                          </td>
-                          <td className="w-px whitespace-nowrap px-1 py-0.5 text-center">
-                            <span
-                              className={`mx-auto block h-2.5 w-2.5 rounded-full ${
-                                vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"
-                              }`}
-                              title={vehicle.status}
-                            />
                           </td>
                         </tr>
                       );
