@@ -141,6 +141,26 @@ export default async (req: Request) => {
     signal_timestamp: new Date(body.payload.timestamp).toISOString(),
   });
   if (historyError) {
+    // Postgres FK-violation code — 2hire is reporting a signal for a
+    // vehicle_id vehicle_profiles has never heard of. Confirmed 2026-09-10
+    // this is a real, expected case (not just a hypothetical): the webhook
+    // subscription is a wildcard covering every vehicle 2hire's account
+    // knows about, which can include a device already registered on 2hire's
+    // side but not yet (or never) onboarded into FLEETii through "Opret
+    // køretøj" — a deleted-without-unsubscribing vehicle would look
+    // identical here too. Retrying can never fix either case — the vehicle
+    // won't suddenly appear in vehicle_profiles — so acknowledge with 200
+    // rather than 500, which would otherwise make 2hire retry the same
+    // undeliverable signal forever. Still logged clearly (unlike every
+    // other silent-drop path this file already guards against) so an
+    // unrecognized vehicle_id stays visible for investigation rather than
+    // quietly vanishing.
+    if (historyError.code === "23503") {
+      console.warn(
+        `[2hire-webhook] ignoring ${topicKind}/${signal} for unknown vehicle_id ${vehicleId} (not in vehicle_profiles — registered with 2hire but not yet onboarded into FLEETii, or deleted here without being unsubscribed there).`,
+      );
+      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
     console.error("[2hire-webhook] failed to record signal history:", historyError);
     return new Response(JSON.stringify({ error: historyError.message }), { status: 500 });
   }
