@@ -88,9 +88,9 @@ export async function getTwoHireAccessToken(credentials: TwoHireCredentials): Pr
  * webhook topics (e.g. "vehicle:*:generic:*" or "vehicle:*:specific:*") for
  * every vehicle in one call. On subscribe, 2hire will first GET
  * `callbackUrl` with a `hub.challenge` to confirm it (see 2hire-webhook.mts),
- * then POST signed signal updates to it going forward. Shared by
- * subscribeTo*/unsubscribeFrom* below — same request shape, only
- * hub.mode/topic differ.
+ * then POST signed signal updates to it going forward. Shared by every
+ * subscribeTo.../unsubscribeFrom... function below — same request shape,
+ * only hub.mode/topic differ.
  *
  * unsubscribe exists because of a 2026-09-10 production investigation: a
  * significant fraction of live deliveries were failing signature validation
