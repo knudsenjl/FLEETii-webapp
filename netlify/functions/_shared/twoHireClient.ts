@@ -84,14 +84,26 @@ export async function getTwoHireAccessToken(credentials: TwoHireCredentials): Pr
 }
 
 /**
- * Subscribes `callbackUrl` to one of 2hire's wildcard webhook topics (e.g.
- * "vehicle:*:generic:*" or "vehicle:*:specific:*") for every vehicle in one
- * call. 2hire will first GET `callbackUrl` with a `hub.challenge` to confirm
- * it (see 2hire-webhook.mts), then POST signed signal updates to it going
- * forward. Shared by subscribeToGenericSignals/subscribeToSpecificSignals
- * below — same request shape, only the topic differs.
+ * Subscribes or unsubscribes `callbackUrl` for one of 2hire's wildcard
+ * webhook topics (e.g. "vehicle:*:generic:*" or "vehicle:*:specific:*") for
+ * every vehicle in one call. On subscribe, 2hire will first GET
+ * `callbackUrl` with a `hub.challenge` to confirm it (see 2hire-webhook.mts),
+ * then POST signed signal updates to it going forward. Shared by every
+ * subscribeTo.../unsubscribeFrom... function below — same request shape,
+ * only hub.mode/topic differ.
+ *
+ * unsubscribe exists because of a 2026-09-10 production investigation: a
+ * significant fraction of live deliveries were failing signature validation
+ * while the SAME underlying reading (identical signal_timestamp) landed
+ * successfully seconds later — consistent with more than one webhook
+ * registration existing for the same topic+callback (e.g. from calling
+ * subscribe more than once over this app's life without ever
+ * unsubscribing first), each still signing with whatever secret was current
+ * when IT was created. 2hire-subscribe.mts now unsubscribes before every
+ * subscribe to collapse any such accumulated duplicates back down to one.
  */
-async function subscribeToWebhookTopic(
+async function setWebhookSubscription(
+  mode: "subscribe" | "unsubscribe",
   topic: string,
   callbackUrl: string,
   credentials: TwoHireCredentials,
@@ -109,7 +121,7 @@ async function subscribeToWebhookTopic(
       Authorization: `${token.tokenType} ${token.value}`,
     },
     body: JSON.stringify({
-      "hub.mode": "subscribe",
+      "hub.mode": mode,
       "hub.topic": topic,
       "hub.callback": callbackUrl,
       "hub.secret": secret,
@@ -117,18 +129,29 @@ async function subscribeToWebhookTopic(
   });
 
   if (!response.ok) {
-    throw new Error(`2hire webhook-abonnement fejlede (${response.status}): ${await response.text()}`);
+    const action = mode === "subscribe" ? "abonnement" : "afmelding";
+    throw new Error(`2hire webhook-${action} fejlede (${response.status}): ${await response.text()}`);
   }
 }
 
-/** Subscribes to every generic signal (online, position, distance_covered, autonomy_percentage, ...) for every vehicle — see subscribeToWebhookTopic. */
+/** Subscribes to every generic signal (online, position, distance_covered, autonomy_percentage, ...) for every vehicle — see setWebhookSubscription. */
 export async function subscribeToGenericSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
-  return subscribeToWebhookTopic("vehicle:*:generic:*", callbackUrl, credentials);
+  return setWebhookSubscription("subscribe", "vehicle:*:generic:*", callbackUrl, credentials);
 }
 
-/** Subscribes to every model/OEM-specific signal for every vehicle (2hire's "vehicle:*:specific:*" topic — signal names and payload shapes vary by vehicle profile, unlike the fixed generic vocabulary) — see subscribeToWebhookTopic and 2hire-webhook.mts's handling of the "specific" topic kind. */
+/** Subscribes to every model/OEM-specific signal for every vehicle (2hire's "vehicle:*:specific:*" topic — signal names and payload shapes vary by vehicle profile, unlike the fixed generic vocabulary) — see setWebhookSubscription and 2hire-webhook.mts's handling of the "specific" topic kind. */
 export async function subscribeToSpecificSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
-  return subscribeToWebhookTopic("vehicle:*:specific:*", callbackUrl, credentials);
+  return setWebhookSubscription("subscribe", "vehicle:*:specific:*", callbackUrl, credentials);
+}
+
+/** Unsubscribes the generic-signals topic — see setWebhookSubscription's own doc comment for why this now runs before every (re-)subscribe. */
+export async function unsubscribeFromGenericSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
+  return setWebhookSubscription("unsubscribe", "vehicle:*:generic:*", callbackUrl, credentials);
+}
+
+/** Unsubscribes the specific-signals topic — see setWebhookSubscription's own doc comment for why this now runs before every (re-)subscribe. */
+export async function unsubscribeFromSpecificSignals(callbackUrl: string, credentials: TwoHireCredentials): Promise<void> {
+  return setWebhookSubscription("unsubscribe", "vehicle:*:specific:*", callbackUrl, credentials);
 }
 
 /**
