@@ -22,4 +22,6 @@ Promoting `main` → `production` requires two separate, explicit requests from 
 
 Routine commits/pushes to `main` need no mention of `production` at all — most `main` work is just iterative testing on `dev.fleetii.dk`.
 
+**Mechanics of the promotion PR itself** (confirmed against #44/#45, both merged): `gh pr create --base production --head main --title "Promote main to production"` — that exact title is the established convention, reused verbatim each time rather than describing the contents. Merge with `gh pr merge <number> --merge` (a real merge commit, not squash/rebase — confirmed by checking a prior promotion merge commit's parent count: 2 parents). No need to re-derive this from `gh pr list --base production` each time.
+
 ## Working conventions
