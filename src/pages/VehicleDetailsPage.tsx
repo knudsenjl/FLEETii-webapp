@@ -11,6 +11,7 @@ import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
+import { EyeGlyph } from "../components/EyeGlyph";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
@@ -157,6 +158,8 @@ export function VehicleDetailsPage() {
   const [iotId, setIotId] = useState<string | null>(null);
   /** vehicle_profiles.twohire_profile — fetched alongside numberPlate below, shown in the sysadm-only "2hire-profil:" row. */
   const [twohireProfile, setTwohireProfile] = useState<string | null>(null);
+  /** Whether the "QR-kode:"/"2hire-profil:" rows are expanded — toggled via the eye button on the "2hire-device:" row above them; start collapsed since both are raw device internals nobody needs on every visit. */
+  const [showTwoHireDetails, setShowTwoHireDetails] = useState(false);
   /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. */
   const { address, addressLoading } = useReverseGeocode(vehicle?.vehicleId, position, isAdmin);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
@@ -574,21 +577,45 @@ export function VehicleDetailsPage() {
                       </div>
                     </>
                   )}
-                  {/* sysadm-only — 2hire-board device internals, not fleet-management info a regular admin has any reason to see. See vehicle_profiles_add_twohire_profile.sql / 2hire-register-vehicle.mts for where these two are set. */}
+                  {/* sysadm-only — 2hire-board device internals, not fleet-management info a regular admin has any reason to see. See vehicle_profiles_add_twohire_profile.sql / 2hire-register-vehicle.mts for where these two are set. "2hire-device:" summarizes both as one Konfigureret/Ikke konfigureret badge, with the raw QR-kode/2hire-profil rows collapsed behind the eye button so they aren't shown by default. */}
                   {isSysadm && (
                     <>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">QR-kode:</label>
-                        <span className="text-sm text-brand-800">
-                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (iotId ?? "—")}
+                        <label className="flex items-center text-sm font-medium text-brand-700">2hire-device:</label>
+                        <span className="flex items-center justify-between text-sm text-brand-800">
+                          {numberPlateLoading ? (
+                            <span className="text-brand-500">Indlæser…</span>
+                          ) : (
+                            <span className={`font-medium ${iotId && twohireProfile ? "text-green-600" : "text-red-600"}`}>
+                              {iotId && twohireProfile ? "Konfigureret" : "Ikke konfigureret"}
+                            </span>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setShowTwoHireDetails((shown) => !shown)}
+                            aria-label={showTwoHireDetails ? "Skjul QR-kode og 2hire-profil" : "Vis QR-kode og 2hire-profil"}
+                            className="flex h-6 w-6 items-center justify-center rounded text-brand-500 transition hover:text-brand-700"
+                          >
+                            <EyeGlyph className="h-4 w-4" />
+                          </button>
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">2hire-profil:</label>
-                        <span className="text-sm text-brand-800">
-                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (twohireProfile ?? "—")}
-                        </span>
-                      </div>
+                      {showTwoHireDetails && (
+                        <>
+                          <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                            <label className="flex items-center text-sm font-medium text-brand-700">QR-kode:</label>
+                            <span className="text-sm text-brand-800">
+                              {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (iotId ?? "—")}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                            <label className="flex items-center text-sm font-medium text-brand-700">2hire-profil:</label>
+                            <span className="text-sm text-brand-800">
+                              {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (twohireProfile ?? "—")}
+                            </span>
+                          </div>
+                        </>
+                      )}
                     </>
                   )}
                 </div>
