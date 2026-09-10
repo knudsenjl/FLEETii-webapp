@@ -18,13 +18,21 @@ export interface Vehicle2Hire {
   version: string;
   autonomyPercentage: string;
   autonomyPercentageUpdatedAt: string;
+  /** Same instant as autonomyPercentageUpdatedAt, as a real ISO timestamp rather than that field's pre-formatted "DD/MM/YYYY HH.MM" display string — added for VehiclesPage.tsx's per-vehicle health check (see getVehicleHealthIssues), which needs to do real timestamp arithmetic ("has this signal updated in the last N days") rather than just displaying it. Null if no reading has ever been received (matches "" for the display field). */
+  autonomyPercentageUpdatedAtIso: string | null;
   distanceCovered: string;
   distanceCoveredUpdatedAt: string;
+  /** See autonomyPercentageUpdatedAtIso's own doc comment — same reasoning, for distanceCoveredUpdatedAt. */
+  distanceCoveredUpdatedAtIso: string | null;
   online: string;
   onlineUpdatedAt: string;
+  /** See autonomyPercentageUpdatedAtIso's own doc comment — same reasoning, for onlineUpdatedAt. */
+  onlineUpdatedAtIso: string | null;
   /** 2hire's "trip_detected" generic signal ("TRUE"/"FALSE", same string convention as `online` above) — optional (unlike every other field here) since the checked-in mock fixture (a real captured 2hire response, predating this signal) doesn't have it; liveVehicleDataSource.ts always sets it. Drives BookingPage.tsx's hero-card car icon turning green. */
   tripDetected?: string;
   tripDetectedUpdatedAt?: string;
+  /** See autonomyPercentageUpdatedAtIso's own doc comment — same reasoning, for tripDetectedUpdatedAt. Optional for the same reason tripDetectedUpdatedAt itself is. */
+  tripDetectedUpdatedAtIso?: string | null;
   brakingSystemWarning: string;
   brakingSystemWarningUpdatedAt: string;
   drivingRelatedFailureWarning: string;
@@ -52,6 +60,8 @@ export interface VehicleGPS2Hire {
   vehicleId: string;
   lat: number;
   lng: number;
+  /** When this fix was reported, as a real ISO timestamp — added for VehiclesPage.tsx's per-vehicle health check (see getVehicleHealthIssues); previously GPS position carried no timestamp anywhere in the app at all. Null if genuinely unknown (shouldn't happen for a live source, but keeps mockVehicleDataSource.ts honest about not inventing one). */
+  updatedAtIso: string | null;
 }
 
 /** The contract every vehicle-data backend (mock fixtures today, a real 2hire API integration in future) must implement. Resolved at runtime by getVehicleDataSource() based on VITE_DATA_SOURCE. */

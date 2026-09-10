@@ -97,12 +97,16 @@ function toVehicle2Hire(
     version: profile.model_year ?? "",
     autonomyPercentage: formatPercentage(signal?.autonomy_percentage ?? null),
     autonomyPercentageUpdatedAt: formatSignalTimestamp(signal?.autonomy_percentage_updated_at ?? null),
+    autonomyPercentageUpdatedAtIso: signal?.autonomy_percentage_updated_at ?? null,
     distanceCovered: formatDistanceMeters(signal?.distance_covered_meters ?? null),
     distanceCoveredUpdatedAt: formatSignalTimestamp(signal?.distance_covered_updated_at ?? null),
+    distanceCoveredUpdatedAtIso: signal?.distance_covered_updated_at ?? null,
     online: signal?.online === true ? "TRUE" : "FALSE",
     onlineUpdatedAt: formatSignalTimestamp(signal?.online_updated_at ?? null),
+    onlineUpdatedAtIso: signal?.online_updated_at ?? null,
     tripDetected: signal?.trip_detected === true ? "TRUE" : "FALSE",
     tripDetectedUpdatedAt: formatSignalTimestamp(signal?.trip_detected_updated_at ?? null),
+    tripDetectedUpdatedAtIso: signal?.trip_detected_updated_at ?? null,
     brakingSystemWarning: "",
     brakingSystemWarningUpdatedAt: "",
     drivingRelatedFailureWarning: "",
@@ -168,7 +172,7 @@ export const liveVehicleDataSource: VehicleDataSource = {
   async getGpsPositions(): Promise<VehicleGPS2Hire[]> {
     const { data, error } = await supabase
       .from("vehicle_signals")
-      .select("vehicle_id, lat, lng")
+      .select("vehicle_id, lat, lng, position_updated_at")
       .not("lat", "is", null)
       .not("lng", "is", null);
 
@@ -180,6 +184,7 @@ export const liveVehicleDataSource: VehicleDataSource = {
       vehicleId: row.vehicle_id as string,
       lat: row.lat as number,
       lng: row.lng as number,
+      updatedAtIso: (row.position_updated_at as string | null) ?? null,
     }));
   },
 };

@@ -3,7 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
-import { use2hireVehicle } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { supabase } from "../lib/supabase";
@@ -11,6 +11,47 @@ import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 
 type Vehicle = DisplayVehicle;
+
+/** How long a tracked signal can go without a fresh reading before the "!" health button below flags it — see this page's own doc comment on getVehicleHealthIssues, and the 2026-09-10 webhook-delivery investigation that prompted this feature. */
+const SIGNAL_STALE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
+
+/** One signal this page's health check found missing or stale for a vehicle — lastReceivedIso is null if that signal has NEVER been received at all (as opposed to merely being older than SIGNAL_STALE_THRESHOLD_MS). */
+type HealthIssue = { label: string; lastReceivedIso: string | null };
+
+/** Danish "DD/MM HH:MM" formatting straight from a raw ISO timestamp — same output shape as shortSignalTimestamp (lib/bookings.ts), which instead takes 2hire's own pre-formatted "DD/MM/YYYY HH.MM" string; position has no such pre-formatted string of its own (see types.ts's VehicleGPS2Hire.updatedAtIso doc comment), so this formats directly from ISO instead. */
+function formatIsoShort(iso: string): string {
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/**
+ * Every 2hire signal this app actually tracks live, checked against
+ * SIGNAL_STALE_THRESHOLD_MS — drives the red "!" health button (admin/
+ * sysadm only, this page is already route-gated to them) right-aligned in
+ * the "Model" cell below. Returns [] for a fully healthy vehicle (button
+ * hidden), or one HealthIssue per signal that's either never arrived or has
+ * gone stale otherwise. Deliberately just the five signals with a real
+ * "current state" column today (see 2hire-webhook.mts's own header
+ * comment) — NOT the 2hire warning fields (engineOilWarning,
+ * serviceWarning, etc. — see vehicleDataSource/types.ts), which aren't
+ * wired to any real data yet; add those here (not in the rendering below)
+ * once they are, per this feature's own "may later be extended" brief.
+ */
+function getVehicleHealthIssues(vehicle: Vehicle, positionUpdatedAtIso: string | null): HealthIssue[] {
+  const now = Date.now();
+  const isStale = (iso: string | null) => !iso || now - new Date(iso).getTime() > SIGNAL_STALE_THRESHOLD_MS;
+
+  const checks: { label: string; iso: string | null }[] = [
+    { label: "Online", iso: vehicle.onlineUpdatedAtIso },
+    { label: "Position", iso: positionUpdatedAtIso },
+    { label: "Kilometerstand", iso: vehicle.distanceCoveredUpdatedAtIso },
+    { label: "Drivmiddelniveau", iso: vehicle.autonomyPercentageUpdatedAtIso },
+    { label: "Turdetektion", iso: vehicle.tripDetectedUpdatedAtIso ?? null },
+  ];
+
+  return checks.filter((check) => isStale(check.iso)).map((check) => ({ label: check.label, lastReceivedIso: check.iso }));
+}
 
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table", reached via
@@ -70,6 +111,9 @@ export function VehiclesPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
+  const gpsPositions = use2hireGPS();
+  /** vehicleId of the row whose "!" health popup is currently open, or null — a single piece of state (not per-row) since only one can sensibly be open at a time. */
+  const [openHealthVehicleId, setOpenHealthVehicleId] = useState<string | null>(null);
   /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
   const isSysadm = isSysadmRole(profile?.role);
 
@@ -133,6 +177,20 @@ export function VehiclesPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, [filterOpen]);
+
+  /** Closes the currently-open health popup on an outside click — a data attribute marker (not a ref) since, unlike filterRef above, there's one popup anchor per table row rather than a single fixed one. */
+  useEffect(() => {
+    if (!openHealthVehicleId) return;
+
+    function handleClickOutside(event: MouseEvent) {
+      if (!(event.target as HTMLElement).closest("[data-health-popup-anchor]")) {
+        setOpenHealthVehicleId(null);
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [openHealthVehicleId]);
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter(
@@ -415,6 +473,9 @@ export function VehiclesPage() {
                     {filteredVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;
                       const goToVehicle = () => navigate(`/vehicle-details/${vehicle.vehicleId}`, { state: { vehicle } });
+                      const positionUpdatedAtIso =
+                        gpsPositions.find((g) => g.vehicleId === vehicle.vehicleId)?.updatedAtIso ?? null;
+                      const healthIssues = getVehicleHealthIssues(vehicle, positionUpdatedAtIso);
                       return (
                         <tr
                           key={vehicle.vehicleId}
@@ -441,7 +502,43 @@ export function VehiclesPage() {
                               </span>
                             )}
                           </td>
-                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{vehicle.vehicle}</td>
+                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="truncate">{vehicle.vehicle}</span>
+                              {healthIssues.length > 0 && (
+                                <span className="relative shrink-0" data-health-popup-anchor>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setOpenHealthVehicleId((prev) => (prev === vehicle.vehicleId ? null : vehicle.vehicleId));
+                                    }}
+                                    aria-label={`Sundhedsproblem: mangler ${healthIssues.map((issue) => issue.label).join(", ")}`}
+                                    className="flex h-4 w-4 items-center justify-center rounded-full border border-red-500 bg-red-50 text-[0.65rem] font-bold leading-none text-red-600 transition hover:bg-red-100"
+                                  >
+                                    !
+                                  </button>
+                                  <InlinePopup
+                                    visible={openHealthVehicleId === vehicle.vehicleId}
+                                    align="right"
+                                    variant="warning"
+                                    message={
+                                      <ul className="space-y-1">
+                                        {healthIssues.map((issue) => (
+                                          <li key={issue.label}>
+                                            <span className="font-semibold">{issue.label}:</span>{" "}
+                                            {issue.lastReceivedIso
+                                              ? `sidst modtaget ${formatIsoShort(issue.lastReceivedIso)}`
+                                              : "aldrig modtaget"}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    }
+                                  />
+                                </span>
+                              )}
+                            </div>
+                          </td>
                           <td className="w-px whitespace-nowrap px-1 py-0.5 text-center">
                             <span
                               className={`mx-auto block h-2.5 w-2.5 rounded-full ${
