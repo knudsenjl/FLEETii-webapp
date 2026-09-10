@@ -35,12 +35,23 @@
 // per-subscription failure (log + collect, same "keep going, surface what
 // failed" pattern as FleetiiAdministrationPage.tsx's bulk-migration loop)
 // rather than aborting the whole run because one credential is bad.
+//
+// Unsubscribes before every subscribe (2026-09-10): live production logs
+// showed the SAME signal reading being delivered twice, one correctly
+// signed and one not, seconds apart — consistent with a stale registration
+// from an earlier subscribe call never having been cleared, still firing
+// alongside the current one. See setWebhookSubscription's own doc comment
+// in twoHireClient.ts. The unsubscribe step is best-effort and never
+// surfaced as a failure on its own (there being nothing to unsubscribe yet
+// is the normal case for a costumer's very first run).
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 import {
   getGlobalCredentials,
   subscribeToGenericSignals,
   subscribeToSpecificSignals,
+  unsubscribeFromGenericSignals,
+  unsubscribeFromSpecificSignals,
   type TwoHireCredentials,
 } from "./_shared/twoHireClient.js";
 
@@ -131,14 +142,37 @@ export default async (req: Request) => {
   // 2hire treats "generic" and "specific" as independent subscriptions, so
   // one succeeding doesn't imply the other did. Both attempted regardless
   // (same "keep going, surface what failed" pattern as the outer loop).
-  const topics: { label: string; subscribe: typeof subscribeToGenericSignals }[] = [
-    { label: "generic", subscribe: subscribeToGenericSignals },
-    { label: "specific", subscribe: subscribeToSpecificSignals },
+  const topics: {
+    label: string;
+    subscribe: typeof subscribeToGenericSignals;
+    unsubscribe: typeof unsubscribeFromGenericSignals;
+  }[] = [
+    { label: "generic", subscribe: subscribeToGenericSignals, unsubscribe: unsubscribeFromGenericSignals },
+    { label: "specific", subscribe: subscribeToSpecificSignals, unsubscribe: unsubscribeFromSpecificSignals },
   ];
 
   const failures: { label: string; error: string }[] = [];
   for (const subscription of subscriptions) {
     for (const topic of topics) {
+      // Unsubscribe FIRST, best-effort — collapses any registration(s) left
+      // over from a previous subscribe call (this app has called subscribe
+      // more than once over its life, and 2026-09-10's investigation found
+      // live evidence of duplicate deliveries consistent with an old
+      // registration never having been cleared, see setWebhookSubscription's
+      // own doc comment). "Nothing to unsubscribe" is an expected, common
+      // outcome (e.g. the very first time this ever runs for a costumer),
+      // so a failure here is logged but never added to `failures` — only a
+      // failed SUBSCRIBE (the step that actually matters) counts as one.
+      try {
+        await topic.unsubscribe(callbackUrl, subscription.credentials);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Ukendt fejl.";
+        console.warn(
+          `[2hire-subscribe] unsubscribeFrom${topic.label === "generic" ? "Generic" : "Specific"}Signals failed for ${subscription.label} (continuing to subscribe anyway):`,
+          message,
+        );
+      }
+
       try {
         await topic.subscribe(callbackUrl, subscription.credentials);
       } catch (error) {
