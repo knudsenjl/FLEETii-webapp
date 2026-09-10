@@ -79,10 +79,23 @@ export default async (req: Request) => {
   if (!isWebhookSignatureValid(rawBody, secret, signatureHeader)) {
     // Diagnostic-only: never logs the secret or the computed/expected
     // signature, just enough to tell a genuinely bad/missing signature
-    // apart from e.g. 2hire silently changing their signing scheme —
-    // header PRESENCE and body LENGTH, nothing that could help forge one.
+    // apart from e.g. 2hire silently changing their signing scheme — header
+    // PRESENCE and body LENGTH, nothing that could help forge one. The
+    // topic itself isn't secret (it's just "vehicle:<id>:generic:<name>",
+    // no different from what a valid delivery's history row already
+    // records), so it's safe to best-effort peek at it here PURELY for
+    // logging — this does NOT mean the body is trusted or processed, the
+    // request is still rejected with 401 either way; this is only here to
+    // tell whether failures cluster on one vehicle/costumer/signal type or
+    // are spread evenly (see 2026-09-10 intermittent-GPS-gap investigation).
+    let unverifiedTopic = "unparseable";
+    try {
+      unverifiedTopic = (JSON.parse(rawBody) as { topic?: string }).topic ?? "(no topic field)";
+    } catch {
+      // leave as "unparseable" — not valid JSON either
+    }
     console.warn(
-      `[2hire-webhook] signature validation failed — x-hub-signature ${signatureHeader ? "present" : "MISSING"}, body length ${rawBody.length}.`,
+      `[2hire-webhook] signature validation failed — x-hub-signature ${signatureHeader ? "present" : "MISSING"}, body length ${rawBody.length}, unverified topic: "${unverifiedTopic}".`,
     );
     return new Response(JSON.stringify({ error: "Ugyldig signatur." }), { status: 401 });
   }
