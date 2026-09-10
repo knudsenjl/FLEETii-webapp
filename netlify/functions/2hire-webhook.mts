@@ -133,13 +133,24 @@ export default async (req: Request) => {
 
   // Every signal delivery gets a history row — generic or specific, known
   // or not, see this file's own header comment and
-  // vehicle_signal_history_table.sql.
-  const { error: historyError } = await admin.from("vehicle_signal_history").insert({
-    vehicle_id: vehicleId,
-    signal_type: signal,
-    signal_value: body.payload.data,
-    signal_timestamp: new Date(body.payload.timestamp).toISOString(),
-  });
+  // vehicle_signal_history_table.sql. Upsert (ignoring a conflicting row)
+  // rather than a plain insert: 2hire sends every real signal reading
+  // TWICE, seconds apart, with the exact same signal_timestamp both times
+  // (confirmed 2026-09-10/11 — its own send-twice-for-reliability dispatch
+  // design, unrelated to the now-fixed duplicate-subscription bug). The
+  // vehicle_signal_history_delivery_unique.sql migration's uniqueness
+  // constraint on (vehicle_id, signal_type, signal_timestamp) is what makes
+  // this actually dedupe rather than just suppress a real error — without
+  // that constraint this upsert behaves identically to insert.
+  const { error: historyError } = await admin.from("vehicle_signal_history").upsert(
+    {
+      vehicle_id: vehicleId,
+      signal_type: signal,
+      signal_value: body.payload.data,
+      signal_timestamp: new Date(body.payload.timestamp).toISOString(),
+    },
+    { onConflict: "vehicle_id,signal_type,signal_timestamp", ignoreDuplicates: true },
+  );
   if (historyError) {
     // Postgres FK-violation code — 2hire is reporting a signal for a
     // vehicle_id vehicle_profiles has never heard of. Confirmed 2026-09-10
