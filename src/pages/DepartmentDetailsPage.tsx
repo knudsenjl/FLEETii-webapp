@@ -59,13 +59,18 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
  * any admin (see ProtectedRoute requireAdmin in App.tsx: "admin" and
  * "sysadm" both reach this page now), from CostumerDetailsPage's
  * "Administration af afdelinger" button, AdminFrontpage's own AFDELINGER
- * button, or KØRETØJER/BRUGERE's own fallback when the target costumer has
- * more than one department to pick from (costumerId/costumerName passed via
- * router state in every case — this page has no direct-URL fallback, since
- * there's no meaningful way to reach it without already knowing which
- * costumer; missing state redirects back to "/costumers"). It fetches its
- * own department list here rather than needing it pre-fetched and passed
- * along, unlike the old EditDepartmentsPage.tsx this absorbed (see below).
+ * button, KØRETØJER/BRUGERE's own fallback when the target costumer has
+ * more than one department to pick from, or CostumerDetailsPage.tsx's own
+ * "follow the header's Afdeling scope" effect (costumerId/costumerName
+ * passed via router state in every case — this page has no direct-URL
+ * fallback, since there's no meaningful way to reach it without already
+ * knowing which costumer; missing state redirects back to "/costumers").
+ * An optional departmentId alongside them (that last case's own use — see
+ * selectedDepartmentId's own doc comment) pre-selects a specific row
+ * instead of falling back to sessionStorage/auto-selecting the first one.
+ * It fetches its own department list here rather than needing it
+ * pre-fetched and passed along, unlike the old EditDepartmentsPage.tsx this
+ * absorbed (see below).
  *
  * 2026-08-28: this page absorbed EditDepartmentsPage.tsx's own table (view/
  * rename/address-edit) wholesale, at the user's request — the previous
@@ -104,7 +109,7 @@ export function DepartmentDetailsPage() {
   const location = useLocation();
   const { profile } = useAuth();
   const isSysadm = isSysadmRole(profile?.role);
-  const state = location.state as { costumerId?: string; costumerName?: string } | null;
+  const state = location.state as { costumerId?: string; costumerName?: string; departmentId?: string } | null;
   const costumerId = state?.costumerId ?? null;
   const costumerName = state?.costumerName ?? null;
 
@@ -112,13 +117,20 @@ export function DepartmentDetailsPage() {
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
   // Which row is highlighted — set on any row click, not just the edit icon.
-  // Seeded from sessionStorage (see the persistence effect below) rather
-  // than always starting null: this page fully remounts on browser-back
-  // from KØRETØJER/BRUGERE (a different route), which would otherwise reset
-  // the selection to null and let the auto-select-first effect below pick
+  // state.departmentId (optional — e.g. CostumerDetailsPage.tsx's own
+  // "follow the header's Afdeling scope" effect, landing here with one
+  // specific department already picked) wins first; otherwise seeded from
+  // sessionStorage (see the persistence effect below) rather than always
+  // starting null: this page fully remounts on browser-back from
+  // KØRETØJER/BRUGERE (a different route), which would otherwise reset the
+  // selection to null and let the auto-select-first effect below pick
   // whichever department sorts first, silently discarding whatever the
-  // admin had actually selected before navigating away.
+  // admin had actually selected before navigating away. Either way, the
+  // auto-select-first effect below still validates it against the loaded
+  // list once that arrives (e.g. a stale/foreign department_id), same as
+  // for the sessionStorage path.
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(() => {
+    if (state?.departmentId) return state.departmentId;
     if (!costumerId) return null;
     try {
       return sessionStorage.getItem(SELECTED_DEPARTMENT_KEY_PREFIX + costumerId);
