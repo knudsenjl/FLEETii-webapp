@@ -122,8 +122,6 @@ export function BookingDetailsPage() {
   const isAdmin = isAnyAdmin(profile?.role);
   /** admin/sysadm always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. */
   const mapVisible = isAdmin || (booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false);
-  /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. Not admin-gated, unlike VehicleDetailsPage's own use of this hook: the map itself is shown to a regular user for their own booking, so the address is too. */
-  const { address, addressLoading } = useReverseGeocode(booking?.vehicle, position, mapVisible);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-details-map:${booking?.vehicle ?? ""}`);
   /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this booking's vehicle so refreshing on a different booking's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, read from `liveVehicle` above rather than waiting on the `twoHireVehicle` destructured below since this hook call needs the value at mount, before that exists) — same reasoning as VehicleDetailsPage.tsx's identical default. Only evaluated once per mount (useState initializer), same caveat as there. */
@@ -152,6 +150,8 @@ export function BookingDetailsPage() {
     }
     prevTripDetectedRef.current = current;
   }, [liveVehicle?.tripDetected, liveEnabled, setLiveEnabled]);
+  /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. Not admin-gated, unlike VehicleDetailsPage's own use of this hook: the map itself is shown to a regular user for their own booking, so the address is too. Suppressed entirely while Live is on (`!liveEnabled`) — see VehicleDetailsPage.tsx's identical change for why: a driving vehicle's position changes on every broadcast tick, which was firing a fresh reverse-geocode request just as often. useReverseGeocode's own `enabled` semantics already do exactly what's wanted for free: address clears to null the instant Live turns on, and one fresh lookup fires automatically the instant Live turns back off (manually, or via the auto-stop-when-parked effect above) for wherever the vehicle actually ended up. */
+  const { address, addressLoading } = useReverseGeocode(booking?.vehicle, position, mapVisible && !liveEnabled);
 
   const {
     twoHireVehicle,
@@ -396,10 +396,10 @@ export function BookingDetailsPage() {
                     )}
                   </div>
 
-                  {/* Reverse-geocoded address of the map position above — see VehicleDetailsPage.tsx's identical row for why this styling/placement. Only rendered with a real GPS fix. */}
+                  {/* Reverse-geocoded address of the map position above — see VehicleDetailsPage.tsx's identical row for why this styling/placement, including why it goes blank (not "Ingen adresse fundet") while Live is on. Only rendered with a real GPS fix. */}
                   {position && (
                     <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
-                      {addressLoading ? "Henter adresse…" : (address ?? "Ingen adresse fundet")}
+                      {addressLoading ? "Henter adresse…" : liveEnabled ? "" : (address ?? "Ingen adresse fundet")}
                     </div>
                   )}
                 </div>

@@ -193,6 +193,9 @@ export function FleetManagementPage() {
     .filter((v) => v.departmentIds.some((id) => costumerDepartmentIds.has(id)))
     .map(toDisplayVehicle);
 
+  /** Which in-scope vehicles currently have 2hire's trip_detected signal true — keyed by vehicleId, used below to color a marker green (see LeafletMap's markerActive/ExtraMarker.active), same convention CarGlyph elsewhere already uses for this signal. Reactive to `vehicles` itself, which VehicleContext.tsx's "trip_detected" broadcast patches live — no polling needed. */
+  const tripDetectedVehicleIds = new Set(vehicles.filter((v) => v.tripDetected === "TRUE").map((v) => v.vehicleId));
+
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter(
     (v) =>
@@ -533,6 +536,7 @@ export function FleetManagementPage() {
                   zoom={savedMapView?.zoom ?? (primary ? 13 : 7)}
                   markerLat={center.lat}
                   markerLng={center.lng}
+                  markerActive={primary ? tripDetectedVehicleIds.has(primary.vehicleId) : false}
                   skipInitialFitBounds={savedMapView !== null}
                   onViewChange={(view) => {
                     mapViewRef.current = view;
@@ -549,6 +553,7 @@ export function FleetManagementPage() {
                     lng: g.lng,
                     tooltip: vehicleTooltip(g.vehicleId),
                     onClick: () => goToVehicleDetails(g.vehicleId),
+                    active: tripDetectedVehicleIds.has(g.vehicleId),
                   }))}
                   cluster={clusterMarkers}
                   permanentTooltips
