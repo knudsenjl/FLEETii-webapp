@@ -590,20 +590,6 @@ export function HandleVehiclePage() {
                         )}
                       </div>
                     </div>
-                    <div className="grid grid-cols-[0.4fr_1fr] px-1 py-0.5 text-sm text-brand-700">
-                      <div className="flex items-center justify-between whitespace-nowrap border-r border-brand-100 pr-1 font-medium">
-                        Status:
-                        {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. */}
-                        <span
-                          className={`h-2.5 w-2.5 shrink-0 rounded-full ${vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"}`}
-                          title={vehicle.status}
-                        />
-                      </div>
-                      <div className="whitespace-nowrap px-1">
-                        {vehicle.status}
-                        {vehicle.onlineUpdatedAt ? ` (${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
-                      </div>
-                    </div>
                     {/* Afdeling(er) + Hjemmeafdeling share this box rather
                         than being two separate rows in the outer field list
                         — they're tightly coupled (Hjemmeafdeling can only

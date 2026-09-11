@@ -374,39 +374,37 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex min-w-0 max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                {/* Not table-fixed: Bruger/Køretøj (or Reg.nr)/Periode/Online
-                    are all w-px (shrink to their actual content, same trick as
-                    VehiclesPage.tsx's own Online column — only
-                    meaningful under table-layout:auto, table-fixed ignores
-                    content entirely). Model has none of these — combined
-                    with `truncate` (which exempts it from contributing its
-                    full intrinsic width to the auto-layout algorithm), it
-                    absorbs whatever space the others leave over, same end
-                    result as the old table-fixed approach. */}
+                {/* Not table-fixed: Bruger/Køretøj (or Reg.nr)/Periode are all
+                    w-px (shrink to their actual content — only meaningful
+                    under table-layout:auto, table-fixed ignores content
+                    entirely). Model has none of these — combined with
+                    `truncate` (which exempts it from contributing its full
+                    intrinsic width to the auto-layout algorithm), it absorbs
+                    whatever space the others leave over, same end result as
+                    the old table-fixed approach. */}
                 <table className="w-full border-collapse text-[0.7rem]">
                   <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
-                      <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-right">Periode</th>
-                      <th className="w-px whitespace-nowrap border-b border-brand-200 px-1 py-0.5 text-center">Online</th>
+                      <th className="w-px whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-right">Periode</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
+                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
                       </tr>
                     )}
                     {!loading && error && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-red-600">{error}</td>
+                        <td colSpan={4} className="px-2 py-3 text-center text-red-600">{error}</td>
                       </tr>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
-                        <td colSpan={5} className="px-2 py-3 text-center text-brand-500">
+                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
                           {filterUser || filterVehicle || filterCostumerId || filterDepartment
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
@@ -461,17 +459,7 @@ export function AllBookingsPage() {
                             >
                               {twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle}
                             </td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 text-right">
-                              {formatBookingPeriod(booking, true)}
-                            </td>
-                            <td className="whitespace-nowrap px-1 py-0.5 text-center">
-                              <span
-                                className={`mx-auto block h-2.5 w-2.5 rounded-full ${
-                                  twoHireVehicle?.online === "TRUE" ? "bg-green-500" : "bg-red-500"
-                                }`}
-                                title={twoHireVehicle?.online === "TRUE" ? "Online" : "Offline"}
-                              />
-                            </td>
+                            <td className="whitespace-nowrap px-2 py-0.5 text-right">{formatBookingPeriod(booking, true)}</td>
                           </tr>
                         );
                       })}
