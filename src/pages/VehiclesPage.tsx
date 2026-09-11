@@ -56,7 +56,7 @@ type Vehicle = DisplayVehicle;
  * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
  * a vehicle both live there too), or create a new one via NewVehiclePage.
  *
- * Kunde/Afdeling scope comes from the global header ("Skift afdeling",
+ * Kunde/Afdeling scope comes from the global header ("Data Filter",
  * PageHeader.tsx — see AuthContext's costumerId/afdelingId) rather than a
  * page-local picker: targetCostumerId follows the header's costumerId
  * directly, and targetDepartmentId follows its afdelingId whenever that
@@ -97,7 +97,7 @@ export function VehiclesPage() {
   /** Which of the listed vehicles are administratively blocked (vehicle_profiles.blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") — keyed by vehicleId, for the "Blokeret" badge next to the Køretøj cell below. */
   const [blockedByVehicleId, setBlockedByVehicleId] = useState<Record<string, boolean>>({});
 
-  /** Page-local, transient (not persisted) — surfaced inside PageHeader's "Skift afdeling" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
+  /** Page-local, transient (not persisted) — surfaced inside PageHeader's "Data Filter" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterPlate, setFilterPlate] = useState("");
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();

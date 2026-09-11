@@ -15,8 +15,8 @@ import { InlinePopup } from "./InlinePopup";
 type SettingsMenuItem = { label: string; path: string };
 
 /**
- * One page-owned, non-persisted filter field surfaced inside the "Skift
- * afdeling" popup alongside Kunde/Afdeling — Bruger (AllBookingsPage.tsx/
+ * One page-owned, non-persisted filter field surfaced inside the "Data
+ * Filter" popup alongside Kunde/Afdeling — Bruger (AllBookingsPage.tsx/
  * DepartmentPage.tsx) and Køretøj (VehiclesPage.tsx/FleetManagementPage.tsx/
  * AllBookingsPage.tsx). The page itself still owns the state/option list/
  * scoping logic entirely; this is purely "render my own filter's <select>
@@ -62,7 +62,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a popup with a Kunde+Afdeling <select> pair, or a 3s "no departments" InlinePopup in the edge case a non-sysadm has none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the popup's Afdeling <select> lists every department under the currently-picked Kunde (or every department platform-wide once the Kunde <select> is "Alle" — see AuthContext's loadAvailableDepartments), and picking "Alle" in the Afdeling <select> alone (Kunde left as-is) persists that Kunde's own "every department" scope rather than fully unscoping — see handleSwitch's own doc comment. A regular admin never sees the Kunde <select> at all — only Afdeling, listing their own grant list, always scoped to their own single costumer. Deliberately styled as labeled <select> fields (same classes as every page's own "Filtrer" funnel popup, e.g. VehiclesPage.tsx) rather than a custom menu — this is the single, persisted source of truth for the app-wide Kunde/Afdeling scope those per-page popups themselves read (see the filter-redesign work), so sharing their visual language keeps the two families of popup legible as the same kind of control. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "Data Filter" button (only when logged in — funnel icon, same as every page's own former "Filtrer" button; opens a popup with a Kunde+Afdeling <select> pair, or a 3s "no departments" InlinePopup in the edge case a non-sysadm has none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the popup's Afdeling <select> lists every department under the currently-picked Kunde (or every department platform-wide once the Kunde <select> is "Alle" — see AuthContext's loadAvailableDepartments), and picking "Alle" in the Afdeling <select> alone (Kunde left as-is) persists that Kunde's own "every department" scope rather than fully unscoping — see handleSwitch's own doc comment. A regular admin never sees the Kunde <select> at all — only Afdeling, listing their own grant list, always scoped to their own single costumer. Deliberately styled as labeled <select> fields (same classes as every page's own "Filtrer" funnel popup, e.g. VehiclesPage.tsx) rather than a custom menu — this is the single, persisted source of truth for the app-wide Kunde/Afdeling scope those per-page popups themselves read (see the filter-redesign work), so sharing their visual language keeps the two families of popup legible as the same kind of control. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -74,7 +74,7 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  *
  * `rolleFilter`/`brugerFilter`/`navnFilter`/`koretoejFilter` (optional,
  * page-supplied — see PageHeaderFilterField): when given, render as extra
- * labeled <select> fields in the "Skift afdeling" popup below Kunde/
+ * labeled <select> fields in the "Data Filter" popup below Kunde/
  * Afdeling, in that fixed order (Rolle > Bruger/Navn hierarchy first, then
  * Køretøj, a separate axis) — letting that one popup double as the page's
  * whole "narrow what I'm looking at" control instead of a separate funnel
@@ -274,7 +274,7 @@ export function PageHeader({
             // map — same fix FleetManagementPage.tsx's own funnel-filter
             // button already needed for the same reason. Only became
             // reachable once Kunde/Afdeling scoping moved into this
-            // "Skift afdeling" control (see the filter-redesign work) —
+            // "Data Filter" control (see the filter-redesign work) —
             // before that, a sysadm on the map page used that page's own
             // local Kunde/Afdeling filter instead, which already had this
             // z-index.
@@ -291,19 +291,13 @@ export function PageHeader({
                     ? triggerNotImplemented("no-other-departments")
                     : setSwitcherOpen((open) => !open)
                 }
-                aria-label="Skift afdeling"
-                title="Skift afdeling"
+                aria-label="Data Filter"
+                title="Data Filter"
                 className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
               >
+                {/* Same funnel icon every page's own "Filtrer" popup uses (e.g. VehiclesPage.tsx) — this control is now that same family of filter, just app-wide/persisted for Kunde/Afdeling. */}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
-                  {/* Hierarchy/org-chart icon (root -> two child departments) —
-                      replaced the earlier swap-arrows icon, which looked too
-                      similar to the new reload button right next to it. */}
-                  <path d="M9 7h6" />
-                  <path d="M9 7v10h6" />
-                  <rect x="3" y="4" width="6" height="6" rx="1" fill="currentColor" stroke="none" />
-                  <rect x="15" y="4" width="6" height="6" rx="1" />
-                  <rect x="15" y="14" width="6" height="6" rx="1" />
+                  <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
                 </svg>
               </button>
               <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen afdelinger tilgængelige" align="right" />
@@ -315,9 +309,8 @@ export function PageHeader({
                 align="right"
                 message={
                   <>
-                    <p className="mb-2">Skift afdeling:</p>
                     {canSwitchToAll && (
-                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                         Kunde
                         <select
                           value={costumerId ?? ""}
@@ -333,7 +326,7 @@ export function PageHeader({
                         </select>
                       </label>
                     )}
-                    <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                    <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                       Afdeling
                       <select
                         value={afdelingId ?? ""}
@@ -362,7 +355,7 @@ export function PageHeader({
                     </label>
                     {/* Rolle/Bruger/Navn/Køretøj — a page's own extra filter fields (see PageHeaderFilterField), always in this fixed order regardless of which ones a given page actually supplies. mb-2 on every one but Køretøj, always the last of the four when present. */}
                     {rolleFilter && (
-                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                         {rolleFilter.label}
                         <select
                           value={rolleFilter.value}
@@ -379,7 +372,7 @@ export function PageHeader({
                       </label>
                     )}
                     {brugerFilter && (
-                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                         {brugerFilter.label}
                         <select
                           value={brugerFilter.value}
@@ -396,7 +389,7 @@ export function PageHeader({
                       </label>
                     )}
                     {navnFilter && (
-                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                         {navnFilter.label}
                         <select
                           value={navnFilter.value}
@@ -413,7 +406,7 @@ export function PageHeader({
                       </label>
                     )}
                     {koretoejFilter && (
-                      <label className="block text-[0.7rem] font-medium text-brand-700">
+                      <label className="block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                         {koretoejFilter.label}
                         <select
                           value={koretoejFilter.value}
@@ -449,7 +442,7 @@ export function PageHeader({
             </div>
           )}
           {isFullyAuthenticated && (
-            // Same Leaflet-beating z-[1001] as the "Skift afdeling" wrapper above.
+            // Same Leaflet-beating z-[1001] as the "Data Filter" wrapper above.
             <div className="relative z-[1001]">
               <button
                 type="button"

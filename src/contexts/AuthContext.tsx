@@ -56,7 +56,7 @@ type ProfileRow = {
   costumers: { name: string } | null;
 };
 
-/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). For a sysadm, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName/costumerId are only ever populated on that branch, letting PageHeader.tsx disambiguate/group same-named departments across different costumers (name alone isn't a safe grouping key). */
+/** One department a user is allowed to switch into (see user_departments_table.sql) — the set PageHeader's "Data Filter" control offers, distinct from afdelingId (the one currently active). For a sysadm, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName/costumerId are only ever populated on that branch, letting PageHeader.tsx disambiguate/group same-named departments across different costumers (name alone isn't a safe grouping key). */
 export interface DepartmentOption {
   department_id: string;
   name: string;
@@ -91,7 +91,7 @@ interface AuthContextValue {
   costumerName: string | null;
   /** The logged-in user's costumer_id (uuid). Alias for profile?.costumer_id — compare/scope queries against this (e.g. UserDetailsPage's department dropdown, DepartmentPage's department picker), not costumerName. */
   costumerId: string | null;
-  /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by "Skift afdeling" (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
+  /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by the "Data Filter" control (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
   availableDepartments: DepartmentOption[];
   /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A sysadm may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (PageHeader.tsx never offers an "Alle" entry to switch to for them). A sysadm may additionally pass a second argument, costumerId, together with a null departmentId — "just this Kunde, every department under it" — which switch-department.mts persists as department_id=null/costumer_id=<given>, distinct from plain "Alle" (both null). Ignored (never sent to the function) unless departmentId is null and the caller is a sysadm. */
   switchDepartment: (departmentId: string | null, costumerId?: string | null) => Promise<string | null>;

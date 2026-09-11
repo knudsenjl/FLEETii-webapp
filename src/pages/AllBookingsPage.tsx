@@ -46,7 +46,7 @@ type Booking = {
  *
  * A sysadm (no department of their own) sees every booking platform-wide by
  * default, narrowed by the global header's Kunde/Afdeling scope (PageHeader's
- * "Skift afdeling" — see AuthContext's costumerId/afdelingId) exactly like
+ * "Data Filter" — see AuthContext's costumerId/afdelingId) exactly like
  * every other admin page now reads it, rather than a page-local Kunde/
  * Afdeling filter of its own. A regular admin never has an unscoped view to
  * begin with — they're always scoped to their own single department. The
@@ -72,7 +72,7 @@ export function AllBookingsPage() {
   const [users, setUsers] = useState<
     { user_id: string; email: string; user_ident: string | null; department_id: string | null }[]
   >([]);
-  /** Page-local, transient (not persisted) — both surfaced inside PageHeader's "Skift afdeling" popup as Bruger/Køretøj <select> fields rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
+  /** Page-local, transient (not persisted) — both surfaced inside PageHeader's "Data Filter" popup as Bruger/Køretøj <select> fields rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
   /** Every department under the global header's active costumerId (sysadm only) — still needed for scopedDepartmentIds below, to turn a Kunde-only scope (costumerId set, afdelingId null) into a department-id set the client-side booking filter can match against. */
@@ -128,7 +128,7 @@ export function AllBookingsPage() {
   const departmentUsers = isSysadm ? users : users.filter((u) => u.department_id === afdelingId);
 
   // Re-fetches whenever the active department changes (via PageHeader's
-  // "Skift afdeling") — user_profiles' SELECT RLS
+  // "Data Filter") — user_profiles' SELECT RLS
   // (user_profiles_select_admin_own_department) scopes rows to the admin's
   // CURRENT department, so an empty dependency array left this list (and
   // the filter popover's "Bruger" dropdown built from it below) stuck

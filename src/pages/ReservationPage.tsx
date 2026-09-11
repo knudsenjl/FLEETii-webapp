@@ -122,7 +122,7 @@ function ceilToInterval(date: Date, intervalMinutes: number): Date {
  * extra required "Kunde/afdeling" row comes first, letting them pick which
  * department platform-wide this booking belongs to — every department,
  * shown as "Kunde / Afdeling" (departmentOptions), same convention as
- * PageHeader's own "Skift afdeling". That pick is what actually scopes
+ * PageHeader's own "Data Filter". That pick is what actually scopes
  * AvailablePage's vehicle list (not afdelingId, which is null for them) and
  * is what ConfirmPage eventually writes as the booking's department_id.
  * Pre-filled to the booking's own current department when editing (via
@@ -171,7 +171,7 @@ export function ReservationPage() {
   const [error, setError] = useState<string | null>(null);
 
   // Re-fetches whenever the active department changes (via PageHeader's
-  // "Skift afdeling") — user_profiles' SELECT RLS
+  // "Data Filter") — user_profiles' SELECT RLS
   // (user_profiles_select_admin_own_department) scopes rows to the admin's
   // CURRENT department, so an empty dependency array left this list (and
   // the "bruger" dropdown built from it below) stuck showing whichever
@@ -281,7 +281,7 @@ export function ReservationPage() {
   // A plain admin can always book for THEMSELVES too, regardless of
   // whether the active department (afdelingId) happens to be their own
   // hjemmeafdeling — an admin with a user_departments grant for another
-  // department (see "Skift afdeling") would otherwise vanish from their
+  // department (see "Data Filter") would otherwise vanish from their
   // own Bruger list the moment they switch into it, since their
   // user_profiles.department_id (home department) no longer matches
   // afdelingId. Their own row is always RLS-visible regardless (see
@@ -523,7 +523,7 @@ export function ReservationPage() {
     return { start, end, brugerLabel };
   };
 
-  /** Display-ready "Kunde/afdeling" label matching the resolved departmentId below — the picked department's own "Kunde / Afdeling" for a sysadm, or the viewer's own afdeling (with costumerName, when set) for every other role. Same "Kunde / Afdeling" (space-slash-space) format as PageHeader's "Skift afdeling" dropdown and this page's own Kunde/afdeling select just below — not PageHeader's OTHER, no-space "Afdeling:" summary line convention. Resolved here (not re-fetched on ConfirmPage) same as brugerLabel above — passed through router state all the way to ConfirmPage, which shows it as a final, read-only "security check" row before the booking is actually written. */
+  /** Display-ready "Kunde/afdeling" label matching the resolved departmentId below — the picked department's own "Kunde / Afdeling" for a sysadm, or the viewer's own afdeling (with costumerName, when set) for every other role. Same "Kunde / Afdeling" (space-slash-space) format as PageHeader's "Data Filter" dropdown and this page's own Kunde/afdeling select just below — not PageHeader's OTHER, no-space "Afdeling:" summary line convention. Resolved here (not re-fetched on ConfirmPage) same as brugerLabel above — passed through router state all the way to ConfirmPage, which shows it as a final, read-only "security check" row before the booking is actually written. */
   const departmentLabel = isSysadm
     ? (() => {
         const selected = departmentOptions.find((d) => d.department_id === selectedDepartmentId);

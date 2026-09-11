@@ -183,7 +183,7 @@ export function DepartmentPage() {
   // before.
   const departmentUsers = users;
 
-  /** Page-local, transient (not persisted) — all three surfaced inside PageHeader's "Skift afdeling" popup as Rolle/Bruger/Navn <select> fields (see PageHeaderFilterField) rather than a separate funnel popup of this page's own; the popup is genuinely gone now, not just shrunk — nothing left here to give it a button for. */
+  /** Page-local, transient (not persisted) — all three surfaced inside PageHeader's "Data Filter" popup as Rolle/Bruger/Navn <select> fields (see PageHeaderFilterField) rather than a separate funnel popup of this page's own; the popup is genuinely gone now, not just shrunk — nothing left here to give it a button for. */
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
   const [filterRolle, setFilterRolle] = useState("");

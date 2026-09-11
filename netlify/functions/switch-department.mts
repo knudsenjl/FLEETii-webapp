@@ -1,5 +1,5 @@
 // Netlify Function: lets a sysadm switch their own active department
-// ("Skift afdeling", see PageHeader.tsx) into ANY department platform-wide,
+// ("Data Filter", see PageHeader.tsx) into ANY department platform-wide,
 // not just one they hold a user_departments grant for. AuthContext.tsx's
 // existing client-side switchDepartment (a direct user_profiles UPDATE) is
 // structurally unable to do this for a sysadm — see

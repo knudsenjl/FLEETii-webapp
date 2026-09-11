@@ -196,7 +196,7 @@ export function BookingDetailsPage() {
   /** "Rediger reservation" is always shown for role=admin; for role=user, only when Tillad_rediger_reservation is true for this department. */
   const canShowEditButton = isAdmin || userMayEditBooking;
 
-  /** "Kunde/afdeling:" row's data — this booking's own department (booking.departmentId) plus its costumer's name, fetched fresh rather than trusted from router state (unlike ConfirmPage, which resolves it once at booking-creation time and passes it straight through — a booking viewed here may be old, or reached by direct fetch-by-id, with no such state at all). departments'/costumers' SELECT RLS is unrestricted for any authenticated user, same as PageHeader's own "Skift afdeling" list. */
+  /** "Kunde/afdeling:" row's data — this booking's own department (booking.departmentId) plus its costumer's name, fetched fresh rather than trusted from router state (unlike ConfirmPage, which resolves it once at booking-creation time and passes it straight through — a booking viewed here may be old, or reached by direct fetch-by-id, with no such state at all). departments'/costumers' SELECT RLS is unrestricted for any authenticated user, same as PageHeader's own "Data Filter" list. */
   const [departmentInfo, setDepartmentInfo] = useState<{ name: string; costumerName: string | null } | null>(null);
   useEffect(() => {
     if (!booking?.departmentId) {
@@ -219,7 +219,7 @@ export function BookingDetailsPage() {
       cancelled = true;
     };
   }, [booking?.departmentId]);
-  /** "Kunde/afdeling:" row's display text — "Kunde / Afdeling" (space-slash-space), same format as ConfirmPage's own read-only summary row and PageHeader's "Skift afdeling" dropdown. */
+  /** "Kunde/afdeling:" row's display text — "Kunde / Afdeling" (space-slash-space), same format as ConfirmPage's own read-only summary row and PageHeader's "Data Filter" dropdown. */
   const departmentLabel = departmentInfo
     ? departmentInfo.costumerName
       ? `${departmentInfo.costumerName} / ${departmentInfo.name}`

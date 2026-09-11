@@ -61,7 +61,7 @@ function isPageReload(): boolean {
  * center the map) and the rest as extra markers. Clicking any marker jumps
  * to VehicleDetailsPage for that vehicle.
  *
- * Kunde/Afdeling scope comes from the global header ("Skift afdeling",
+ * Kunde/Afdeling scope comes from the global header ("Data Filter",
  * PageHeader.tsx — see AuthContext's costumerId/afdelingId), same as every
  * other admin page now reads it, rather than a page-local Kunde/Afdeling
  * picker of its own — same "navigation wins" override as VehiclesPage.tsx's
@@ -130,7 +130,7 @@ export function FleetManagementPage() {
   const targetDepartmentId = navigationSeed?.department || effectiveAfdelingId;
 
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
-  /** Page-local, transient (not persisted, unlike Kunde/Afdeling above) — surfaced inside PageHeader's "Skift afdeling" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. Still snapshotted/restored the same way as before (sessionStorage + goToVehicleDetails' own router state) — only its UI moved. */
+  /** Page-local, transient (not persisted, unlike Kunde/Afdeling above) — surfaced inside PageHeader's "Data Filter" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. Still snapshotted/restored the same way as before (sessionStorage + goToVehicleDetails' own router state) — only its UI moved. */
   const [filterPlate, setFilterPlate] = useState(savedSnapshot?.filters?.plate ?? "");
   /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern the old funnel popup used. */
   const [noGpsOpen, setNoGpsOpen] = useState(false);
