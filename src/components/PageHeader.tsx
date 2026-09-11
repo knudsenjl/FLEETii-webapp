@@ -72,17 +72,27 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * untouched — same state, same handlers — only the two things named above
  * change, so there's nothing to duplicate on the compact pages.
  *
- * `brugerFilter`/`koretoejFilter` (optional, page-supplied — see
- * PageHeaderFilterField): when given, render as extra labeled <select>
- * fields in the "Skift afdeling" popup below Kunde/Afdeling, letting that
- * one popup double as the page's whole "narrow what I'm looking at"
- * control instead of a separate funnel popup. Absent on pages with no such
- * concept (e.g. DepartmentPage.tsx has no Køretøj). */
+ * `rolleFilter`/`brugerFilter`/`navnFilter`/`koretoejFilter` (optional,
+ * page-supplied — see PageHeaderFilterField): when given, render as extra
+ * labeled <select> fields in the "Skift afdeling" popup below Kunde/
+ * Afdeling, in that fixed order (Rolle > Bruger/Navn hierarchy first, then
+ * Køretøj, a separate axis) — letting that one popup double as the page's
+ * whole "narrow what I'm looking at" control instead of a separate funnel
+ * popup. Absent on pages with no such concept (e.g. VehiclesPage.tsx has
+ * no Bruger/Rolle/Navn). */
 export function PageHeader({
   compact = false,
+  rolleFilter,
   brugerFilter,
+  navnFilter,
   koretoejFilter,
-}: { compact?: boolean; brugerFilter?: PageHeaderFilterField; koretoejFilter?: PageHeaderFilterField } = {}) {
+}: {
+  compact?: boolean;
+  rolleFilter?: PageHeaderFilterField;
+  brugerFilter?: PageHeaderFilterField;
+  navnFilter?: PageHeaderFilterField;
+  koretoejFilter?: PageHeaderFilterField;
+} = {}) {
   const {
     signOut,
     profile,
@@ -272,7 +282,12 @@ export function PageHeader({
               <button
                 type="button"
                 onClick={() =>
-                  availableDepartments.length === 0 && !canSwitchToAll && !brugerFilter && !koretoejFilter
+                  availableDepartments.length === 0 &&
+                  !canSwitchToAll &&
+                  !rolleFilter &&
+                  !brugerFilter &&
+                  !navnFilter &&
+                  !koretoejFilter
                     ? triggerNotImplemented("no-other-departments")
                     : setSwitcherOpen((open) => !open)
                 }
@@ -318,7 +333,7 @@ export function PageHeader({
                         </select>
                       </label>
                     )}
-                    <label className={`block text-[0.7rem] font-medium text-brand-700 ${brugerFilter || koretoejFilter ? "mb-2" : ""}`}>
+                    <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                       Afdeling
                       <select
                         value={afdelingId ?? ""}
@@ -345,8 +360,26 @@ export function PageHeader({
                         ))}
                       </select>
                     </label>
+                    {/* Rolle/Bruger/Navn/Køretøj — a page's own extra filter fields (see PageHeaderFilterField), always in this fixed order regardless of which ones a given page actually supplies. mb-2 on every one but Køretøj, always the last of the four when present. */}
+                    {rolleFilter && (
+                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                        {rolleFilter.label}
+                        <select
+                          value={rolleFilter.value}
+                          onChange={(e) => rolleFilter.onChange(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Alle</option>
+                          {rolleFilter.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                     {brugerFilter && (
-                      <label className={`block text-[0.7rem] font-medium text-brand-700 ${koretoejFilter ? "mb-2" : ""}`}>
+                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                         {brugerFilter.label}
                         <select
                           value={brugerFilter.value}
@@ -355,6 +388,23 @@ export function PageHeader({
                         >
                           <option value="">Alle</option>
                           {brugerFilter.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {navnFilter && (
+                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                        {navnFilter.label}
+                        <select
+                          value={navnFilter.value}
+                          onChange={(e) => navnFilter.onChange(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Alle</option>
+                          {navnFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>
@@ -379,11 +429,13 @@ export function PageHeader({
                         </select>
                       </label>
                     )}
-                    {(brugerFilter?.value || koretoejFilter?.value) && (
+                    {(rolleFilter?.value || brugerFilter?.value || navnFilter?.value || koretoejFilter?.value) && (
                       <button
                         type="button"
                         onClick={() => {
+                          rolleFilter?.onChange("");
                           brugerFilter?.onChange("");
+                          navnFilter?.onChange("");
                           koretoejFilter?.onChange("");
                         }}
                         className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
