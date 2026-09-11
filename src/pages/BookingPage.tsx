@@ -352,6 +352,7 @@ export function BookingPage() {
                   markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
                   onMarkerClick={goToVehicleDetails}
                   className="absolute inset-0"
+                  followMarker
                 />
                 {!position && (
                   <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">

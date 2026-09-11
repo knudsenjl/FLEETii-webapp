@@ -385,6 +385,7 @@ export function BookingDetailsPage() {
                       onMarkerClick={goToVehicleDetails}
                       className="absolute inset-0"
                       liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
+                      followMarker
                     />
                     {!position && (
                       <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
