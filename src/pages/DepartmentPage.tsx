@@ -76,7 +76,7 @@ type ProfileQueryRow = {
  * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { costumerId, profile } = useAuth();
+  const { costumerId, afdelingId, availableDepartments, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -93,6 +93,23 @@ export function DepartmentPage() {
   /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
   const targetDepartmentId = state?.departmentId ?? null;
   const targetDepartmentName = state?.departmentName ?? null;
+
+  /**
+   * UNLOCKED mode only: the global header's active department (afdelingId),
+   * carried over IF (and only if) it actually belongs to targetCostumerId —
+   * otherwise null, i.e. no narrowing. This is the "navigation wins" formula
+   * (see the filter-redesign plan's Common pattern): without the membership
+   * check, navigating here for a DIFFERENT costumer than the header's
+   * currently-active department would filter every one of this costumer's
+   * users out (none of them have that foreign department_id), showing an
+   * empty table instead of the whole costumer's users. For a regular admin
+   * this is a no-op either way — RLS already limits departmentUsers to their
+   * own single department regardless (see this component's own doc comment).
+   */
+  const effectiveAfdelingId =
+    afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
+      ? afdelingId
+      : null;
 
   /** Whether targetDepartmentId's OWN department_settings shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — deliberately the LISTED department's own setting, not the viewing admin's currently-active one. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears, only its value source swaps. UNLOCKED mode (targetDepartmentId null) has no single department's setting to apply across users from several departments at once, so useIdentSettings' own fail-closed default (plain E-mail) applies uniformly there instead. */
   const { useUserIdent } = useIdentSettings(targetDepartmentId);
@@ -171,8 +188,6 @@ export function DepartmentPage() {
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
-  /** UNLOCKED mode only — narrows the whole-costumer user list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
-  const [filterAfdeling, setFilterAfdeling] = useState("");
   const [filterRolle, setFilterRolle] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
 
@@ -191,35 +206,27 @@ export function DepartmentPage() {
 
   /** Mirrors the Bruger column's own display logic (useUserIdent toggle) so the filter's dropdown values and matching always agree with what's actually shown in the table. */
   const brugerValue = (user: ProfileRow) => (useUserIdent ? user.user_ident || user.email : user.email) ?? "—";
+  /** UNLOCKED mode only — the global header's Afdeling (effectiveAfdelingId above) narrows departmentUsers before the page's own Rolle > Bruger/Navn filter hierarchy applies on top; LOCKED mode's departmentUsers is already just one department, so this is a no-op there. Kept as its own name purely so the rest of this file's filter-chain reads the same as before the local Afdeling picker was removed. */
+  const afdelingScopedUsers = effectiveAfdelingId ? departmentUsers.filter((u) => u.department_id === effectiveAfdelingId) : departmentUsers;
   /**
-   * The filter fields form a hierarchy — Afdeling > Rolle > Bruger/Navn (UNLOCKED
-   * mode only — LOCKED mode has no Afdeling tier at all, departmentUsers above
-   * is already scoped to one department there, and the dropdown below isn't
-   * rendered) — where each field's own option list is scoped down by whatever
-   * is picked ABOVE it, never by a field at its own level or below. Bruger and
-   * Navn sit at the same bottom rung (both identify one specific user), so they
-   * share the same scope rather than narrowing each other.
+   * The remaining filter fields form a hierarchy — Rolle > Bruger/Navn —
+   * where each field's own option list is scoped down by whatever is picked
+   * ABOVE it, never by a field at its own level or below. Bruger and Navn sit
+   * at the same bottom rung (both identify one specific user), so they share
+   * the same scope rather than narrowing each other.
    */
-  const afdelingScopedUsers = filterAfdeling ? departmentUsers.filter((u) => u.department_id === filterAfdeling) : departmentUsers;
   const rolleScopedUsers = filterRolle ? afdelingScopedUsers.filter((u) => u.role === filterRolle) : afdelingScopedUsers;
-  /** Deduped by department_id (the filter's actual match key) while keeping department_name for the option label — a Map collapses repeats from users sharing the same department. UNLOCKED mode only; stays empty (and unused) in LOCKED mode since departmentUsers there is already just one department. */
-  const afdelingOptions = Array.from(
-    new Map(departmentUsers.map((u) => [u.department_id, u.department_name] as const)).entries(),
-  )
-    .filter((entry): entry is [string, string] => entry[0] !== null && entry[1] !== null)
-    .sort((a, b) => a[1].localeCompare(b[1]));
   const roleOptions = Array.from(new Set(afdelingScopedUsers.map((u) => u.role))).sort();
   const brugerOptions = Array.from(new Set(rolleScopedUsers.map(brugerValue))).sort();
   const navnOptions = Array.from(new Set(rolleScopedUsers.map((u) => u.full_name ?? "—"))).sort();
 
-  const filteredUsers = departmentUsers.filter(
+  const filteredUsers = afdelingScopedUsers.filter(
     (u) =>
       (!filterBruger || brugerValue(u) === filterBruger) &&
       (!filterNavn || (u.full_name ?? "—") === filterNavn) &&
-      (!filterAfdeling || u.department_id === filterAfdeling) &&
       (!filterRolle || u.role === filterRolle),
   );
-  const hasActiveFilter = Boolean(filterBruger || filterNavn || filterAfdeling || filterRolle);
+  const hasActiveFilter = Boolean(filterBruger || filterNavn || filterRolle);
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -265,32 +272,6 @@ export function DepartmentPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge brugere på disse kriterier:</p>
-                        {/* LOCKED mode (targetDepartmentId set) hides this entirely — nothing to widen back out to from in-page, see this component's own doc comment. */}
-                        {!targetDepartmentId && (
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Afdeling
-                            <select
-                              value={filterAfdeling}
-                              onChange={(e) => {
-                                // Changing an upstream field invalidates every field below it in
-                                // the Afdeling > Rolle > Bruger/Navn hierarchy, so all of them
-                                // reset rather than risking a stale, now-impossible combination.
-                                setFilterAfdeling(e.target.value);
-                                setFilterRolle("");
-                                setFilterBruger("");
-                                setFilterNavn("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {afdelingOptions.map(([departmentId, departmentName]) => (
-                                <option key={departmentId} value={departmentId}>
-                                  {departmentName}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Rolle
                           <select
@@ -319,8 +300,8 @@ export function DepartmentPage() {
                               setFilterBruger(value);
                               if (!value) return;
                               // Bruger/Navn each identify one specific user, so — unlike
-                              // Afdeling/Rolle above — picking one flows UP the hierarchy instead
-                              // of down: it fills in Afdeling/Rolle (and the other of
+                              // Rolle above — picking one flows UP the hierarchy instead
+                              // of down: it fills in Rolle (and the other of
                               // Bruger/Navn) from that user's own actual values, even if those
                               // were still "Alle" beforehand. Matched against the full
                               // departmentUsers list (not the already-scoped option source)
@@ -328,7 +309,6 @@ export function DepartmentPage() {
                               // so the match is unambiguous regardless of the current scope.
                               const match = departmentUsers.find((u) => brugerValue(u) === value);
                               if (match) {
-                                setFilterAfdeling(match.department_id ?? "");
                                 setFilterRolle(match.role);
                                 setFilterNavn(match.full_name ?? "—");
                               }
@@ -356,7 +336,6 @@ export function DepartmentPage() {
                               // first matching user — an accepted approximation for this edge case.
                               const match = departmentUsers.find((u) => (u.full_name ?? "—") === value);
                               if (match) {
-                                setFilterAfdeling(match.department_id ?? "");
                                 setFilterRolle(match.role);
                                 setFilterBruger(brugerValue(match));
                               }
@@ -377,7 +356,6 @@ export function DepartmentPage() {
                             onClick={() => {
                               setFilterBruger("");
                               setFilterNavn("");
-                              setFilterAfdeling("");
                               setFilterRolle("");
                             }}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
