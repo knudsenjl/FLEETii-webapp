@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -145,7 +145,29 @@ export function VehicleDetailsPage() {
    */
   const liveVehicle = allVehicles.find((v) => v.vehicleId === vehicle?.vehicleId) ?? null;
   const gpsPositions = use2hireGPS();
+  /** The vehicle's OWN, always-current position — feeds the marker (via markerLat/markerLng below), deliberately NOT the map's own center — see stableCenter below. */
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
+  /**
+   * The map's own center — deliberately NOT re-derived on every live
+   * position update (same pattern as FleetManagementPage.tsx's own
+   * stableCenter). Without this, passing `position.lat`/`position.lng`
+   * straight into LeafletMap's `lat`/`lng` props would change them on
+   * every single live GPS tick (the "Live" toggle's broadcast — see
+   * VehicleContext.tsx), which LeafletMap treats as a genuine recenter
+   * request and rebuilds the WHOLE map for — including resetting the zoom
+   * back to whatever the `zoom` prop below says, discarding any zoom level
+   * the admin had manually set. `markerLat`/`markerLng` (fed `position`
+   * directly, not this) is what actually tracks the live position — see
+   * LeafletMap's own doc comment on how a change there just slides the
+   * marker in place without touching the map's view at all.
+   */
+  const stableCenter = useMemo(
+    () => (position ? { lat: position.lat, lng: position.lng } : DENMARK_CENTER),
+    // position.lat/position.lng deliberately excluded — see this constant's
+    // own doc comment just above.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [position?.vehicleId],
+  );
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this vehicle so refreshing on a different vehicle's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`vehicle-details-map:${vehicle?.vehicleId ?? ""}`);
   /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this vehicle so refreshing on a different vehicle's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, same one driving the header's CarGlyph icon above) — a driving vehicle's position is the one you'd actually want to watch move, so this saves the admin an extra click on the common "just clicked in from a moving vehicle" path; a parked vehicle still defaults off, same as before. Reads `liveVehicle` first (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) so the default reflects the freshest data available AT MOUNT — still only evaluated once per mount (useState initializer), so it won't retroactively flip on once the mount effect's refetch below resolves; the toggle stays user-controlled from then on, same as the pre-existing reload-persistence behavior. */
@@ -164,6 +186,26 @@ export function VehicleDetailsPage() {
     if (liveEnabled) void refreshVehicles();
     return () => setLiveTracking(false);
   }, [liveEnabled, setLiveTracking, refreshVehicles]);
+  /**
+   * Auto-stops the Live toggle the instant this vehicle's trip actually
+   * ENDS (trip_detected TRUE -> FALSE) while Live is on — now driven by a
+   * genuine push (VehicleContext.tsx's "trip_detected" broadcast handler
+   * patches `allVehicles`/`liveVehicle` live, no polling). Deliberately
+   * only fires on that specific transition (tracked via
+   * prevTripDetectedRef), not just "whenever liveVehicle.tripDetected is
+   * currently FALSE" — an admin should still be able to manually turn Live
+   * on for an already-parked vehicle (e.g. just to watch its position)
+   * without this immediately switching it back off.
+   */
+  const prevTripDetectedRef = useRef(liveVehicle?.tripDetected);
+  useEffect(() => {
+    const previous = prevTripDetectedRef.current;
+    const current = liveVehicle?.tripDetected;
+    if (liveEnabled && previous === "TRUE" && current === "FALSE") {
+      setLiveEnabled(false);
+    }
+    prevTripDetectedRef.current = current;
+  }, [liveVehicle?.tripDetected, liveEnabled, setLiveEnabled]);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -674,8 +716,8 @@ export function VehicleDetailsPage() {
                 <div className="flex flex-1 flex-col gap-1">
                   <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                     <LeafletMap
-                      lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
-                      lng={savedMapView?.lng ?? position?.lng ?? DENMARK_CENTER.lng}
+                      lat={savedMapView?.lat ?? stableCenter.lat}
+                      lng={savedMapView?.lng ?? stableCenter.lng}
                       zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
                       markerLat={position?.lat ?? DENMARK_CENTER.lat}
                       markerLng={position?.lng ?? DENMARK_CENTER.lng}
