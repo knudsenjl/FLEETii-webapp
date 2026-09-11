@@ -109,8 +109,8 @@ export function VehiclesPage() {
   }, [costumerId, isLocked]);
   /** Navigation (router state) wins over the global header ONLY until the header itself is touched (see headerTouchedCostumer above) — same "filtering by navigation" precedent as targetDepartmentId's LOCKED case below, but no longer permanent for Kunde specifically. Otherwise follows the header's own costumerId directly (global for every role, not just sysadm — a regular admin's costumerId is always their own anyway). */
   const targetCostumerId = headerTouchedCostumer ? costumerId : (state?.costumerId ?? costumerId);
-  /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. */
-  const targetCostumerName = isSysadm ? (state?.costumerName ?? costumerName) : null;
+  /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. Same headerTouchedCostumer gate as targetCostumerId above — without it, the "Køretøjer hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual vehicle list) had already moved on to a different Kunde. */
+  const targetCostumerName = isSysadm ? (headerTouchedCostumer ? costumerName : (state?.costumerName ?? costumerName)) : null;
 
   /** UNLOCKED case only — the global header's active afdelingId, carried over IF it actually belongs to targetCostumerId's departments (checked via availableDepartments), else null (no narrowing, whole-costumer view). Same "navigation wins" membership check as DepartmentPage.tsx's own effectiveAfdelingId — without it, switching costumer via router state while the header still has a DIFFERENT costumer's department active would incorrectly try to scope vehicles to a department outside targetCostumerId. */
   const effectiveAfdelingId =

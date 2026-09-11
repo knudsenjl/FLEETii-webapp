@@ -75,7 +75,7 @@ type ProfileQueryRow = {
  * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { costumerId, afdelingId, availableDepartments, profile } = useAuth();
+  const { costumerId, costumerName, afdelingId, availableDepartments, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -100,7 +100,8 @@ export function DepartmentPage() {
     }
   }, [costumerId, isLocked]);
   const targetCostumerId = headerTouchedCostumer ? costumerId : (state?.costumerId ?? costumerId);
-  const targetCostumerName = isSysadm ? (state?.costumerName ?? null) : null;
+  /** Same headerTouchedCostumer gate as targetCostumerId above — without it, the "Brugere hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual user list) had already moved on to a different Kunde. costumerName (global) is the correct fallback once touched, same as VehiclesPage.tsx's identical fix — this page just never had a reason to read it before. */
+  const targetCostumerName = isSysadm ? (headerTouchedCostumer ? costumerName : (state?.costumerName ?? null)) : null;
   /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
   const targetDepartmentId = state?.departmentId ?? null;
   const targetDepartmentName = state?.departmentName ?? null;
