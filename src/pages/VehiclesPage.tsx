@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { CarGlyph } from "../components/CarGlyph";
 import { InlinePopup } from "../components/InlinePopup";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { supabase } from "../lib/supabase";
@@ -434,7 +435,16 @@ export function VehiclesPage() {
                           <td className="whitespace-nowrap px-2 py-0.5">
                             <div className="flex items-center justify-between gap-2">
                               <span className="truncate">{vehicle.vehicle}</span>
-                              <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
+                              <div className="flex items-center gap-1.5">
+                                {/* Driving-vehicle icon, same trip_detected convention as VehicleDetailsPage.tsx's header/BookingPage.tsx's hero card — placed right before the "!" health button, both right-aligned in this cell. */}
+                                {vehicle.tripDetected === "TRUE" && <CarGlyph className="h-5 w-8 shrink-0 text-green-600" title="Kører" />}
+                                {/* Reserves the "!" button's own h-4 w-4 footprint even when healthy (VehicleHealthIndicator renders nothing at all for an empty issues list) — otherwise a healthy row's CarGlyph above would sit further right than a row with a real "!" next to it, since this whole group is right-aligned via the parent's justify-between. This blank placeholder keeps every row's CarGlyph at the same horizontal position down the column. */}
+                                {healthIssues.length > 0 ? (
+                                  <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
+                                ) : (
+                                  <span className="h-4 w-4 shrink-0" aria-hidden="true" />
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
