@@ -14,15 +14,6 @@ import { InlinePopup } from "./InlinePopup";
 /** One entry in the settings button's dropdown menu (admin/sysadm only — see settingsMenuItemsForRole). */
 type SettingsMenuItem = { label: string; path: string };
 
-/** Marks the currently-active entry in the "Skift afdeling" dropdown below. */
-function DepartmentCheckmark() {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-accent-600">
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
 /**
  * The settings destination(s) for a given `user_profiles.role`. A plain
  * "user" (any non-"admin"/"sysadm" role, including null/undefined,
@@ -52,7 +43,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), grouped under a clickable Kunde header row per costumer (costumerId is the grouping key, not the name — see DepartmentOption) — clicking a Kunde header switches into that costumer with no specific department (department_id=null, costumer_id=<that Kunde>, checkmarked via the same rule), and its indented department rows below switch into one specific department, same as before. This is the single, persisted source of truth this app-wide Kunde/Afdeling scope; the per-page "Filtrer" buttons on VehiclesPage/FleetManagementPage/AllBookingsPage/DepartmentPage read it directly rather than keeping their own local copy. A leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null && costumerId === null) clears back to the sysadm's default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a popup with a Kunde+Afdeling <select> pair, or a 3s "no departments" InlinePopup in the edge case a non-sysadm has none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the popup's Afdeling <select> lists every department under the currently-picked Kunde (or every department platform-wide once the Kunde <select> is "Alle" — see AuthContext's loadAvailableDepartments), and picking "Alle" in the Afdeling <select> alone (Kunde left as-is) persists that Kunde's own "every department" scope rather than fully unscoping — see handleSwitch's own doc comment. A regular admin never sees the Kunde <select> at all — only Afdeling, listing their own grant list, always scoped to their own single costumer. Deliberately styled as labeled <select> fields (same classes as every page's own "Filtrer" funnel popup, e.g. VehiclesPage.tsx) rather than a custom menu — this is the single, persisted source of truth for the app-wide Kunde/Afdeling scope those per-page popups themselves read (see the filter-redesign work), so sharing their visual language keeps the two families of popup legible as the same kind of control. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -83,27 +74,35 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
-  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a sysadm (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. Also gates the Kunde-grouped rendering below — non-sysadm departments never carry costumerId (see loadAvailableDepartments), so grouping is a no-op for them anyway, but this keeps the two decisions (group vs. flat, offer "Alle" vs. not) visibly tied to the same one condition. */
+  /** Whether the Kunde <select> and the Afdeling <select>'s own "Alle" option should be offered — only for a sysadm (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see either: their afdelingId is always a real department within their own fixed costumer, and "Alle" isn't a valid state for them at all. */
   const canSwitchToAll = isSysadm(profile?.role);
 
-  /** Sysadm-only: availableDepartments (flat, name-sorted) grouped by costumerId — the grouping key, not costumerName (names can collide across costumers). Groups are sorted by costumerName for a stable, readable dropdown; a department with no costumer_id at all (edge case — departments.costumer_id is nullable) falls into its own "no Kunde" bucket with no clickable header row, since there's no valid costumerId to switch into. */
-  const groupedDepartments = canSwitchToAll
-    ? (() => {
-        const groups = new Map<string, { costumerId: string | null; costumerName: string | null; departments: typeof availableDepartments }>();
-        for (const department of availableDepartments) {
-          const key = department.costumerId ?? "—";
-          if (!groups.has(key)) {
-            groups.set(key, { costumerId: department.costumerId ?? null, costumerName: department.costumerName ?? null, departments: [] });
-          }
-          groups.get(key)!.departments.push(department);
-        }
-        return [...groups.values()].sort((a, b) => (a.costumerName ?? "").localeCompare(b.costumerName ?? ""));
-      })()
+  /** Sysadm-only: every distinct Kunde availableDepartments spans, for the Kunde <select> below — deduped by costumerId (the grouping key, not costumerName, which can collide across costumers), sorted by name. */
+  const kundeOptions = canSwitchToAll
+    ? Array.from(
+        new Map(
+          availableDepartments
+            .filter((d): d is typeof d & { costumerId: string } => Boolean(d.costumerId))
+            .map((d) => [d.costumerId, d.costumerName ?? "Kunde"] as const),
+        ).entries(),
+      ).sort((a, b) => a[1].localeCompare(b[1]))
     : [];
+  /** Options for the Afdeling <select> below — sysadm: every department under the currently-active Kunde (global costumerId), or every department platform-wide once Kunde is "Alle" (costumerId null); non-sysadm: their own grant list, unfiltered (they have no Kunde field to narrow by, and every entry is already within their one fixed costumer). */
+  const afdelingOptions = canSwitchToAll ? availableDepartments.filter((d) => !costumerId || d.costumerId === costumerId) : availableDepartments;
 
-  /** departmentId null means "Alle" (no costumerId) or "just this Kunde" (costumerId given) — see canSwitchToAll/AuthContext's switchDepartment. costumerId is only ever meaningful (and only ever passed) alongside a null departmentId. */
+  /**
+   * departmentId null means "Alle" (no costumerId) or "just this Kunde"
+   * (costumerId given) — see canSwitchToAll/AuthContext's switchDepartment.
+   * costumerId is only ever meaningful (and only ever passed) alongside a
+   * null departmentId.
+   *
+   * Deliberately does NOT close the popup (unlike a plain menu click would)
+   * — same "stays open until the outside-click overlay closes it" behavior
+   * as every page's own funnel-filter popup, and functionally required
+   * here: picking a Kunde must leave the Afdeling <select> reachable for a
+   * second pick, not close the popup out from under it.
+   */
   const handleSwitch = async (departmentId: string | null, costumerId?: string | null) => {
-    setSwitcherOpen(false);
     const error = await switchDepartment(departmentId, costumerId);
     if (error) {
       setSwitchError(error);
@@ -265,60 +264,58 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
               <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen afdelinger tilgængelige" align="right" />
               <InlinePopup visible={notImplementedKey === "switch-department-error"} message={switchError ?? "Kunne ikke skifte afdeling."} align="right" />
               {switcherOpen && <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />}
-              {/* Same InlinePopup shell every "Filtrer" funnel popup uses (VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx/DepartmentPage.tsx) — same card/border/shadow/text size/fade-in, for visual consistency between this control and those, now that both live in the same "narrow what I'm looking at" family of popups. Rows are compact rounded hover items (a picker/menu) rather than labeled form fields, since there's nothing to fill in here, just something to click. */}
+              {/* Same InlinePopup shell + labeled <select> fields every "Filtrer" funnel popup uses (VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx/DepartmentPage.tsx) — card/border/shadow/text size/fade-in AND the select's own bg-brand-50/60 box styling, for visual consistency now that this control and those popups are the same "narrow what I'm looking at" family, just persisted here instead of page-local. */}
               <InlinePopup
                 visible={switcherOpen}
                 align="right"
                 message={
-                  <div className="max-h-80 space-y-0.5 overflow-y-auto">
+                  <>
+                    <p className="mb-2">Skift afdeling:</p>
                     {canSwitchToAll && (
-                      <button
-                        type="button"
-                        onClick={() => void handleSwitch(null)}
-                        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left font-medium transition hover:bg-brand-50"
-                      >
-                        <span className="truncate">Alle</span>
-                        {afdelingId === null && costumerId === null && <DepartmentCheckmark />}
-                      </button>
+                      <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
+                        Kunde
+                        <select
+                          value={costumerId ?? ""}
+                          onChange={(e) => void handleSwitch(null, e.target.value || null)}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Alle</option>
+                          {kundeOptions.map(([id, name]) => (
+                            <option key={id} value={id}>
+                              {name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
                     )}
-                    {canSwitchToAll
-                      ? groupedDepartments.map((group) => (
-                          <div key={group.costumerId ?? "no-kunde"}>
-                            {group.costumerId && (
-                              <button
-                                type="button"
-                                onClick={() => void handleSwitch(null, group.costumerId)}
-                                className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left font-semibold transition hover:bg-brand-50"
-                              >
-                                <span className="truncate">{group.costumerName ?? "Kunde"}</span>
-                                {afdelingId === null && costumerId === group.costumerId && <DepartmentCheckmark />}
-                              </button>
-                            )}
-                            {group.departments.map((department) => (
-                              <button
-                                key={department.department_id}
-                                type="button"
-                                onClick={() => void handleSwitch(department.department_id)}
-                                className="flex w-full items-center justify-between gap-2 rounded-md py-1.5 pl-5 pr-2 text-left transition hover:bg-brand-50"
-                              >
-                                <span className="truncate">{department.name}</span>
-                                {department.department_id === afdelingId && <DepartmentCheckmark />}
-                              </button>
-                            ))}
-                          </div>
-                        ))
-                      : availableDepartments.map((department) => (
-                          <button
-                            key={department.department_id}
-                            type="button"
-                            onClick={() => void handleSwitch(department.department_id)}
-                            className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-brand-50"
-                          >
-                            <span className="truncate">{department.name}</span>
-                            {department.department_id === afdelingId && <DepartmentCheckmark />}
-                          </button>
+                    <label className="block text-[0.7rem] font-medium text-brand-700">
+                      Afdeling
+                      <select
+                        value={afdelingId ?? ""}
+                        onChange={(e) => {
+                          const departmentId = e.target.value || null;
+                          // Picking a real department always wins outright
+                          // (costumerId omitted — switch-department.mts
+                          // derives it from the department itself). Picking
+                          // "Alle" here instead preserves whichever Kunde is
+                          // currently active (the Kunde <select> above, or
+                          // "Alle" already if that's what it is) rather than
+                          // always fully unscoping — same "just this Kunde,
+                          // every department" state the Kunde <select>'s own
+                          // onChange sets, just reached from this field too.
+                          void handleSwitch(departmentId, departmentId ? undefined : costumerId);
+                        }}
+                        className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                      >
+                        {canSwitchToAll && <option value="">Alle</option>}
+                        {afdelingOptions.map((department) => (
+                          <option key={department.department_id} value={department.department_id}>
+                            {department.name}
+                          </option>
                         ))}
-                  </div>
+                      </select>
+                    </label>
+                  </>
                 }
               />
             </div>
