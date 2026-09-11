@@ -34,6 +34,15 @@ const positionMarkerIcon = L.divIcon({
   popupAnchor: [0, -9],
 });
 
+/** Same triangle as positionMarkerIcon, colored green (#16a34a, Tailwind green-600) instead of navy — used for a marker whose `active` flag is true (see ExtraMarker.active/markerActive's own doc comments), e.g. FleetManagementPage.tsx highlighting a vehicle whose 2hire trip_detected is currently true, same green CarGlyph elsewhere already uses for the same signal. */
+const positionMarkerIconActive = L.divIcon({
+  className: "",
+  html: '<div style="width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-top:9px solid #16a34a;filter:drop-shadow(0 0 1px white)"></div>',
+  iconSize: [12, 9],
+  iconAnchor: [6, 9],
+  popupAnchor: [0, -9],
+});
+
 type ExtraMarker = {
   /** Stable per-marker identity (e.g. a vehicleId) — used to match this marker back to the SAME Leaflet marker instance across a position-only update (see the position-sync effect below), so a live GPS poll can't accidentally reposition the wrong marker if the caller's own array happens to reorder between renders (e.g. an unordered DB query). Falls back to `tooltip` when omitted — callers that never reposition markers after creation (i.e. everyone except FleetManagementPage.tsx today) don't need to set this. */
   id?: string;
@@ -41,6 +50,8 @@ type ExtraMarker = {
   lng: number;
   tooltip?: string;
   onClick?: () => void;
+  /** Highlights this marker with positionMarkerIconActive (green) instead of the default positionMarkerIcon (navy) — see markerActive's own doc comment for the same thing on the primary marker. Only visible when showMarkerIcon is false; the full fleetiiIcon pin has no active variant. */
+  active?: boolean;
 };
 
 type LeafletMapProps = {
@@ -51,6 +62,8 @@ type LeafletMapProps = {
   /** The primary marker's actual position, when it needs to differ from `lat`/`lng` (the map's own center) — e.g. VehicleDetailsPage.tsx/BookingDetailsPage.tsx/BookingPage.tsx restoring a saved pan/zoom across a browser refresh (see useMapViewSnapshot), or FleetManagementPage.tsx keeping the map's own center pinned to whichever vehicle is "primary" while the marker itself tracks that vehicle's live position independently (see this component's position-sync effect below for how a change here moves the marker WITHOUT recentering the map or rebuilding anything). Defaults to `lat`/`lng` (the marker sits exactly where the map is centered) — the original behavior any caller that doesn't set these still gets. */
   markerLat?: number;
   markerLng?: number;
+  /** Highlights the PRIMARY marker with positionMarkerIconActive (green) instead of the default positionMarkerIcon (navy) — e.g. FleetManagementPage.tsx's fleet map coloring a vehicle whose 2hire trip_detected is currently true, same green CarGlyph elsewhere already uses for the same signal. Only visible when showMarkerIcon is false; the full fleetiiIcon pin has no active variant. Updated in place (Marker#setIcon) on change, same "don't rebuild the whole map for a live update" principle as markerLat/markerLng's own position-sync effect — see that effect below. */
+  markerActive?: boolean;
   className?: string;
   /** Additional markers besides the primary one (e.g. every vehicle on the fleet map besides the "primary"/selected one). */
   extraMarkers?: ExtraMarker[];
@@ -84,6 +97,7 @@ export function LeafletMap({
   zoom = 13,
   markerLat,
   markerLng,
+  markerActive = false,
   className,
   extraMarkers = [],
   showMarker = true,
@@ -193,14 +207,19 @@ export function LeafletMap({
       }
     };
 
-    const icon = showMarkerIcon ? fleetiiIcon : positionMarkerIcon;
     // The -28 offset was tuned for fleetiiIcon's 30px height; positionMarkerIcon
     // is only 9px tall, so the same offset would leave a large gap between the
     // triangle and its tooltip.
     const tooltipOffset: [number, number] = showMarkerIcon ? [0, -28] : [0, -6];
 
     if (showMarker) {
-      const marker = L.marker([effectiveMarkerLat, effectiveMarkerLng], { icon });
+      // markerActive read here only for this ONE-TIME initial icon choice —
+      // like effectiveMarkerLat/effectiveMarkerLng just below, it is
+      // deliberately NOT a dependency of this effect (see the icon-sync
+      // effect further down, which is what actually keeps this in sync on
+      // every later change without rebuilding the map).
+      const primaryIcon = showMarkerIcon ? fleetiiIcon : markerActive ? positionMarkerIconActive : positionMarkerIcon;
+      const marker = L.marker([effectiveMarkerLat, effectiveMarkerLng], { icon: primaryIcon });
       addMarkerToMap(marker);
       primaryMarkerRef.current = marker;
       // Binding the SAME logical click on both the marker and its own
@@ -340,7 +359,10 @@ export function LeafletMap({
 
     const extraMarkerRefs = new Map<string, L.Marker>();
     extraMarkers.forEach((marker, index) => {
-      const extraMarker = L.marker([marker.lat, marker.lng], { icon });
+      // marker.active read here only for this ONE-TIME initial icon choice —
+      // same reasoning as the primary marker's own primaryIcon just above.
+      const extraIcon = showMarkerIcon ? fleetiiIcon : marker.active ? positionMarkerIconActive : positionMarkerIcon;
+      const extraMarker = L.marker([marker.lat, marker.lng], { icon: extraIcon });
       addMarkerToMap(extraMarker);
       extraMarkerRefs.set(marker.id ?? marker.tooltip ?? String(index), extraMarker);
       // See the primary marker's identical handling (including the
@@ -491,6 +513,37 @@ export function LeafletMap({
     // extraMarkersStructureKey above.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveMarkerLat, effectiveMarkerLng, extraMarkersPositionKey, followMarker]);
+
+  // Content-based signature for the primary/extraMarkers' ACTIVE state (id +
+  // active) — triggers the icon-sync effect below whenever any marker's
+  // active flag actually changes, without needing markerActive/extraMarkers'
+  // own array reference as dependencies (same "fresh array every render"
+  // reasoning as the other signatures above).
+  const extraMarkersActiveKey = extraMarkers.map((m, i) => `${m.id ?? m.tooltip ?? i}:${m.active ?? false}`).join("|");
+
+  // Restyles the primary/extraMarkers' icon in place (Marker#setIcon —
+  // green positionMarkerIconActive vs. the default navy positionMarkerIcon)
+  // whenever markerActive/an extraMarker's own active flag changes, WITHOUT
+  // rebuilding the map — same "don't tear down the whole map for a live
+  // update" principle as the position-sync effect above, just for icon
+  // color instead of position, and deliberately its OWN effect rather than
+  // folded into that one so an unrelated position-only tick doesn't also
+  // reassign every marker's icon. Only meaningful when showMarkerIcon is
+  // false — the full fleetiiIcon pin has no active variant, so this is a
+  // no-op (still harmless) for every caller except FleetManagementPage.tsx.
+  useEffect(() => {
+    if (showMarkerIcon) return;
+    primaryMarkerRef.current?.setIcon(markerActive ? positionMarkerIconActive : positionMarkerIcon);
+    extraMarkers.forEach((marker, index) => {
+      extraMarkerRefsById.current
+        .get(marker.id ?? marker.tooltip ?? String(index))
+        ?.setIcon(marker.active ? positionMarkerIconActive : positionMarkerIcon);
+    });
+    // extraMarkers itself is intentionally omitted — extraMarkersActiveKey
+    // (a content-based signature) is the real dependency, same reasoning as
+    // extraMarkersPositionKey above.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+  }, [markerActive, extraMarkersActiveKey, showMarkerIcon]);
 
   return <div ref={containerRef} className={className} />;
 }

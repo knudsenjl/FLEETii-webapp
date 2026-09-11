@@ -241,8 +241,8 @@ export function VehicleDetailsPage() {
   const [twohireProfile, setTwohireProfile] = useState<string | null>(null);
   /** Whether the "QR-kode:"/"2hire-profil:" rows are expanded — toggled via the eye button on the "2hire-device:" row above them; start collapsed since both are raw device internals nobody needs on every visit. */
   const [showTwoHireDetails, setShowTwoHireDetails] = useState(false);
-  /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. */
-  const { address, addressLoading } = useReverseGeocode(vehicle?.vehicleId, position, isAdmin);
+  /** Reverse-geocoded address for the vehicle's current GPS position, shown in the full-width row below the map — see lib/geocode.ts's useReverseGeocode. Suppressed entirely while Live is on (`!liveEnabled`): a driving vehicle's position changes on every broadcast tick, which was firing a fresh reverse-geocode request just as often — pointless traffic for an address nobody's looking at mid-drive. useReverseGeocode's own `enabled` semantics already do exactly what's wanted here for free: address clears to null the instant Live turns on, and one fresh lookup fires automatically the instant Live turns back off (manually, or via the auto-stop-when-parked effect above) for wherever the vehicle actually ended up. */
+  const { address, addressLoading } = useReverseGeocode(vehicle?.vehicleId, position, isAdmin && !liveEnabled);
   /** Whether this vehicle's own home department shows vehicle_ident at all in the merged "Køretøj:" row below — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identDepartmentId);
 
@@ -737,10 +737,10 @@ export function VehicleDetailsPage() {
                     )}
                   </div>
 
-                  {/* Reverse-geocoded address of the map position above (Nominatim) — full width, smaller text than the detail rows since it's supplementary context, not a primary field. Kept in the same flex-col as the map (gap-1) rather than a sibling of it, so it sits closer to the map than the parent's own gap-4 would otherwise allow. Only rendered with a real GPS fix. */}
+                  {/* Reverse-geocoded address of the map position above (Nominatim) — full width, smaller text than the detail rows since it's supplementary context, not a primary field. Kept in the same flex-col as the map (gap-1) rather than a sibling of it, so it sits closer to the map than the parent's own gap-4 would otherwise allow. Only rendered with a real GPS fix. Blank (not "Ingen adresse fundet") while Live is on — the lookup itself is suppressed then (see useReverseGeocode's own `enabled` argument above), so showing the "not found" message would be actively misleading; the row just goes quiet until Live stops and a fresh lookup fires. */}
                   {position && (
                     <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
-                      {addressLoading ? "Henter adresse…" : (address ?? "Ingen adresse fundet")}
+                      {addressLoading ? "Henter adresse…" : liveEnabled ? "" : (address ?? "Ingen adresse fundet")}
                     </div>
                   )}
                 </div>
