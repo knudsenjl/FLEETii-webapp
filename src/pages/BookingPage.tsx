@@ -45,10 +45,15 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * see RootRoute in App.tsx): fetches the viewer's OWN currently-active
  * booking, or if none, their soonest upcoming one — the same "end >= now OR
  * end is null, ordered by start ascending, take the first" query
- * BookingsPage.tsx's own query mirrors, just scoped to a single result.
- * Redirects straight to "/bookings" (replace, no flash) if the viewer has no
- * current/upcoming booking at all, matching BookingsPage's own "Ingen
- * kommende reservation." case rather than showing an empty page here.
+ * BookingsPage.tsx's own query mirrors, just scoped to a single result,
+ * ALSO scoped to the viewer's own current afdelingId (see the fetch effect's
+ * own comment). With none found, stays on this page instead of redirecting
+ * to "/bookings" (this page used to do that, replace/no-flash, until
+ * 2026-09-11) — shows just the header and "Alle" button, plus a centered
+ * explanation pointing at the two real next steps: pick a different
+ * department in the header's own "Data Filter" popup (if the viewer holds
+ * more than one grant), which re-runs this same fetch scoped to the new
+ * department, or fall through to the full cross-department list via "Alle".
  *
  * Mobile-first "hero card" layout (the chosen direction from a canvas
  * mock-up review, 2026-08): a big circular Lås/Lås op control
@@ -211,16 +216,53 @@ export function BookingPage() {
     };
   }, [session?.user.id, afdelingId]);
 
-  useEffect(() => {
-    if (!booking && !bookingLoading) {
-      navigate("/bookings", { replace: true });
-    }
-  }, [booking, bookingLoading, navigate]);
-
   if (!booking) {
-    return bookingLoading ? (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>
-    ) : null;
+    if (bookingLoading) {
+      return <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>;
+    }
+    // No current/upcoming booking in the viewer's OWN active department —
+    // stays on this page (rather than redirecting to "/bookings", the
+    // original behavior here) with just the header and "Alle" button live,
+    // and a centered explanation pointing at the two real next steps: pick
+    // a different department in the header's own "Data Filter" (if the
+    // viewer holds more than one grant — see PageHeader.tsx), or fall
+    // through to the full list via "Alle" for more context (a
+    // cross-department booking that afdelingId's own scoping here doesn't
+    // surface, or simply confirmation that there genuinely isn't one).
+    return (
+      <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 text-brand-900">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
+          aria-hidden="true"
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
+        >
+          <PageHeader compact />
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-2 text-center">
+            <p className="text-sm text-brand-700">
+              Du har ingen reservationer i denne afdeling. Hvis du har reservationer i en anden afdeling, så vælg
+              denne afdeling i filteret øverst på denne side. Ellers tryk på "Alle" knappen for at få yderligere
+              oplysninger.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate("/bookings")}
+              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
+            >
+              Alle
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                <path d="M5 12h14" />
+                <path d="m13 5 7 7-7 7" />
+              </svg>
+            </button>
+          </div>
+        </motion.div>
+      </div>
+    );
   }
 
   return (
