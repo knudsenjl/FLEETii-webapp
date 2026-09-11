@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -107,7 +107,7 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
 export function DepartmentDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile } = useAuth();
+  const { profile, costumerId: activeCostumerId, costumerName: activeCostumerName, afdelingId: activeAfdelingId } = useAuth();
   const isSysadm = isSysadmRole(profile?.role);
   const state = location.state as { costumerId?: string; costumerName?: string; departmentId?: string } | null;
   const costumerId = state?.costumerId ?? null;
@@ -187,6 +187,60 @@ export function DepartmentDetailsPage() {
     void loadDepartments(costumerId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [costumerId]);
+
+  /**
+   * Follows the global header's own Kunde/Afdeling scope ("Data Filter",
+   * PageHeader.tsx) — same combined-effect pattern as
+   * CostumerDetailsPage.tsx's own identical follow-effect (see its doc
+   * comment for the full "why one effect, not two" reasoning: a single pick
+   * that changes both at once — a department under a DIFFERENT Kunde than
+   * the one currently shown, switch-department.mts keeps costumer_id in
+   * lockstep — must not race two separate navigate() calls against each
+   * other):
+   * - Afdeling changing to a real department wins outright. If it belongs
+   *   to the SAME Kunde already shown here, no navigation is needed at
+   *   all — just select that row directly (setSelectedDepartmentId), same
+   *   as clicking it. Otherwise it belongs to a DIFFERENT Kunde, so this
+   *   jumps there first (departmentId in router state — see
+   *   selectedDepartmentId's own doc comment for how that's consumed).
+   * - Otherwise, Kunde changing to a real, different costumer jumps to
+   *   that Kunde's own /department-details (no departmentId this time —
+   *   the auto-select-first-department effect below picks one once that
+   *   costumer's own department list loads).
+   * - Kunde changing to "Alle" (null), or Afdeling resetting to "Alle"
+   *   under the SAME Kunde already being viewed, does nothing.
+   *
+   * Deliberately reacts to CHANGE only (the prevRefs below), not to either
+   * value simply differing from this page's own target on mount — this
+   * page is routinely reached with a completely different Kunde/Afdeling
+   * already active in the header, and that normal navigation must not
+   * immediately bounce back out. replace (not push) when navigating: a
+   * live scope-follow, not a new history entry to browser-back through.
+   */
+  const prevActiveCostumerIdRef = useRef(activeCostumerId);
+  const prevActiveAfdelingIdRef = useRef(activeAfdelingId);
+  useEffect(() => {
+    const costumerChanged = activeCostumerId !== prevActiveCostumerIdRef.current;
+    const afdelingChanged = activeAfdelingId !== prevActiveAfdelingIdRef.current;
+    prevActiveCostumerIdRef.current = activeCostumerId;
+    prevActiveAfdelingIdRef.current = activeAfdelingId;
+    if (!costumerChanged && !afdelingChanged) return;
+
+    if (afdelingChanged && activeAfdelingId) {
+      if (activeCostumerId !== costumerId) {
+        navigate("/department-details", {
+          replace: true,
+          state: { costumerId: activeCostumerId, costumerName: activeCostumerName, departmentId: activeAfdelingId },
+        });
+      } else {
+        setSelectedDepartmentId(activeAfdelingId);
+      }
+      return;
+    }
+    if (costumerChanged && activeCostumerId && activeCostumerId !== costumerId) {
+      navigate("/department-details", { replace: true, state: { costumerId: activeCostumerId, costumerName: activeCostumerName } });
+    }
+  }, [activeCostumerId, activeCostumerName, activeAfdelingId, costumerId, navigate]);
 
   // Keeps a real department selected whenever one exists — auto-selects the
   // first loaded department if nothing's selected yet (or the sessionStorage-
