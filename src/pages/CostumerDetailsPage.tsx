@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -85,7 +85,7 @@ type Costumer = {
  */
 export function CostumerDetailsPage() {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, costumerId: activeCostumerId } = useAuth();
   const location = useLocation();
   const { costumerId } = useParams<{ costumerId: string }>();
   const state = location.state as { costumer?: Costumer } | null;
@@ -210,6 +210,29 @@ export function CostumerDetailsPage() {
       navigate("/costumers", { replace: true });
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
+
+  /**
+   * Follows the global header's own Kunde scope ("Data Filter",
+   * PageHeader.tsx — every sysadm reaching this page has one, the route
+   * itself is sysadm-only, see ProtectedRoute above) — picking a DIFFERENT
+   * Kunde there while already viewing one costumer's details jumps this
+   * page straight to that Kunde's own /costumer-details/:costumerId, same
+   * as switching "Skift afdeling" already live-updates every other admin
+   * page's scope. Deliberately reacts to CHANGE only (prevActiveCostumerIdRef),
+   * not to activeCostumerId simply differing from the route's costumerId on
+   * mount — this page is routinely reached with a completely different
+   * costumerId already active in the header (e.g. via
+   * CostumerAdministrationPage's own row click), and that normal navigation
+   * must not immediately bounce back out to wherever the header happened to
+   * be scoped before. replace (not push): a live scope-follow, not a new
+   * history entry to browser-back through. */
+  const prevActiveCostumerIdRef = useRef(activeCostumerId);
+  useEffect(() => {
+    const changed = activeCostumerId !== prevActiveCostumerIdRef.current;
+    prevActiveCostumerIdRef.current = activeCostumerId;
+    if (!changed || !activeCostumerId || activeCostumerId === costumerId) return;
+    navigate(`/costumer-details/${activeCostumerId}`, { replace: true });
+  }, [activeCostumerId, costumerId, navigate]);
 
   // Row counts for the AFDELINGER/KØRETØJER/BRUGERE grid buttons below.
   useEffect(() => {
