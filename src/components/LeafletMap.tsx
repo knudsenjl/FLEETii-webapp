@@ -73,6 +73,8 @@ type LeafletMapProps = {
   liveToggle?: { active: boolean; onToggle: () => void };
   /** Makes the Recenter control re-fit the view to every visible marker (primary + extraMarkers, same bounds/padding as the initial-mount fitBounds above) instead of its default behavior of centering on just the primary marker's own position. Right for a multi-vehicle map like FleetManagementPage.tsx, where there's no one vehicle the admin is specifically tracking — "primary" there is just whichever vehicle happens to sort first (see extraMarkersStructureKey's own comment), an internal bookkeeping detail with no meaning to the admin, so recentering on it instead of showing every vehicle again was reported as a bug. Deliberately re-fits bounds at CLICK time rather than replaying a view captured once after mount — capturing "the" initial view is inherently racy (the very first setView on map creation and the subsequent fitBounds can both fire moveend, and which one a caller's onViewChange handler sees first isn't guaranteed), whereas recomputing fitBounds from the markers' CURRENT positions (already available in this same closure) needs no timing assumptions at all, and self-heals if the vehicle set has changed since mount. Falls back to the default single-marker recenter when there are no extraMarkers (nothing to fit bounds to). Off by default. */
   recenterFitsAllMarkers?: boolean;
+  /** Keeps the map's view centered on the primary marker as markerLat/markerLng changes, PRESERVING whatever zoom level is currently set — for a single-vehicle "chase" map (VehicleDetailsPage.tsx/BookingDetailsPage.tsx/BookingPage.tsx) where the caller wants the view to keep following a moving vehicle without the zoom resetting on every live GPS tick the way it would if the caller instead kept feeding the live position into `lat`/`lng` themselves (that always looks like a genuine recenter request to this component, which rebuilds the whole map — see the structural effect below — and re-applies the `zoom` prop from scratch). Implemented as a Leaflet `panTo()` call inside the SAME lightweight position-sync effect that already slides the marker itself, so it never touches the structural effect or rebuilds anything. Off by default — FleetManagementPage.tsx's multi-vehicle map deliberately does NOT want this (recentering away from wherever the admin had manually panned was reported as a bug there; see recenterFitsAllMarkers/its own manual Recenter control instead). */
+  followMarker?: boolean;
 };
 
 /** Renders an OpenStreetMap tile map with a primary marker and optional extra markers/clustering. See LeafletMapProps for what each prop controls. */
@@ -94,6 +96,7 @@ export function LeafletMap({
   onViewChange,
   liveToggle,
   recenterFitsAllMarkers = false,
+  followMarker = false,
 }: LeafletMapProps) {
   // Falls back to the map's own center whenever markerLat/markerLng aren't
   // given — see their own doc comment above.
@@ -470,6 +473,14 @@ export function LeafletMap({
   useEffect(() => {
     if (primaryMarkerRef.current) {
       primaryMarkerRef.current.setLatLng([effectiveMarkerLat, effectiveMarkerLng]);
+      // followMarker: see its own doc comment above — panTo() (not setView())
+      // preserves whatever zoom the map currently has, and doesn't touch the
+      // structural effect above at all, so this can't trigger the
+      // whole-map-rebuild-and-reset-zoom behavior that feeding a live
+      // position straight into the `lat`/`lng` props would.
+      if (followMarker && mapRef.current) {
+        mapRef.current.panTo([effectiveMarkerLat, effectiveMarkerLng]);
+      }
     }
     extraMarkers.forEach((marker, index) => {
       extraMarkerRefsById.current.get(marker.id ?? marker.tooltip ?? String(index))?.setLatLng([marker.lat, marker.lng]);
@@ -479,7 +490,7 @@ export function LeafletMap({
     // (a content-based signature) is the real dependency, same reasoning as
     // extraMarkersStructureKey above.
     // oxlint-disable-next-line react-hooks/exhaustive-deps
-  }, [effectiveMarkerLat, effectiveMarkerLng, extraMarkersPositionKey]);
+  }, [effectiveMarkerLat, effectiveMarkerLng, extraMarkersPositionKey, followMarker]);
 
   return <div ref={containerRef} className={className} />;
 }
