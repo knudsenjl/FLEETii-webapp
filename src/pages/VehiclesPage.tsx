@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -60,10 +60,14 @@ type Vehicle = DisplayVehicle;
  * PageHeader.tsx — see AuthContext's costumerId/afdelingId) rather than a
  * page-local picker: targetCostumerId follows the header's costumerId
  * directly, and targetDepartmentId follows its afdelingId whenever that
- * department actually belongs to targetCostumerId (the "navigation wins"
- * override below still takes priority when reached via router state — see
- * DepartmentDetailsPage's own KØRETØJER button). Only the Køretøj filter
- * stays page-local (narrows the already-scoped list by plate).
+ * department actually belongs to targetCostumerId. A router-state seed
+ * (e.g. CostumerDetailsPage's own KØRETØJER button, UNLOCKED) only wins
+ * for the INITIAL render — once the header is actually touched, it takes
+ * over live for the rest of the visit (see headerTouchedCostumer's own
+ * doc comment) — except true LOCKED mode (departmentId also given, e.g.
+ * DepartmentDetailsPage's own KØRETØJER button), which stays fully frozen
+ * for the whole visit regardless, unchanged from before. Only the Køretøj
+ * filter stays page-local (narrows the already-scoped list by plate).
  */
 export function VehiclesPage() {
   const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, profile } = useAuth();
@@ -77,8 +81,34 @@ export function VehiclesPage() {
   const state = location.state as
     | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
     | null;
-  /** Navigation (router state) wins over the global header when given — same "filtering by navigation" precedent as targetDepartmentId's LOCKED case below. Otherwise follows the header's own costumerId directly (global for every role, not just sysadm — a regular admin's costumerId is always their own anyway). */
-  const targetCostumerId = state?.costumerId ?? costumerId;
+  /** True LOCKED mode only — a specific department was already selected before navigating here (DepartmentDetailsPage's own KØRETØJER button). Gates headerTouchedCostumer below: a LOCKED visit stays fully frozen for its whole duration (matching targetDepartmentId's own unconditional state?.departmentId below), so Kunde must never "unstick" and start following the header there either — only the UNLOCKED case (costumerId alone, or nothing) should. */
+  const isLocked = Boolean(state?.departmentId);
+  /**
+   * Whether the header's own costumerId has genuinely changed since this
+   * page mounted — once it has, it wins outright over state?.costumerId
+   * below for the rest of this visit. Without this, a page reached via a
+   * router-state costumerId seed (e.g. CostumerDetailsPage's own KØRETØJER
+   * button) would have that seed permanently override the header, and
+   * subsequent Kunde picks in "Data Filter" would silently do nothing —
+   * the header used to be a page-local, always-live picker before the
+   * filter-redesign work moved it up here, so this restores that same
+   * "changing Kunde always actually changes the list" behavior. Sticky
+   * (via state, not a live comparison) rather than "does costumerId
+   * currently differ from its mount-time value" — a live comparison would
+   * incorrectly revert to trusting the stale seed again if the header ever
+   * cycles back to exactly its mount-time value.
+   */
+  const [headerTouchedCostumer, setHeaderTouchedCostumer] = useState(false);
+  const mountedCostumerIdRef = useRef(costumerId);
+  useEffect(() => {
+    if (isLocked) return;
+    if (costumerId !== mountedCostumerIdRef.current) {
+      mountedCostumerIdRef.current = costumerId;
+      setHeaderTouchedCostumer(true);
+    }
+  }, [costumerId, isLocked]);
+  /** Navigation (router state) wins over the global header ONLY until the header itself is touched (see headerTouchedCostumer above) — same "filtering by navigation" precedent as targetDepartmentId's LOCKED case below, but no longer permanent for Kunde specifically. Otherwise follows the header's own costumerId directly (global for every role, not just sysadm — a regular admin's costumerId is always their own anyway). */
+  const targetCostumerId = headerTouchedCostumer ? costumerId : (state?.costumerId ?? costumerId);
   /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. */
   const targetCostumerName = isSysadm ? (state?.costumerName ?? costumerName) : null;
 
