@@ -317,7 +317,8 @@ export function PageHeader({
                           onChange={(e) => void handleSwitch(null, e.target.value || null)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          <option value="">Alle</option>
+                          {/* Nothing meaningful to choose between with 0-1 real options. */}
+                          {kundeOptions.length > 1 && <option value="">Alle</option>}
                           {kundeOptions.map(([id, name]) => (
                             <option key={id} value={id}>
                               {name}
@@ -364,7 +365,7 @@ export function PageHeader({
                           onChange={(e) => rolleFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          <option value="">Alle</option>
+                          {rolleFilter.options.length > 1 && <option value="">Alle</option>}
                           {rolleFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -381,7 +382,7 @@ export function PageHeader({
                           onChange={(e) => brugerFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          <option value="">Alle</option>
+                          {brugerFilter.options.length > 1 && <option value="">Alle</option>}
                           {brugerFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -398,7 +399,7 @@ export function PageHeader({
                           onChange={(e) => navnFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          <option value="">Alle</option>
+                          {navnFilter.options.length > 1 && <option value="">Alle</option>}
                           {navnFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -415,7 +416,7 @@ export function PageHeader({
                           onChange={(e) => koretoejFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          <option value="">Alle</option>
+                          {koretoejFilter.options.length > 1 && <option value="">Alle</option>}
                           {koretoejFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
