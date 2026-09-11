@@ -57,58 +57,40 @@ type Vehicle = DisplayVehicle;
  * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
  * a vehicle both live there too), or create a new one via NewVehiclePage.
  *
- * sysadm-only "Kunde" filter (hidden in LOCKED mode, same as
- * Afdeling — a locked department already implies one exact costumer): lets
- * a sysadm switch which costumer's vehicles are shown without
- * leaving the page, same in-page filter FleetManagementPage.tsx's "Liste af
- * køretøjer" button offers on its own map. Kunde/Afdeling/Køretøj sync to
- * stay mutually consistent exactly like that page's own filters do (picking
- * a department while Kunde is "Alle" promotes Kunde to its costumer;
- * picking a vehicle syncs both; changing Kunde or Afdeling clears Køretøj)
- * — see FleetManagementPage.tsx's own filter onChange handlers for the
- * identical logic and reasoning.
+ * Kunde/Afdeling scope comes from the global header ("Skift afdeling",
+ * PageHeader.tsx — see AuthContext's costumerId/afdelingId) rather than a
+ * page-local picker: targetCostumerId follows the header's costumerId
+ * directly, and targetDepartmentId follows its afdelingId whenever that
+ * department actually belongs to targetCostumerId (the "navigation wins"
+ * override below still takes priority when reached via router state — see
+ * DepartmentDetailsPage's own KØRETØJER button). Only the Køretøj filter
+ * stays page-local (narrows the already-scoped list by plate).
  */
 export function VehiclesPage() {
-  const { costumerId, profile } = useAuth();
+  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
-  /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
+  /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state or the global header, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
   const isSysadm = isSysadmRole(profile?.role);
 
   const state = location.state as
     | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
     | null;
-  /** sysadm-only "Kunde" filter ("" = "Alle", every costumer) — same seeding/meaning as FleetManagementPage.tsx's own filterCostumerId, just seeded from router state instead of a saved sessionStorage snapshot. Stays "" (unused) for a regular admin, who is always scoped to their own costumerId below regardless. */
-  const [filterCostumerId, setFilterCostumerId] = useState(isSysadm ? (state?.costumerId ?? "") : "");
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
-  const targetCostumerId = isSysadm ? filterCostumerId || null : costumerId;
-  const targetCostumerName = isSysadm
-    ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? null)
-    : null;
-  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable) or, for a sysadm with no targetCostumerId either, ALL-COSTUMERS. */
-  const targetDepartmentId = state?.departmentId ?? null;
-  const targetDepartmentName = state?.departmentName ?? null;
+  /** Navigation (router state) wins over the global header when given — same "filtering by navigation" precedent as targetDepartmentId's LOCKED case below. Otherwise follows the header's own costumerId directly (global for every role, not just sysadm — a regular admin's costumerId is always their own anyway). */
+  const targetCostumerId = state?.costumerId ?? costumerId;
+  /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. */
+  const targetCostumerName = isSysadm ? (state?.costumerName ?? costumerName) : null;
 
-  /** Loads every costumer for the Kunde filter dropdown — sysadm only, since a regular admin is always scoped to their own single costumer. Same query as FleetManagementPage.tsx's own. */
-  useEffect(() => {
-    if (!isSysadm) return;
-
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name")
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSysadm]);
+  /** UNLOCKED case only — the global header's active afdelingId, carried over IF it actually belongs to targetCostumerId's departments (checked via availableDepartments), else null (no narrowing, whole-costumer view). Same "navigation wins" membership check as DepartmentPage.tsx's own effectiveAfdelingId — without it, switching costumer via router state while the header still has a DIFFERENT costumer's department active would incorrectly try to scope vehicles to a department outside targetCostumerId. */
+  const effectiveAfdelingId =
+    afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
+      ? afdelingId
+      : null;
+  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Router state (DepartmentDetailsPage's own KØRETØJER button) always wins; otherwise follows the global header's own effectiveAfdelingId, soft-narrowing to whichever department is currently active there (changes live if the header changes while still on this page — there's no local override to protect, unlike the true LOCKED case). Null means UNLOCKED (whole costumer) or, for a sysadm with no targetCostumerId either, ALL-COSTUMERS. */
+  const targetDepartmentId = state?.departmentId ?? effectiveAfdelingId;
+  const targetDepartmentName = state?.departmentName ?? (targetDepartmentId ? afdeling : null);
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   /** UNLOCKED/ALL-COSTUMERS modes only (see this component's own doc comment) — the target costumer's own departments (or, in ALL-COSTUMERS mode, every department platform-wide), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
@@ -118,11 +100,7 @@ export function VehiclesPage() {
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
-  /** UNLOCKED mode only — narrows the whole-costumer vehicle list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
-  const [filterDepartment, setFilterDepartment] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
-  /** Whether Kunde counts as an active/resettable filter — false in LOCKED mode even though filterCostumerId itself is non-empty there (seeded once from the department's own costumer, not user-editable — the Kunde select isn't even rendered, see this component's own doc comment), so the filter badge/reset button don't react to it and "Nulstil filter" doesn't clobber the locked costumer out from under "Opret køretøj"'s disabled check. */
-  const costumerFilterActive = isSysadm && !targetDepartmentId && Boolean(filterCostumerId);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -138,17 +116,9 @@ export function VehiclesPage() {
   }, [filterOpen]);
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
-  const filteredVehicles = vehicles.filter(
-    (v) =>
-      (!filterPlate || v.plate === filterPlate) &&
-      // filterDepartment only ever has a value in UNLOCKED mode (the
-      // dropdown that sets it isn't rendered otherwise) — in LOCKED mode
-      // `vehicles` itself is already scoped to targetDepartmentId below, so
-      // this check is always vacuously true there.
-      (!filterDepartment || v.departmentIds.includes(filterDepartment)),
-  );
+  const filteredVehicles = vehicles.filter((v) => !filterPlate || v.plate === filterPlate);
 
-  /** UNLOCKED/ALL-COSTUMERS modes only — loads the target costumer's own departments (or, with no targetCostumerId at all, every department platform-wide — only reachable by a sysadm, see fetchDepartmentOptions' own doc comment), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Skipped entirely in LOCKED mode (targetDepartmentId set), which doesn't need any department list at all, and for a regular admin with no targetCostumerId (can't happen — they always have their own). */
+  /** UNLOCKED/ALL-COSTUMERS modes only — loads the target costumer's own departments (or, with no targetCostumerId at all, every department platform-wide — only reachable by a sysadm, see fetchDepartmentOptions' own doc comment), for computing which vehicles are in scope below (via their department_ids). Skipped entirely when targetDepartmentId is set (whether LOCKED via router state or soft-narrowed via the global header), which doesn't need any department list at all, and for a regular admin with no targetCostumerId (can't happen — they always have their own). */
   useEffect(() => {
     if (targetDepartmentId || (!targetCostumerId && !isSysadm)) {
       setDepartmentOptions([]);
@@ -165,7 +135,7 @@ export function VehiclesPage() {
     };
   }, [targetCostumerId, targetDepartmentId, isSysadm]);
 
-  /** LOCKED mode: scopes vehicles straight to targetDepartmentId's own membership (vehicle_departments, via departmentIds — see liveVehicleDataSource.ts). UNLOCKED mode: every vehicle whose departmentIds intersects ANY of the target costumer's own departments (departmentOptions above) — the whole-costumer set the KØRETØJER button's own count badge already promised, further narrowed by filterDepartment above if picked. */
+  /** targetDepartmentId set (LOCKED via router state, or soft-narrowed via the global header): scopes vehicles straight to its own membership (vehicle_departments, via departmentIds — see liveVehicleDataSource.ts). Otherwise (UNLOCKED/ALL-COSTUMERS): every vehicle whose departmentIds intersects ANY of the target costumer's own departments (departmentOptions above) — the whole-costumer set the KØRETØJER button's own count badge already promised. */
   useEffect(() => {
     if (targetDepartmentId) {
       setVehicles(
@@ -243,7 +213,7 @@ export function VehiclesPage() {
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate || filterDepartment || costumerFilterActive
+                      filterPlate
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -258,94 +228,11 @@ export function VehiclesPage() {
                     message={
                       <>
                         <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                        {/* LOCKED mode (targetDepartmentId set) hides both Kunde and Afdeling entirely — a locked department already implies one exact costumer, nothing to widen back out to from in-page, see this component's own doc comment. */}
-                        {isSysadm && !targetDepartmentId && (
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Kunde
-                            <select
-                              value={filterCostumerId}
-                              onChange={(e) => {
-                                setFilterCostumerId(e.target.value);
-                                setFilterDepartment("");
-                                // A previously-picked Køretøj almost certainly
-                                // belongs to the OLD Kunde, not the new one —
-                                // same inconsistency class as Afdeling above
-                                // (and the reverse of Køretøj's own onChange,
-                                // which syncs Afdeling/Kunde TO match the
-                                // vehicle picked). See
-                                // FleetManagementPage.tsx's identical onChange
-                                // for the full reasoning.
-                                setFilterPlate("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {costumerOptions.map((costumer) => (
-                                <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                                  {costumer.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        {!targetDepartmentId && (
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Afdeling
-                            <select
-                              value={filterDepartment}
-                              onChange={(e) => {
-                                const departmentId = e.target.value;
-                                setFilterDepartment(departmentId);
-                                // While Kunde is still "Alle" (isSysadm
-                                // only — departmentOptions spans every
-                                // costumer in that state), picking one
-                                // specific department left Kunde stuck on
-                                // "Alle" — auto-promote it to that
-                                // department's own costumer instead, same as
-                                // FleetManagementPage.tsx's identical
-                                // onChange.
-                                if (isSysadm && !filterCostumerId && departmentId) {
-                                  const department = departmentOptions.find((d) => d.department_id === departmentId);
-                                  if (department) setFilterCostumerId(department.costumer_id);
-                                }
-                                // Same reasoning as Kunde's own onChange
-                                // above — a previously-picked Køretøj may not
-                                // belong to the newly-picked Afdeling.
-                                setFilterPlate("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {departmentOptions.map((department) => (
-                                <option key={department.department_id} value={department.department_id}>
-                                  {department.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
                         <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
                           Køretøj
                           <select
                             value={filterPlate}
-                            onChange={(e) => {
-                              const plate = e.target.value;
-                              setFilterPlate(plate);
-                              // Picking one specific vehicle is more specific
-                              // than either Afdeling or Kunde — sync both to
-                              // match it (unconditionally), same reasoning
-                              // and logic as FleetManagementPage.tsx's
-                              // identical onChange.
-                              if (!plate) return;
-                              const vehicle = vehicles.find((v) => v.plate === plate);
-                              const departmentId = vehicle?.departmentIds[0];
-                              if (!departmentId) return;
-                              setFilterDepartment(departmentId);
-                              if (isSysadm) {
-                                const department = departmentOptions.find((d) => d.department_id === departmentId);
-                                if (department) setFilterCostumerId(department.costumer_id);
-                              }
-                            }}
+                            onChange={(e) => setFilterPlate(e.target.value)}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                           >
                             <option value="">Alle</option>
@@ -356,19 +243,10 @@ export function VehiclesPage() {
                             ))}
                           </select>
                         </label>
-                        {(filterPlate || filterDepartment || costumerFilterActive) && (
+                        {filterPlate && (
                           <button
                             type="button"
-                            onClick={() => {
-                              setFilterPlate("");
-                              setFilterDepartment("");
-                              // Only in the modes where Kunde is actually an
-                              // editable filter (see costumerFilterActive's
-                              // own doc comment) — in LOCKED mode this would
-                              // otherwise wipe out the department's own
-                              // costumer, which "Opret køretøj" needs.
-                              if (!targetDepartmentId) setFilterCostumerId("");
-                            }}
+                            onClick={() => setFilterPlate("")}
                             className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
                           >
                             Nulstil filter
@@ -394,7 +272,7 @@ export function VehiclesPage() {
                         <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
                           {!targetCostumerId && !isSysadm
                             ? "Ingen kunde valgt."
-                            : filterPlate || filterDepartment
+                            : filterPlate
                               ? "Ingen køretøjer matcher filteret."
                               : "Ingen køretøjer fundet."}
                         </td>
