@@ -106,6 +106,10 @@ export function BookingDetailsPage() {
   );
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
+  /** Forces a fresh fleet refetch every time this page is opened (or :bookingId changes without a remount) — VehicleContext's allVehicles/gpsPositions are otherwise only fetched once per login session by default (see useRefreshVehicles' own doc comment in VehicleContext.tsx), so twoHireVehicle's fields below (Kilometerstand/Drivmiddelniveau, and the Live-toggle default above) could otherwise stay stale for the rest of the session. Same fix as VehicleDetailsPage.tsx's identical mount effect. */
+  useEffect(() => {
+    void refreshVehicles();
+  }, [bookingId, refreshVehicles]);
   useEffect(() => {
     setLiveTracking(liveEnabled);
     if (liveEnabled) void refreshVehicles();

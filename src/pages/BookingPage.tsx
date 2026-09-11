@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
+import { use2hireGPS, use2hireVehicle, useRefreshVehicles } from "../contexts/VehicleContext";
 import {
   BOOKINGS_SELECT_COLUMNS,
   DEPARTMENT_COLUMN,
@@ -79,6 +79,11 @@ export function BookingPage() {
 
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
+  const refreshVehicles = useRefreshVehicles();
+  /** Forces a fresh fleet refetch on landing here — VehicleContext's allVehicles/gpsPositions are otherwise only fetched once per login session by default (see useRefreshVehicles' own doc comment in VehicleContext.tsx), so the hero card's driving-vehicle icon below (twoHireVehicle?.tripDetected) could otherwise show a stale value for the rest of the session. Same fix as VehicleDetailsPage.tsx's identical mount effect. */
+  useEffect(() => {
+    void refreshVehicles();
+  }, [refreshVehicles]);
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
   /** Time-gated to the 15-minutes-before-start through 15-minutes-after-end window (see isMapVisible) — this page is role "user" only (requireRole in App.tsx), so there's no admin-always-visible override to make here, unlike BookingDetailsPage.tsx's own use of the same map. */
   const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;

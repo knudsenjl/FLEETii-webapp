@@ -125,14 +125,40 @@ export function VehicleDetailsPage() {
   // effect (which depends on [vehicle, isAdmin]) in an unnecessary loop.
   const [fetchedVehicle, setFetchedVehicle] = useState<Vehicle | null>(null);
   const vehicle = stateVehicle ?? fetchedVehicle;
+  /**
+   * The freshest data VehicleContext currently has for this vehicle — unlike
+   * `vehicle` above, which is either a router-state snapshot frozen at
+   * whatever moment the admin clicked in from (VehiclesPage/
+   * FleetManagementPage/BookingDetailsPage all pass `{ state: { vehicle } }`)
+   * or, in the no-router-state fallback, a one-time fetch-by-id snapshot
+   * (see the effect below) that's never re-synced afterward either.
+   * allVehicles/use2hireVehicle() itself is ALSO only fetched once per
+   * session by default (see useRefreshVehicles' own doc comment in
+   * VehicleContext.tsx) — but the mount effect below now forces a fresh
+   * refetch every time this page is opened, so `liveVehicle` becomes
+   * genuinely current shortly after mount and stays reactive to it (unlike
+   * `vehicle`, which would keep showing 2hire's trip_detected/online/etc.
+   * signal values from however long ago the admin actually navigated here,
+   * even after that refetch resolves). Used below for exactly the
+   * time-sensitive bits: the driving-icon/health-check and the Live-toggle
+   * default. Null until allVehicles contains this vehicle.
+   */
+  const liveVehicle = allVehicles.find((v) => v.vehicleId === vehicle?.vehicleId) ?? null;
   const gpsPositions = use2hireGPS();
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this vehicle so refreshing on a different vehicle's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`vehicle-details-map:${vehicle?.vehicleId ?? ""}`);
-  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this vehicle so refreshing on a different vehicle's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, same one driving the header's CarGlyph icon above) — a driving vehicle's position is the one you'd actually want to watch move, so this saves the admin an extra click on the common "just clicked in from a moving vehicle" path; a parked vehicle still defaults off, same as before. Only evaluated once per mount (useState initializer, not re-derived if trip_detected flips later) — fine here since the toggle stays user-controlled from then on, same as the pre-existing reload-persistence behavior. */
-  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(`vehicle-details-live:${vehicle?.vehicleId ?? ""}`, vehicle?.tripDetected === "TRUE");
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this vehicle so refreshing on a different vehicle's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, same one driving the header's CarGlyph icon above) — a driving vehicle's position is the one you'd actually want to watch move, so this saves the admin an extra click on the common "just clicked in from a moving vehicle" path; a parked vehicle still defaults off, same as before. Reads `liveVehicle` first (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) so the default reflects the freshest data available AT MOUNT — still only evaluated once per mount (useState initializer), so it won't retroactively flip on once the mount effect's refetch below resolves; the toggle stays user-controlled from then on, same as the pre-existing reload-persistence behavior. */
+  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(
+    `vehicle-details-live:${vehicle?.vehicleId ?? ""}`,
+    (liveVehicle?.tripDetected ?? vehicle?.tripDetected) === "TRUE",
+  );
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
+  /** Forces a fresh fleet refetch every time this page is opened (or the :vehicleId changes without a remount) — see `liveVehicle`'s own doc comment above for why this is needed at all: otherwise this vehicle's trip_detected/online/etc. signals could be showing whatever they were at login (or the last refreshVehicles() call anywhere in the app), arbitrarily stale. */
+  useEffect(() => {
+    void refreshVehicles();
+  }, [vehicleId, refreshVehicles]);
   useEffect(() => {
     setLiveTracking(liveEnabled);
     if (liveEnabled) void refreshVehicles();
@@ -312,10 +338,10 @@ export function VehicleDetailsPage() {
     ) : null;
   }
 
-  /** Admin/sysadm-only red "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Empty (button hidden) for a non-admin viewer, same as VehiclesPage's own gating. */
-  const healthIssues = isAdmin ? getVehicleHealthIssues(vehicle, position?.updatedAtIso ?? null) : [];
-  /** Whether the driving-vehicle icon shows next to the "Køretøjsdetaljer" heading below — admin/sysadm only, and only while 2hire's live trip_detected signal is currently true for this vehicle. */
-  const isDriving = isAdmin && vehicle.tripDetected === "TRUE";
+  /** Admin/sysadm-only red "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Reads `liveVehicle` (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) — see liveVehicle's own doc comment for why: this button exists specifically to catch stale signals, so feeding it a frozen router-state snapshot would silently defeat its whole purpose. Empty (button hidden) for a non-admin viewer, same as VehiclesPage's own gating. */
+  const healthIssues = isAdmin ? getVehicleHealthIssues(liveVehicle ?? vehicle, position?.updatedAtIso ?? null) : [];
+  /** Whether the driving-vehicle icon shows next to the "Køretøjsdetaljer" heading below — admin/sysadm only, and only while 2hire's live trip_detected signal is currently true for this vehicle. Reads `liveVehicle` first, same reasoning as healthIssues above. */
+  const isDriving = isAdmin && (liveVehicle?.tripDetected ?? vehicle.tripDetected) === "TRUE";
 
   /**
    * "Slet køretøj" doesn't delete anything directly — a customer admin can't,
