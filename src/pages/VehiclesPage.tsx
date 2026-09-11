@@ -129,6 +129,10 @@ export function VehiclesPage() {
 
   /** Page-local, transient (not persisted) — surfaced inside PageHeader's "Data Filter" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterPlate, setFilterPlate] = useState("");
+  /** Resets back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked vehicle almost certainly doesn't belong to the NEW scope (it may not even be in `vehicles` at all any more), so leaving it selected would either silently show nothing or, worse, keep matching a vehicle that's no longer actually in view. Same reasoning the page's own local Kunde/Afdeling filter used to apply to this same field before Kunde/Afdeling moved into the header. */
+  useEffect(() => {
+    setFilterPlate("");
+  }, [targetCostumerId, targetDepartmentId]);
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter((v) => !filterPlate || v.plate === filterPlate);
