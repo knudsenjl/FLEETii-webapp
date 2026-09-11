@@ -416,7 +416,8 @@ export function PageHeader({
                           onChange={(e) => koretoejFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          {koretoejFilter.options.length > 1 && <option value="">Alle</option>}
+                          {/* Unlike the other fields, always shown regardless of options.length — VehiclesPage.tsx/FleetManagementPage.tsx reset this field's value back to "" the moment Kunde/Afdeling changes (a previous pick almost certainly doesn't belong to the new scope), and with only one vehicle in view, hiding "Alle" would leave no <option value=""> for that "" to actually match — the browser would just default-show the sole vehicle as if it were deliberately picked, which is exactly the misleading state the reset is trying to avoid. */}
+                          <option value="">Alle</option>
                           {koretoejFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
