@@ -39,29 +39,24 @@ type ProfileQueryRow = {
 };
 
 /**
- * Admin "user management" page ("/department"): two modes, both scoped to a
- * target costumer (costumerId/costumerName via router state, or the
- * viewer's own costumerId for a regular admin).
+ * Admin "user management" page ("/department"): scoped to a target
+ * costumer (costumerId/costumerName via router state, or the viewer's own
+ * costumerId for a regular admin) and, optionally, one specific department
+ * within it (departmentId — e.g. DepartmentDetailsPage.tsx's own
+ * BRUGERE button, a department row already selected there; absent means
+ * "every user across the whole target costumer", matching AdminFrontpage's/
+ * CostumerDetailsPage's own BRUGERE button and its count badge).
  *
- * LOCKED (departmentId also given — DepartmentDetailsPage's own BRUGERE
- * button, a department row already selected there): lists just that ONE
- * department's users, no in-page way to widen back out — "filtering by
- * navigation", same pattern this app already uses for costumerId scoping
- * elsewhere. To see a different department's users, go back and select a
- * different row on DepartmentDetailsPage.
- *
- * UNLOCKED (no departmentId — AdminFrontpage/CostumerDetailsPage's own
- * BRUGERE button, straight there): lists every user across the WHOLE target
- * costumer (matching what that button's own count badge already showed),
- * with an in-page Afdeling filter to narrow it back down —
- * CostumerDetailsPage's own BRUGERE used to fall back to DepartmentDetailsPage
- * as a picker whenever the costumer had 0 or 2+ departments; this replaced
- * that (2026-08-28, at the user's request) since landing on a whole
- * different page just to pick one felt like the wrong destination for a
- * button whose badge already promised "every user here". A regular admin's
- * own users are always within their own single department already (RLS
- * itself enforces that regardless of mode — see user_profiles_select_admin_own_department),
- * so none of this distinction is visible to them in practice.
+ * Either way, this is only ever the INITIAL scope — the global header
+ * ("Data Filter", PageHeader.tsx) always wins outright the moment it's
+ * touched (headerTouched below), for BOTH Kunde and Afdeling, regardless of
+ * how this page was reached. There's no "go back and pick a different row"
+ * carve-out left here the way VehiclesPage.tsx/FleetManagementPage.tsx
+ * still have for their own true LOCKED case — this page's users list always
+ * follows "Data Filter" live. A regular admin's own users are always within
+ * their own single department already (RLS itself enforces that regardless
+ * — see user_profiles_select_admin_own_department), so none of this
+ * distinction is visible to them in practice.
  *
  * Reaching this page with neither a costumerId a sysadm could resolve
  * nor one of their own (a regular admin always has one) redirects back to
@@ -75,7 +70,7 @@ type ProfileQueryRow = {
  * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { costumerId, costumerName, afdelingId, availableDepartments, profile } = useAuth();
+  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -85,33 +80,46 @@ export function DepartmentPage() {
   /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
   const columnCount = 4;
 
-  /** A sysadm has no costumer of their own — for them, targetCostumerId only ever comes from router state (until the header is touched — see headerTouchedCostumer below). */
+  /** A sysadm has no costumer of their own — for them, targetCostumerId only ever comes from router state (until the header is touched — see headerTouched below). */
   const isSysadm = isSysadmRole(profile?.role);
-  /** True LOCKED mode only — a specific department was already selected before navigating here. Gates headerTouchedCostumer below: a LOCKED visit stays fully frozen for its whole duration, so Kunde must never "unstick" and start following the header there either — only the UNLOCKED case (costumerId alone, or nothing) should. Same pattern/reasoning as VehiclesPage.tsx's identical fix. */
-  const isLocked = Boolean(state?.departmentId);
-  /** Whether the header's own costumerId has genuinely changed since this page mounted — once it has, it wins outright over state?.costumerId for the rest of this visit, same "changing Kunde always actually changes the list" fix as VehiclesPage.tsx's own headerTouchedCostumer (see its doc comment there for the full reasoning: without this, a router-state costumerId seed — e.g. CostumerDetailsPage's own BRUGERE button — would permanently shadow the header, since this page's own Kunde picker moved there during the filter-redesign work). Sticky rather than a live mount-time comparison, for the same reason documented there. */
-  const [headerTouchedCostumer, setHeaderTouchedCostumer] = useState(false);
+  /**
+   * Whether the header's own Kunde/Afdeling scope has genuinely changed
+   * since this page mounted (either one) — once it has, it wins outright
+   * over any router-state seed (state?.costumerId/departmentId) for the
+   * rest of this visit, INCLUDING true LOCKED visits (a specific department
+   * row's own BRUGERE button on DepartmentDetailsPage.tsx). This
+   * deliberately overrides the original filter-redesign plan's "LOCKED mode
+   * stays frozen for its whole visit" decision for this page specifically,
+   * per explicit, repeated request: changing Kunde or Afdeling in "Data
+   * Filter" must always update this page's own user list, regardless of how
+   * it was reached — there's no "go back and pick a different row" carve-out
+   * left here (VehiclesPage.tsx/FleetManagementPage.tsx still keep that
+   * carve-out; this page no longer does).
+   *
+   * Sticky rather than a live mount-time comparison — a live comparison
+   * would incorrectly revert to trusting the stale router-state seed again
+   * if the header ever cycles back to exactly its mount-time values.
+   */
+  const [headerTouched, setHeaderTouched] = useState(false);
   const mountedCostumerIdRef = useRef(costumerId);
+  const mountedAfdelingIdRef = useRef(afdelingId);
   useEffect(() => {
-    if (isLocked) return;
-    if (costumerId !== mountedCostumerIdRef.current) {
+    if (costumerId !== mountedCostumerIdRef.current || afdelingId !== mountedAfdelingIdRef.current) {
       mountedCostumerIdRef.current = costumerId;
-      setHeaderTouchedCostumer(true);
+      mountedAfdelingIdRef.current = afdelingId;
+      setHeaderTouched(true);
     }
-  }, [costumerId, isLocked]);
-  const targetCostumerId = headerTouchedCostumer ? costumerId : (state?.costumerId ?? costumerId);
-  /** Same headerTouchedCostumer gate as targetCostumerId above — without it, the "Brugere hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual user list) had already moved on to a different Kunde. costumerName (global) is the correct fallback once touched, same as VehiclesPage.tsx's identical fix — this page just never had a reason to read it before. */
-  const targetCostumerName = isSysadm ? (headerTouchedCostumer ? costumerName : (state?.costumerName ?? null)) : null;
-  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
-  const targetDepartmentId = state?.departmentId ?? null;
-  const targetDepartmentName = state?.departmentName ?? null;
+  }, [costumerId, afdelingId]);
+  const targetCostumerId = headerTouched ? costumerId : (state?.costumerId ?? costumerId);
+  /** Same headerTouched gate as targetCostumerId above — without it, the "Brugere hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual user list) had already moved on to a different Kunde. costumerName (global) is the correct fallback once touched, same as VehiclesPage.tsx's identical fix — this page just never had a reason to read it before. */
+  const targetCostumerName = isSysadm ? (headerTouched ? costumerName : (state?.costumerName ?? null)) : null;
 
   /**
-   * UNLOCKED mode only: the global header's active department (afdelingId),
-   * carried over IF (and only if) it actually belongs to targetCostumerId —
-   * otherwise null, i.e. no narrowing. This is the "navigation wins" formula
-   * (see the filter-redesign plan's Common pattern): without the membership
-   * check, navigating here for a DIFFERENT costumer than the header's
+   * The global header's active department (afdelingId), carried over IF
+   * (and only if) it actually belongs to targetCostumerId — otherwise null,
+   * i.e. no narrowing. This is the "navigation wins" formula (see the
+   * filter-redesign plan's Common pattern): without the membership check,
+   * navigating here for a DIFFERENT costumer than the header's
    * currently-active department would filter every one of this costumer's
    * users out (none of them have that foreign department_id), showing an
    * empty table instead of the whole costumer's users. For a regular admin
@@ -122,6 +130,9 @@ export function DepartmentPage() {
     afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
       ? afdelingId
       : null;
+  /** Router-state seed (e.g. DepartmentDetailsPage.tsx's own department-specific BRUGERE button) wins ONLY until the header is touched (see headerTouched above) — once it is, effectiveAfdelingId takes over outright, same as targetCostumerId. Absent/null means UNLOCKED (whole costumer, filterable). */
+  const targetDepartmentId = headerTouched ? effectiveAfdelingId : (state?.departmentId ?? null);
+  const targetDepartmentName = headerTouched ? (targetDepartmentId ? afdeling : null) : (state?.departmentName ?? null);
 
   /** Whether targetDepartmentId's OWN department_settings shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — deliberately the LISTED department's own setting, not the viewing admin's currently-active one. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears, only its value source swaps. UNLOCKED mode (targetDepartmentId null) has no single department's setting to apply across users from several departments at once, so useIdentSettings' own fail-closed default (plain E-mail) applies uniformly there instead. */
   const { useUserIdent } = useIdentSettings(targetDepartmentId);
