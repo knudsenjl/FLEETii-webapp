@@ -345,7 +345,8 @@ export function PageHeader({
                         }}
                         className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                       >
-                        {canSwitchToAll && <option value="">Alle</option>}
+                        {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. */}
+                        {canSwitchToAll && afdelingOptions.length > 1 && <option value="">Alle</option>}
                         {afdelingOptions.map((department) => (
                           <option key={department.department_id} value={department.department_id}>
                             {/* Kunde "Alle" (costumerId null): afdelingOptions spans every costumer platform-wide, so the same department name can recur under different Kunder — prefix with "Kunde/" to disambiguate, same "Kunde / Afdeling" convention as elsewhere (BookingDetailsPage.tsx/ReservationPage.tsx). Once a specific Kunde is picked, every option is already implicitly that one Kunde's own, so the plain name is enough. */}
