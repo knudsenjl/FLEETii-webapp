@@ -348,7 +348,8 @@ export function PageHeader({
                         {canSwitchToAll && <option value="">Alle</option>}
                         {afdelingOptions.map((department) => (
                           <option key={department.department_id} value={department.department_id}>
-                            {department.name}
+                            {/* Kunde "Alle" (costumerId null): afdelingOptions spans every costumer platform-wide, so the same department name can recur under different Kunder — prefix with "Kunde/" to disambiguate, same "Kunde / Afdeling" convention as elsewhere (BookingDetailsPage.tsx/ReservationPage.tsx). Once a specific Kunde is picked, every option is already implicitly that one Kunde's own, so the plain name is enough. */}
+                            {!costumerId && department.costumerName ? `${department.costumerName}/${department.name}` : department.name}
                           </option>
                         ))}
                       </select>
