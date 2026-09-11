@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -84,7 +84,31 @@ export function BookingPage() {
   useEffect(() => {
     void refreshVehicles();
   }, [refreshVehicles]);
+  /** The vehicle's OWN, always-current position — feeds the marker (via markerLat/markerLng below), deliberately NOT the map's own center — see stableCenter below. */
   const position = booking ? resolveVehicleGpsPosition(booking.vehicle, gpsPositions) : null;
+  /**
+   * The map's own center — deliberately NOT re-derived on every live
+   * position update (same pattern as FleetManagementPage.tsx's own
+   * stableCenter/VehicleDetailsPage.tsx's identical fix). Without this,
+   * passing `position.lat`/`position.lng` straight into LeafletMap's
+   * `lat`/`lng` props would change them on every single live GPS update,
+   * which LeafletMap treats as a genuine recenter request and rebuilds the
+   * WHOLE map for — including resetting the zoom back to whatever the
+   * `zoom` prop below says, discarding any zoom level the viewer had
+   * manually set. `Boolean(position)` (rather than a vehicleId, which
+   * resolveVehicleGpsPosition's return shape doesn't carry) is the
+   * recompute trigger instead: it flips false -> true exactly once, the
+   * moment a first GPS fix actually arrives, then stays true (so this
+   * doesn't recompute again) for every later position-only update of that
+   * same fix.
+   */
+  const stableCenter = useMemo(
+    () => (position ? { lat: position.lat, lng: position.lng } : DENMARK_CENTER),
+    // position.lat/position.lng deliberately excluded — see this constant's
+    // own doc comment just above.
+    // oxlint-disable-next-line react-hooks/exhaustive-deps
+    [booking?.vehicle, Boolean(position)],
+  );
   /** Time-gated to the 15-minutes-before-start through 15-minutes-after-end window (see isMapVisible) — this page is role "user" only (requireRole in App.tsx), so there's no admin-always-visible override to make here, unlike BookingDetailsPage.tsx's own use of the same map. */
   const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. */
@@ -318,8 +342,8 @@ export function BookingPage() {
             <div className="flex flex-col gap-1.5">
               <div className="relative isolate h-52 overflow-hidden rounded-2xl border border-brand-100">
                 <LeafletMap
-                  lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
-                  lng={savedMapView?.lng ?? position?.lng ?? DENMARK_CENTER.lng}
+                  lat={savedMapView?.lat ?? stableCenter.lat}
+                  lng={savedMapView?.lng ?? stableCenter.lng}
                   zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
                   markerLat={position?.lat ?? DENMARK_CENTER.lat}
                   markerLng={position?.lng ?? DENMARK_CENTER.lng}

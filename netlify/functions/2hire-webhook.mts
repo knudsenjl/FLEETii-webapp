@@ -22,22 +22,25 @@
 // "trip_detected" — confirmed by 2hire to genuinely be a "specific" signal,
 // not generic as vehicle_signals_add_trip_detected.sql originally assumed)
 // is fine to apply the same way a generic signal would be.
-// A "position" signal additionally pushes a Realtime Broadcast message
-// (see the bottom of the handler below) straight to any browser currently
-// watching FleetManagementPage.tsx's "Live" toggle — see
-// VehicleContext.tsx's own "fleet-positions:*" broadcast listener — so the
-// map marker moves the instant 2hire reports it, instead of that page
-// having to poll for changes. Sent to TWO topics: the vehicle's own
-// "fleet-positions:<costumerId>" (what that costumer's own users/admins
-// subscribe to) AND the fixed "fleet-positions:sysadm" (what a
-// sysadm subscribes to instead, since they need every costumer's
-// positions at once, e.g. FleetManagementPage's "Alle" filter) — see
+// A "position" or "trip_detected" signal additionally pushes a Realtime
+// Broadcast message (see broadcastToFleetTopics below, called from the
+// bottom of the handler) straight to any browser currently connected — see
+// VehicleContext.tsx's own "fleet-positions:*" broadcast listener, which
+// keeps a channel open for every authenticated session (not just while a
+// "Live" map toggle is on), so the map marker/health icons/driving-vehicle
+// icon all update the instant 2hire reports a change instead of every page
+// having to poll or wait for its own next full fetch. Sent to TWO topics:
+// the vehicle's own "fleet-positions:<costumerId>" (what that costumer's
+// own users/admins subscribe to) AND the fixed "fleet-positions:sysadm"
+// (what a sysadm subscribes to instead, since they need every costumer's
+// updates at once, e.g. FleetManagementPage's "Alle" filter) — see
 // fleet_positions_realtime_authorization.sql's RLS policy on
 // realtime.messages, which is what actually restricts who may receive each
 // topic; sending to both here is just picking the right addressees, not the
 // security boundary itself.
 //
 // Docs: https://developer.2hire.io/docs/receiving-signals
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isWebhookSignatureValid } from "./_shared/webhookSignature.js";
 
@@ -48,6 +51,47 @@ const SPECIFIC_SIGNALS_APPLIED_TO_CURRENT_STATE = new Set(["trip_detected"]);
 
 type SignalPayload = { timestamp: number; data: Record<string, unknown> };
 type WebhookBody = { topic: string; payload: SignalPayload };
+
+/**
+ * Looks up `vehicleId`'s costumer_id and broadcasts `payload` under `event`
+ * to that costumer's own "fleet-positions:<costumerId>" topic plus the
+ * fixed "fleet-positions:sysadm" topic — shared by the position and
+ * trip_detected live-update broadcasts below, previously duplicated inline.
+ * `{ config: { private: true } }` on each channel is required to MATCH
+ * VehicleContext.tsx's own subscribe-side channel config — without it,
+ * RealtimeChannel.private defaults to false, so httpSend() posts the
+ * broadcast WITHOUT the "?private=true" query param the Realtime server
+ * needs to route it through the authorized/private delivery path
+ * fleet_positions_realtime_authorization.sql's RLS policy actually guards.
+ * Confirmed 2026-09-11 this was silently missing for "position" (the send
+ * itself 200ed, the DB write was already correct, so the only visible
+ * symptom was "the map only updates on a manual refresh, never live").
+ */
+async function broadcastToFleetTopics(
+  admin: SupabaseClient,
+  vehicleId: string,
+  event: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  const { data: vehicle, error: vehicleError } = await admin
+    .from("vehicle_profiles")
+    .select("costumer_id")
+    .eq("vehicle_id", vehicleId)
+    .maybeSingle<{ costumer_id: string | null }>();
+  if (vehicleError) throw new Error(`Kunne ikke slå køretøjets kunde op: ${vehicleError.message}`);
+
+  // Every costumer's own topic, plus the fixed sysadm one (always sent
+  // regardless of costumer_id, so a sysadm keeps seeing every vehicle
+  // update) — see this file's own header comment.
+  const topics = ["fleet-positions:sysadm"];
+  if (vehicle?.costumer_id) topics.push(`fleet-positions:${vehicle.costumer_id}`);
+
+  for (const topic of topics) {
+    const channel = admin.channel(topic, { config: { private: true } });
+    await channel.httpSend(event, payload);
+    await admin.removeChannel(channel);
+  }
+}
 
 export default async (req: Request) => {
   const url = new URL(req.url);
@@ -216,62 +260,49 @@ export default async (req: Request) => {
     }
   }
 
-  // Pushes the new position straight to any browser currently watching
-  // FleetManagementPage.tsx's "Live" toggle (see VehicleContext.tsx's own
-  // "fleet-positions:*" broadcast listener) — a plain Realtime Broadcast
-  // message, not tied to any table, so this needs no table
-  // publication/postgres_changes setup (unlike a postgres_changes
-  // subscription, which was considered and rejected as overbuilt for this)
-  // — it DOES need the realtime.messages RLS policy in
-  // fleet_positions_realtime_authorization.sql, since these are now private,
-  // authorized channels rather than one open global one. httpSend() posts
-  // over REST without holding a WebSocket open, which is what makes this
-  // safe to call from a single, short-lived function invocation. Scoped to
-  // "position" only — the map marker is the only thing this drives;
-  // online/trip_detected/etc. stay on the existing once-per-session fetch.
-  // Best-effort: a failure here is logged, never turned into a failed
-  // response to 2hire — the vehicle_signals write above already persisted
-  // the real state, so a missed broadcast just means the map isn't
-  // live-updated until the next page load/refresh, not a data loss.
+  // Pushes the new position straight to any connected browser (see
+  // broadcastToFleetTopics/VehicleContext.tsx's own "fleet-positions:*"
+  // listener above) — a plain Realtime Broadcast message, not tied to any
+  // table, so this needs no table publication/postgres_changes setup
+  // (unlike a postgres_changes subscription, which was considered and
+  // rejected as overbuilt for this). httpSend() posts over REST without
+  // holding a WebSocket open, which is what makes this safe to call from a
+  // single, short-lived function invocation. Best-effort: a failure here is
+  // logged, never turned into a failed response to 2hire — the
+  // vehicle_signals write above already persisted the real state, so a
+  // missed broadcast just means the map isn't live-updated until the next
+  // page load/refresh, not a data loss.
   if (topicKind === "generic" && signal === "position" && signalApplied) {
     try {
-      const { data: vehicle, error: vehicleError } = await admin
-        .from("vehicle_profiles")
-        .select("costumer_id")
-        .eq("vehicle_id", vehicleId)
-        .maybeSingle<{ costumer_id: string | null }>();
-      if (vehicleError) throw new Error(`Kunne ikke slå køretøjets kunde op: ${vehicleError.message}`);
-
-      const positionPayload = {
+      await broadcastToFleetTopics(admin, vehicleId, "position", {
         vehicleId,
         lat: Number(body.payload.data.latitude),
         lng: Number(body.payload.data.longitude),
-      };
-
-      // Every costumer's own topic, plus the fixed sysadm one (always
-      // sent regardless of costumer_id, so a sysadm keeps seeing
-      // every vehicle move) — see this function's own header comment.
-      const topics = ["fleet-positions:sysadm"];
-      if (vehicle?.costumer_id) topics.push(`fleet-positions:${vehicle.costumer_id}`);
-
-      for (const topic of topics) {
-        // { config: { private: true } } is required here to MATCH
-        // VehicleContext.tsx's own subscribe-side channel config — without
-        // it, RealtimeChannel.private defaults to false, so httpSend() below
-        // posts the broadcast WITHOUT the "?private=true" query param the
-        // Realtime server needs to route it through the authorized/private
-        // delivery path that fleet_positions_realtime_authorization.sql's
-        // RLS policy actually guards. The send itself still succeeded (200,
-        // no error here) and the DB write above was already correct, so this
-        // was invisible everywhere except as "the map only updates on a
-        // manual refresh, never live" — confirmed 2026-09-11 after a user
-        // report of exactly that symptom on a vehicle known to be driving.
-        const channel = admin.channel(topic, { config: { private: true } });
-        await channel.httpSend("position", positionPayload);
-        await admin.removeChannel(channel);
-      }
+      });
     } catch (broadcastError) {
       console.error("[2hire-webhook] failed to broadcast live position:", broadcastError);
+    }
+  }
+
+  // Same idea as the position broadcast just above, for trip_detected —
+  // added 2026-09-11 so the driving-vehicle CarGlyph (VehicleDetailsPage's
+  // header, BookingPage's hero card, VehiclesPage's fleet table) and
+  // VehicleDetailsPage/BookingDetailsPage's "Live" auto-stop-when-parked
+  // behavior (see VehicleContext.tsx) both react the instant 2hire reports
+  // a trip starting/stopping, instead of only refreshing on the next page
+  // load. `data.value` is 2hire's actual payload shape for this one signal
+  // (confirmed 2026-09-11 — NOT keyed by the signal's own name like
+  // "online"/"locked" are, see fix_vehicle_signals_view_trip_detected_key.sql
+  // for the same discovery fixing the DB-side view).
+  if (topicKind === "specific" && signal === "trip_detected" && signalApplied) {
+    try {
+      await broadcastToFleetTopics(admin, vehicleId, "trip_detected", {
+        vehicleId,
+        tripDetected: Boolean(body.payload.data.value),
+        updatedAtIso: new Date(body.payload.timestamp).toISOString(),
+      });
+    } catch (broadcastError) {
+      console.error("[2hire-webhook] failed to broadcast trip_detected:", broadcastError);
     }
   }
 
