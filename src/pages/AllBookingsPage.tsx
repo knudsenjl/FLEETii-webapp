@@ -139,6 +139,12 @@ export function AllBookingsPage() {
       .from("user_profiles")
       .select("user_id, email, user_ident, department_id")
       .is("deleted_at", null)
+      // A sysadm's own department_id is just their current "Data Filter"
+      // scope pointer (see AuthContext's switchDepartment), never a real
+      // booking-relevant user — without this, a sysadm who has ever
+      // switched their own scope would show up in the Bruger dropdown as
+      // if they were a genuine user, same gap as DepartmentPage.tsx's own.
+      .neq("role", "sysadm")
       .order("email")
       .then(({ data }) => {
         setUsers(

@@ -141,6 +141,13 @@ export function DepartmentPage() {
         .select(
           "user_id, email, full_name, phone, user_ident, department_id, costumer_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
         )
+        // A sysadm's own department_id/costumer_id is just their current
+        // "Data Filter" scope pointer (see AuthContext's switchDepartment),
+        // never real department membership — without this exclusion, a
+        // sysadm who has ever switched their own scope into this
+        // department/costumer would show up in this list as if they were a
+        // genuine assigned user of it.
+        .neq("role", "sysadm")
         .order("full_name", { ascending: true });
       // LOCKED mode: scope straight to targetDepartmentId (a department_id
       // already determines its own costumer, so no separate costumer_id
