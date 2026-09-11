@@ -17,7 +17,6 @@ import {
   type BookingRow,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
-import { CarGlyph } from "../components/CarGlyph";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
@@ -80,7 +79,7 @@ export function BookingPage() {
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
   const refreshVehicles = useRefreshVehicles();
-  /** Forces a fresh fleet refetch on landing here — VehicleContext's allVehicles/gpsPositions are otherwise only fetched once per login session by default (see useRefreshVehicles' own doc comment in VehicleContext.tsx), so the hero card's driving-vehicle icon below (twoHireVehicle?.tripDetected) could otherwise show a stale value for the rest of the session. Same fix as VehicleDetailsPage.tsx's identical mount effect. */
+  /** Forces a fresh fleet refetch on landing here — VehicleContext's allVehicles/gpsPositions are otherwise only fetched once per login session by default (see useRefreshVehicles' own doc comment in VehicleContext.tsx), so the map marker below could otherwise show a stale position for the rest of the session. Same fix as VehicleDetailsPage.tsx's identical mount effect. */
   useEffect(() => {
     void refreshVehicles();
   }, [refreshVehicles]);
@@ -258,10 +257,6 @@ export function BookingPage() {
                     </span>
                   )}
                 </div>
-                {/* Green when 2hire's "trip_detected" signal is currently true for this vehicle (see liveVehicleDataSource.ts's tripDetected mapping) — brand-colored otherwise, same as before this signal existed. */}
-                <CarGlyph
-                  className={`h-9 w-14 shrink-0 ${twoHireVehicle?.tripDetected === "TRUE" ? "text-green-600" : "text-brand-600"}`}
-                />
               </button>
               {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Alle" ("all") is the way to see everything else. */}
               <button
