@@ -75,6 +75,11 @@ export function AllBookingsPage() {
   /** Page-local, transient (not persisted) — both surfaced inside PageHeader's "Data Filter" popup as Bruger/Køretøj <select> fields rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
+  /** Resets both back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked Bruger/Køretøj almost certainly doesn't correspond to the NEW scope's bookings, so leaving them selected would silently show an empty or misleading result. Same reasoning/fix as VehiclesPage.tsx's own Køretøj reset and DepartmentPage.tsx's Rolle/Bruger/Navn reset. */
+  useEffect(() => {
+    setFilterUser("");
+    setFilterVehicle("");
+  }, [costumerId, afdelingId]);
   /** Every department under the global header's active costumerId (sysadm only) — still needed for scopedDepartmentIds below, to turn a Kunde-only scope (costumerId set, afdelingId null) into a department-id set the client-side booking filter can match against. */
   const [departmentOptions, setDepartmentOptions] = useState<{ department_id: string; name: string }[]>([]);
 
