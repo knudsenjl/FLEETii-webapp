@@ -365,7 +365,8 @@ export function PageHeader({
                           onChange={(e) => rolleFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          {rolleFilter.options.length > 1 && <option value="">Alle</option>}
+                          {/* Always shown, same reasoning as Køretøj's own — DepartmentPage.tsx resets this field to "" the moment Kunde/Afdeling changes, so it needs a real <option value=""> to land on even with only one Rolle in view. */}
+                          <option value="">Alle</option>
                           {rolleFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -382,7 +383,8 @@ export function PageHeader({
                           onChange={(e) => brugerFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          {brugerFilter.options.length > 1 && <option value="">Alle</option>}
+                          {/* Always shown, same reasoning as Køretøj's own — DepartmentPage.tsx resets this field to "" the moment Kunde/Afdeling changes, so it needs a real <option value=""> to land on even with only one Bruger in view. */}
+                          <option value="">Alle</option>
                           {brugerFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
@@ -399,7 +401,8 @@ export function PageHeader({
                           onChange={(e) => navnFilter.onChange(e.target.value)}
                           className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                         >
-                          {navnFilter.options.length > 1 && <option value="">Alle</option>}
+                          {/* Always shown, same reasoning as Køretøj's own — DepartmentPage.tsx resets this field to "" the moment Kunde/Afdeling changes, so it needs a real <option value=""> to land on even with only one Navn in view. */}
+                          <option value="">Alle</option>
                           {navnFilter.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}

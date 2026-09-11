@@ -207,6 +207,12 @@ export function DepartmentPage() {
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
   const [filterRolle, setFilterRolle] = useState("");
+  /** Resets all three back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked Rolle/Bruger/Navn almost certainly doesn't correspond to the NEW scope's users (the picked Bruger/Navn might not even be a user of the new department/costumer at all), so leaving them selected would silently show an empty or misleading result. Same reasoning/fix as VehiclesPage.tsx's own Køretøj reset. */
+  useEffect(() => {
+    setFilterRolle("");
+    setFilterBruger("");
+    setFilterNavn("");
+  }, [targetCostumerId, effectiveAfdelingId]);
 
   /** Mirrors the Bruger column's own display logic (useUserIdent toggle) so the filter's dropdown values and matching always agree with what's actually shown in the table. */
   const brugerValue = (user: ProfileRow) => (useUserIdent ? user.user_ident || user.email : user.email) ?? "—";
