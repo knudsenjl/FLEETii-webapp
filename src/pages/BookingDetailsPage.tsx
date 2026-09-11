@@ -68,8 +68,8 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * with BookingPage.tsx (role "user"'s equivalent landing page) via
  * useBookingLifecycle — the two pages' layouts deliberately stay separate
  * (this one keeps the original table layout, plus admin-only Bruger/
- * Kilometerstand/Status rows and a department lookup BookingPage has no
- * need for), only the handlers themselves are shared.
+ * Kilometerstand rows and a department lookup BookingPage has no need for),
+ * only the handlers themselves are shared.
  */
 export function BookingDetailsPage() {
   const navigate = useNavigate();
@@ -99,8 +99,11 @@ export function BookingDetailsPage() {
   const { address, addressLoading } = useReverseGeocode(booking?.vehicle, position, mapVisible);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-details-map:${booking?.vehicle ?? ""}`);
-  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this booking's vehicle so refreshing on a different booking's page never inherits a stale on/off state. */
-  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(`booking-details-live:${booking?.vehicle ?? ""}`, false);
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this booking's vehicle so refreshing on a different booking's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, looked up straight from `vehicles` rather than waiting on the `twoHireVehicle` destructured below since this hook call needs the value at mount, before that exists) — same reasoning as VehicleDetailsPage.tsx's identical default. Only evaluated once per mount (useState initializer), same caveat as there. */
+  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(
+    `booking-details-live:${booking?.vehicle ?? ""}`,
+    vehicles.find((v) => v.vehicleId === booking?.vehicle)?.tripDetected === "TRUE",
+  );
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
   useEffect(() => {
@@ -241,7 +244,7 @@ export function BookingDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
+              <h2 className="shrink-0 text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
 
               {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
               <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
@@ -295,7 +298,7 @@ export function BookingDetailsPage() {
                       )}
                     </span>
                   </div>
-                  {/* Kilometerstand and Status are only shown to admin/sysadm — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
+                  {/* Kilometerstand is only shown to admin/sysadm — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
@@ -317,31 +320,17 @@ export function BookingDetailsPage() {
                         : ""}
                     </span>
                   </div>
-                  {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                        Status:
-                        {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. Omitted entirely when twoHireVehicle hasn't loaded (matching the value's own "—" fallback). */}
-                        {twoHireVehicle && (
-                          <span
-                            className={`h-2.5 w-2.5 rounded-full ${twoHireVehicle.online === "TRUE" ? "bg-green-500" : "bg-red-500"}`}
-                            title={twoHireVehicle.online === "TRUE" ? "Online" : "Offline"}
-                          />
-                        )}
-                      </label>
-                      <span className="text-sm text-brand-800">
-                        {twoHireVehicle ? (twoHireVehicle.online === "TRUE" ? "Online" : "Offline") : "—"}
-                        {twoHireVehicle?.onlineUpdatedAt
-                          ? ` (${shortSignalTimestamp(twoHireVehicle.onlineUpdatedAt)})`
-                          : ""}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
 
               {mapVisible && (
-                <div className="flex min-h-0 flex-1 flex-col gap-1">
+                // Deliberately no min-h-0 here — see VehicleDetailsPage.tsx's
+                // identical wrapper for why: without it, overflow-y-auto on
+                // the scrolling ancestor above lets this wrapper's own box
+                // collapse below its map child's explicit min-h-[12rem]
+                // floor, and the map then visually spills past its shrunk
+                // wrapper and overlaps the Lås/Blink/Horn row directly below.
+                <div className="flex flex-1 flex-col gap-1">
                   <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                     <LeafletMap
                       lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
@@ -367,14 +356,15 @@ export function BookingDetailsPage() {
 
                   {/* Reverse-geocoded address of the map position above — see VehicleDetailsPage.tsx's identical row for why this styling/placement. Only rendered with a real GPS fix. */}
                   {position && (
-                    <div className="w-full rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
+                    <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
                       {addressLoading ? "Henter adresse…" : (address ?? "Ingen adresse fundet")}
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="flex gap-3">
+              {/* shrink-0: see VehicleDetailsPage.tsx's identical row for why — without it, this row's box can collapse under overflow-y-auto pressure while its buttons keep their natural size, rendering them overlapping the map above. */}
+              <div className="flex shrink-0 gap-3">
                 <VehicleLockToggle
                   className="flex-1"
                   locked={vehicleLocked}
@@ -421,8 +411,8 @@ export function BookingDetailsPage() {
                 </div>
               </div>
 
-              {/* Afslut/Rediger/Slet, all on one row (labels shortened from "... reservation" since the section they're in already makes that context clear). */}
-              <div className="flex gap-3">
+              {/* Afslut/Rediger/Slet, all on one row (labels shortened from "... reservation" since the section they're in already makes that context clear). shrink-0 for the same reason as the Lås/Blink/Horn row above. */}
+              <div className="flex shrink-0 gap-3">
                 <button
                   type="button"
                   onClick={() => setShowFinishConfirm(true)}
@@ -452,10 +442,10 @@ export function BookingDetailsPage() {
                 )}
               </div>
 
-              {lockError && <p className="text-sm text-red-600">{lockError}</p>}
-              {locateError && <p className="text-sm text-red-600">{locateError}</p>}
+              {lockError && <p className="shrink-0 text-sm text-red-600">{lockError}</p>}
+              {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && <p className="shrink-0 text-sm text-red-600">{error}</p>}
             </div>
           </section>
         </motion.main>

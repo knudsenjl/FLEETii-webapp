@@ -19,7 +19,7 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 type FleetMapSnapshot = {
   mapView?: { lat: number; lng: number; zoom: number };
   clusterMarkers?: boolean;
-  filters?: { costumerId: string; department: string; plate: string; status: string };
+  filters?: { costumerId: string; department: string; plate: string };
   liveEnabled?: boolean;
 };
 
@@ -59,7 +59,7 @@ function isPageReload(): boolean {
  * to VehicleDetailsPage for that vehicle.
  *
  * Scope is filterable exactly like VehiclesPage.tsx's ("/fleet-table")
- * Kunde/Afdeling/Køretøj/Status filter — same funnel-icon button, same
+ * Kunde/Afdeling/Køretøj filter — same funnel-icon button, same
  * InlinePopup layout, same filter state shape — so an admin can narrow the
  * map down (e.g. to a single vehicle, or a department other than their own
  * currently-active one) without needing to "Skift afdeling" first, and a
@@ -138,7 +138,6 @@ export function FleetManagementPage() {
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState(savedSnapshot?.filters?.plate ?? "");
-  const [filterStatus, setFilterStatus] = useState(savedSnapshot?.filters?.status ?? "");
   const [filterDepartment, setFilterDepartment] = useState(savedSnapshot?.filters?.department ?? "");
   const filterRef = useRef<HTMLDivElement>(null);
   /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern as the filter popup above, own state/ref since the two popups are independent. */
@@ -198,7 +197,6 @@ export function FleetManagementPage() {
   const filteredVehicles = vehicles.filter(
     (v) =>
       (!filterPlate || v.plate === filterPlate) &&
-      (!filterStatus || v.status === filterStatus) &&
       (!filterDepartment || v.departmentIds.includes(filterDepartment)),
   );
 
@@ -283,9 +281,9 @@ export function FleetManagementPage() {
   useEffect(() => {
     writeStoredSnapshot({
       clusterMarkers,
-      filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate, status: filterStatus },
+      filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate },
     });
-  }, [clusterMarkers, filterCostumerId, filterDepartment, filterPlate, filterStatus]);
+  }, [clusterMarkers, filterCostumerId, filterDepartment, filterPlate]);
 
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
@@ -295,7 +293,7 @@ export function FleetManagementPage() {
     // before navigating away — so a browser-back from VehicleDetailsPage
     // lands back on a "/fleet-map" entry that still remembers where the
     // admin was looking, whether they'd switched to "Vis alle",
-    // whatever Kunde/Afdeling/Køretøj/Status they'd filtered to, and whether
+    // whatever Kunde/Afdeling/Køretøj they'd filtered to, and whether
     // Live polling was on, instead of resetting all of it to defaults. Same
     // formSnapshot-style pattern as
     // ReservationPage.tsx/AvailablePage.tsx. mapView is omitted (not just
@@ -307,7 +305,7 @@ export function FleetManagementPage() {
       state: {
         ...(mapViewRef.current ? { mapView: mapViewRef.current } : {}),
         clusterMarkers,
-        filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate, status: filterStatus },
+        filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate },
         liveEnabled,
       },
     });
@@ -373,7 +371,7 @@ export function FleetManagementPage() {
                       onClick={() => setFilterOpen((prev) => !prev)}
                       aria-label="Filtrer"
                       className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                        filterPlate || filterStatus || filterDepartment || filterCostumerId
+                        filterPlate || filterDepartment || filterCostumerId
                           ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                           : "border-brand-300 text-brand-600 hover:bg-brand-50"
                       }`}
@@ -501,24 +499,11 @@ export function FleetManagementPage() {
                               ))}
                             </select>
                           </label>
-                          <label className="block text-[0.7rem] font-medium text-brand-700">
-                            Status
-                            <select
-                              value={filterStatus}
-                              onChange={(e) => setFilterStatus(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              <option value="Online">Online</option>
-                              <option value="Offline">Offline</option>
-                            </select>
-                          </label>
-                          {(filterPlate || filterStatus || filterDepartment || filterCostumerId) && (
+                          {(filterPlate || filterDepartment || filterCostumerId) && (
                             <button
                               type="button"
                               onClick={() => {
                                 setFilterPlate("");
-                                setFilterStatus("");
                                 setFilterDepartment("");
                                 setFilterCostumerId("");
                               }}
@@ -574,7 +559,7 @@ export function FleetManagementPage() {
                   <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
                     <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
                       {filteredVehicles.length === 0
-                        ? filterPlate || filterStatus || filterDepartment || filterCostumerId
+                        ? filterPlate || filterDepartment || filterCostumerId
                           ? "Ingen køretøjer matcher filteret"
                           : "Der er ingen køretøjer i afdelingen"
                         : // filteredVehicles.length > 0 but departmentGpsPositions is

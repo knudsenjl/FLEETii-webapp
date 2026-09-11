@@ -10,49 +10,9 @@ import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
+import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
 
 type Vehicle = DisplayVehicle;
-
-/** How long a tracked signal can go without a fresh reading before the "!" health button below flags it — see this page's own doc comment on getVehicleHealthIssues, and the 2026-09-10 webhook-delivery investigation that prompted this feature. */
-const SIGNAL_STALE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
-
-/** One signal this page's health check found missing or stale for a vehicle — lastReceivedIso is null if that signal has NEVER been received at all (as opposed to merely being older than SIGNAL_STALE_THRESHOLD_MS). */
-type HealthIssue = { label: string; lastReceivedIso: string | null };
-
-/** Danish "DD/MM HH:MM" formatting straight from a raw ISO timestamp — same output shape as shortSignalTimestamp (lib/bookings.ts), which instead takes 2hire's own pre-formatted "DD/MM/YYYY HH.MM" string; position has no such pre-formatted string of its own (see types.ts's VehicleGPS2Hire.updatedAtIso doc comment), so this formats directly from ISO instead. */
-function formatIsoShort(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-}
-
-/**
- * Every 2hire signal this app actually tracks live, checked against
- * SIGNAL_STALE_THRESHOLD_MS — drives the red "!" health button (admin/
- * sysadm only, this page is already route-gated to them) right-aligned in
- * the "Model" cell below. Returns [] for a fully healthy vehicle (button
- * hidden), or one HealthIssue per signal that's either never arrived or has
- * gone stale otherwise. Deliberately just the five signals with a real
- * "current state" column today (see 2hire-webhook.mts's own header
- * comment) — NOT the 2hire warning fields (engineOilWarning,
- * serviceWarning, etc. — see vehicleDataSource/types.ts), which aren't
- * wired to any real data yet; add those here (not in the rendering below)
- * once they are, per this feature's own "may later be extended" brief.
- */
-function getVehicleHealthIssues(vehicle: Vehicle, positionUpdatedAtIso: string | null): HealthIssue[] {
-  const now = Date.now();
-  const isStale = (iso: string | null) => !iso || now - new Date(iso).getTime() > SIGNAL_STALE_THRESHOLD_MS;
-
-  const checks: { label: string; iso: string | null }[] = [
-    { label: "Online", iso: vehicle.onlineUpdatedAtIso },
-    { label: "Position", iso: positionUpdatedAtIso },
-    { label: "Kilometerstand", iso: vehicle.distanceCoveredUpdatedAtIso },
-    { label: "Drivmiddelniveau", iso: vehicle.autonomyPercentageUpdatedAtIso },
-    { label: "Turdetektion", iso: vehicle.tripDetectedUpdatedAtIso ?? null },
-  ];
-
-  return checks.filter((check) => isStale(check.iso)).map((check) => ({ label: check.label, lastReceivedIso: check.iso }));
-}
 
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table", reached via
@@ -157,7 +117,6 @@ export function VehiclesPage() {
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterPlate, setFilterPlate] = useState("");
-  const [filterStatus, setFilterStatus] = useState("");
   /** UNLOCKED mode only — narrows the whole-costumer vehicle list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
   const [filterDepartment, setFilterDepartment] = useState("");
   const filterRef = useRef<HTMLDivElement>(null);
@@ -181,7 +140,6 @@ export function VehiclesPage() {
   const filteredVehicles = vehicles.filter(
     (v) =>
       (!filterPlate || v.plate === filterPlate) &&
-      (!filterStatus || v.status === filterStatus) &&
       // filterDepartment only ever has a value in UNLOCKED mode (the
       // dropdown that sets it isn't rendered otherwise) — in LOCKED mode
       // `vehicles` itself is already scoped to targetDepartmentId below, so
@@ -284,7 +242,7 @@ export function VehiclesPage() {
                     onClick={() => setFilterOpen((prev) => !prev)}
                     aria-label="Filtrer"
                     className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate || filterStatus || filterDepartment || costumerFilterActive
+                      filterPlate || filterDepartment || costumerFilterActive
                         ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
                         : "border-brand-300 text-brand-600 hover:bg-brand-50"
                     }`}
@@ -397,24 +355,11 @@ export function VehiclesPage() {
                             ))}
                           </select>
                         </label>
-                        <label className="block text-[0.7rem] font-medium text-brand-700">
-                          Status
-                          <select
-                            value={filterStatus}
-                            onChange={(e) => setFilterStatus(e.target.value)}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            <option value="Online">Online</option>
-                            <option value="Offline">Offline</option>
-                          </select>
-                        </label>
-                        {(filterPlate || filterStatus || filterDepartment || costumerFilterActive) && (
+                        {(filterPlate || filterDepartment || costumerFilterActive) && (
                           <button
                             type="button"
                             onClick={() => {
                               setFilterPlate("");
-                              setFilterStatus("");
                               setFilterDepartment("");
                               // Only in the modes where Kunde is actually an
                               // editable filter (see costumerFilterActive's
@@ -448,7 +393,7 @@ export function VehiclesPage() {
                         <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
                           {!targetCostumerId && !isSysadm
                             ? "Ingen kunde valgt."
-                            : filterPlate || filterStatus || filterDepartment
+                            : filterPlate || filterDepartment
                               ? "Ingen køretøjer matcher filteret."
                               : "Ingen køretøjer fundet."}
                         </td>

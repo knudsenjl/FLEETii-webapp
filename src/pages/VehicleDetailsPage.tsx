@@ -5,11 +5,13 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { CarGlyph } from "../components/CarGlyph";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
+import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { EyeGlyph } from "../components/EyeGlyph";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
@@ -21,6 +23,7 @@ import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
 import { useReverseGeocode } from "../lib/geocode";
 import { supabase } from "../lib/supabase";
+import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
 type Vehicle = {
@@ -32,9 +35,15 @@ type Vehicle = {
   version?: string;
   autonomyPercentage?: string;
   autonomyPercentageUpdatedAt?: string;
+  autonomyPercentageUpdatedAtIso?: string | null;
   distanceCovered?: string;
   distanceCoveredUpdatedAt?: string;
+  distanceCoveredUpdatedAtIso?: string | null;
   onlineUpdatedAt?: string;
+  onlineUpdatedAtIso?: string | null;
+  /** 2hire's live "trip_detected" signal ("TRUE"/"FALSE") — drives the driving-vehicle icon in the "Køretøj:" row below, same convention as BookingPage.tsx's hero-card car icon (see liveVehicleDataSource.ts's tripDetected mapping). */
+  tripDetected?: string;
+  tripDetectedUpdatedAtIso?: string | null;
 };
 
 /** The regular user's own reservation for this vehicle, if reached via BookingDetailsPage's map marker — see useVehicleLockState. Only ever present for a non-admin; admin navigation paths (VehiclesPage, FleetManagementPage) don't pass one. */
@@ -68,8 +77,12 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /**
  * Vehicle detail view ("/vehicle-details/:vehicleId"): plate, model, fuel
- * level, mileage, status, a read-only Afdeling(er) row (the departments this
- * vehicle belongs to, via vehicle_departments), and (admin-only) a map
+ * level, mileage, a read-only Afdeling(er) row (the departments this
+ * vehicle belongs to, via vehicle_departments), an admin/sysadm-only
+ * driving-vehicle icon + red "!" health button next to the
+ * "Køretøjsdetaljer" heading (see lib/vehicleHealth.ts — same feature as
+ * VehiclesPage.tsx's fleet table, replacing the old standalone Status row
+ * removed 2026-09-11), and (admin-only) a map
  * showing its last known GPS position (or a
  * "no GPS available" overlay if none exists), plus (also admin-only)
  * "Rediger køretøj" (to HandleVehiclePage, where Afdeling(er) is actually
@@ -116,8 +129,8 @@ export function VehicleDetailsPage() {
   const position = gpsPositions.find((g) => g.vehicleId === vehicle?.vehicleId);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this vehicle so refreshing on a different vehicle's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`vehicle-details-map:${vehicle?.vehicleId ?? ""}`);
-  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this vehicle so refreshing on a different vehicle's page never inherits a stale on/off state. */
-  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(`vehicle-details-live:${vehicle?.vehicleId ?? ""}`, false);
+  /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this vehicle so refreshing on a different vehicle's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, same one driving the header's CarGlyph icon above) — a driving vehicle's position is the one you'd actually want to watch move, so this saves the admin an extra click on the common "just clicked in from a moving vehicle" path; a parked vehicle still defaults off, same as before. Only evaluated once per mount (useState initializer, not re-derived if trip_detected flips later) — fine here since the toggle stays user-controlled from then on, same as the pre-existing reload-persistence behavior. */
+  const [liveEnabled, setLiveEnabled] = useReloadPersistedBoolean(`vehicle-details-live:${vehicle?.vehicleId ?? ""}`, vehicle?.tripDetected === "TRUE");
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
   useEffect(() => {
@@ -150,7 +163,7 @@ export function VehicleDetailsPage() {
   const [identDepartmentId, setIdentDepartmentId] = useState<string | null>(null);
   /** vehicle_profiles.drivmiddel — fetched alongside numberPlate below, shown in the "Drivmiddel:" row. */
   const [drivmiddel, setDrivmiddel] = useState<string | null>(null);
-  /** vehicle_profiles.parking — fetched alongside numberPlate below, shown in the admin-only "P-plads:" row right before "Hjemmeafdeling:". */
+  /** vehicle_profiles.parking — fetched alongside numberPlate below, shown in the admin-only "P-plads:" row, last of the three (after "Afdeling(er):"/"Hjemmeafdeling:"). */
   const [parking, setParking] = useState<string | null>(null);
   /** vehicle_profiles.blocked_at — fetched alongside numberPlate below, non-null once "Bloker køretøj" has been used (see handleBlockVehicle). Drives the "Blokeret" badge next to the "Køretøj:" row. */
   const [blockedAt, setBlockedAt] = useState<string | null>(null);
@@ -298,6 +311,11 @@ export function VehicleDetailsPage() {
       <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser køretøj…</div>
     ) : null;
   }
+
+  /** Admin/sysadm-only red "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Empty (button hidden) for a non-admin viewer, same as VehiclesPage's own gating. */
+  const healthIssues = isAdmin ? getVehicleHealthIssues(vehicle, position?.updatedAtIso ?? null) : [];
+  /** Whether the driving-vehicle icon shows next to the "Køretøjsdetaljer" heading below — admin/sysadm only, and only while 2hire's live trip_detected signal is currently true for this vehicle. */
+  const isDriving = isAdmin && vehicle.tripDetected === "TRUE";
 
   /**
    * "Slet køretøj" doesn't delete anything directly — a customer admin can't,
@@ -454,7 +472,16 @@ export function VehicleDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
+              <div className="flex shrink-0 items-center justify-between">
+                <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
+                {/* Driving-vehicle icon (only while 2hire's trip_detected is currently true) + red "!" health button — both admin/sysadm-only, right-aligned next to this heading. Replaces the old standalone Status row (removed 2026-09-11) as the header-level admin health summary for this vehicle — see lib/vehicleHealth.ts, shared with VehiclesPage.tsx's fleet table. */}
+                {isAdmin && (
+                  <span className="flex items-center gap-1.5">
+                    {isDriving && <CarGlyph className="h-4 w-6 text-green-600" title="Kører" />}
+                    <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
+                  </span>
+                )}
+              </div>
 
               {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
               <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
@@ -489,7 +516,7 @@ export function VehicleDetailsPage() {
                       {vehicle.version ? `${vehicle.vehicle} - årgang: ${vehicle.version}` : vehicle.vehicle}
                     </span>
                   </div>
-                  {/* Kilometerstand and Status are only shown to admin/sysadm — same gating as BookingDetailsPage.tsx's identical rows. */}
+                  {/* Kilometerstand is only shown to admin/sysadm — same gating as BookingDetailsPage.tsx's identical row. */}
                   {isAdmin && (
                     <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
@@ -519,29 +546,28 @@ export function VehicleDetailsPage() {
                     </span>
                   </div>
                   {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center justify-between text-sm font-medium text-brand-700">
-                        Status:
-                        {/* Same green/red online-state dot as the "Online" column elsewhere (AllBookingsPage.tsx/VehiclesPage.tsx) — right-aligned within this label field, not the value field. */}
-                        <span
-                          className={`h-2.5 w-2.5 rounded-full ${vehicle.status === "Online" ? "bg-green-500" : "bg-red-500"}`}
-                          title={vehicle.status}
-                        />
-                      </label>
-                      <span className="text-sm text-brand-800">
-                        {vehicle.status}
-                        {vehicle.onlineUpdatedAt ? ` (${shortSignalTimestamp(vehicle.onlineUpdatedAt)})` : ""}
-                      </span>
-                    </div>
-                  )}
-                  {isAdmin && (
                     <>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
-                        <span className="text-sm text-brand-800">
-                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (parking ?? "—")}
-                        </span>
-                      </div>
+                      {/* Only shown once loaded, and only when this vehicle genuinely belongs to more than one department (or the fetch errored, so that error still surfaces) — a single department is already covered by "Hjemmeafdeling:" below, so listing it again here would just be redundant. */}
+                      {!departmentsLoading && (departmentsError || vehicleDepartments.length > 1) && (
+                        <div className="grid grid-cols-2 items-start gap-2 p-0.5">
+                          <label className="flex items-center text-sm font-medium text-brand-700">Afdeling(er):</label>
+                          <div className="text-sm text-brand-800">
+                            {departmentsError ? (
+                              <span className="text-red-600">{departmentsError}</span>
+                            ) : (
+                              <table className="w-full border-collapse">
+                                <tbody>
+                                  {vehicleDepartments.map((department) => (
+                                    <tr key={department.department_id}>
+                                      <td className="py-0">{department.name}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            )}
+                          </div>
+                        </div>
+                      )}
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">Hjemmeafdeling:</label>
                         <span className="text-sm text-brand-800">
@@ -552,28 +578,11 @@ export function VehicleDetailsPage() {
                           )}
                         </span>
                       </div>
-                      <div className="grid grid-cols-2 items-start gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Afdeling(er):</label>
-                        <div className="text-sm text-brand-800">
-                          {departmentsLoading && <span className="text-brand-500">Indlæser…</span>}
-                          {!departmentsLoading && departmentsError && (
-                            <span className="text-red-600">{departmentsError}</span>
-                          )}
-                          {!departmentsLoading && !departmentsError && vehicleDepartments.length === 0 && (
-                            <span className="text-brand-500">—</span>
-                          )}
-                          {!departmentsLoading && !departmentsError && vehicleDepartments.length > 0 && (
-                            <table className="w-full border-collapse">
-                              <tbody>
-                                {vehicleDepartments.map((department) => (
-                                  <tr key={department.department_id}>
-                                    <td className="py-0">{department.name}</td>
-                                  </tr>
-                                ))}
-                              </tbody>
-                            </table>
-                          )}
-                        </div>
+                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
+                        <span className="text-sm text-brand-800">
+                          {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (parking ?? "—")}
+                        </span>
                       </div>
                     </>
                   )}
@@ -622,7 +631,21 @@ export function VehicleDetailsPage() {
               </div>
 
               {isAdmin && (
-                <div className="flex min-h-0 flex-1 flex-col gap-1">
+                // Deliberately no min-h-0 here (unlike the scrolling ancestor
+                // above, which needs it): this wrapper's own automatic
+                // minimum height must stay content-based, so it can never be
+                // flex-shrunk below what its map child's explicit
+                // min-h-[12rem] requires. With min-h-0, overflow-y-auto on
+                // the ancestor let this wrapper collapse toward 0 while the
+                // map (overflow-hidden, so bounded to its own box) still
+                // rendered its full 192px — but since a shrunk PARENT box
+                // doesn't clip a child sized by its own min-height, the map
+                // visually spilled downward past where the flex layout
+                // thought this wrapper ended, painting over the Lås/Blink/
+                // Horn button row directly below it. Keeping this wrapper's
+                // height honest fixes that without needing overflow-hidden
+                // here (which would just clip the map's bottom edge instead).
+                <div className="flex flex-1 flex-col gap-1">
                   <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
                     <LeafletMap
                       lat={savedMapView?.lat ?? position?.lat ?? DENMARK_CENTER.lat}
@@ -647,14 +670,15 @@ export function VehicleDetailsPage() {
 
                   {/* Reverse-geocoded address of the map position above (Nominatim) — full width, smaller text than the detail rows since it's supplementary context, not a primary field. Kept in the same flex-col as the map (gap-1) rather than a sibling of it, so it sits closer to the map than the parent's own gap-4 would otherwise allow. Only rendered with a real GPS fix. */}
                   {position && (
-                    <div className="w-full rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
+                    <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
                       {addressLoading ? "Henter adresse…" : (address ?? "Ingen adresse fundet")}
                     </div>
                   )}
                 </div>
               )}
 
-              <div className="flex gap-3">
+              {/* shrink-0: without this, overflow-y-auto on the scrolling ancestor above lets this row's automatic minimum size collapse below its own content height under vertical space pressure (a short window) — the row's box shrinks toward zero while its buttons keep their natural size, so the buttons render overlapping the map above instead of pushing it up and being scrolled to. Same fix applied to the Rediger/Bloker/Slet row below, which showed the same collapse (hidden entirely under the map). */}
+              <div className="flex shrink-0 gap-3">
                 <VehicleLockToggle
                   className="flex-1"
                   locked={vehicleLocked}
@@ -701,11 +725,11 @@ export function VehicleDetailsPage() {
                 </div>
               </div>
 
-              {lockError && <p className="text-sm text-red-600">{lockError}</p>}
-              {locateError && <p className="text-sm text-red-600">{locateError}</p>}
+              {lockError && <p className="shrink-0 text-sm text-red-600">{lockError}</p>}
+              {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
 
               {isAdmin && (
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid shrink-0 grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
