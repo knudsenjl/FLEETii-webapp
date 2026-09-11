@@ -144,6 +144,15 @@ export function FleetManagementPage() {
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   /** Page-local, transient (not persisted, unlike Kunde/Afdeling above) — surfaced inside PageHeader's "Data Filter" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. Still snapshotted/restored the same way as before (sessionStorage + goToVehicleDetails' own router state) — only its UI moved. */
   const [filterPlate, setFilterPlate] = useState(savedSnapshot?.filters?.plate ?? "");
+  /** Resets filterPlate back to "Alle" whenever the Kunde/Afdeling scope itself LATER changes (skipping the very first run — see skipFirstPlateResetRef below — so a legitimately snapshot-restored plate on mount isn't immediately wiped out again). A previously-picked vehicle almost certainly doesn't belong to the NEW scope, so leaving it selected would silently show nothing. Same fix as VehiclesPage.tsx's identical reset. */
+  const skipFirstPlateResetRef = useRef(true);
+  useEffect(() => {
+    if (skipFirstPlateResetRef.current) {
+      skipFirstPlateResetRef.current = false;
+      return;
+    }
+    setFilterPlate("");
+  }, [targetCostumerId, targetDepartmentId]);
   /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern the old funnel popup used. */
   const [noGpsOpen, setNoGpsOpen] = useState(false);
   const noGpsRef = useRef<HTMLDivElement>(null);
