@@ -264,15 +264,18 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
               </button>
               <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen afdelinger tilgængelige" align="right" />
               <InlinePopup visible={notImplementedKey === "switch-department-error"} message={switchError ?? "Kunne ikke skifte afdeling."} align="right" />
-              {switcherOpen && (
-                <>
-                  <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />
-                  <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-brand-200 bg-white py-1 text-sm shadow-lg">
+              {switcherOpen && <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />}
+              {/* Same InlinePopup shell every "Filtrer" funnel popup uses (VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx/DepartmentPage.tsx) — same card/border/shadow/text size/fade-in, for visual consistency between this control and those, now that both live in the same "narrow what I'm looking at" family of popups. Rows are compact rounded hover items (a picker/menu) rather than labeled form fields, since there's nothing to fill in here, just something to click. */}
+              <InlinePopup
+                visible={switcherOpen}
+                align="right"
+                message={
+                  <div className="max-h-80 space-y-0.5 overflow-y-auto">
                     {canSwitchToAll && (
                       <button
                         type="button"
                         onClick={() => void handleSwitch(null)}
-                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left font-medium text-brand-700 transition hover:bg-brand-50"
+                        className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left font-medium transition hover:bg-brand-50"
                       >
                         <span className="truncate">Alle</span>
                         {afdelingId === null && costumerId === null && <DepartmentCheckmark />}
@@ -285,7 +288,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                               <button
                                 type="button"
                                 onClick={() => void handleSwitch(null, group.costumerId)}
-                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                                className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left font-semibold transition hover:bg-brand-50"
                               >
                                 <span className="truncate">{group.costumerName ?? "Kunde"}</span>
                                 {afdelingId === null && costumerId === group.costumerId && <DepartmentCheckmark />}
@@ -296,7 +299,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                                 key={department.department_id}
                                 type="button"
                                 onClick={() => void handleSwitch(department.department_id)}
-                                className="flex w-full items-center justify-between gap-2 py-2 pl-6 pr-3 text-left text-brand-700 transition hover:bg-brand-50"
+                                className="flex w-full items-center justify-between gap-2 rounded-md py-1.5 pl-5 pr-2 text-left transition hover:bg-brand-50"
                               >
                                 <span className="truncate">{department.name}</span>
                                 {department.department_id === afdelingId && <DepartmentCheckmark />}
@@ -309,15 +312,15 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                             key={department.department_id}
                             type="button"
                             onClick={() => void handleSwitch(department.department_id)}
-                            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
+                            className="flex w-full items-center justify-between gap-2 rounded-md px-2 py-1.5 text-left transition hover:bg-brand-50"
                           >
                             <span className="truncate">{department.name}</span>
                             {department.department_id === afdelingId && <DepartmentCheckmark />}
                           </button>
                         ))}
                   </div>
-                </>
-              )}
+                }
+              />
             </div>
           )}
           {isFullyAuthenticated && (
