@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -85,9 +85,21 @@ export function DepartmentPage() {
   /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
   const columnCount = 4;
 
-  /** A sysadm has no costumer of their own — for them, targetCostumerId only ever comes from router state. */
+  /** A sysadm has no costumer of their own — for them, targetCostumerId only ever comes from router state (until the header is touched — see headerTouchedCostumer below). */
   const isSysadm = isSysadmRole(profile?.role);
-  const targetCostumerId = state?.costumerId ?? costumerId;
+  /** True LOCKED mode only — a specific department was already selected before navigating here. Gates headerTouchedCostumer below: a LOCKED visit stays fully frozen for its whole duration, so Kunde must never "unstick" and start following the header there either — only the UNLOCKED case (costumerId alone, or nothing) should. Same pattern/reasoning as VehiclesPage.tsx's identical fix. */
+  const isLocked = Boolean(state?.departmentId);
+  /** Whether the header's own costumerId has genuinely changed since this page mounted — once it has, it wins outright over state?.costumerId for the rest of this visit, same "changing Kunde always actually changes the list" fix as VehiclesPage.tsx's own headerTouchedCostumer (see its doc comment there for the full reasoning: without this, a router-state costumerId seed — e.g. CostumerDetailsPage's own BRUGERE button — would permanently shadow the header, since this page's own Kunde picker moved there during the filter-redesign work). Sticky rather than a live mount-time comparison, for the same reason documented there. */
+  const [headerTouchedCostumer, setHeaderTouchedCostumer] = useState(false);
+  const mountedCostumerIdRef = useRef(costumerId);
+  useEffect(() => {
+    if (isLocked) return;
+    if (costumerId !== mountedCostumerIdRef.current) {
+      mountedCostumerIdRef.current = costumerId;
+      setHeaderTouchedCostumer(true);
+    }
+  }, [costumerId, isLocked]);
+  const targetCostumerId = headerTouchedCostumer ? costumerId : (state?.costumerId ?? costumerId);
   const targetCostumerName = isSysadm ? (state?.costumerName ?? null) : null;
   /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
   const targetDepartmentId = state?.departmentId ?? null;

@@ -113,8 +113,20 @@ export function FleetManagementPage() {
     return () => setLiveTracking(false);
   }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
-  /** Navigation wins over the global header when given (see navigationSeed above); otherwise follows the header's own costumerId directly — global for every role, not just sysadm, same as VehiclesPage.tsx's identical targetCostumerId (a regular admin's costumerId is always their own anyway, so this never actually diverges for them). */
-  const targetCostumerId = navigationSeed?.costumerId ?? costumerId;
+  /** True LOCKED mode only — a specific department was already given in navigationSeed before navigating here. Gates headerTouchedCostumer below: a LOCKED visit stays fully frozen for its whole duration, so Kunde must never "unstick" and start following the header there either — only the UNLOCKED case (costumerId alone, or nothing) should. Same pattern/reasoning as VehiclesPage.tsx's identical fix. */
+  const isLocked = Boolean(navigationSeed?.department);
+  /** Whether the header's own costumerId has genuinely changed since this page mounted — once it has, it wins outright over navigationSeed?.costumerId for the rest of this visit, same "changing Kunde always actually changes the map" fix as VehiclesPage.tsx's own headerTouchedCostumer (see its doc comment there for the full reasoning: without this, a navigationSeed costumerId — e.g. CostumerDetailsPage's own "Flådestyring" button — would permanently shadow the header, since this page's own Kunde picker moved there during the filter-redesign work). Sticky rather than a live mount-time comparison, for the same reason documented there. */
+  const [headerTouchedCostumer, setHeaderTouchedCostumer] = useState(false);
+  const mountedCostumerIdRef = useRef(costumerId);
+  useEffect(() => {
+    if (isLocked) return;
+    if (costumerId !== mountedCostumerIdRef.current) {
+      mountedCostumerIdRef.current = costumerId;
+      setHeaderTouchedCostumer(true);
+    }
+  }, [costumerId, isLocked]);
+  /** Navigation wins over the global header ONLY until the header itself is touched (see headerTouchedCostumer above) — same "filtering by navigation" precedent as navigationSeed's department below, but no longer permanent for Kunde specifically. Otherwise follows the header's own costumerId directly — global for every role, not just sysadm, same as VehiclesPage.tsx's identical targetCostumerId (a regular admin's costumerId is always their own anyway, so this never actually diverges for them). */
+  const targetCostumerId = headerTouchedCostumer ? costumerId : (navigationSeed?.costumerId ?? costumerId);
   /** Display-only, sysadm only (matching this page's pre-consolidation behavior of never repeating a regular admin's own costumer name back at them). When targetCostumerId matches the global header's own costumerId, its costumerName is already correct — otherwise (a navigation seed pointed at a DIFFERENT costumer than whatever's currently active in the header) look it up via availableDepartments, the one list that already spans every costumer platform-wide for a sysadm. */
   const targetCostumerName = isSysadm
     ? targetCostumerId === costumerId
