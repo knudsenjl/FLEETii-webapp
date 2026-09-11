@@ -225,7 +225,21 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
             </svg>
           </button>
           {isFullyAuthenticated && (
-            <div className="relative">
+            // z-[1001] (not just the dropdown's own z-20 below) — Leaflet's
+            // own controls/panes reach z-index 1000 on map pages
+            // (FleetManagementPage.tsx/VehicleDetailsPage.tsx/
+            // BookingDetailsPage.tsx), and this div otherwise has no
+            // z-index of its own, so its dropdown would be compared
+            // directly against Leaflet's much higher values in the shared
+            // ambient stacking context and lose, rendering underneath the
+            // map — same fix FleetManagementPage.tsx's own funnel-filter
+            // button already needed for the same reason. Only became
+            // reachable once Kunde/Afdeling scoping moved into this
+            // "Skift afdeling" control (see the filter-redesign work) —
+            // before that, a sysadm on the map page used that page's own
+            // local Kunde/Afdeling filter instead, which already had this
+            // z-index.
+            <div className="relative z-[1001]">
               <button
                 type="button"
                 onClick={() =>
@@ -307,7 +321,8 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
             </div>
           )}
           {isFullyAuthenticated && (
-            <div className="relative">
+            // Same Leaflet-beating z-[1001] as the "Skift afdeling" wrapper above.
+            <div className="relative z-[1001]">
               <button
                 type="button"
                 onClick={() =>
