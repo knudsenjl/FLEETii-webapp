@@ -52,7 +52,7 @@ function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), each shown as "Kunde / Afdeling" (department.costumerName) rather than just the department name, since the same department name can recur across different costumers — plus a leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null) that clears back to their default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "change department" button (only when logged in — opens a dropdown listing EVERY one of the user's user_departments grants, including the currently active one (checkmarked via DepartmentCheckmark, not hidden), or a 3s "no departments" InlinePopup in the edge case there are none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the "change department" dropdown lists EVERY department platform-wide (not a personal grant list — see AuthContext's loadAvailableDepartments), grouped under a clickable Kunde header row per costumer (costumerId is the grouping key, not the name — see DepartmentOption) — clicking a Kunde header switches into that costumer with no specific department (department_id=null, costumer_id=<that Kunde>, checkmarked via the same rule), and its indented department rows below switch into one specific department, same as before. This is the single, persisted source of truth this app-wide Kunde/Afdeling scope; the per-page "Filtrer" buttons on VehiclesPage/FleetManagementPage/AllBookingsPage/DepartmentPage read it directly rather than keeping their own local copy. A leading "Alle" entry (also checkmarked instead of hidden when already on it, i.e. afdelingId === null && costumerId === null) clears back to the sysadm's default, fully unscoped state. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -68,6 +68,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
     afdeling,
     afdelingId,
     costumerName,
+    costumerId,
     availableDepartments,
     switchDepartment,
     isFullyAuthenticated,
@@ -82,13 +83,28 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
 
-  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a sysadm (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. */
+  /** Whether the "Alle" pseudo-entry (below) should be offered — only for a sysadm (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see this: their afdelingId is always a real department, and "Alle" isn't a valid state for them at all. Shown even while already on it (checkmarked instead of hidden), matching the department list below. Also gates the Kunde-grouped rendering below — non-sysadm departments never carry costumerId (see loadAvailableDepartments), so grouping is a no-op for them anyway, but this keeps the two decisions (group vs. flat, offer "Alle" vs. not) visibly tied to the same one condition. */
   const canSwitchToAll = isSysadm(profile?.role);
 
-  /** departmentId null means "Alle" (see canSwitchToAll/AuthContext's switchDepartment) — the sysadm's own default, unscoped state. */
-  const handleSwitch = async (departmentId: string | null) => {
+  /** Sysadm-only: availableDepartments (flat, name-sorted) grouped by costumerId — the grouping key, not costumerName (names can collide across costumers). Groups are sorted by costumerName for a stable, readable dropdown; a department with no costumer_id at all (edge case — departments.costumer_id is nullable) falls into its own "no Kunde" bucket with no clickable header row, since there's no valid costumerId to switch into. */
+  const groupedDepartments = canSwitchToAll
+    ? (() => {
+        const groups = new Map<string, { costumerId: string | null; costumerName: string | null; departments: typeof availableDepartments }>();
+        for (const department of availableDepartments) {
+          const key = department.costumerId ?? "—";
+          if (!groups.has(key)) {
+            groups.set(key, { costumerId: department.costumerId ?? null, costumerName: department.costumerName ?? null, departments: [] });
+          }
+          groups.get(key)!.departments.push(department);
+        }
+        return [...groups.values()].sort((a, b) => (a.costumerName ?? "").localeCompare(b.costumerName ?? ""));
+      })()
+    : [];
+
+  /** departmentId null means "Alle" (no costumerId) or "just this Kunde" (costumerId given) — see canSwitchToAll/AuthContext's switchDepartment. costumerId is only ever meaningful (and only ever passed) alongside a null departmentId. */
+  const handleSwitch = async (departmentId: string | null, costumerId?: string | null) => {
     setSwitcherOpen(false);
-    const error = await switchDepartment(departmentId);
+    const error = await switchDepartment(departmentId, costumerId);
     if (error) {
       setSwitchError(error);
       triggerNotImplemented("switch-department-error");
@@ -245,22 +261,46 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                         className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left font-medium text-brand-700 transition hover:bg-brand-50"
                       >
                         <span className="truncate">Alle</span>
-                        {afdelingId === null && <DepartmentCheckmark />}
+                        {afdelingId === null && costumerId === null && <DepartmentCheckmark />}
                       </button>
                     )}
-                    {availableDepartments.map((department) => (
-                      <button
-                        key={department.department_id}
-                        type="button"
-                        onClick={() => void handleSwitch(department.department_id)}
-                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
-                      >
-                        <span className="truncate">
-                          {department.costumerName ? `${department.costumerName} / ${department.name}` : department.name}
-                        </span>
-                        {department.department_id === afdelingId && <DepartmentCheckmark />}
-                      </button>
-                    ))}
+                    {canSwitchToAll
+                      ? groupedDepartments.map((group) => (
+                          <div key={group.costumerId ?? "no-kunde"}>
+                            {group.costumerId && (
+                              <button
+                                type="button"
+                                onClick={() => void handleSwitch(null, group.costumerId)}
+                                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm font-semibold text-brand-700 transition hover:bg-brand-50"
+                              >
+                                <span className="truncate">{group.costumerName ?? "Kunde"}</span>
+                                {afdelingId === null && costumerId === group.costumerId && <DepartmentCheckmark />}
+                              </button>
+                            )}
+                            {group.departments.map((department) => (
+                              <button
+                                key={department.department_id}
+                                type="button"
+                                onClick={() => void handleSwitch(department.department_id)}
+                                className="flex w-full items-center justify-between gap-2 py-2 pl-6 pr-3 text-left text-brand-700 transition hover:bg-brand-50"
+                              >
+                                <span className="truncate">{department.name}</span>
+                                {department.department_id === afdelingId && <DepartmentCheckmark />}
+                              </button>
+                            ))}
+                          </div>
+                        ))
+                      : availableDepartments.map((department) => (
+                          <button
+                            key={department.department_id}
+                            type="button"
+                            onClick={() => void handleSwitch(department.department_id)}
+                            className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-brand-700 transition hover:bg-brand-50"
+                          >
+                            <span className="truncate">{department.name}</span>
+                            {department.department_id === afdelingId && <DepartmentCheckmark />}
+                          </button>
+                        ))}
                   </div>
                 </>
               )}
@@ -322,8 +362,8 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
             Afdeling: {costumerName ? `${costumerName}/` : ""}
-            {/* afdeling is only ever null for a sysadm sitting on "Alle" (see PageHeader's own "Skift afdeling" pseudo-entry) — every other role always has a real department, so "—" (missing data) never actually applies to them. */}
-            {afdeling ?? (isSysadm(profile?.role) ? "Alle" : "—")}
+            {/* afdeling is only ever null for a sysadm sitting on "Alle" (fully unscoped) or the newer "Kunde only" state (costumerId set, no specific department — see the Kunde-header row above); every other role always has a real department, so "—" (missing data) never actually applies to them. Distinguished by costumerId, since both states share a null afdeling. */}
+            {afdeling ?? (isSysadm(profile?.role) ? (costumerId ? "Alle afdelinger" : "Alle") : "—")}
           </p>
         </div>
       )}

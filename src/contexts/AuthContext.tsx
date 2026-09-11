@@ -52,6 +52,8 @@ type ProfileRow = {
   costumer_id: string | null;
   role: string;
   departments: { name: string; costumers: { name: string; deactivated_at: string | null } | null } | null;
+  /** Direct costumer_id embed (user_profiles_costumer_id_fkey), independent of the departments embed above — needed to resolve costumerName when department_id is null but costumer_id is set (the "Kunde only" scope, see switchDepartment/switch-department.mts): the departments embed alone resolves to null in that case since it joins through department_id. */
+  costumers: { name: string } | null;
 };
 
 /** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). For a sysadm, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName/costumerId are only ever populated on that branch, letting PageHeader.tsx disambiguate/group same-named departments across different costumers (name alone isn't a safe grouping key). */
@@ -189,7 +191,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // user_departments, so a bare "departments(...)" is now ambiguous
         // (PGRST201) and fails outright — this pins it to the direct FK.
         .select(
-          "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
+          "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at)), costumers!user_profiles_costumer_id_fkey(name)",
         )
         .eq("user_id", userId)
         .maybeSingle<ProfileRow>();
@@ -207,11 +209,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data) {
       return { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     }
-    const { departments, ...profileFields } = data;
+    const { departments, costumers, ...profileFields } = data;
     return {
       profile: profileFields,
       afdeling: departments?.name ?? null,
-      costumerName: departments?.costumers?.name ?? null,
+      // The departments embed resolves costumerName via department_id, which
+      // is null in the "Kunde only" scope (see costumers's own doc comment
+      // on ProfileRow) — fall back to the direct costumer_id embed so the
+      // header's "Afdeling: <Kunde>/..." display still shows the right Kunde
+      // name in that state instead of going blank.
+      costumerName: departments?.costumers?.name ?? costumers?.name ?? null,
       // "sysadm" is exempt from the deactivation lockout, mirroring
       // is_sysadm() being left untouched by costumers_add_
       // deactivated_at.sql — see fetchCostumerDeactivatedAt's doc comment
