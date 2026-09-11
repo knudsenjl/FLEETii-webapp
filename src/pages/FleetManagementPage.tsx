@@ -130,25 +130,11 @@ export function FleetManagementPage() {
   const targetDepartmentId = navigationSeed?.department || effectiveAfdelingId;
 
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
-  const [filterOpen, setFilterOpen] = useState(false);
+  /** Page-local, transient (not persisted, unlike Kunde/Afdeling above) — surfaced inside PageHeader's "Skift afdeling" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. Still snapshotted/restored the same way as before (sessionStorage + goToVehicleDetails' own router state) — only its UI moved. */
   const [filterPlate, setFilterPlate] = useState(savedSnapshot?.filters?.plate ?? "");
-  const filterRef = useRef<HTMLDivElement>(null);
-  /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern as the filter popup above, own state/ref since the two popups are independent. */
+  /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern the old funnel popup used. */
   const [noGpsOpen, setNoGpsOpen] = useState(false);
   const noGpsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setFilterOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filterOpen]);
 
   useEffect(() => {
     if (!noGpsOpen) return;
@@ -293,7 +279,14 @@ export function FleetManagementPage() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <PageHeader />
+            <PageHeader
+              koretoejFilter={{
+                label: "Køretøj",
+                value: filterPlate,
+                onChange: setFilterPlate,
+                options: plateOptions.map((plate) => ({ value: plate, label: plate })),
+              }}
+            />
 
             <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-2 space-y-4">
@@ -302,7 +295,7 @@ export function FleetManagementPage() {
                 </h2>
                 <div className="flex shrink-0 items-center gap-2">
                   {vehiclesWithoutGps.length > 0 && (
-                    // Same z-[1001]-on-wrapper reasoning as the filter button below.
+                    // z-[1001] — Leaflet's own controls/panes reach z-index 1000 (see the empty-notice's z-[1000] further down); this div otherwise has no z-index of its own, so its InlinePopup would lose to Leaflet's much higher values in the shared ambient stacking context and render underneath the map.
                     <div className="relative z-[1001]" ref={noGpsRef}>
                       <button
                         type="button"
@@ -330,56 +323,6 @@ export function FleetManagementPage() {
                       />
                     </div>
                   )}
-                  {/* z-[1001] on this wrapper (not just InlinePopup's own z-20) — Leaflet's own controls/panes below reach z-index 1000 (see the empty-notice's z-[1000] further down), and this div has no z-index of its own otherwise, so its z-20 popup would be compared directly against Leaflet's much higher values in the shared ambient stacking context and lose, rendering underneath the map. */}
-                  <div className="relative z-[1001]" ref={filterRef}>
-                    <button
-                      type="button"
-                      onClick={() => setFilterOpen((prev) => !prev)}
-                      aria-label="Filtrer"
-                      className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                        filterPlate
-                          ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                          : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                      }`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                        <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                      </svg>
-                    </button>
-                    <InlinePopup
-                      visible={filterOpen}
-                      align="right"
-                      message={
-                        <>
-                          <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Køretøj
-                            <select
-                              value={filterPlate}
-                              onChange={(e) => setFilterPlate(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {plateOptions.map((plate) => (
-                                <option key={plate} value={plate}>
-                                  {plate}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {filterPlate && (
-                            <button
-                              type="button"
-                              onClick={() => setFilterPlate("")}
-                              className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
-                            >
-                              Nulstil filter
-                            </button>
-                          )}
-                        </>
-                      }
-                    />
-                  </div>
                   <button
                     type="button"
                     onClick={() => setClusterMarkers((prev) => !prev)}

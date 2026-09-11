@@ -15,6 +15,25 @@ import { InlinePopup } from "./InlinePopup";
 type SettingsMenuItem = { label: string; path: string };
 
 /**
+ * One page-owned, non-persisted filter field surfaced inside the "Skift
+ * afdeling" popup alongside Kunde/Afdeling — Bruger (AllBookingsPage.tsx/
+ * DepartmentPage.tsx) and Køretøj (VehiclesPage.tsx/FleetManagementPage.tsx/
+ * AllBookingsPage.tsx). The page itself still owns the state/option list/
+ * scoping logic entirely; this is purely "render my own filter's <select>
+ * inside your popup instead of a separate funnel popup of my own." Unlike
+ * Kunde/Afdeling, nothing here is persisted (see the filter-redesign work's
+ * own decision on this) — value/onChange are just this page's own useState,
+ * passed straight through.
+ */
+export interface PageHeaderFilterField {
+  /** Field label, e.g. "Bruger" or "Bruger-ID" (AllBookingsPage.tsx toggles this based on useUserIdent). */
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: { value: string; label: string }[];
+}
+
+/**
  * The settings destination(s) for a given `user_profiles.role`. A plain
  * "user" (any non-"admin"/"sysadm" role, including null/undefined,
  * matching formatRoleLabel's convention) has only one settings page
@@ -51,8 +70,19 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * (role "user", the only role reaching a compact page) or already shown
  * elsewhere on those pages. Every icon button and its dropdown/menu logic is
  * untouched — same state, same handlers — only the two things named above
- * change, so there's nothing to duplicate on the compact pages. */
-export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
+ * change, so there's nothing to duplicate on the compact pages.
+ *
+ * `brugerFilter`/`koretoejFilter` (optional, page-supplied — see
+ * PageHeaderFilterField): when given, render as extra labeled <select>
+ * fields in the "Skift afdeling" popup below Kunde/Afdeling, letting that
+ * one popup double as the page's whole "narrow what I'm looking at"
+ * control instead of a separate funnel popup. Absent on pages with no such
+ * concept (e.g. DepartmentPage.tsx has no Køretøj). */
+export function PageHeader({
+  compact = false,
+  brugerFilter,
+  koretoejFilter,
+}: { compact?: boolean; brugerFilter?: PageHeaderFilterField; koretoejFilter?: PageHeaderFilterField } = {}) {
   const {
     signOut,
     profile,
@@ -242,7 +272,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
               <button
                 type="button"
                 onClick={() =>
-                  availableDepartments.length === 0 && !canSwitchToAll
+                  availableDepartments.length === 0 && !canSwitchToAll && !brugerFilter && !koretoejFilter
                     ? triggerNotImplemented("no-other-departments")
                     : setSwitcherOpen((open) => !open)
                 }
@@ -288,7 +318,7 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                         </select>
                       </label>
                     )}
-                    <label className="block text-[0.7rem] font-medium text-brand-700">
+                    <label className={`block text-[0.7rem] font-medium text-brand-700 ${brugerFilter || koretoejFilter ? "mb-2" : ""}`}>
                       Afdeling
                       <select
                         value={afdelingId ?? ""}
@@ -315,6 +345,52 @@ export function PageHeader({ compact = false }: { compact?: boolean } = {}) {
                         ))}
                       </select>
                     </label>
+                    {brugerFilter && (
+                      <label className={`block text-[0.7rem] font-medium text-brand-700 ${koretoejFilter ? "mb-2" : ""}`}>
+                        {brugerFilter.label}
+                        <select
+                          value={brugerFilter.value}
+                          onChange={(e) => brugerFilter.onChange(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Alle</option>
+                          {brugerFilter.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {koretoejFilter && (
+                      <label className="block text-[0.7rem] font-medium text-brand-700">
+                        {koretoejFilter.label}
+                        <select
+                          value={koretoejFilter.value}
+                          onChange={(e) => koretoejFilter.onChange(e.target.value)}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Alle</option>
+                          {koretoejFilter.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {(brugerFilter?.value || koretoejFilter?.value) && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          brugerFilter?.onChange("");
+                          koretoejFilter?.onChange("");
+                        }}
+                        className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
+                      >
+                        Nulstil filter
+                      </button>
+                    )}
                   </>
                 }
               />

@@ -184,7 +184,7 @@ export function DepartmentPage() {
   // before.
   const departmentUsers = users;
 
-  /** Same popup-filter pattern as VehiclesPage's fleet-table filter: a funnel button toggles an InlinePopup of dropdown selects, each populated from the actual rows in view (not free-text search) so every option is guaranteed to match something. */
+  /** Same popup-filter pattern as VehiclesPage's fleet-table filter: a funnel button toggles an InlinePopup of dropdown selects, each populated from the actual rows in view (not free-text search) so every option is guaranteed to match something. Rolle/Navn stay in this page's own popup (a genuine 2-level hierarchy, Rolle > Navn); Bruger instead lives in PageHeader's "Skift afdeling" popup (see PageHeaderFilterField) — state stays here (still page-local/non-persisted, still an independent AND condition in filteredUsers below), only its UI moved, and it's deliberately decoupled from the Rolle/Navn hierarchy (no more auto-fill either direction) since cross-filling across two separate popups would be invisible/confusing to a user who doesn't have both open at once. */
   const [filterOpen, setFilterOpen] = useState(false);
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
@@ -206,18 +206,19 @@ export function DepartmentPage() {
 
   /** Mirrors the Bruger column's own display logic (useUserIdent toggle) so the filter's dropdown values and matching always agree with what's actually shown in the table. */
   const brugerValue = (user: ProfileRow) => (useUserIdent ? user.user_ident || user.email : user.email) ?? "—";
-  /** UNLOCKED mode only — the global header's Afdeling (effectiveAfdelingId above) narrows departmentUsers before the page's own Rolle > Bruger/Navn filter hierarchy applies on top; LOCKED mode's departmentUsers is already just one department, so this is a no-op there. Kept as its own name purely so the rest of this file's filter-chain reads the same as before the local Afdeling picker was removed. */
+  /** UNLOCKED mode only — the global header's Afdeling (effectiveAfdelingId above) narrows departmentUsers before the page's own Rolle > Navn filter hierarchy (and Bruger, independent — see filterBruger's own doc comment) applies on top; LOCKED mode's departmentUsers is already just one department, so this is a no-op there. Kept as its own name purely so the rest of this file's filter-chain reads the same as before the local Afdeling picker was removed. */
   const afdelingScopedUsers = effectiveAfdelingId ? departmentUsers.filter((u) => u.department_id === effectiveAfdelingId) : departmentUsers;
   /**
-   * The remaining filter fields form a hierarchy — Rolle > Bruger/Navn —
-   * where each field's own option list is scoped down by whatever is picked
-   * ABOVE it, never by a field at its own level or below. Bruger and Navn sit
-   * at the same bottom rung (both identify one specific user), so they share
-   * the same scope rather than narrowing each other.
+   * Rolle > Navn form a 2-level hierarchy — Navn's own option list is
+   * scoped down by whatever Rolle is picked, never the other way round.
+   * Bruger sits OUTSIDE this hierarchy entirely now (see filterBruger's own
+   * doc comment) — its own option list is scoped straight off
+   * afdelingScopedUsers, same top-level scope Rolle itself uses, not
+   * narrowed by Rolle/Navn.
    */
   const rolleScopedUsers = filterRolle ? afdelingScopedUsers.filter((u) => u.role === filterRolle) : afdelingScopedUsers;
   const roleOptions = Array.from(new Set(afdelingScopedUsers.map((u) => u.role))).sort();
-  const brugerOptions = Array.from(new Set(rolleScopedUsers.map(brugerValue))).sort();
+  const brugerOptions = Array.from(new Set(afdelingScopedUsers.map(brugerValue))).sort();
   const navnOptions = Array.from(new Set(rolleScopedUsers.map((u) => u.full_name ?? "—"))).sort();
 
   const filteredUsers = afdelingScopedUsers.filter(
@@ -226,7 +227,8 @@ export function DepartmentPage() {
       (!filterNavn || (u.full_name ?? "—") === filterNavn) &&
       (!filterRolle || u.role === filterRolle),
   );
-  const hasActiveFilter = Boolean(filterBruger || filterNavn || filterRolle);
+  /** Drives this page's OWN funnel button's badge/reset — deliberately excludes filterBruger, which now lives in PageHeader's own popup and has its own independent reset there (see PageHeader's "Nulstil filter"). */
+  const hasActiveFilter = Boolean(filterNavn || filterRolle);
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -242,7 +244,14 @@ export function DepartmentPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            brugerFilter={{
+              label: "Bruger",
+              value: filterBruger,
+              onChange: setFilterBruger,
+              options: brugerOptions.map((bruger) => ({ value: bruger, label: bruger })),
+            }}
+          />
 
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
@@ -278,7 +287,6 @@ export function DepartmentPage() {
                             value={filterRolle}
                             onChange={(e) => {
                               setFilterRolle(e.target.value);
-                              setFilterBruger("");
                               setFilterNavn("");
                             }}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
@@ -291,38 +299,6 @@ export function DepartmentPage() {
                             ))}
                           </select>
                         </label>
-                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Bruger
-                          <select
-                            value={filterBruger}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFilterBruger(value);
-                              if (!value) return;
-                              // Bruger/Navn each identify one specific user, so — unlike
-                              // Rolle above — picking one flows UP the hierarchy instead
-                              // of down: it fills in Rolle (and the other of
-                              // Bruger/Navn) from that user's own actual values, even if those
-                              // were still "Alle" beforehand. Matched against the full
-                              // departmentUsers list (not the already-scoped option source)
-                              // since Bruger/Navn values (email/user_ident) are unique per user,
-                              // so the match is unambiguous regardless of the current scope.
-                              const match = departmentUsers.find((u) => brugerValue(u) === value);
-                              if (match) {
-                                setFilterRolle(match.role);
-                                setFilterNavn(match.full_name ?? "—");
-                              }
-                            }}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {brugerOptions.map((bruger) => (
-                              <option key={bruger} value={bruger}>
-                                {bruger}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
                         <label className="block text-[0.7rem] font-medium text-brand-700">
                           Navn
                           <select
@@ -331,14 +307,16 @@ export function DepartmentPage() {
                               const value = e.target.value;
                               setFilterNavn(value);
                               if (!value) return;
-                              // Same up-the-hierarchy fill as Bruger above. Names aren't
-                              // guaranteed unique the way email/user_ident is, so this takes the
-                              // first matching user — an accepted approximation for this edge case.
+                              // Names aren't guaranteed unique the way
+                              // email/user_ident is, so this takes the first
+                              // matching user — an accepted approximation
+                              // for this edge case. Picking a Navn flows UP
+                              // into Rolle (unlike Rolle's own onChange,
+                              // which flows down into Navn) since Navn
+                              // identifies one specific user, even if Rolle
+                              // was still "Alle" beforehand.
                               const match = departmentUsers.find((u) => (u.full_name ?? "—") === value);
-                              if (match) {
-                                setFilterRolle(match.role);
-                                setFilterBruger(brugerValue(match));
-                              }
+                              if (match) setFilterRolle(match.role);
                             }}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                           >
@@ -354,7 +332,6 @@ export function DepartmentPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              setFilterBruger("");
                               setFilterNavn("");
                               setFilterRolle("");
                             }}

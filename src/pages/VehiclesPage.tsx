@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -6,7 +6,6 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { CarGlyph } from "../components/CarGlyph";
-import { InlinePopup } from "../components/InlinePopup";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
@@ -98,22 +97,8 @@ export function VehiclesPage() {
   /** Which of the listed vehicles are administratively blocked (vehicle_profiles.blocked_at, see VehicleDetailsPage.tsx's "Bloker køretøj") — keyed by vehicleId, for the "Blokeret" badge next to the Køretøj cell below. */
   const [blockedByVehicleId, setBlockedByVehicleId] = useState<Record<string, boolean>>({});
 
-  const [filterOpen, setFilterOpen] = useState(false);
+  /** Page-local, transient (not persisted) — surfaced inside PageHeader's "Skift afdeling" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterPlate, setFilterPlate] = useState("");
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setFilterOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filterOpen]);
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter((v) => !filterPlate || v.plate === filterPlate);
@@ -198,7 +183,14 @@ export function VehiclesPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            koretoejFilter={{
+              label: "Køretøj",
+              value: filterPlate,
+              onChange: setFilterPlate,
+              options: plateOptions.map((plate) => ({ value: plate, label: plate })),
+            }}
+          />
 
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
@@ -207,55 +199,6 @@ export function VehiclesPage() {
                   Køretøjer{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                   {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
                 </h2>
-                <div className="relative" ref={filterRef}>
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen((prev) => !prev)}
-                    aria-label="Filtrer"
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      filterPlate
-                        ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                        : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                    }`}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                      <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                    </svg>
-                  </button>
-                  <InlinePopup
-                    visible={filterOpen}
-                    align="right"
-                    message={
-                      <>
-                        <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Køretøj
-                          <select
-                            value={filterPlate}
-                            onChange={(e) => setFilterPlate(e.target.value)}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {plateOptions.map((plate) => (
-                              <option key={plate} value={plate}>
-                                {plate}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {filterPlate && (
-                          <button
-                            type="button"
-                            onClick={() => setFilterPlate("")}
-                            className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
-                          >
-                            Nulstil filter
-                          </button>
-                        )}
-                      </>
-                    }
-                  />
-                </div>
               </div>
 
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">

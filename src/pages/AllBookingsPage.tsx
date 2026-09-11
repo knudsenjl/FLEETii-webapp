@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -37,20 +37,23 @@ type Booking = {
 
 /**
  * Admin-only "Aktive reservationer" page ("/allbookings"): every upcoming
- * booking in the admin's department, with a user/vehicle filter popover.
- * Clicking a row navigates straight to BookingDetailsPage (view/cancel a
- * booking from there) — this page itself is display/filter-only. This is
- * the admin equivalent of BookingsPage (which shows a regular user their
- * own bookings, or an admin's own "next booking" home view) — the two share
- * most of their fetch/render logic but haven't been consolidated into one
- * component.
+ * booking in the admin's department. Clicking a row navigates straight to
+ * BookingDetailsPage (view/cancel a booking from there) — this page itself
+ * is display/filter-only. This is the admin equivalent of BookingsPage
+ * (which shows a regular user their own bookings, or an admin's own "next
+ * booking" home view) — the two share most of their fetch/render logic but
+ * haven't been consolidated into one component.
  *
  * A sysadm (no department of their own) sees every booking platform-wide by
  * default, narrowed by the global header's Kunde/Afdeling scope (PageHeader's
  * "Skift afdeling" — see AuthContext's costumerId/afdelingId) exactly like
  * every other admin page now reads it, rather than a page-local Kunde/
  * Afdeling filter of its own. A regular admin never has an unscoped view to
- * begin with — they're always scoped to their own single department.
+ * begin with — they're always scoped to their own single department. The
+ * Bruger/Køretøj filters are also surfaced through that same header popup
+ * (see PageHeaderFilterField) rather than a separate funnel popup of this
+ * page's own — the state/option lists (departmentUsers/vehicleOptions
+ * below) are still entirely this page's own, page-local and non-persisted.
  */
 export function AllBookingsPage() {
   const { afdelingId, costumerId, profile } = useAuth();
@@ -69,25 +72,11 @@ export function AllBookingsPage() {
   const [users, setUsers] = useState<
     { user_id: string; email: string; user_ident: string | null; department_id: string | null }[]
   >([]);
-  const [filterOpen, setFilterOpen] = useState(false);
+  /** Page-local, transient (not persisted) — both surfaced inside PageHeader's "Skift afdeling" popup as Bruger/Køretøj <select> fields rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
   /** Every department under the global header's active costumerId (sysadm only) — still needed for scopedDepartmentIds below, to turn a Kunde-only scope (costumerId set, afdelingId null) into a department-id set the client-side booking filter can match against. */
   const [departmentOptions, setDepartmentOptions] = useState<{ department_id: string; name: string }[]>([]);
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setFilterOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filterOpen]);
 
   /** Loads the departments under the global header's active costumerId (sysadm only) — or every department platform-wide when costumerId is null ("Alle"). A regular admin never has more than their own single department to begin with, so this stays empty for them. */
   useEffect(() => {
@@ -206,80 +195,29 @@ export function AllBookingsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            brugerFilter={{
+              label: useUserIdent ? "Bruger-ID" : "Bruger",
+              value: filterUser,
+              onChange: setFilterUser,
+              options: departmentUsers.map((u) => ({
+                value: u.user_id,
+                label: (useUserIdent ? u.user_ident || u.email : u.email) ?? "—",
+              })),
+            }}
+            koretoejFilter={{
+              label: "Køretøj",
+              value: filterVehicle,
+              onChange: setFilterVehicle,
+              options: vehicleOptions.map((v) => ({ value: v, label: formatVehicleLabel(v, vehicles) })),
+            }}
+          />
 
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
                 <div className="flex items-center gap-2">
-                  <div className="relative" ref={filterRef}>
-                    <button
-                      type="button"
-                      onClick={() => setFilterOpen((prev) => !prev)}
-                      aria-label="Filtrer"
-                      className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                        filterUser || filterVehicle
-                          ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                          : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                      }`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                        <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                      </svg>
-                    </button>
-                    <InlinePopup
-                      visible={filterOpen}
-                      align="right"
-                      message={
-                        <>
-                          <p className="mb-2">Du kan her udvælge reservationer på disse kriterier:</p>
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            {useUserIdent ? "Bruger-ID" : "Bruger"}
-                            <select
-                              value={filterUser}
-                              onChange={(e) => setFilterUser(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {departmentUsers.map((u) => (
-                                <option key={u.user_id} value={u.user_id}>
-                                  {useUserIdent ? u.user_ident || u.email : u.email}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="block text-[0.7rem] font-medium text-brand-700">
-                            Køretøj
-                            <select
-                              value={filterVehicle}
-                              onChange={(e) => setFilterVehicle(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {vehicleOptions.map((v) => (
-                                <option key={v} value={v}>
-                                  {formatVehicleLabel(v, vehicles)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {(filterUser || filterVehicle) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterUser("");
-                                setFilterVehicle("");
-                              }}
-                              className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
-                            >
-                              Nulstil filter
-                            </button>
-                          )}
-                        </>
-                      }
-                    />
-                  </div>
                   <div className="relative">
                     <button
                       type="button"
