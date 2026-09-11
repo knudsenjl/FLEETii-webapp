@@ -255,7 +255,18 @@ export default async (req: Request) => {
       if (vehicle?.costumer_id) topics.push(`fleet-positions:${vehicle.costumer_id}`);
 
       for (const topic of topics) {
-        const channel = admin.channel(topic);
+        // { config: { private: true } } is required here to MATCH
+        // VehicleContext.tsx's own subscribe-side channel config — without
+        // it, RealtimeChannel.private defaults to false, so httpSend() below
+        // posts the broadcast WITHOUT the "?private=true" query param the
+        // Realtime server needs to route it through the authorized/private
+        // delivery path that fleet_positions_realtime_authorization.sql's
+        // RLS policy actually guards. The send itself still succeeded (200,
+        // no error here) and the DB write above was already correct, so this
+        // was invisible everywhere except as "the map only updates on a
+        // manual refresh, never live" — confirmed 2026-09-11 after a user
+        // report of exactly that symptom on a vehicle known to be driving.
+        const channel = admin.channel(topic, { config: { private: true } });
         await channel.httpSend("position", positionPayload);
         await admin.removeChannel(channel);
       }

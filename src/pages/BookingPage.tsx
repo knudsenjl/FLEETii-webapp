@@ -236,7 +236,7 @@ export function BookingPage() {
                 </div>
                 {/* Green when 2hire's "trip_detected" signal is currently true for this vehicle (see liveVehicleDataSource.ts's tripDetected mapping) — brand-colored otherwise, same as before this signal existed. */}
                 <CarGlyph
-                  className={`h-7 w-11 shrink-0 ${twoHireVehicle?.tripDetected === "TRUE" ? "text-green-600" : "text-brand-600"}`}
+                  className={`h-9 w-14 shrink-0 ${twoHireVehicle?.tripDetected === "TRUE" ? "text-green-600" : "text-brand-600"}`}
                 />
               </button>
               {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Alle" ("all") is the way to see everything else. */}

@@ -134,7 +134,7 @@ export function BookingsPage() {
         onClick={onClick}
         className="flex items-center gap-3 rounded-[20px] border border-brand-100 bg-white p-3.5 text-left shadow-sm shadow-brand-900/5 transition hover:bg-brand-50"
       >
-        <CarGlyph className="h-6 w-10 shrink-0 text-brand-600" />
+        <CarGlyph className="h-7 w-11 shrink-0 text-brand-600" />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-center gap-1.5">
             <span className="truncate text-sm font-semibold text-brand-800">{modelLabel}</span>

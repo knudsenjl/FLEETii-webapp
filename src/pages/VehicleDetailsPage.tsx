@@ -503,7 +503,7 @@ export function VehicleDetailsPage() {
                 {/* Driving-vehicle icon (only while 2hire's trip_detected is currently true) + red "!" health button — both admin/sysadm-only, right-aligned next to this heading. Replaces the old standalone Status row (removed 2026-09-11) as the header-level admin health summary for this vehicle — see lib/vehicleHealth.ts, shared with VehiclesPage.tsx's fleet table. */}
                 {isAdmin && (
                   <span className="flex items-center gap-1.5">
-                    {isDriving && <CarGlyph className="h-4 w-6 text-green-600" title="Kører" />}
+                    {isDriving && <CarGlyph className="h-6 w-9 text-green-600" title="Kører" />}
                     <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
                   </span>
                 )}

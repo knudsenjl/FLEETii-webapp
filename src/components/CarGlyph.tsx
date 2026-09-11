@@ -17,7 +17,7 @@ interface CarGlyphProps {
   title?: string;
 }
 
-export function CarGlyph({ className = "h-4 w-6", title }: CarGlyphProps) {
+export function CarGlyph({ className = "h-6 w-9", title }: CarGlyphProps) {
   return (
     <svg
       viewBox="0 0 34 22"
