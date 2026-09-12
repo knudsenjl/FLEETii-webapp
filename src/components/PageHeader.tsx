@@ -5,7 +5,7 @@
 // that layout; changing it here changes it everywhere.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth, type DepartmentOption } from "../contexts/AuthContext";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
@@ -64,6 +64,20 @@ export interface PageHeaderNavigateField {
  */
 export interface PageHeaderKundeNavigateField {
   onSelect: (costumerId: string) => void;
+}
+
+/**
+ * CostumerAdministrationPage.tsx-only: the same "quick jump" repurposing as
+ * PageHeaderKundeNavigateField above, but for the Afdeling <select> — that
+ * page's own flat, costumer-agnostic list has no Kunde/Afdeling scoping
+ * concept either, so picking a department there jumps straight to
+ * /department-details with it pre-selected instead of persisting a scope
+ * switch. Handed the full DepartmentOption (not just its id) since the
+ * page needs that department's own costumerId/costumerName too, to build
+ * DepartmentDetailsPage.tsx's own router-state contract.
+ */
+export interface PageHeaderAfdelingNavigateField {
+  onSelect: (department: DepartmentOption) => void;
 }
 
 /**
@@ -142,7 +156,11 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * same idea as `hideAfdelingAlle` above, but for the (non-navigate) Kunde
  * <select>'s own "Alle" option — that page manages exactly ONE costumer at
  * a time, so "every costumer at once" is a dead choice there too (see its
- * own "Kunde changing to Alle...does nothing" doc comment). */
+ * own "Kunde changing to Alle...does nothing" doc comment).
+ *
+ * `afdelingNavigate` (optional, page-supplied — CostumerAdministrationPage.tsx
+ * only, see PageHeaderAfdelingNavigateField): same repurposing as
+ * `kundeNavigate`, but for the Afdeling <select>. */
 export function PageHeader({
   compact = false,
   rolleFilter,
@@ -155,6 +173,7 @@ export function PageHeader({
   hideAfdeling = false,
   hideKundeAlle = false,
   kundeNavigate,
+  afdelingNavigate,
 }: {
   compact?: boolean;
   rolleFilter?: PageHeaderFilterField;
@@ -167,6 +186,7 @@ export function PageHeader({
   hideAfdeling?: boolean;
   hideKundeAlle?: boolean;
   kundeNavigate?: PageHeaderKundeNavigateField;
+  afdelingNavigate?: PageHeaderAfdelingNavigateField;
 } = {}) {
   const {
     signOut,
@@ -424,43 +444,61 @@ export function PageHeader({
                     {!hideAfdeling && (
                     <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                       Afdeling
-                      <select
-                        value={!canSwitchToAll && afdelingScopedToAllGrants ? "" : (afdelingId ?? "")}
-                        onChange={(e) => {
-                          const departmentId = e.target.value || null;
-                          if (!canSwitchToAll) {
-                            // Non-sysadm: "Alle" can never be persisted (switchDepartment
-                            // rejects departmentId=null for this role — their own department_id
-                            // must always be a real one) — so this is a purely local,
-                            // non-persisted override instead (see afdelingScopedToAllGrants'
-                            // own doc comment in AuthContext.tsx). Picking a real department
-                            // clears the override and persists as normal, same as before.
-                            setAfdelingScopedToAllGrants(!departmentId);
-                            if (departmentId) void handleSwitch(departmentId);
-                            return;
-                          }
-                          // Picking a real department always wins outright
-                          // (costumerId omitted — switch-department.mts
-                          // derives it from the department itself). Picking
-                          // "Alle" here instead preserves whichever Kunde is
-                          // currently active (the Kunde <select> above, or
-                          // "Alle" already if that's what it is) rather than
-                          // always fully unscoping — same "just this Kunde,
-                          // every department" state the Kunde <select>'s own
-                          // onChange sets, just reached from this field too.
-                          void handleSwitch(departmentId, departmentId ? undefined : costumerId);
-                        }}
-                        className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                      >
-                        {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. Shown for BOTH roles now — a non-sysadm's own "Alle" is just handled locally above (afdelingScopedToAllGrants) rather than persisted. Also hidden outright when hideAfdelingAlle is set (DepartmentDetailsPage.tsx — see its own doc comment), regardless of option count. */}
-                        {afdelingOptions.length > 1 && !hideAfdelingAlle && <option value="">Alle</option>}
-                        {afdelingOptions.map((department) => (
-                          <option key={department.department_id} value={department.department_id}>
-                            {/* Kunde "Alle" (costumerId null): afdelingOptions spans every costumer platform-wide, so the same department name can recur under different Kunder — prefix with "Kunde/" to disambiguate, same "Kunde / Afdeling" convention as elsewhere (BookingDetailsPage.tsx/ReservationPage.tsx). Once a specific Kunde is picked, every option is already implicitly that one Kunde's own, so the plain name is enough. */}
-                            {!costumerId && department.costumerName ? `${department.costumerName}/${department.name}` : department.name}
-                          </option>
-                        ))}
-                      </select>
+                      {afdelingNavigate ? (
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            const department = afdelingOptions.find((d) => d.department_id === e.target.value);
+                            if (department) afdelingNavigate.onSelect(department);
+                          }}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Vælg…</option>
+                          {afdelingOptions.map((department) => (
+                            <option key={department.department_id} value={department.department_id}>
+                              {!costumerId && department.costumerName ? `${department.costumerName}/${department.name}` : department.name}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <select
+                          value={!canSwitchToAll && afdelingScopedToAllGrants ? "" : (afdelingId ?? "")}
+                          onChange={(e) => {
+                            const departmentId = e.target.value || null;
+                            if (!canSwitchToAll) {
+                              // Non-sysadm: "Alle" can never be persisted (switchDepartment
+                              // rejects departmentId=null for this role — their own department_id
+                              // must always be a real one) — so this is a purely local,
+                              // non-persisted override instead (see afdelingScopedToAllGrants'
+                              // own doc comment in AuthContext.tsx). Picking a real department
+                              // clears the override and persists as normal, same as before.
+                              setAfdelingScopedToAllGrants(!departmentId);
+                              if (departmentId) void handleSwitch(departmentId);
+                              return;
+                            }
+                            // Picking a real department always wins outright
+                            // (costumerId omitted — switch-department.mts
+                            // derives it from the department itself). Picking
+                            // "Alle" here instead preserves whichever Kunde is
+                            // currently active (the Kunde <select> above, or
+                            // "Alle" already if that's what it is) rather than
+                            // always fully unscoping — same "just this Kunde,
+                            // every department" state the Kunde <select>'s own
+                            // onChange sets, just reached from this field too.
+                            void handleSwitch(departmentId, departmentId ? undefined : costumerId);
+                          }}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. Shown for BOTH roles now — a non-sysadm's own "Alle" is just handled locally above (afdelingScopedToAllGrants) rather than persisted. Also hidden outright when hideAfdelingAlle is set (DepartmentDetailsPage.tsx — see its own doc comment), regardless of option count. */}
+                          {afdelingOptions.length > 1 && !hideAfdelingAlle && <option value="">Alle</option>}
+                          {afdelingOptions.map((department) => (
+                            <option key={department.department_id} value={department.department_id}>
+                              {/* Kunde "Alle" (costumerId null): afdelingOptions spans every costumer platform-wide, so the same department name can recur under different Kunder — prefix with "Kunde/" to disambiguate, same "Kunde / Afdeling" convention as elsewhere (BookingDetailsPage.tsx/ReservationPage.tsx). Once a specific Kunde is picked, every option is already implicitly that one Kunde's own, so the plain name is enough. */}
+                              {!costumerId && department.costumerName ? `${department.costumerName}/${department.name}` : department.name}
+                            </option>
+                          ))}
+                        </select>
+                      )}
                     </label>
                     )}
                     {/* Rolle/Bruger/Navn/Køretøj — a page's own extra filter fields (see PageHeaderFilterField), always in this fixed order regardless of which ones a given page actually supplies. mb-2 on every one but Køretøj, always the last of the four when present. */}
