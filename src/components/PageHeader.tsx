@@ -103,7 +103,16 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * PageHeaderNavigateField): render right after the filter fields above,
  * always in that order — AdminFrontpage.tsx's own "Køretøjer"/"Brugere"
  * quick-jump to a specific vehicle's/user's detail page, since that page
- * shows no list of its own to filter. */
+ * shows no list of its own to filter.
+ *
+ * `hideAfdelingAlle` (optional, page-supplied — DepartmentDetailsPage.tsx
+ * only): suppresses the Afdeling <select>'s own "Alle" option regardless of
+ * afdelingOptions.length. That page's entire concept is managing exactly
+ * ONE selected department at a time (selectedDepartmentId) — there's no
+ * "all departments at once" mode for it to mean anything, unlike every
+ * other page that reads this global scope, so offering "Alle" there is
+ * simply a dead choice (see that page's own "Kunde changing to Alle...does
+ * nothing" doc comment). */
 export function PageHeader({
   compact = false,
   rolleFilter,
@@ -112,6 +121,7 @@ export function PageHeader({
   koretoejFilter,
   koretoejNavigate,
   brugerNavigate,
+  hideAfdelingAlle = false,
 }: {
   compact?: boolean;
   rolleFilter?: PageHeaderFilterField;
@@ -120,6 +130,7 @@ export function PageHeader({
   koretoejFilter?: PageHeaderFilterField;
   koretoejNavigate?: PageHeaderNavigateField;
   brugerNavigate?: PageHeaderNavigateField;
+  hideAfdelingAlle?: boolean;
 } = {}) {
   const {
     signOut,
@@ -387,8 +398,8 @@ export function PageHeader({
                         }}
                         className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                       >
-                        {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. Shown for BOTH roles now — a non-sysadm's own "Alle" is just handled locally above (afdelingScopedToAllGrants) rather than persisted. */}
-                        {afdelingOptions.length > 1 && <option value="">Alle</option>}
+                        {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. Shown for BOTH roles now — a non-sysadm's own "Alle" is just handled locally above (afdelingScopedToAllGrants) rather than persisted. Also hidden outright when hideAfdelingAlle is set (DepartmentDetailsPage.tsx — see its own doc comment), regardless of option count. */}
+                        {afdelingOptions.length > 1 && !hideAfdelingAlle && <option value="">Alle</option>}
                         {afdelingOptions.map((department) => (
                           <option key={department.department_id} value={department.department_id}>
                             {/* Kunde "Alle" (costumerId null): afdelingOptions spans every costumer platform-wide, so the same department name can recur under different Kunder — prefix with "Kunde/" to disambiguate, same "Kunde / Afdeling" convention as elsewhere (BookingDetailsPage.tsx/ReservationPage.tsx). Once a specific Kunde is picked, every option is already implicitly that one Kunde's own, so the plain name is enough. */}

@@ -107,7 +107,14 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
 export function DepartmentDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile, costumerId: activeCostumerId, costumerName: activeCostumerName, afdelingId: activeAfdelingId } = useAuth();
+  const {
+    profile,
+    costumerId: activeCostumerId,
+    costumerName: activeCostumerName,
+    afdelingId: activeAfdelingId,
+    afdelingScopedToAllGrants,
+    setAfdelingScopedToAllGrants,
+  } = useAuth();
   const isSysadm = isSysadmRole(profile?.role);
   const state = location.state as { costumerId?: string; costumerName?: string; departmentId?: string } | null;
   const costumerId = state?.costumerId ?? null;
@@ -241,6 +248,30 @@ export function DepartmentDetailsPage() {
       navigate("/department-details", { replace: true, state: { costumerId: activeCostumerId, costumerName: activeCostumerName } });
     }
   }, [activeCostumerId, activeCostumerName, activeAfdelingId, costumerId, navigate]);
+
+  /**
+   * This page's header hides the Afdeling <select>'s own "Alle" option
+   * entirely (hideAfdelingAlle below) — there's no "all departments at
+   * once" mode here, just one selectedDepartmentId at a time. For a
+   * regular admin, "Alle" is really just the local, non-persisted
+   * afdelingScopedToAllGrants override (see AuthContext/PageHeader) rather
+   * than a real department — force it back off while this page is mounted
+   * so the (now option-less) <select> never has to represent a "" value
+   * that no longer has a matching <option>, restoring whatever it was
+   * before on unmount, same non-persisting "force + restore" pattern
+   * AdminFrontpage.tsx uses for the opposite default. A sysadm's own "Alle"
+   * (afdelingId null) isn't touched here — unlike the local flag, that's
+   * real persisted state (switchDepartment), and silently changing it just
+   * because this page was visited would be a bigger, unrelated behavior
+   * change (see the deferred "Data Filter vs. navigation" question).
+   */
+  const previousAllGrantsRef = useRef(afdelingScopedToAllGrants);
+  useEffect(() => {
+    if (isSysadm) return;
+    const previous = previousAllGrantsRef.current;
+    setAfdelingScopedToAllGrants(false);
+    return () => setAfdelingScopedToAllGrants(previous);
+  }, [isSysadm, setAfdelingScopedToAllGrants]);
 
   // Keeps a real department selected whenever one exists — auto-selects the
   // first loaded department if nothing's selected yet (or the sessionStorage-
@@ -441,7 +472,7 @@ export function DepartmentDetailsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader hideAfdelingAlle />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Afdelinger hos {costumerName ?? "—"}</h2>
