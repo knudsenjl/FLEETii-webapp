@@ -13,6 +13,7 @@
 // later once real usage shows what's actually needed.
 import { useState } from "react";
 import { motion } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 
@@ -33,6 +34,7 @@ type BackfillResult = {
 
 export function TwoHireCommandPage() {
   const { session } = useAuth();
+  const navigate = useNavigate();
   const [command, setCommand] = useState("POST /api/v1/vehicle/{AB12345}/command/generic/locate");
   const [body, setBody] = useState("");
   const [isExecuting, setIsExecuting] = useState(false);
@@ -114,11 +116,16 @@ export function TwoHireCommandPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            hideAfdeling
+            kundeNavigate={{ onSelect: (costumerId) => navigate(`/costumer-details/${costumerId}`) }}
+          />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div>
-              <h2 className="text-xl font-semibold text-brand-800">2hire kommando</h2>
+              <h2 className="text-xl font-semibold text-brand-800">
+                2hire kommando (Kun til testformål - fjernes når test er overstået)
+              </h2>
               <p className="mt-1 text-sm text-brand-600">
                 Skriv en 2hire-forespørgsel som "METODE /sti", f.eks.{" "}
                 <code className="rounded bg-brand-50 px-1 py-0.5 text-xs">POST /api/v1/vehicle/{"{AB12345}"}/command/generic/locate</code>.

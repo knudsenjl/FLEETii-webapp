@@ -52,6 +52,21 @@ export interface PageHeaderNavigateField {
 }
 
 /**
+ * TwoHireCommandPage.tsx-only variant of the same "quick jump" idea as
+ * PageHeaderNavigateField above, but for the Kunde <select> specifically —
+ * that page has no Kunde/Afdeling scoping concept of its own at all (its
+ * commands address a vehicle directly by plate/2hire id), so repurposing
+ * the header's existing Kunde field to jump straight to that Kunde's own
+ * /costumer-details is more useful there than the normal persisted-switch
+ * behavior every other page relies on. Uses the same kundeOptions this
+ * component already computes for the normal Kunde <select> — the page only
+ * supplies where a pick should go, not the option list itself.
+ */
+export interface PageHeaderKundeNavigateField {
+  onSelect: (costumerId: string) => void;
+}
+
+/**
  * The settings destination(s) for a given `user_profiles.role`. A plain
  * "user" (any non-"admin"/"sysadm" role, including null/undefined,
  * matching formatRoleLabel's convention) has only one settings page
@@ -112,7 +127,16 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * "all departments at once" mode for it to mean anything, unlike every
  * other page that reads this global scope, so offering "Alle" there is
  * simply a dead choice (see that page's own "Kunde changing to Alle...does
- * nothing" doc comment). */
+ * nothing" doc comment).
+ *
+ * `hideAfdeling`/`kundeNavigate` (optional, page-supplied —
+ * TwoHireCommandPage.tsx only): that page has no Kunde/Afdeling scoping
+ * concept at all, so `hideAfdeling` drops the Afdeling <select> entirely
+ * (not just its "Alle" option), and `kundeNavigate` (see
+ * PageHeaderKundeNavigateField) repurposes the Kunde <select> into a
+ * straight jump to that Kunde's own /costumer-details instead of the
+ * normal persisted Kunde/Afdeling switch every other sysadm page uses it
+ * for. */
 export function PageHeader({
   compact = false,
   rolleFilter,
@@ -122,6 +146,8 @@ export function PageHeader({
   koretoejNavigate,
   brugerNavigate,
   hideAfdelingAlle = false,
+  hideAfdeling = false,
+  kundeNavigate,
 }: {
   compact?: boolean;
   rolleFilter?: PageHeaderFilterField;
@@ -131,6 +157,8 @@ export function PageHeader({
   koretoejNavigate?: PageHeaderNavigateField;
   brugerNavigate?: PageHeaderNavigateField;
   hideAfdelingAlle?: boolean;
+  hideAfdeling?: boolean;
+  kundeNavigate?: PageHeaderKundeNavigateField;
 } = {}) {
   const {
     signOut,
@@ -353,21 +381,39 @@ export function PageHeader({
                     {canSwitchToAll && (
                       <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                         Kunde
-                        <select
-                          value={costumerId ?? ""}
-                          onChange={(e) => void handleSwitch(null, e.target.value || null)}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          {/* Nothing meaningful to choose between with 0-1 real options. */}
-                          {kundeOptions.length > 1 && <option value="">Alle</option>}
-                          {kundeOptions.map(([id, name]) => (
-                            <option key={id} value={id}>
-                              {name}
-                            </option>
-                          ))}
-                        </select>
+                        {kundeNavigate ? (
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              if (e.target.value) kundeNavigate.onSelect(e.target.value);
+                            }}
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                          >
+                            <option value="">Vælg…</option>
+                            {kundeOptions.map(([id, name]) => (
+                              <option key={id} value={id}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <select
+                            value={costumerId ?? ""}
+                            onChange={(e) => void handleSwitch(null, e.target.value || null)}
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                          >
+                            {/* Nothing meaningful to choose between with 0-1 real options. */}
+                            {kundeOptions.length > 1 && <option value="">Alle</option>}
+                            {kundeOptions.map(([id, name]) => (
+                              <option key={id} value={id}>
+                                {name}
+                              </option>
+                            ))}
+                          </select>
+                        )}
                       </label>
                     )}
+                    {!hideAfdeling && (
                     <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                       Afdeling
                       <select
@@ -408,6 +454,7 @@ export function PageHeader({
                         ))}
                       </select>
                     </label>
+                    )}
                     {/* Rolle/Bruger/Navn/Køretøj — a page's own extra filter fields (see PageHeaderFilterField), always in this fixed order regardless of which ones a given page actually supplies. mb-2 on every one but Køretøj, always the last of the four when present. */}
                     {rolleFilter && (
                       <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
