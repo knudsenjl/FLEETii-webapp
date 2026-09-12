@@ -95,7 +95,16 @@ export function CostumerDetailsPage() {
   // gone" (e.g. deleted — must NOT fall back to stale state, or the
   // redirect-on-missing-data effect below would never fire).
   const [fetchedCostumer, setFetchedCostumer] = useState<Costumer | null | undefined>(undefined);
-  const [costumerLoading, setCostumerLoading] = useState(false);
+  // Starts true whenever there's a costumerId to fetch and no router state
+  // already covers it (same lazy-initializer idiom as UserDetailsPage.tsx's
+  // own userLoading) — plain `useState(false)` left a one-render race on a
+  // fresh mount reached WITHOUT router state (e.g. AdminFrontpage.tsx's own
+  // Kunde quick-jump): the redirect-on-missing-data effect below and this
+  // state both run as part of the same initial effect flush, so it would
+  // still read the OLD (pre-update) `false` and misread "haven't started
+  // fetching yet" as "confirmed missing", bouncing straight back to
+  // /costumers before the fetch had even begun.
+  const [costumerLoading, setCostumerLoading] = useState(() => Boolean(costumerId) && !stateCostumer);
   // fetchedCostumer wins once it arrives, not stateCostumer — router state
   // is only an instant-paint fallback for the moment before the fetch
   // below resolves. It used to be the other way around (state always won),
