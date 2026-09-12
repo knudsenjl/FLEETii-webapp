@@ -542,7 +542,7 @@ export function CostumerDetailsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader hideKundeAlle />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">

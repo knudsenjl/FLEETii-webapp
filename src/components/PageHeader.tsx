@@ -130,13 +130,19 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * nothing" doc comment).
  *
  * `hideAfdeling`/`kundeNavigate` (optional, page-supplied —
- * TwoHireCommandPage.tsx only): that page has no Kunde/Afdeling scoping
- * concept at all, so `hideAfdeling` drops the Afdeling <select> entirely
- * (not just its "Alle" option), and `kundeNavigate` (see
- * PageHeaderKundeNavigateField) repurposes the Kunde <select> into a
- * straight jump to that Kunde's own /costumer-details instead of the
- * normal persisted Kunde/Afdeling switch every other sysadm page uses it
- * for. */
+ * TwoHireCommandPage.tsx/AdminFrontpage.tsx only): those pages have no
+ * Kunde/Afdeling scoping concept at all, so `hideAfdeling` drops the
+ * Afdeling <select> entirely (not just its "Alle" option), and
+ * `kundeNavigate` (see PageHeaderKundeNavigateField) repurposes the Kunde
+ * <select> into a straight jump to that Kunde's own /costumer-details
+ * instead of the normal persisted Kunde/Afdeling switch every other sysadm
+ * page uses it for.
+ *
+ * `hideKundeAlle` (optional, page-supplied — CostumerDetailsPage.tsx only):
+ * same idea as `hideAfdelingAlle` above, but for the (non-navigate) Kunde
+ * <select>'s own "Alle" option — that page manages exactly ONE costumer at
+ * a time, so "every costumer at once" is a dead choice there too (see its
+ * own "Kunde changing to Alle...does nothing" doc comment). */
 export function PageHeader({
   compact = false,
   rolleFilter,
@@ -147,6 +153,7 @@ export function PageHeader({
   brugerNavigate,
   hideAfdelingAlle = false,
   hideAfdeling = false,
+  hideKundeAlle = false,
   kundeNavigate,
 }: {
   compact?: boolean;
@@ -158,6 +165,7 @@ export function PageHeader({
   brugerNavigate?: PageHeaderNavigateField;
   hideAfdelingAlle?: boolean;
   hideAfdeling?: boolean;
+  hideKundeAlle?: boolean;
   kundeNavigate?: PageHeaderKundeNavigateField;
 } = {}) {
   const {
@@ -402,8 +410,8 @@ export function PageHeader({
                             onChange={(e) => void handleSwitch(null, e.target.value || null)}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                           >
-                            {/* Nothing meaningful to choose between with 0-1 real options. */}
-                            {kundeOptions.length > 1 && <option value="">Alle</option>}
+                            {/* Nothing meaningful to choose between with 0-1 real options. Also hidden outright when hideKundeAlle is set (CostumerDetailsPage.tsx — see its own doc comment), regardless of option count. */}
+                            {kundeOptions.length > 1 && !hideKundeAlle && <option value="">Alle</option>}
                             {kundeOptions.map(([id, name]) => (
                               <option key={id} value={id}>
                                 {name}
