@@ -34,6 +34,24 @@ export interface PageHeaderFilterField {
 }
 
 /**
+ * One page-owned "quick jump" field surfaced inside the "Data Filter"
+ * popup — Køretøjer/Brugere on AdminFrontpage.tsx, which (unlike
+ * VehiclesPage.tsx/DepartmentPage.tsx) shows no vehicle/user LIST of its
+ * own to narrow with PageHeaderFilterField; picking one instead navigates
+ * straight to that specific vehicle's/user's own detail page. Genuinely
+ * different semantics from PageHeaderFilterField, not just a rename:
+ * there's no persisted "current selection" to hold (the page navigates
+ * away the instant one is picked) and thus no value/reset participation —
+ * the <select> stays permanently on its own blank placeholder option.
+ */
+export interface PageHeaderNavigateField {
+  /** Field label, e.g. "Køretøjer" or "Brugere". */
+  label: string;
+  options: { value: string; label: string }[];
+  onSelect: (value: string) => void;
+}
+
+/**
  * The settings destination(s) for a given `user_profiles.role`. A plain
  * "user" (any non-"admin"/"sysadm" role, including null/undefined,
  * matching formatRoleLabel's convention) has only one settings page
@@ -79,19 +97,29 @@ const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adapto
  * Køretøj, a separate axis) — letting that one popup double as the page's
  * whole "narrow what I'm looking at" control instead of a separate funnel
  * popup. Absent on pages with no such concept (e.g. VehiclesPage.tsx has
- * no Bruger/Rolle/Navn). */
+ * no Bruger/Rolle/Navn).
+ *
+ * `koretoejNavigate`/`brugerNavigate` (optional, page-supplied — see
+ * PageHeaderNavigateField): render right after the filter fields above,
+ * always in that order — AdminFrontpage.tsx's own "Køretøjer"/"Brugere"
+ * quick-jump to a specific vehicle's/user's detail page, since that page
+ * shows no list of its own to filter. */
 export function PageHeader({
   compact = false,
   rolleFilter,
   brugerFilter,
   navnFilter,
   koretoejFilter,
+  koretoejNavigate,
+  brugerNavigate,
 }: {
   compact?: boolean;
   rolleFilter?: PageHeaderFilterField;
   brugerFilter?: PageHeaderFilterField;
   navnFilter?: PageHeaderFilterField;
   koretoejFilter?: PageHeaderFilterField;
+  koretoejNavigate?: PageHeaderNavigateField;
+  brugerNavigate?: PageHeaderNavigateField;
 } = {}) {
   const {
     signOut,
@@ -422,6 +450,45 @@ export function PageHeader({
                           {/* Unlike the other fields, always shown regardless of options.length — VehiclesPage.tsx/FleetManagementPage.tsx reset this field's value back to "" the moment Kunde/Afdeling changes (a previous pick almost certainly doesn't belong to the new scope), and with only one vehicle in view, hiding "Alle" would leave no <option value=""> for that "" to actually match — the browser would just default-show the sole vehicle as if it were deliberately picked, which is exactly the misleading state the reset is trying to avoid. */}
                           <option value="">Alle</option>
                           {koretoejFilter.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {/* Køretøjer/Brugere — AdminFrontpage.tsx's own "quick jump straight to one specific vehicle's/user's detail page" (see PageHeaderNavigateField), never present alongside the filter fields above (mutually exclusive per page), so their own mb-2/no-mb-2 spacing doesn't need to account for these two. */}
+                    {koretoejNavigate && (
+                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
+                        {koretoejNavigate.label}
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) koretoejNavigate.onSelect(e.target.value);
+                          }}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Vælg…</option>
+                          {koretoejNavigate.options.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    {brugerNavigate && (
+                      <label className="block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
+                        {brugerNavigate.label}
+                        <select
+                          value=""
+                          onChange={(e) => {
+                            if (e.target.value) brugerNavigate.onSelect(e.target.value);
+                          }}
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                        >
+                          <option value="">Vælg…</option>
+                          {brugerNavigate.options.map((option) => (
                             <option key={option.value} value={option.value}>
                               {option.label}
                             </option>

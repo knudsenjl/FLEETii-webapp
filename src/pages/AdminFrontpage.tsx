@@ -11,6 +11,7 @@ import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
+import { useIdentSettings } from "../hooks/useIdentSettings";
 
 /** A row from the `costumers` table, for the embedded list below — same fields CostumerAdministrationPage.tsx's own full-page version fetches, so the object handed to CostumerDetailsPage via router state already has everything it displays. */
 type Costumer = {
@@ -55,7 +56,12 @@ type Costumer = {
  * admin with more than one department grant, picking a different one in
  * the header's own "Data Filter" also jumps there directly, with that
  * department pre-selected — see the follow-effect right above
- * handleOpenDepartments.
+ * handleOpenDepartments. The same "Data Filter" popup also gets two
+ * regular-admin-only quick-jump fields, "Køretøjer"/"Brugere" (see
+ * vehicleOptions/userOptions below, and PageHeaderNavigateField) — since
+ * this page shows no vehicle/user list of its own to click a row on,
+ * picking one there navigates straight to that specific vehicle's/user's
+ * own detail page instead.
  */
 export function AdminFrontpage() {
   const navigate = useNavigate();
@@ -71,6 +77,71 @@ export function AdminFrontpage() {
   const [departmentsCount, setDepartmentsCount] = useState<number | null>(null);
   const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
   const [usersCount, setUsersCount] = useState<number | null>(null);
+  /** Whether afdelingId's (this admin's own CURRENT department's) department_settings shows Køretøj-ID/Bruger-ID — used only for the "Data Filter" quick-jump labels below, same fail-closed-to-plain-plate/email approximation DepartmentPage.tsx's own UNLOCKED mode uses when listing across more than one department at once (there's no single department's setting to apply costumer-wide here either). */
+  const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
+  /** "Køretøjer" quick-jump options below — every vehicle under this admin's own costumer, labeled with a "(Blokeret)" suffix for any administratively blocked one (see VehicleDetailsPage.tsx's "Bloker køretøj") so it's still reachable to unblock, same convention as AllBookingsPage.tsx's own vehicleTooltip. */
+  const [vehicleOptions, setVehicleOptions] = useState<{ value: string; label: string }[]>([]);
+  /** "Brugere" quick-jump options below — every user under this admin's own costumer, INCLUDING blocked ones (a red "(Blokeret)" suffix, not filtered out — same reasoning as DepartmentPage.tsx's own list: blocking is reversible, so they need to stay reachable to unblock). Excludes role=sysadm — see the identical exclusion/reasoning on DepartmentPage.tsx's own Brugere query. */
+  const [userOptions, setUserOptions] = useState<{ value: string; label: string }[]>([]);
+
+  useEffect(() => {
+    if (!isDepartmentAdmin(profile?.role) || !costumerId) {
+      setVehicleOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("vehicle_profiles")
+      .select("vehicle_id, vehicle_ident, number_plate, blocked_at")
+      .eq("costumer_id", costumerId)
+      .order("number_plate", { ascending: true })
+      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null; blocked_at: string | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setVehicleOptions(
+          (data ?? []).map((v) => ({
+            value: v.vehicle_id,
+            label:
+              ((useVehicleIdent ? v.vehicle_ident || v.number_plate : v.number_plate) ?? "—") +
+              (v.blocked_at ? " (Blokeret)" : ""),
+          })),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.role, costumerId, useVehicleIdent]);
+
+  useEffect(() => {
+    if (!isDepartmentAdmin(profile?.role) || !costumerId) {
+      setUserOptions([]);
+      return;
+    }
+
+    let cancelled = false;
+    void supabase
+      .from("user_profiles")
+      .select("user_id, email, user_ident, deleted_at")
+      .eq("costumer_id", costumerId)
+      .neq("role", "sysadm")
+      .order("email", { ascending: true })
+      .returns<{ user_id: string; email: string | null; user_ident: string | null; deleted_at: string | null }[]>()
+      .then(({ data }) => {
+        if (cancelled) return;
+        setUserOptions(
+          (data ?? []).map((u) => ({
+            value: u.user_id,
+            label: ((useUserIdent ? u.user_ident || u.email : u.email) ?? "—") + (u.deleted_at ? " (Blokeret)" : ""),
+          })),
+        );
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.role, costumerId, useUserIdent]);
 
   useEffect(() => {
     if (!isDepartmentAdmin(profile?.role) || !costumerId) return;
@@ -189,7 +260,18 @@ export function AdminFrontpage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            koretoejNavigate={
+              isDepartmentAdmin(profile?.role)
+                ? { label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }
+                : undefined
+            }
+            brugerNavigate={
+              isDepartmentAdmin(profile?.role)
+                ? { label: "Brugere", options: userOptions, onSelect: (id) => navigate(`/user-details/${id}`) }
+                : undefined
+            }
+          />
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
