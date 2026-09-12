@@ -253,8 +253,10 @@ export function BookingPage() {
           <PageHeader compact />
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-2">
             <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
-              Du har ingen aktuelle eller kommende reservationer i denne afdeling. Hvis du har reservationer i en
-              anden afdeling, så vælg denne afdeling i filteret øverst på denne side.
+              Du har ingen aktuelle eller kommende reservationer i denne afdeling.
+            </div>
+            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.
             </div>
             <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
               {userMayCreateBooking
