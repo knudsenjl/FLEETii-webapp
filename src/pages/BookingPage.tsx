@@ -27,6 +27,7 @@ import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingL
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
 import { supabase } from "../lib/supabase";
+import { isSettingTilladt } from "../lib/settings";
 import { useReverseGeocode } from "../lib/geocode";
 
 /** A booking as fetched fresh on mount below (see mapBookingRow) — same shape BookingDetailsPage.tsx's own fetch-by-id fallback produces, and a superset of useBookingLifecycle's own LifecycleBooking (the extra startDate/start/endDate/end fields are display strings this page's own formatBookingPeriod call below needs). */
@@ -49,11 +50,13 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * ALSO scoped to the viewer's own current afdelingId (see the fetch effect's
  * own comment). With none found, stays on this page instead of redirecting
  * to "/bookings" (this page used to do that, replace/no-flash, until
- * 2026-09-11) — shows just the header and "Alle" button, plus a centered
- * explanation pointing at the two real next steps: pick a different
- * department in the header's own "Data Filter" popup (if the viewer holds
- * more than one grant), which re-runs this same fetch scoped to the new
- * department, or fall through to the full cross-department list via "Alle".
+ * 2026-09-11) — shows just the header, plus two centered white cards: one
+ * pointing at picking a different department in the header's own "Data
+ * Filter" popup (if the viewer holds more than one grant — re-runs this
+ * same fetch scoped to the new department), and a second, gated by
+ * Tillad_ny_reservation (same setting/check as BookingsPage.tsx's own),
+ * either pointing at asking an admin or offering its own "Opret
+ * reservation" button straight to "/reservation".
  *
  * Mobile-first "hero card" layout (the chosen direction from a canvas
  * mock-up review, 2026-08): a big circular Lås/Lås op control
@@ -80,6 +83,11 @@ export function BookingPage() {
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [bookingLoading, setBookingLoading] = useState(true);
+  /** Whether the viewer is allowed to create a new reservation, per Tillad_ny_reservation — drives which of the two follow-up messages the no-booking empty state below shows (and whether it also offers an "Opret reservation" button). Same setting/pattern as BookingsPage.tsx's own identical check. */
+  const [userMayCreateBooking, setUserMayCreateBooking] = useState(false);
+  useEffect(() => {
+    void isSettingTilladt("Tillad_ny_reservation", profile?.user_id, afdelingId).then(setUserMayCreateBooking);
+  }, [profile?.user_id, afdelingId]);
 
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
@@ -222,13 +230,14 @@ export function BookingPage() {
     }
     // No current/upcoming booking in the viewer's OWN active department —
     // stays on this page (rather than redirecting to "/bookings", the
-    // original behavior here) with just the header and "Alle" button live,
-    // and a centered explanation pointing at the two real next steps: pick
-    // a different department in the header's own "Data Filter" (if the
-    // viewer holds more than one grant — see PageHeader.tsx), or fall
-    // through to the full list via "Alle" for more context (a
-    // cross-department booking that afdelingId's own scoping here doesn't
-    // surface, or simply confirmation that there genuinely isn't one).
+    // original behavior here) with just the header live and two centered
+    // white cards: an explanation pointing at the header's own "Data
+    // Filter" (if the viewer holds more than one department grant, picking
+    // a different one re-runs the fetch effect above), and — depending on
+    // Tillad_ny_reservation — either a pointer to ask an admin, or a second
+    // "Opret reservation" entry point (same destination/styling as
+    // BookingsPage.tsx's own button; that one stays put there too, for
+    // creating an ADDITIONAL reservation once the viewer already has one).
     return (
       <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 text-brand-900">
         <div
@@ -242,23 +251,25 @@ export function BookingPage() {
           className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
         >
           <PageHeader compact />
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 px-2 text-center">
-            <p className="text-sm text-brand-700">
-              Du har ingen reservationer i denne afdeling. Hvis du har reservationer i en anden afdeling, så vælg
-              denne afdeling i filteret øverst på denne side. Ellers tryk på "Alle" knappen for at få yderligere
-              oplysninger.
-            </p>
-            <button
-              type="button"
-              onClick={() => navigate("/bookings")}
-              className="inline-flex shrink-0 items-center gap-1 rounded-full border border-brand-200 bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
-            >
-              Alle
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                <path d="M5 12h14" />
-                <path d="m13 5 7 7-7 7" />
-              </svg>
-            </button>
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-2">
+            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              Du har ingen aktuelle eller kommende reservationer i denne afdeling. Hvis du har reservationer i en
+              anden afdeling, så vælg denne afdeling i filteret øverst på denne side.
+            </div>
+            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              {userMayCreateBooking
+                ? "Du kan lave en ny reservation ved at trykke på knappen nedenunder:"
+                : "Anmod din administrator om at lave en reservation til dig."}
+            </div>
+            {userMayCreateBooking && (
+              <button
+                type="button"
+                onClick={() => navigate("/reservation")}
+                className="w-full rounded-full border border-brand-200 bg-white px-2 py-2.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50"
+              >
+                Opret reservation
+              </button>
+            )}
           </div>
         </motion.div>
       </div>
