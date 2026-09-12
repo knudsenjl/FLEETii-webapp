@@ -56,7 +56,7 @@ type Booking = {
  * below) are still entirely this page's own, page-local and non-persisted.
  */
 export function AllBookingsPage() {
-  const { afdelingId, costumerId, profile } = useAuth();
+  const { afdelingId, costumerId, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
   /** A sysadm has no department of their own (platform-wide role) — for them alone, the Kunde/Afdeling filters below (not just the existing Bruger/Køretøj ones) actually narrow the list down, since departmentBookings otherwise shows every booking platform-wide. */
   const isSysadm = isSysadmRole(profile?.role);
   const navigate = useNavigate();
@@ -79,7 +79,7 @@ export function AllBookingsPage() {
   useEffect(() => {
     setFilterUser("");
     setFilterVehicle("");
-  }, [costumerId, afdelingId]);
+  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
   /** Every department under the global header's active costumerId (sysadm only) — still needed for scopedDepartmentIds below, to turn a Kunde-only scope (costumerId set, afdelingId null) into a department-id set the client-side booking filter can match against. */
   const [departmentOptions, setDepartmentOptions] = useState<{ department_id: string; name: string }[]>([]);
 
@@ -117,6 +117,8 @@ export function AllBookingsPage() {
   // (departmentOptions is already loaded pre-scoped to it, see the effect
   // above).
   const scopedDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
+  /** A regular admin's own granted department ids (see user_departments_table.sql) — only relevant when afdelingScopedToAllGrants is true (the header's local "Alle", picked for an admin holding more than one department grant); see AuthContext's own doc comment on the flag. */
+  const grantedDepartmentIds = new Set(availableDepartments.map((d) => d.department_id));
   const departmentBookings = bookings.filter((b) => {
     const bookingDepartmentIds = vehicles.find((v) => v.vehicleId === b.vehicle)?.departmentIds ?? [];
     if (isSysadm) {
@@ -124,13 +126,16 @@ export function AllBookingsPage() {
       if (costumerId) return bookingDepartmentIds.some((id) => scopedDepartmentIds.has(id));
       return true;
     }
+    if (afdelingScopedToAllGrants) return bookingDepartmentIds.some((id) => grantedDepartmentIds.has(id));
     return afdelingId !== null && bookingDepartmentIds.includes(afdelingId);
   });
   const vehicleOptions = Array.from(new Set(departmentBookings.map((b) => b.vehicle))).sort();
   const filteredBookings = departmentBookings.filter(
     (b) => (!filterUser || b.userId === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
-  const departmentUsers = isSysadm ? users : users.filter((u) => u.department_id === afdelingId);
+  const departmentUsers = isSysadm
+    ? users
+    : users.filter((u) => (afdelingScopedToAllGrants ? grantedDepartmentIds.has(u.department_id ?? "") : u.department_id === afdelingId));
 
   // Re-fetches whenever the active department changes (via PageHeader's
   // "Data Filter") — user_profiles' SELECT RLS

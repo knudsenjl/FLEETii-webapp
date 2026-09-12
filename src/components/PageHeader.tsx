@@ -130,6 +130,8 @@ export function PageHeader({
     costumerId,
     availableDepartments,
     switchDepartment,
+    afdelingScopedToAllGrants,
+    setAfdelingScopedToAllGrants,
     isFullyAuthenticated,
     session,
   } = useAuth();
@@ -358,9 +360,20 @@ export function PageHeader({
                     <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                       Afdeling
                       <select
-                        value={afdelingId ?? ""}
+                        value={!canSwitchToAll && afdelingScopedToAllGrants ? "" : (afdelingId ?? "")}
                         onChange={(e) => {
                           const departmentId = e.target.value || null;
+                          if (!canSwitchToAll) {
+                            // Non-sysadm: "Alle" can never be persisted (switchDepartment
+                            // rejects departmentId=null for this role — their own department_id
+                            // must always be a real one) — so this is a purely local,
+                            // non-persisted override instead (see afdelingScopedToAllGrants'
+                            // own doc comment in AuthContext.tsx). Picking a real department
+                            // clears the override and persists as normal, same as before.
+                            setAfdelingScopedToAllGrants(!departmentId);
+                            if (departmentId) void handleSwitch(departmentId);
+                            return;
+                          }
                           // Picking a real department always wins outright
                           // (costumerId omitted — switch-department.mts
                           // derives it from the department itself). Picking
@@ -374,8 +387,8 @@ export function PageHeader({
                         }}
                         className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
                       >
-                        {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. */}
-                        {canSwitchToAll && afdelingOptions.length > 1 && <option value="">Alle</option>}
+                        {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. Shown for BOTH roles now — a non-sysadm's own "Alle" is just handled locally above (afdelingScopedToAllGrants) rather than persisted. */}
+                        {afdelingOptions.length > 1 && <option value="">Alle</option>}
                         {afdelingOptions.map((department) => (
                           <option key={department.department_id} value={department.department_id}>
                             {/* Kunde "Alle" (costumerId null): afdelingOptions spans every costumer platform-wide, so the same department name can recur under different Kunder — prefix with "Kunde/" to disambiguate, same "Kunde / Afdeling" convention as elsewhere (BookingDetailsPage.tsx/ReservationPage.tsx). Once a specific Kunde is picked, every option is already implicitly that one Kunde's own, so the plain name is enough. */}
@@ -572,8 +585,10 @@ export function PageHeader({
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
             Afdeling: {costumerName ? `${costumerName}/` : ""}
-            {/* afdeling is only ever null for a sysadm sitting on "Alle" (fully unscoped) or the newer "Kunde only" state (costumerId set, no specific department — see the Kunde-header row above); every other role always has a real department, so "—" (missing data) never actually applies to them. Distinguished by costumerId, since both states share a null afdeling. */}
-            {afdeling ?? (isSysadm(profile?.role) ? (costumerId ? "Alle afdelinger" : "Alle") : "—")}
+            {/* afdeling is only ever null for a sysadm sitting on "Alle" (fully unscoped) or the newer "Kunde only" state (costumerId set, no specific department — see the Kunde-header row above); every other role always has a real department_id, so "—" (missing data) never actually applies to them. Distinguished by costumerId, since both states share a null afdeling. A non-sysadm's own "Alle" is checked FIRST and separately (afdelingScopedToAllGrants) — afdeling itself stays a real, non-null name for them even while it's active (see that state's own doc comment in AuthContext.tsx), so it would otherwise never show here at all. */}
+            {afdelingScopedToAllGrants && !isSysadm(profile?.role)
+              ? "Alle afdelinger"
+              : (afdeling ?? (isSysadm(profile?.role) ? (costumerId ? "Alle afdelinger" : "Alle") : "—"))}
           </p>
         </div>
       )}

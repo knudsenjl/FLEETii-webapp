@@ -59,7 +59,7 @@ type Vehicle = DisplayVehicle;
  * already-scoped list by plate).
  */
 export function VehiclesPage() {
-  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, profile } = useAuth();
+  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
@@ -95,23 +95,47 @@ export function VehiclesPage() {
   const [headerTouched, setHeaderTouched] = useState(false);
   const mountedCostumerIdRef = useRef(costumerId);
   const mountedAfdelingIdRef = useRef(afdelingId);
+  const mountedAllGrantsRef = useRef(afdelingScopedToAllGrants);
   useEffect(() => {
-    if (costumerId !== mountedCostumerIdRef.current || afdelingId !== mountedAfdelingIdRef.current) {
+    if (
+      costumerId !== mountedCostumerIdRef.current ||
+      afdelingId !== mountedAfdelingIdRef.current ||
+      afdelingScopedToAllGrants !== mountedAllGrantsRef.current
+    ) {
       mountedCostumerIdRef.current = costumerId;
       mountedAfdelingIdRef.current = afdelingId;
+      mountedAllGrantsRef.current = afdelingScopedToAllGrants;
       setHeaderTouched(true);
     }
-  }, [costumerId, afdelingId]);
+  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
   /** Navigation (router state) wins over the global header ONLY until the header itself is touched (see headerTouched above) — otherwise follows the header's own costumerId directly (global for every role, not just sysadm — a regular admin's costumerId is always their own anyway). */
   const targetCostumerId = headerTouched ? costumerId : (state?.costumerId ?? costumerId);
   /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. Same headerTouched gate as targetCostumerId above — without it, the "Køretøjer hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual vehicle list) had already moved on to a different Kunde. */
   const targetCostumerName = isSysadm ? (headerTouched ? costumerName : (state?.costumerName ?? costumerName)) : null;
 
-  /** The global header's active afdelingId, carried over IF it actually belongs to targetCostumerId's departments (checked via availableDepartments), else null (no narrowing, whole-costumer view). Same "navigation wins" membership check as DepartmentPage.tsx's own effectiveAfdelingId — without it, switching costumer via router state while the header still has a DIFFERENT costumer's department active would incorrectly try to scope vehicles to a department outside targetCostumerId. */
+  /**
+   * The global header's active afdelingId, carried over IF it actually
+   * belongs to targetCostumerId's departments (checked via
+   * availableDepartments), else null (no narrowing, whole-costumer view).
+   * Same "navigation wins" membership check as DepartmentPage.tsx's own
+   * effectiveAfdelingId — without it, switching costumer via router state
+   * while the header still has a DIFFERENT costumer's department active
+   * would incorrectly try to scope vehicles to a department outside
+   * targetCostumerId.
+   *
+   * afdelingScopedToAllGrants (non-sysadm's own local "Alle", see
+   * AuthContext.tsx's own doc comment) forces this to null regardless of
+   * afdelingId — a regular admin's afdelingId is never null, so without
+   * this check they could never actually reach the whole-costumer view
+   * this page's own UNLOCKED mode is supposed to offer them, same gap
+   * DepartmentPage.tsx had.
+   */
   const effectiveAfdelingId =
-    afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
-      ? afdelingId
-      : null;
+    !isSysadm && afdelingScopedToAllGrants
+      ? null
+      : afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
+        ? afdelingId
+        : null;
   /** Router-state seed (DepartmentDetailsPage's own KØRETØJER button, true LOCKED) wins ONLY until the header is touched (see headerTouched above) — once it is, effectiveAfdelingId takes over outright, same as targetCostumerId, for the rest of the visit. Null means UNLOCKED (whole costumer) or, for a sysadm with no targetCostumerId either, ALL-COSTUMERS. */
   const targetDepartmentId = headerTouched ? effectiveAfdelingId : (state?.departmentId ?? effectiveAfdelingId);
   const targetDepartmentName = headerTouched

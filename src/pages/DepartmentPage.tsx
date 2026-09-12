@@ -70,7 +70,7 @@ type ProfileQueryRow = {
  * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, profile } = useAuth();
+  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const state = location.state as
@@ -103,13 +103,19 @@ export function DepartmentPage() {
   const [headerTouched, setHeaderTouched] = useState(false);
   const mountedCostumerIdRef = useRef(costumerId);
   const mountedAfdelingIdRef = useRef(afdelingId);
+  const mountedAllGrantsRef = useRef(afdelingScopedToAllGrants);
   useEffect(() => {
-    if (costumerId !== mountedCostumerIdRef.current || afdelingId !== mountedAfdelingIdRef.current) {
+    if (
+      costumerId !== mountedCostumerIdRef.current ||
+      afdelingId !== mountedAfdelingIdRef.current ||
+      afdelingScopedToAllGrants !== mountedAllGrantsRef.current
+    ) {
       mountedCostumerIdRef.current = costumerId;
       mountedAfdelingIdRef.current = afdelingId;
+      mountedAllGrantsRef.current = afdelingScopedToAllGrants;
       setHeaderTouched(true);
     }
-  }, [costumerId, afdelingId]);
+  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
   const targetCostumerId = headerTouched ? costumerId : (state?.costumerId ?? costumerId);
   /** Same headerTouched gate as targetCostumerId above — without it, the "Brugere hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual user list) had already moved on to a different Kunde. costumerName (global) is the correct fallback once touched, same as VehiclesPage.tsx's identical fix — this page just never had a reason to read it before. */
   const targetCostumerName = isSysadm ? (headerTouched ? costumerName : (state?.costumerName ?? null)) : null;
@@ -122,14 +128,27 @@ export function DepartmentPage() {
    * navigating here for a DIFFERENT costumer than the header's
    * currently-active department would filter every one of this costumer's
    * users out (none of them have that foreign department_id), showing an
-   * empty table instead of the whole costumer's users. For a regular admin
-   * this is a no-op either way — RLS already limits departmentUsers to their
-   * own single department regardless (see this component's own doc comment).
+   * empty table instead of the whole costumer's users.
+   *
+   * A regular admin's own afdelingId is never null (switchDepartment
+   * rejects departmentId=null for that role), so without
+   * afdelingScopedToAllGrants below, this would ALWAYS narrow them to just
+   * their one currently-active department — even though
+   * user_profiles_select_admin_own_costumer.sql already widens their own
+   * RLS to their WHOLE costumer specifically so this page's UNLOCKED mode
+   * could show every department they're granted, not just one at a time.
+   * afdelingScopedToAllGrants (set via PageHeader.tsx's own Afdeling
+   * "Alle" — a local override, never persisted, since this role can't
+   * persist an unscoped department_id) is exactly that: "Alle" for a
+   * non-sysadm, so this becomes null (no narrowing) the same way a
+   * sysadm's real, persisted null afdelingId already does.
    */
   const effectiveAfdelingId =
-    afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
-      ? afdelingId
-      : null;
+    !isSysadm && afdelingScopedToAllGrants
+      ? null
+      : afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
+        ? afdelingId
+        : null;
   /** Router-state seed (e.g. DepartmentDetailsPage.tsx's own department-specific BRUGERE button) wins ONLY until the header is touched (see headerTouched above) — once it is, effectiveAfdelingId takes over outright, same as targetCostumerId. Absent/null means UNLOCKED (whole costumer, filterable). */
   const targetDepartmentId = headerTouched ? effectiveAfdelingId : (state?.departmentId ?? null);
   const targetDepartmentName = headerTouched ? (targetDepartmentId ? afdeling : null) : (state?.departmentName ?? null);

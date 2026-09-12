@@ -77,7 +77,7 @@ function isPageReload(): boolean {
  * just one field instead of three.
  */
 export function FleetManagementPage() {
-  const { afdelingId, costumerId, costumerName, availableDepartments, profile } = useAuth();
+  const { afdelingId, costumerId, costumerName, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isSysadm = isSysadmRole(profile?.role);
@@ -143,13 +143,19 @@ export function FleetManagementPage() {
   const [headerTouched, setHeaderTouched] = useState(false);
   const mountedCostumerIdRef = useRef(costumerId);
   const mountedAfdelingIdRef = useRef(afdelingId);
+  const mountedAllGrantsRef = useRef(afdelingScopedToAllGrants);
   useEffect(() => {
-    if (costumerId !== mountedCostumerIdRef.current || afdelingId !== mountedAfdelingIdRef.current) {
+    if (
+      costumerId !== mountedCostumerIdRef.current ||
+      afdelingId !== mountedAfdelingIdRef.current ||
+      afdelingScopedToAllGrants !== mountedAllGrantsRef.current
+    ) {
       mountedCostumerIdRef.current = costumerId;
       mountedAfdelingIdRef.current = afdelingId;
+      mountedAllGrantsRef.current = afdelingScopedToAllGrants;
       setHeaderTouched(true);
     }
-  }, [costumerId, afdelingId]);
+  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
   /** Navigation wins over the global header ONLY until the header itself is touched (see headerTouched above) — otherwise follows the header's own costumerId directly — global for every role, not just sysadm, same as VehiclesPage.tsx's identical targetCostumerId (a regular admin's costumerId is always their own anyway, so this never actually diverges for them). */
   const targetCostumerId = headerTouched ? costumerId : (navigationSeed?.costumerId ?? costumerId);
   /** Display-only, sysadm only (matching this page's pre-consolidation behavior of never repeating a regular admin's own costumer name back at them). When targetCostumerId matches the global header's own costumerId, its costumerName is already correct — otherwise (a navigation seed pointed at a DIFFERENT costumer than whatever's currently active in the header, only possible before headerTouched) look it up via availableDepartments, the one list that already spans every costumer platform-wide for a sysadm. */
@@ -158,11 +164,13 @@ export function FleetManagementPage() {
       ? costumerName
       : (availableDepartments.find((d) => d.costumerId === targetCostumerId)?.costumerName ?? null)
     : null;
-  /** The global header's active afdelingId, carried over IF it actually belongs to targetCostumerId's departments (checked via availableDepartments) — else null (no narrowing, whole-costumer view). Same "navigation wins" membership check as DepartmentPage.tsx's/VehiclesPage.tsx's own effectiveAfdelingId — without it, a navigationSeed pointed at a different costumer than the header's currently-active department would try to scope the map to a department outside targetCostumerId. */
+  /** The global header's active afdelingId, carried over IF it actually belongs to targetCostumerId's departments (checked via availableDepartments) — else null (no narrowing, whole-costumer view). Same "navigation wins" membership check as DepartmentPage.tsx's/VehiclesPage.tsx's own effectiveAfdelingId — without it, a navigationSeed pointed at a different costumer than the header's currently-active department would try to scope the map to a department outside targetCostumerId. afdelingScopedToAllGrants (non-sysadm's own local "Alle" — see AuthContext.tsx) forces this to null regardless of afdelingId, same fix as DepartmentPage.tsx/VehiclesPage.tsx: a regular admin's afdelingId is never null, so without this they could never reach the whole-costumer map view this page's own UNLOCKED mode is supposed to offer them. */
   const effectiveAfdelingId =
-    afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
-      ? afdelingId
-      : null;
+    !isSysadm && afdelingScopedToAllGrants
+      ? null
+      : afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
+        ? afdelingId
+        : null;
   /** navigationSeed's department (true LOCKED — e.g. DepartmentDetailsPage's own "Flådestyring" button scoped to one specific department) wins ONLY until the header is touched (see headerTouched above) — once it is, effectiveAfdelingId takes over outright, same as targetCostumerId, for the rest of the visit. Replaces the old page-local, user-adjustable filterDepartment: department scope is no longer something this page's own filter picks, only something it reads. */
   const targetDepartmentId = headerTouched ? effectiveAfdelingId : (navigationSeed?.department || effectiveAfdelingId);
 
