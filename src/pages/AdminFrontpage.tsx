@@ -65,8 +65,7 @@ type Costumer = {
  */
 export function AdminFrontpage() {
   const navigate = useNavigate();
-  const { profile, costumerId, costumerName, afdelingId, afdelingScopedToAllGrants, setAfdelingScopedToAllGrants, switchDepartment } =
-    useAuth();
+  const { profile, costumerId, costumerName, afdelingId, afdelingScopedToAllGrants, setAfdelingScopedToAllGrants } = useAuth();
   /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. sysadm only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
   const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
   const [costumers, setCostumers] = useState<Costumer[]>([]);
@@ -260,29 +259,6 @@ export function AdminFrontpage() {
     return () => setAfdelingScopedToAllGrants(previous);
   }, [profile?.role, setAfdelingScopedToAllGrants]);
 
-  /**
-   * Same "default to what this page actually shows" reasoning as the
-   * effect above, for a sysadm's own Kunde <select> instead: the embedded
-   * costumer list and pendingInstallationsCount above are never
-   * Kunde-scoped (their own fetches carry no costumer_id filter at all),
-   * so a leftover Kunde from elsewhere in the app (e.g. still viewing one
-   * specific costumer's own details before navigating home) left the
-   * header showing that Kunde here for no reason. Mount-only (no
-   * dependency on costumerId, no cleanup/restore) rather than the
-   * force+restore pattern above — unlike Afdeling for a regular admin, a
-   * sysadm CAN deliberately pick a different Kunde while remaining on this
-   * page (no auto-navigate-away effect exists for sysadm here), so
-   * reacting to every later costumerId change would fight that pick right
-   * back to "Alle", and restoring on unmount would just as easily clobber
-   * a real, deliberate choice made mid-visit. This only ever nudges the
-   * very first render's leftover value, once.
-   */
-  useEffect(() => {
-    if (!isSysadm(profile?.role) || costumerId === null) return;
-    void switchDepartment(null, null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   /** AFDELINGER's own handler — DepartmentDetailsPage.tsx now fetches its own department list (given just costumerId/costumerName via router state), so this just navigates straight there; always lands on that page regardless of how many departments there are, since its whole job IS managing departments, not skipping past them. */
   const handleOpenDepartments = () => {
     if (!costumerId) return;
@@ -309,6 +285,18 @@ export function AdminFrontpage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
+          {/*
+            hideAfdeling/kundeNavigate (sysadm only): the sysadm branch of
+            this page (costumer list + pendingInstallationsCount above) has
+            no Afdeling concept at all and never reads costumerId either
+            (unlike the isDepartmentAdmin branch's own AFDELINGER/KØRETØJER/
+            BRUGERE, which genuinely depend on both — see
+            handleOpenDepartments/goToVehiclesOrUsers) — so Afdeling is
+            simply dropped, and Kunde is repurposed the same way
+            TwoHireCommandPage.tsx's own header is: picking a Kunde jumps
+            straight to its /costumer-details instead of persisting a scope
+            switch nothing on this page's sysadm view would ever read.
+          */}
           <PageHeader
             koretoejNavigate={
               isDepartmentAdmin(profile?.role)
@@ -318,6 +306,12 @@ export function AdminFrontpage() {
             brugerNavigate={
               isDepartmentAdmin(profile?.role)
                 ? { label: "Brugere", options: userOptions, onSelect: (id) => navigate(`/user-details/${id}`) }
+                : undefined
+            }
+            hideAfdeling={isSysadm(profile?.role)}
+            kundeNavigate={
+              isSysadm(profile?.role)
+                ? { onSelect: (id) => navigate(`/costumer-details/${id}`) }
                 : undefined
             }
           />
