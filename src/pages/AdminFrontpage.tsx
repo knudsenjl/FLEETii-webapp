@@ -2,7 +2,7 @@
 // login). Pure navigation hub: no data fetching beyond the on-demand
 // departments fetch and the sysadm-only costumers/installations
 // fetches below, just links to every other admin-only section of the app.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
@@ -51,11 +51,15 @@ type Costumer = {
  * all, so manages any given costumer's equivalents through
  * CostumerDetailsPage instead. AFDELINGER jumps straight to
  * DepartmentDetailsPage.tsx (see handleOpenDepartments below), which now
- * fetches that admin's own costumer's departments itself.
+ * fetches that admin's own costumer's departments itself. For a regular
+ * admin with more than one department grant, picking a different one in
+ * the header's own "Data Filter" also jumps there directly, with that
+ * department pre-selected — see the follow-effect right above
+ * handleOpenDepartments.
  */
 export function AdminFrontpage() {
   const navigate = useNavigate();
-  const { profile, costumerId, costumerName } = useAuth();
+  const { profile, costumerId, costumerName, afdelingId } = useAuth();
   /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. sysadm only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
   const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
   const [costumers, setCostumers] = useState<Costumer[]>([]);
@@ -134,6 +138,30 @@ export function AdminFrontpage() {
       cancelled = true;
     };
   }, [profile?.role]);
+
+  /**
+   * Follows the header's own Afdeling scope ("Data Filter", PageHeader.tsx)
+   * while sitting on AdminFrontpage (isDepartmentAdmin only — a sysadm's own
+   * view here is costumer-oriented, not department-oriented, see this
+   * page's own doc comment) — picking a different department jumps
+   * straight to that department's own /department-details with it
+   * pre-selected (departmentId in router state — see
+   * DepartmentDetailsPage.tsx's own selectedDepartmentId support), same
+   * live-follow behavior CostumerDetailsPage.tsx's own identical effect
+   * gives a sysadm. Reacts to CHANGE only (prevAfdelingIdRef), not to the
+   * afdelingId already active on mount, so simply landing here after login
+   * doesn't immediately bounce away to DepartmentDetailsPage. A regular
+   * admin has no Kunde field in "Data Filter" at all (sysadm-only, see
+   * PageHeader's own canSwitchToAll), so this only ever needs to watch
+   * afdelingId, never costumerId too.
+   */
+  const prevAfdelingIdRef = useRef(afdelingId);
+  useEffect(() => {
+    const changed = afdelingId !== prevAfdelingIdRef.current;
+    prevAfdelingIdRef.current = afdelingId;
+    if (!changed || !afdelingId || !isDepartmentAdmin(profile?.role)) return;
+    navigate("/department-details", { state: { costumerId, costumerName, departmentId: afdelingId } });
+  }, [afdelingId, costumerId, costumerName, profile?.role, navigate]);
 
   /** AFDELINGER's own handler — DepartmentDetailsPage.tsx now fetches its own department list (given just costumerId/costumerName via router state), so this just navigates straight there; always lands on that page regardless of how many departments there are, since its whole job IS managing departments, not skipping past them. */
   const handleOpenDepartments = () => {
