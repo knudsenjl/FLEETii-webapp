@@ -9,19 +9,22 @@ import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
-import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel, toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 
 /** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
+/** Persisted to sessionStorage and restamped by goToVehicleDetails below — only what this page itself owns as page-local, adjustable-in-place state. Kunde/Afdeling scope is NOT part of this: it's derived fresh every render from the global header (costumerId/afdelingId, useAuth()) rather than something this page snapshots/restores, so there's nothing meaningful to persist for it — unlike filters.plate, which stays a genuine page-local Køretøj filter (see this component's own doc comment). */
 type FleetMapSnapshot = {
   mapView?: { lat: number; lng: number; zoom: number };
   clusterMarkers?: boolean;
-  filters?: { costumerId: string; department: string; plate: string };
+  filters?: { plate: string };
   liveEnabled?: boolean;
 };
+
+/** Router-state seed for a fresh, costumer/department-scoped visit — CostumerDetailsPage.tsx's/DepartmentDetailsPage.tsx's own "Flådestyring" buttons pass filters.costumerId/filters.department this way (department "" means no specific department, same convention the old local filterDepartment used). Read directly from location.state, separately from FleetMapSnapshot above, since this is only the INITIAL scope — the global header always wins outright the moment it's touched (see headerTouched's own doc comment) — and not something this page's own sessionStorage snapshot persists or restores either way. */
+type FleetMapNavigationSeed = { filters?: { costumerId?: string; department?: string } };
 
 /** sessionStorage key for the reload-surviving snapshot below — see savedSnapshot's own doc comment for why this exists ALONGSIDE the router-state mechanism (which only survives browser-BACK, not an actual page reload). */
 const SNAPSHOT_STORAGE_KEY = "fleet-map:snapshot";
@@ -58,22 +61,28 @@ function isPageReload(): boolean {
  * center the map) and the rest as extra markers. Clicking any marker jumps
  * to VehicleDetailsPage for that vehicle.
  *
- * Scope is filterable exactly like VehiclesPage.tsx's ("/fleet-table")
- * Kunde/Afdeling/Køretøj filter — same funnel-icon button, same
- * InlinePopup layout, same filter state shape — so an admin can narrow the
- * map down (e.g. to a single vehicle, or a department other than their own
- * currently-active one) without needing to "Skift afdeling" first, and a
- * sysadm (who has no department/costumer of their own) can pick a
- * Kunde to scope to instead of always seeing every vehicle platform-wide.
- * Defaults to the viewer's own active department (afdelingId) — see the
- * sync effects below — matching this page's previous fixed, unfilterable
- * behavior when nothing's been changed yet.
+ * Kunde/Afdeling scope comes from the global header ("Data Filter",
+ * PageHeader.tsx — see AuthContext's costumerId/afdelingId), same as every
+ * other admin page now reads it, rather than a page-local Kunde/Afdeling
+ * picker of its own. A navigationSeed (CostumerDetailsPage.tsx's/
+ * DepartmentDetailsPage.tsx's own "Flådestyring" buttons — see
+ * FleetMapNavigationSeed above) only supplies the INITIAL scope — the
+ * header always wins outright the moment it's touched (headerTouched
+ * below), for BOTH Kunde and Afdeling, regardless of how this page was
+ * reached — INCLUDING the true LOCKED case (navigationSeed.department
+ * given). There's no "go back and pick a different row" carve-out left
+ * here any more; this page's map always follows "Data Filter" live. Only
+ * the Køretøj filter stays page-local, narrowing the already-scoped
+ * vehicle list by plate — same funnel-icon button/InlinePopup as before,
+ * just one field instead of three.
  */
 export function FleetManagementPage() {
-  const { afdelingId, costumerId, profile } = useAuth();
+  const { afdelingId, costumerId, costumerName, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const isSysadm = isSysadmRole(profile?.role);
+  /** "Navigation wins" seed — CostumerDetailsPage.tsx's/DepartmentDetailsPage.tsx's own "Flådestyring" buttons (see FleetMapNavigationSeed's own doc comment). Read separately from routerSnapshot below, which is typed for this page's OWN persisted fields (mapView/clusterMarkers/filters.plate/liveEnabled) rather than this one-time costumer/department seed. */
+  const navigationSeed = (location.state as FleetMapNavigationSeed | null)?.filters ?? null;
   /** router-state snapshot — either the full one goToVehicleDetails stamps right before navigating to VehicleDetailsPage (present on the history entry a browser-back actually lands back on — NOT a reload, so storedSnapshot below is never in play there and this is the only source anyway), or the PARTIAL one CostumerDetailsPage.tsx's/DepartmentDetailsPage.tsx's own "Flådestyring" button passes (just `filters`, for a fresh costumer/department-scoped visit — no mapView/clusterMarkers/liveEnabled at all, and frozen at whatever it was on that one navigation — the browser preserves it verbatim across a later reload, unlike sessionStorage below, which keeps getting overwritten as the admin actually interacts). */
   const routerSnapshot = (location.state as FleetMapSnapshot | null) ?? null;
   /** The sessionStorage snapshot (see readStoredSnapshot/isPageReload above), consulted only on a genuine browser refresh — router state alone doesn't survive that, only browser-back does. */
@@ -108,54 +117,78 @@ export function FleetManagementPage() {
     return () => setLiveTracking(false);
   }, [liveEnabled, setLiveTracking, refreshVehicles]);
 
-  /** sysadm-only "Kunde" filter — same seeding/meaning as VehiclesPage.tsx's own filterCostumerId ("" = "Alle", every costumer). Restored from savedSnapshot.filters first (a browser-back should land back on exactly the scope the admin had picked), then the admin's own costumerId if their account happens to carry one, otherwise "". */
-  const [filterCostumerId, setFilterCostumerId] = useState(savedSnapshot?.filters?.costumerId ?? costumerId ?? "");
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
-  const targetCostumerId = isSysadm ? filterCostumerId || null : costumerId;
-  const targetCostumerName = isSysadm
-    ? (costumerOptions.find((c) => c.costumer_id === filterCostumerId)?.name ?? null)
-    : null;
-
-  /** Loads every costumer for the Kunde filter dropdown — sysadm only, since a regular admin is always scoped to their own single costumer. Same query as VehiclesPage.tsx's own. */
+  /**
+   * Whether the header's own Kunde/Afdeling scope has genuinely changed
+   * since this page mounted (either one) — once it has, it wins outright
+   * over any navigationSeed field for the rest of this visit, INCLUDING
+   * true LOCKED visits (navigationSeed.department given — e.g.
+   * DepartmentDetailsPage's own "Flådestyring" button, a department row
+   * already selected there). Same "header always wins once touched"
+   * redesign as DepartmentPage.tsx's/VehiclesPage.tsx's own headerTouched,
+   * applied here per explicit, repeated request — there's no "go back and
+   * pick a different row" carve-out left on this page either now. Without
+   * this at all, a page reached via a navigationSeed would have that seed
+   * permanently override the header, and subsequent Kunde/Afdeling picks in
+   * "Data Filter" would silently do nothing — the header used to be a
+   * page-local, always-live picker before the filter-redesign work moved it
+   * up here, so this restores that same "changing Kunde/Afdeling always
+   * actually changes the map" behavior regardless of how the page was
+   * reached.
+   *
+   * Sticky (via state, not a live comparison) rather than "does costumerId/
+   * afdelingId currently differ from its mount-time value" — a live
+   * comparison would incorrectly revert to trusting the stale seed again if
+   * the header ever cycles back to exactly its mount-time values.
+   */
+  const [headerTouched, setHeaderTouched] = useState(false);
+  const mountedCostumerIdRef = useRef(costumerId);
+  const mountedAfdelingIdRef = useRef(afdelingId);
+  const mountedAllGrantsRef = useRef(afdelingScopedToAllGrants);
   useEffect(() => {
-    if (!isSysadm) return;
-
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name")
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSysadm]);
+    if (
+      costumerId !== mountedCostumerIdRef.current ||
+      afdelingId !== mountedAfdelingIdRef.current ||
+      afdelingScopedToAllGrants !== mountedAllGrantsRef.current
+    ) {
+      mountedCostumerIdRef.current = costumerId;
+      mountedAfdelingIdRef.current = afdelingId;
+      mountedAllGrantsRef.current = afdelingScopedToAllGrants;
+      setHeaderTouched(true);
+    }
+  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
+  /** Navigation wins over the global header ONLY until the header itself is touched (see headerTouched above) — otherwise follows the header's own costumerId directly — global for every role, not just sysadm, same as VehiclesPage.tsx's identical targetCostumerId (a regular admin's costumerId is always their own anyway, so this never actually diverges for them). */
+  const targetCostumerId = headerTouched ? costumerId : (navigationSeed?.costumerId ?? costumerId);
+  /** Display-only, sysadm only (matching this page's pre-consolidation behavior of never repeating a regular admin's own costumer name back at them). When targetCostumerId matches the global header's own costumerId, its costumerName is already correct — otherwise (a navigation seed pointed at a DIFFERENT costumer than whatever's currently active in the header, only possible before headerTouched) look it up via availableDepartments, the one list that already spans every costumer platform-wide for a sysadm. */
+  const targetCostumerName = isSysadm
+    ? targetCostumerId === costumerId
+      ? costumerName
+      : (availableDepartments.find((d) => d.costumerId === targetCostumerId)?.costumerName ?? null)
+    : null;
+  /** The global header's active afdelingId, carried over IF it actually belongs to targetCostumerId's departments (checked via availableDepartments) — else null (no narrowing, whole-costumer view). Same "navigation wins" membership check as DepartmentPage.tsx's/VehiclesPage.tsx's own effectiveAfdelingId — without it, a navigationSeed pointed at a different costumer than the header's currently-active department would try to scope the map to a department outside targetCostumerId. afdelingScopedToAllGrants (non-sysadm's own local "Alle" — see AuthContext.tsx) forces this to null regardless of afdelingId, same fix as DepartmentPage.tsx/VehiclesPage.tsx: a regular admin's afdelingId is never null, so without this they could never reach the whole-costumer map view this page's own UNLOCKED mode is supposed to offer them. */
+  const effectiveAfdelingId =
+    !isSysadm && afdelingScopedToAllGrants
+      ? null
+      : afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
+        ? afdelingId
+        : null;
+  /** navigationSeed's department (true LOCKED — e.g. DepartmentDetailsPage's own "Flådestyring" button scoped to one specific department) wins ONLY until the header is touched (see headerTouched above) — once it is, effectiveAfdelingId takes over outright, same as targetCostumerId, for the rest of the visit. Replaces the old page-local, user-adjustable filterDepartment: department scope is no longer something this page's own filter picks, only something it reads. */
+  const targetDepartmentId = headerTouched ? effectiveAfdelingId : (navigationSeed?.department || effectiveAfdelingId);
 
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
-  const [filterOpen, setFilterOpen] = useState(false);
+  /** Page-local, transient (not persisted, unlike Kunde/Afdeling above) — surfaced inside PageHeader's "Data Filter" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. Still snapshotted/restored the same way as before (sessionStorage + goToVehicleDetails' own router state) — only its UI moved. */
   const [filterPlate, setFilterPlate] = useState(savedSnapshot?.filters?.plate ?? "");
-  const [filterDepartment, setFilterDepartment] = useState(savedSnapshot?.filters?.department ?? "");
-  const filterRef = useRef<HTMLDivElement>(null);
-  /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern as the filter popup above, own state/ref since the two popups are independent. */
+  /** Resets filterPlate back to "Alle" whenever the Kunde/Afdeling scope itself LATER changes (skipping the very first run — see skipFirstPlateResetRef below — so a legitimately snapshot-restored plate on mount isn't immediately wiped out again). A previously-picked vehicle almost certainly doesn't belong to the NEW scope, so leaving it selected would silently show nothing. Same fix as VehiclesPage.tsx's identical reset. */
+  const skipFirstPlateResetRef = useRef(true);
+  useEffect(() => {
+    if (skipFirstPlateResetRef.current) {
+      skipFirstPlateResetRef.current = false;
+      return;
+    }
+    setFilterPlate("");
+  }, [targetCostumerId, targetDepartmentId]);
+  /** "Uden lokation" popup (see vehiclesWithoutGps below) — same open/close-on-outside-click pattern the old funnel popup used. */
   const [noGpsOpen, setNoGpsOpen] = useState(false);
   const noGpsRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setFilterOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filterOpen]);
 
   useEffect(() => {
     if (!noGpsOpen) return;
@@ -198,9 +231,7 @@ export function FleetManagementPage() {
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter(
-    (v) =>
-      (!filterPlate || v.plate === filterPlate) &&
-      (!filterDepartment || v.departmentIds.includes(filterDepartment)),
+    (v) => (!filterPlate || v.plate === filterPlate) && (!targetDepartmentId || v.departmentIds.includes(targetDepartmentId)),
   );
 
   /** GPS positions for exactly the vehicles that passed every filter above — the map only ever shows markers for these. Sorted by vehicleId — gpsPositions itself comes from a plain, unordered SQL select (see liveVehicleDataSource.ts's getGpsPositions), so without this, which vehicle lands at index 0 (and thus becomes `primary` below) could silently shuffle between two Live-toggle polls of the exact same underlying vehicle set, which would make the map's own center (see stableCenter below) and the marker structure both look like they'd changed when nothing really had. */
@@ -250,55 +281,27 @@ export function FleetManagementPage() {
     return () => clearTimeout(timeout);
   }, [departmentGpsPositions.length]);
 
-  /** Syncs the Afdeling filter to the viewer's own active department — on initial load, and again every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so the filter follows along. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual change to the dropdown (browsing a different department within the same afdelingId) is left alone until the active department itself changes again. Same pattern as VehiclesPage.tsx's own identical effect.
-   *
-   * Guarded by explicitDepartmentFilterRef below whenever an explicit initial department scope arrived via router state (e.g. DepartmentDetailsPage's own "Flådestyring" button, scoped to one specific department that need not be the viewer's own active one) — without it, this effect's own departmentOptions-driven second run (departmentOptions starts empty and populates async, so the meaningful sync happens on THAT later run, not literally the first) would silently override the requested department back to the viewer's own afdelingId the moment departmentOptions finishes loading. The guard clears itself the first time afdelingId actually changes (a real "Skift afdeling"), so the effect resumes following it normally from then on, same as for everyone else. */
-  const explicitDepartmentFilterRef = useRef(Boolean(savedSnapshot?.filters?.department));
-  const prevAfdelingIdRef = useRef(afdelingId);
-  useEffect(() => {
-    const afdelingChanged = afdelingId !== prevAfdelingIdRef.current;
-    prevAfdelingIdRef.current = afdelingId;
-    if (explicitDepartmentFilterRef.current) {
-      if (!afdelingChanged) return;
-      explicitDepartmentFilterRef.current = false;
-    }
-    if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
-      setFilterDepartment(afdelingId);
-    } else if (isSysadm) {
-      setFilterDepartment("");
-    }
-  }, [afdelingId, departmentOptions, isSysadm]);
-
-  /** sysadm-only: syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, just one level up (costumerId, not afdelingId). Same pattern as VehiclesPage.tsx's own identical effect, INCLUDING skipping its own first run (see costumerSyncSkippedFirstRun below) — this one would otherwise clobber savedSnapshot's own restored Kunde filter (a browser-back from VehicleDetailsPage) back to the viewer's own costumerId — usually null, meaning "Alle" — the moment this page remounts, defeating the whole point of restoring it. The initial useState above already seeds the correct value either way, so skipping the first run changes nothing for a plain, snapshot-less visit. */
-  const costumerSyncSkippedFirstRun = useRef(false);
-  useEffect(() => {
-    if (!isSysadm) return;
-    if (!costumerSyncSkippedFirstRun.current) {
-      costumerSyncSkippedFirstRun.current = true;
-      return;
-    }
-    setFilterCostumerId(costumerId ?? "");
-  }, [isSysadm, costumerId]);
-
-  /** Persists clusterMarkers/filters to sessionStorage on every change — together with the mapView write in onViewChange above, this is what lets a genuine browser refresh (see isPageReload) restore the map the same way browser-back already does via router state alone. */
+  /** Persists clusterMarkers/filters.plate to sessionStorage on every change — together with the mapView write in onViewChange above, this is what lets a genuine browser refresh (see isPageReload) restore the map the same way browser-back already does via router state alone. Kunde/Afdeling are no longer part of this — they're derived fresh from the global header every render (see targetCostumerId/targetDepartmentId above), not page-local state this page persists or restores. */
   useEffect(() => {
     writeStoredSnapshot({
       clusterMarkers,
-      filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate },
+      filters: { plate: filterPlate },
     });
-  }, [clusterMarkers, filterCostumerId, filterDepartment, filterPlate]);
+  }, [clusterMarkers, filterPlate]);
 
   const goToVehicleDetails = (vehicleId: string) => {
     const twoHireVehicle = twoHireVehicles.find((v) => v.vehicleId === vehicleId);
     if (!twoHireVehicle) return;
-    // Stamps the map's current view, cluster toggle, filter picks, AND Live
-    // toggle onto THIS page's own history entry (replace, not push) right
-    // before navigating away — so a browser-back from VehicleDetailsPage
-    // lands back on a "/fleet-map" entry that still remembers where the
-    // admin was looking, whether they'd switched to "Vis alle",
-    // whatever Kunde/Afdeling/Køretøj they'd filtered to, and whether
-    // Live polling was on, instead of resetting all of it to defaults. Same
-    // formSnapshot-style pattern as
+    // Stamps the map's current view, cluster toggle, Køretøj filter, AND
+    // Live toggle onto THIS page's own history entry (replace, not push)
+    // right before navigating away — so a browser-back from
+    // VehicleDetailsPage lands back on a "/fleet-map" entry that still
+    // remembers where the admin was looking, whether they'd switched to
+    // "Vis alle", whatever Køretøj they'd filtered to, and whether Live
+    // polling was on, instead of resetting all of it to defaults. Kunde/
+    // Afdeling are deliberately NOT restamped here — they're derived fresh
+    // from the global header every render, not page state this navigation
+    // needs to preserve. Same formSnapshot-style pattern as
     // ReservationPage.tsx/AvailablePage.tsx. mapView is omitted (not just
     // null) when unknown (moveend hasn't fired even once yet) — matches
     // savedMapView's own "absent, not null" check for "no override" ??
@@ -308,7 +311,7 @@ export function FleetManagementPage() {
       state: {
         ...(mapViewRef.current ? { mapView: mapViewRef.current } : {}),
         clusterMarkers,
-        filters: { costumerId: filterCostumerId, department: filterDepartment, plate: filterPlate },
+        filters: { plate: filterPlate },
         liveEnabled,
       },
     });
@@ -330,7 +333,14 @@ export function FleetManagementPage() {
             transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
             className="flex min-h-0 flex-1 flex-col"
           >
-            <PageHeader />
+            <PageHeader
+              koretoejFilter={{
+                label: "Køretøj",
+                value: filterPlate,
+                onChange: setFilterPlate,
+                options: plateOptions.map((plate) => ({ value: plate, label: plate })),
+              }}
+            />
 
             <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-2 space-y-4">
@@ -339,7 +349,7 @@ export function FleetManagementPage() {
                 </h2>
                 <div className="flex shrink-0 items-center gap-2">
                   {vehiclesWithoutGps.length > 0 && (
-                    // Same z-[1001]-on-wrapper reasoning as the filter button below.
+                    // z-[1001] — Leaflet's own controls/panes reach z-index 1000 (see the empty-notice's z-[1000] further down); this div otherwise has no z-index of its own, so its InlinePopup would lose to Leaflet's much higher values in the shared ambient stacking context and render underneath the map.
                     <div className="relative z-[1001]" ref={noGpsRef}>
                       <button
                         type="button"
@@ -367,158 +377,6 @@ export function FleetManagementPage() {
                       />
                     </div>
                   )}
-                  {/* z-[1001] on this wrapper (not just InlinePopup's own z-20) — Leaflet's own controls/panes below reach z-index 1000 (see the empty-notice's z-[1000] further down), and this div has no z-index of its own otherwise, so its z-20 popup would be compared directly against Leaflet's much higher values in the shared ambient stacking context and lose, rendering underneath the map. */}
-                  <div className="relative z-[1001]" ref={filterRef}>
-                    <button
-                      type="button"
-                      onClick={() => setFilterOpen((prev) => !prev)}
-                      aria-label="Filtrer"
-                      className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                        filterPlate || filterDepartment || filterCostumerId
-                          ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                          : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                      }`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                        <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                      </svg>
-                    </button>
-                    <InlinePopup
-                      visible={filterOpen}
-                      align="right"
-                      message={
-                        <>
-                          <p className="mb-2">Du kan her udvælge køretøjer på disse kriterier:</p>
-                          {isSysadm && (
-                            <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                              Kunde
-                              <select
-                                value={filterCostumerId}
-                                onChange={(e) => {
-                                  setFilterCostumerId(e.target.value);
-                                  setFilterDepartment("");
-                                  // A previously-picked Køretøj almost
-                                  // certainly belongs to the OLD Kunde, not
-                                  // the new one — same inconsistency class
-                                  // as Afdeling above (and the reverse of
-                                  // Køretøj's own onChange, which syncs
-                                  // Afdeling/Kunde TO match the vehicle
-                                  // picked); left alone, filterPlate would
-                                  // keep excluding every vehicle in the new
-                                  // scope.
-                                  setFilterPlate("");
-                                }}
-                                className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                              >
-                                <option value="">Alle</option>
-                                {costumerOptions.map((costumer) => (
-                                  <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                                    {costumer.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          )}
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Afdeling
-                            <select
-                              value={filterDepartment}
-                              onChange={(e) => {
-                                const departmentId = e.target.value;
-                                setFilterDepartment(departmentId);
-                                // While Kunde is still "Alle" (isSysadm
-                                // only — departmentOptions spans every
-                                // costumer in that state, see
-                                // fetchDepartmentOptions' own doc comment),
-                                // picking one specific department left Kunde
-                                // stuck on "Alle" — confusing downstream,
-                                // e.g. "Liste af køretøjer" would
-                                // land on VehiclesPage locked to this one
-                                // department but showing no costumer name at
-                                // all. Auto-promote Kunde to that
-                                // department's own costumer instead, same as
-                                // if the admin had picked it there first.
-                                if (isSysadm && !filterCostumerId && departmentId) {
-                                  const department = departmentOptions.find((d) => d.department_id === departmentId);
-                                  if (department) setFilterCostumerId(department.costumer_id);
-                                }
-                                // Same reasoning as Kunde's own onChange
-                                // above — a previously-picked Køretøj may
-                                // not belong to the newly-picked Afdeling,
-                                // and would otherwise keep excluding every
-                                // vehicle in the new scope.
-                                setFilterPlate("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {departmentOptions.map((department) => (
-                                <option key={department.department_id} value={department.department_id}>
-                                  {department.name}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Køretøj
-                            <select
-                              value={filterPlate}
-                              onChange={(e) => {
-                                const plate = e.target.value;
-                                setFilterPlate(plate);
-                                // Picking one specific vehicle is more
-                                // specific than either Afdeling or Kunde —
-                                // sync both to match it (unconditionally,
-                                // not just when they're still "Alle"),
-                                // otherwise picking a vehicle outside
-                                // whatever Afdeling happens to already be
-                                // selected would silently zero out the list
-                                // (filterDepartment excludes it) instead of
-                                // showing the vehicle just picked. `vehicles`
-                                // here is only scoped by Kunde, not Afdeling
-                                // (see its own doc comment above), so this
-                                // is the one case an already-picked Afdeling
-                                // can disagree with a Køretøj choice. Same
-                                // "Alle Kunde" auto-promote as the Afdeling
-                                // select's own onChange, just always applied
-                                // rather than only when Kunde is unset.
-                                if (!plate) return;
-                                const vehicle = vehicles.find((v) => v.plate === plate);
-                                const departmentId = vehicle?.departmentIds[0];
-                                if (!departmentId) return;
-                                setFilterDepartment(departmentId);
-                                if (isSysadm) {
-                                  const department = departmentOptions.find((d) => d.department_id === departmentId);
-                                  if (department) setFilterCostumerId(department.costumer_id);
-                                }
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {plateOptions.map((plate) => (
-                                <option key={plate} value={plate}>
-                                  {plate}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {(filterPlate || filterDepartment || filterCostumerId) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterPlate("");
-                                setFilterDepartment("");
-                                setFilterCostumerId("");
-                              }}
-                              className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
-                            >
-                              Nulstil filter
-                            </button>
-                          )}
-                        </>
-                      }
-                    />
-                  </div>
                   <button
                     type="button"
                     onClick={() => setClusterMarkers((prev) => !prev)}
@@ -564,7 +422,7 @@ export function FleetManagementPage() {
                   <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
                     <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
                       {filteredVehicles.length === 0
-                        ? filterPlate || filterDepartment || filterCostumerId
+                        ? filterPlate
                           ? "Ingen køretøjer matcher filteret"
                           : "Der er ingen køretøjer i afdelingen"
                         : // filteredVehicles.length > 0 but departmentGpsPositions is
@@ -585,20 +443,21 @@ export function FleetManagementPage() {
                 onClick={() =>
                   navigate("/fleet-table", {
                     state: {
-                      // targetCostumerId is null when this map's own Kunde
-                      // filter is "Alle" (sysadm only) — VehiclesPage
-                      // now has a matching ALL-COSTUMERS mode for exactly
-                      // that case instead of redirecting away, see its own
-                      // doc comment.
+                      // targetCostumerId is null when the global header's
+                      // own Kunde scope is "Alle" (sysadm only) —
+                      // VehiclesPage has a matching ALL-COSTUMERS mode for
+                      // exactly that case instead of redirecting away, see
+                      // its own doc comment.
                       costumerId: targetCostumerId,
                       costumerName: targetCostumerName,
                       // Locks VehiclesPage to one department (its own LOCKED
-                      // mode) only when this map's own Afdeling filter has
-                      // one picked, same as filterDepartment itself — left
-                      // unset ("Alle") lands in VehiclesPage's UNLOCKED (or
-                      // ALL-COSTUMERS) mode instead, filterable in-page.
-                      departmentId: filterDepartment || undefined,
-                      departmentName: departmentOptions.find((d) => d.department_id === filterDepartment)?.name,
+                      // mode) only when this map's own scope has one active,
+                      // same as targetDepartmentId itself — left unset
+                      // ("Alle") lands in VehiclesPage's UNLOCKED (or
+                      // ALL-COSTUMERS) mode instead, filterable via the
+                      // global header from there.
+                      departmentId: targetDepartmentId || undefined,
+                      departmentName: departmentOptions.find((d) => d.department_id === targetDepartmentId)?.name,
                     },
                   })
                 }

@@ -1,5 +1,5 @@
 // Netlify Function: lets a sysadm switch their own active department
-// ("Skift afdeling", see PageHeader.tsx) into ANY department platform-wide,
+// ("Data Filter", see PageHeader.tsx) into ANY department platform-wide,
 // not just one they hold a user_departments grant for. AuthContext.tsx's
 // existing client-side switchDepartment (a direct user_profiles UPDATE) is
 // structurally unable to do this for a sysadm — see
@@ -24,13 +24,17 @@
 // departmentId may also be null — PageHeader.tsx's "Alle" pseudo-entry,
 // the sysadm's own default/unscoped state — in which case this
 // clears department_id/costumer_id back to null rather than looking up a
-// department at all.
+// department at all. When departmentId is null AND a costumerId is given,
+// that's a distinct third state — "just this Kunde, every department under
+// it" (PageHeader.tsx's Kunde-header row) — department_id stays null but
+// costumer_id is set to the given, validated costumer.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 
 type SwitchDepartmentBody = {
   departmentId?: string | null;
+  costumerId?: string | null;
 };
 
 export default async (req: Request) => {
@@ -84,6 +88,25 @@ export default async (req: Request) => {
     }
     targetDepartmentId = department.department_id;
     targetCostumerId = department.costumer_id;
+  } else {
+    // "Just this Kunde" — validate it exists (same not-found convention as
+    // the department lookup above), same as leaving both null ("Alle") when
+    // no costumerId was given.
+    const costumerId = asTrimmedString(body.costumerId) || null;
+    if (costumerId) {
+      const { data: costumer, error: costumerError } = await admin
+        .from("costumers")
+        .select("costumer_id")
+        .eq("costumer_id", costumerId)
+        .maybeSingle<{ costumer_id: string }>();
+      if (costumerError) {
+        return new Response(JSON.stringify({ error: costumerError.message }), { status: 500 });
+      }
+      if (!costumer) {
+        return new Response(JSON.stringify({ error: "Kunden findes ikke." }), { status: 404 });
+      }
+      targetCostumerId = costumer.costumer_id;
+    }
   }
 
   const { error: updateError } = await admin

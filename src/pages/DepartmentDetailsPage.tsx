@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -59,13 +59,18 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
  * any admin (see ProtectedRoute requireAdmin in App.tsx: "admin" and
  * "sysadm" both reach this page now), from CostumerDetailsPage's
  * "Administration af afdelinger" button, AdminFrontpage's own AFDELINGER
- * button, or KØRETØJER/BRUGERE's own fallback when the target costumer has
- * more than one department to pick from (costumerId/costumerName passed via
- * router state in every case — this page has no direct-URL fallback, since
- * there's no meaningful way to reach it without already knowing which
- * costumer; missing state redirects back to "/costumers"). It fetches its
- * own department list here rather than needing it pre-fetched and passed
- * along, unlike the old EditDepartmentsPage.tsx this absorbed (see below).
+ * button, KØRETØJER/BRUGERE's own fallback when the target costumer has
+ * more than one department to pick from, or CostumerDetailsPage.tsx's own
+ * "follow the header's Afdeling scope" effect (costumerId/costumerName
+ * passed via router state in every case — this page has no direct-URL
+ * fallback, since there's no meaningful way to reach it without already
+ * knowing which costumer; missing state redirects back to "/costumers").
+ * An optional departmentId alongside them (that last case's own use — see
+ * selectedDepartmentId's own doc comment) pre-selects a specific row
+ * instead of falling back to sessionStorage/auto-selecting the first one.
+ * It fetches its own department list here rather than needing it
+ * pre-fetched and passed along, unlike the old EditDepartmentsPage.tsx this
+ * absorbed (see below).
  *
  * 2026-08-28: this page absorbed EditDepartmentsPage.tsx's own table (view/
  * rename/address-edit) wholesale, at the user's request — the previous
@@ -102,9 +107,9 @@ function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
 export function DepartmentDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { profile } = useAuth();
+  const { profile, costumerId: activeCostumerId, costumerName: activeCostumerName, afdelingId: activeAfdelingId } = useAuth();
   const isSysadm = isSysadmRole(profile?.role);
-  const state = location.state as { costumerId?: string; costumerName?: string } | null;
+  const state = location.state as { costumerId?: string; costumerName?: string; departmentId?: string } | null;
   const costumerId = state?.costumerId ?? null;
   const costumerName = state?.costumerName ?? null;
 
@@ -112,13 +117,20 @@ export function DepartmentDetailsPage() {
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
   // Which row is highlighted — set on any row click, not just the edit icon.
-  // Seeded from sessionStorage (see the persistence effect below) rather
-  // than always starting null: this page fully remounts on browser-back
-  // from KØRETØJER/BRUGERE (a different route), which would otherwise reset
-  // the selection to null and let the auto-select-first effect below pick
+  // state.departmentId (optional — e.g. CostumerDetailsPage.tsx's own
+  // "follow the header's Afdeling scope" effect, landing here with one
+  // specific department already picked) wins first; otherwise seeded from
+  // sessionStorage (see the persistence effect below) rather than always
+  // starting null: this page fully remounts on browser-back from
+  // KØRETØJER/BRUGERE (a different route), which would otherwise reset the
+  // selection to null and let the auto-select-first effect below pick
   // whichever department sorts first, silently discarding whatever the
-  // admin had actually selected before navigating away.
+  // admin had actually selected before navigating away. Either way, the
+  // auto-select-first effect below still validates it against the loaded
+  // list once that arrives (e.g. a stale/foreign department_id), same as
+  // for the sessionStorage path.
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(() => {
+    if (state?.departmentId) return state.departmentId;
     if (!costumerId) return null;
     try {
       return sessionStorage.getItem(SELECTED_DEPARTMENT_KEY_PREFIX + costumerId);
@@ -175,6 +187,60 @@ export function DepartmentDetailsPage() {
     void loadDepartments(costumerId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [costumerId]);
+
+  /**
+   * Follows the global header's own Kunde/Afdeling scope ("Data Filter",
+   * PageHeader.tsx) — same combined-effect pattern as
+   * CostumerDetailsPage.tsx's own identical follow-effect (see its doc
+   * comment for the full "why one effect, not two" reasoning: a single pick
+   * that changes both at once — a department under a DIFFERENT Kunde than
+   * the one currently shown, switch-department.mts keeps costumer_id in
+   * lockstep — must not race two separate navigate() calls against each
+   * other):
+   * - Afdeling changing to a real department wins outright. If it belongs
+   *   to the SAME Kunde already shown here, no navigation is needed at
+   *   all — just select that row directly (setSelectedDepartmentId), same
+   *   as clicking it. Otherwise it belongs to a DIFFERENT Kunde, so this
+   *   jumps there first (departmentId in router state — see
+   *   selectedDepartmentId's own doc comment for how that's consumed).
+   * - Otherwise, Kunde changing to a real, different costumer jumps to
+   *   that Kunde's own /department-details (no departmentId this time —
+   *   the auto-select-first-department effect below picks one once that
+   *   costumer's own department list loads).
+   * - Kunde changing to "Alle" (null), or Afdeling resetting to "Alle"
+   *   under the SAME Kunde already being viewed, does nothing.
+   *
+   * Deliberately reacts to CHANGE only (the prevRefs below), not to either
+   * value simply differing from this page's own target on mount — this
+   * page is routinely reached with a completely different Kunde/Afdeling
+   * already active in the header, and that normal navigation must not
+   * immediately bounce back out. replace (not push) when navigating: a
+   * live scope-follow, not a new history entry to browser-back through.
+   */
+  const prevActiveCostumerIdRef = useRef(activeCostumerId);
+  const prevActiveAfdelingIdRef = useRef(activeAfdelingId);
+  useEffect(() => {
+    const costumerChanged = activeCostumerId !== prevActiveCostumerIdRef.current;
+    const afdelingChanged = activeAfdelingId !== prevActiveAfdelingIdRef.current;
+    prevActiveCostumerIdRef.current = activeCostumerId;
+    prevActiveAfdelingIdRef.current = activeAfdelingId;
+    if (!costumerChanged && !afdelingChanged) return;
+
+    if (afdelingChanged && activeAfdelingId) {
+      if (activeCostumerId !== costumerId) {
+        navigate("/department-details", {
+          replace: true,
+          state: { costumerId: activeCostumerId, costumerName: activeCostumerName, departmentId: activeAfdelingId },
+        });
+      } else {
+        setSelectedDepartmentId(activeAfdelingId);
+      }
+      return;
+    }
+    if (costumerChanged && activeCostumerId && activeCostumerId !== costumerId) {
+      navigate("/department-details", { replace: true, state: { costumerId: activeCostumerId, costumerName: activeCostumerName } });
+    }
+  }, [activeCostumerId, activeCostumerName, activeAfdelingId, costumerId, navigate]);
 
   // Keeps a real department selected whenever one exists — auto-selects the
   // first loaded department if nothing's selected yet (or the sessionStorage-

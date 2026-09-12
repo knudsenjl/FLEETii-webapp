@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -85,7 +85,7 @@ type Costumer = {
  */
 export function CostumerDetailsPage() {
   const navigate = useNavigate();
-  const { session } = useAuth();
+  const { session, costumerId: activeCostumerId, costumerName: activeCostumerName, afdelingId: activeAfdelingId } = useAuth();
   const location = useLocation();
   const { costumerId } = useParams<{ costumerId: string }>();
   const state = location.state as { costumer?: Costumer } | null;
@@ -210,6 +210,60 @@ export function CostumerDetailsPage() {
       navigate("/costumers", { replace: true });
     }
   }, [costumerId, costumer, costumerLoading, navigate]);
+
+  /**
+   * Follows the global header's own Kunde/Afdeling scope ("Data Filter",
+   * PageHeader.tsx — every sysadm reaching this page has one, the route
+   * itself is sysadm-only, see ProtectedRoute above), one combined effect
+   * rather than two independent ones so a single pick that changes BOTH at
+   * once (picking a specific Afdeling under a DIFFERENT Kunde than the one
+   * currently shown — switch-department.mts keeps costumer_id in lockstep
+   * with whatever department is picked) can't race two separate navigate()
+   * calls against each other and land on the wrong page:
+   * - Afdeling changing to a real department wins outright — jumps to that
+   *   department's own /department-details with it pre-selected
+   *   (departmentId in router state — see DepartmentDetailsPage.tsx's own
+   *   selectedDepartmentId initializer). activeCostumerId/activeCostumerName
+   *   already reflect that department's own costumer by the time this
+   *   effect sees the change (same profile reload switchDepartment does),
+   *   so no separate lookup is needed.
+   * - Otherwise, Kunde changing to a real, different costumer (Afdeling
+   *   staying "Alle", e.g. the Kunde <select> itself, or the Afdeling
+   *   <select> reset to "Alle" while a DIFFERENT Kunde was already active)
+   *   jumps to that Kunde's own /costumer-details/:costumerId.
+   * - Kunde changing to "Alle" (null), or Afdeling resetting to "Alle"
+   *   under the SAME Kunde already being viewed, does nothing — there's no
+   *   "Alle costumer" details page to jump to, and staying put is correct.
+   *
+   * Deliberately reacts to CHANGE only (the prevRefs below), not to either
+   * value simply differing from this page's own target on mount — this
+   * page is routinely reached with a completely different Kunde/Afdeling
+   * already active in the header (e.g. via CostumerAdministrationPage's own
+   * row click), and that normal navigation must not immediately bounce back
+   * out to wherever the header happened to be scoped before. replace (not
+   * push): a live scope-follow, not a new history entry to browser-back
+   * through.
+   */
+  const prevActiveCostumerIdRef = useRef(activeCostumerId);
+  const prevActiveAfdelingIdRef = useRef(activeAfdelingId);
+  useEffect(() => {
+    const costumerChanged = activeCostumerId !== prevActiveCostumerIdRef.current;
+    const afdelingChanged = activeAfdelingId !== prevActiveAfdelingIdRef.current;
+    prevActiveCostumerIdRef.current = activeCostumerId;
+    prevActiveAfdelingIdRef.current = activeAfdelingId;
+    if (!costumerChanged && !afdelingChanged) return;
+
+    if (afdelingChanged && activeAfdelingId) {
+      navigate("/department-details", {
+        replace: true,
+        state: { costumerId: activeCostumerId, costumerName: activeCostumerName, departmentId: activeAfdelingId },
+      });
+      return;
+    }
+    if (costumerChanged && activeCostumerId && activeCostumerId !== costumerId) {
+      navigate(`/costumer-details/${activeCostumerId}`, { replace: true });
+    }
+  }, [activeCostumerId, activeCostumerName, activeAfdelingId, costumerId, navigate]);
 
   // Row counts for the AFDELINGER/KØRETØJER/BRUGERE grid buttons below.
   useEffect(() => {

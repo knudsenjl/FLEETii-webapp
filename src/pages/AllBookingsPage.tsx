@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
@@ -37,23 +37,26 @@ type Booking = {
 
 /**
  * Admin-only "Aktive reservationer" page ("/allbookings"): every upcoming
- * booking in the admin's department, with a user/vehicle filter popover.
- * Clicking a row navigates straight to BookingDetailsPage (view/cancel a
- * booking from there) — this page itself is display/filter-only. This is
- * the admin equivalent of BookingsPage (which shows a regular user their
- * own bookings, or an admin's own "next booking" home view) — the two share
- * most of their fetch/render logic but haven't been consolidated into one
- * component.
+ * booking in the admin's department. Clicking a row navigates straight to
+ * BookingDetailsPage (view/cancel a booking from there) — this page itself
+ * is display/filter-only. This is the admin equivalent of BookingsPage
+ * (which shows a regular user their own bookings, or an admin's own "next
+ * booking" home view) — the two share most of their fetch/render logic but
+ * haven't been consolidated into one component.
  *
- * A sysadm (no department of their own) sees every booking
- * platform-wide by default, and gets two extra filter fields — Kunde and
- * Afdeling — to narrow that down, same "Alle" (blank = no scoping)
- * convention as VehiclesPage.tsx's own Kunde/Afdeling filters. A regular
- * admin never sees these two fields at all — they're always scoped to
- * their own single department already.
+ * A sysadm (no department of their own) sees every booking platform-wide by
+ * default, narrowed by the global header's Kunde/Afdeling scope (PageHeader's
+ * "Data Filter" — see AuthContext's costumerId/afdelingId) exactly like
+ * every other admin page now reads it, rather than a page-local Kunde/
+ * Afdeling filter of its own. A regular admin never has an unscoped view to
+ * begin with — they're always scoped to their own single department. The
+ * Bruger/Køretøj filters are also surfaced through that same header popup
+ * (see PageHeaderFilterField) rather than a separate funnel popup of this
+ * page's own — the state/option lists (departmentUsers/vehicleOptions
+ * below) are still entirely this page's own, page-local and non-persisted.
  */
 export function AllBookingsPage() {
-  const { afdelingId, costumerId, profile } = useAuth();
+  const { afdelingId, costumerId, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
   /** A sysadm has no department of their own (platform-wide role) — for them alone, the Kunde/Afdeling filters below (not just the existing Bruger/Køretøj ones) actually narrow the list down, since departmentBookings otherwise shows every booking platform-wide. */
   const isSysadm = isSysadmRole(profile?.role);
   const navigate = useNavigate();
@@ -69,49 +72,18 @@ export function AllBookingsPage() {
   const [users, setUsers] = useState<
     { user_id: string; email: string; user_ident: string | null; department_id: string | null }[]
   >([]);
-  const [filterOpen, setFilterOpen] = useState(false);
+  /** Page-local, transient (not persisted) — both surfaced inside PageHeader's "Data Filter" popup as Bruger/Køretøj <select> fields rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
-  /** sysadm-only "Kunde"/"Afdeling" filters — a regular admin is always scoped to their own single department already (see departmentBookings below), so these only exist for a sysadm narrowing down the platform-wide list. Same "Alle" (blank = no scoping) convention as VehiclesPage.tsx's own Kunde filter; a sysadm has no costumerId of their own to seed a default from (see the "let sysadm operate unscoped" work), so both simply default to "". */
-  const [filterCostumerId, setFilterCostumerId] = useState("");
-  const [filterDepartment, setFilterDepartment] = useState("");
-  const [costumerOptions, setCostumerOptions] = useState<{ costumer_id: string; name: string }[]>([]);
+  /** Resets both back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked Bruger/Køretøj almost certainly doesn't correspond to the NEW scope's bookings, so leaving them selected would silently show an empty or misleading result. Same reasoning/fix as VehiclesPage.tsx's own Køretøj reset and DepartmentPage.tsx's Rolle/Bruger/Navn reset. */
+  useEffect(() => {
+    setFilterUser("");
+    setFilterVehicle("");
+  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
+  /** Every department under the global header's active costumerId (sysadm only) — still needed for scopedDepartmentIds below, to turn a Kunde-only scope (costumerId set, afdelingId null) into a department-id set the client-side booking filter can match against. */
   const [departmentOptions, setDepartmentOptions] = useState<{ department_id: string; name: string }[]>([]);
-  const filterRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!filterOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setFilterOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filterOpen]);
-
-  /** Loads every costumer for the sysadm-only Kunde filter — mirrors VehiclesPage.tsx's own costumerOptions effect. */
-  useEffect(() => {
-    if (!isSysadm) return;
-
-    let cancelled = false;
-    void supabase
-      .from("costumers")
-      .select("costumer_id, name")
-      .order("name", { ascending: true })
-      .returns<{ costumer_id: string; name: string }[]>()
-      .then(({ data }) => {
-        if (!cancelled) setCostumerOptions(data ?? []);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSysadm]);
-
-  /** Loads the Afdeling filter's own options — every department belonging to filterCostumerId, or (when "Alle" is selected) every department platform-wide, same "Alle: no scoping" meaning as VehiclesPage.tsx's identical effect. sysadm only; a regular admin never has more than their own single department to begin with. */
+  /** Loads the departments under the global header's active costumerId (sysadm only) — or every department platform-wide when costumerId is null ("Alle"). A regular admin never has more than their own single department to begin with, so this stays empty for them. */
   useEffect(() => {
     if (!isSysadm) {
       setDepartmentOptions([]);
@@ -120,7 +92,7 @@ export function AllBookingsPage() {
 
     let cancelled = false;
     const query = supabase.from("departments").select("department_id, name").order("name", { ascending: true });
-    void (filterCostumerId ? query.eq("costumer_id", filterCostumerId) : query)
+    void (costumerId ? query.eq("costumer_id", costumerId) : query)
       .returns<{ department_id: string; name: string }[]>()
       .then(({ data }) => {
         if (!cancelled) setDepartmentOptions(data ?? []);
@@ -129,21 +101,6 @@ export function AllBookingsPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSysadm, filterCostumerId]);
-
-  /** Syncs the Afdeling filter to the viewer's own active department — every time "Skift afdeling" (PageHeader.tsx) actually changes afdelingId, so this page's own filter follows along, same pattern as VehiclesPage.tsx's identical effect. Only depends on afdelingId/departmentOptions, not filterDepartment itself, so a manual in-page pick is left alone until the active department itself changes again. The else branch resets back to "" ("Alle") the moment afdelingId becomes null — switching back to "Alle" via PageHeader. */
-  useEffect(() => {
-    if (afdelingId && departmentOptions.some((d) => d.department_id === afdelingId)) {
-      setFilterDepartment(afdelingId);
-    } else if (isSysadm) {
-      setFilterDepartment("");
-    }
-  }, [afdelingId, departmentOptions, isSysadm]);
-
-  /** Syncs the Kunde filter to the viewer's own active costumer — same "follow Skift afdeling" reasoning as the Afdeling sync effect above, one level up. Only depends on costumerId (not filterCostumerId itself), so a manual in-page Kunde pick is left alone until the active costumer itself actually changes — costumerId never changes any other way. Resets to "" ("Alle") when costumerId goes back to null too. */
-  useEffect(() => {
-    if (!isSysadm) return;
-    setFilterCostumerId(costumerId ?? "");
   }, [isSysadm, costumerId]);
 
   // A sysadm sees every booking/user platform-wide by default (they
@@ -151,31 +108,37 @@ export function AllBookingsPage() {
   // bookings/vehicles/users fetches are already cross-department (SELECT RLS
   // is unrestricted for bookings/vehicle_profiles, and
   // user_profiles_select_allow_fleetii_admin.sql already covers users) — but
-  // narrows down to whichever Kunde/Afdeling was picked in the filter below,
-  // same as VehiclesPage.tsx's own Kunde/Afdeling filters. A specific
-  // Afdeling pick always wins over a Kunde pick alone (a department belongs
-  // to exactly one costumer, so it's already the more specific choice);
-  // Kunde alone scopes to every one of that costumer's departments
+  // narrows down to the global header's active Kunde/Afdeling (costumerId/
+  // afdelingId), same scope every other admin page now reads. A specific
+  // Afdeling always wins over Kunde alone (a department belongs to exactly
+  // one costumer, so it's already the more specific choice, and
+  // switchDepartment keeps costumerId in lockstep with it anyway); Kunde
+  // alone scopes to every one of that costumer's departments
   // (departmentOptions is already loaded pre-scoped to it, see the effect
   // above).
   const scopedDepartmentIds = new Set(departmentOptions.map((d) => d.department_id));
+  /** A regular admin's own granted department ids (see user_departments_table.sql) — only relevant when afdelingScopedToAllGrants is true (the header's local "Alle", picked for an admin holding more than one department grant); see AuthContext's own doc comment on the flag. */
+  const grantedDepartmentIds = new Set(availableDepartments.map((d) => d.department_id));
   const departmentBookings = bookings.filter((b) => {
     const bookingDepartmentIds = vehicles.find((v) => v.vehicleId === b.vehicle)?.departmentIds ?? [];
     if (isSysadm) {
-      if (filterDepartment) return bookingDepartmentIds.includes(filterDepartment);
-      if (filterCostumerId) return bookingDepartmentIds.some((id) => scopedDepartmentIds.has(id));
+      if (afdelingId) return bookingDepartmentIds.includes(afdelingId);
+      if (costumerId) return bookingDepartmentIds.some((id) => scopedDepartmentIds.has(id));
       return true;
     }
+    if (afdelingScopedToAllGrants) return bookingDepartmentIds.some((id) => grantedDepartmentIds.has(id));
     return afdelingId !== null && bookingDepartmentIds.includes(afdelingId);
   });
   const vehicleOptions = Array.from(new Set(departmentBookings.map((b) => b.vehicle))).sort();
   const filteredBookings = departmentBookings.filter(
     (b) => (!filterUser || b.userId === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
-  const departmentUsers = isSysadm ? users : users.filter((u) => u.department_id === afdelingId);
+  const departmentUsers = isSysadm
+    ? users
+    : users.filter((u) => (afdelingScopedToAllGrants ? grantedDepartmentIds.has(u.department_id ?? "") : u.department_id === afdelingId));
 
   // Re-fetches whenever the active department changes (via PageHeader's
-  // "Skift afdeling") — user_profiles' SELECT RLS
+  // "Data Filter") — user_profiles' SELECT RLS
   // (user_profiles_select_admin_own_department) scopes rows to the admin's
   // CURRENT department, so an empty dependency array left this list (and
   // the filter popover's "Bruger" dropdown built from it below) stuck
@@ -186,6 +149,12 @@ export function AllBookingsPage() {
       .from("user_profiles")
       .select("user_id, email, user_ident, department_id")
       .is("deleted_at", null)
+      // A sysadm's own department_id is just their current "Data Filter"
+      // scope pointer (see AuthContext's switchDepartment), never a real
+      // booking-relevant user — without this, a sysadm who has ever
+      // switched their own scope would show up in the Bruger dropdown as
+      // if they were a genuine user, same gap as DepartmentPage.tsx's own.
+      .neq("role", "sysadm")
       .order("email")
       .then(({ data }) => {
         setUsers(
@@ -242,119 +211,29 @@ export function AllBookingsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            brugerFilter={{
+              label: useUserIdent ? "Bruger-ID" : "Bruger",
+              value: filterUser,
+              onChange: setFilterUser,
+              options: departmentUsers.map((u) => ({
+                value: u.user_id,
+                label: (useUserIdent ? u.user_ident || u.email : u.email) ?? "—",
+              })),
+            }}
+            koretoejFilter={{
+              label: "Køretøj",
+              value: filterVehicle,
+              onChange: setFilterVehicle,
+              options: vehicleOptions.map((v) => ({ value: v, label: formatVehicleLabel(v, vehicles) })),
+            }}
+          />
 
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
                 <div className="flex items-center gap-2">
-                  <div className="relative" ref={filterRef}>
-                    <button
-                      type="button"
-                      onClick={() => setFilterOpen((prev) => !prev)}
-                      aria-label="Filtrer"
-                      className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                        filterUser || filterVehicle || filterCostumerId || filterDepartment
-                          ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                          : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                      }`}
-                    >
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                        <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                      </svg>
-                    </button>
-                    <InlinePopup
-                      visible={filterOpen}
-                      align="right"
-                      message={
-                        <>
-                          <p className="mb-2">Du kan her udvælge reservationer på disse kriterier:</p>
-                          {isSysadm && (
-                            <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                              Kunde
-                              <select
-                                value={filterCostumerId}
-                                onChange={(e) => {
-                                  setFilterCostumerId(e.target.value);
-                                  setFilterDepartment("");
-                                }}
-                                className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                              >
-                                <option value="">Alle</option>
-                                {costumerOptions.map((costumer) => (
-                                  <option key={costumer.costumer_id} value={costumer.costumer_id}>
-                                    {costumer.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          )}
-                          {isSysadm && (
-                            <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                              Afdeling
-                              <select
-                                value={filterDepartment}
-                                onChange={(e) => setFilterDepartment(e.target.value)}
-                                className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                              >
-                                <option value="">Alle</option>
-                                {departmentOptions.map((department) => (
-                                  <option key={department.department_id} value={department.department_id}>
-                                    {department.name}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          )}
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            {useUserIdent ? "Bruger-ID" : "Bruger"}
-                            <select
-                              value={filterUser}
-                              onChange={(e) => setFilterUser(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {departmentUsers.map((u) => (
-                                <option key={u.user_id} value={u.user_id}>
-                                  {useUserIdent ? u.user_ident || u.email : u.email}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          <label className="block text-[0.7rem] font-medium text-brand-700">
-                            Køretøj
-                            <select
-                              value={filterVehicle}
-                              onChange={(e) => setFilterVehicle(e.target.value)}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {vehicleOptions.map((v) => (
-                                <option key={v} value={v}>
-                                  {formatVehicleLabel(v, vehicles)}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                          {(filterUser || filterVehicle || filterCostumerId || filterDepartment) && (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setFilterUser("");
-                                setFilterVehicle("");
-                                setFilterCostumerId("");
-                                setFilterDepartment("");
-                              }}
-                              className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
-                            >
-                              Nulstil filter
-                            </button>
-                          )}
-                        </>
-                      }
-                    />
-                  </div>
                   <div className="relative">
                     <button
                       type="button"
@@ -405,7 +284,7 @@ export function AllBookingsPage() {
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {filterUser || filterVehicle || filterCostumerId || filterDepartment
+                          {filterUser || filterVehicle
                             ? "Ingen reservationer matcher filteret."
                             : "Ingen aktive reservationer."}
                         </td>

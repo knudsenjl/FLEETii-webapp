@@ -110,7 +110,7 @@ export function NewVehiclePage() {
   /** Which (if either) of the FLEETii-device "?" info popovers is open — mirrors UserDetailsPage.tsx's own Afdeling(er)/Hjemmeafdeling popover pattern. */
   const [openInfoPopover, setOpenInfoPopover] = useState<"device" | "deviceId" | null>(null);
 
-  /** Pre-fills Kontaktperson/Kontakt e-mail/Kontakt tlf. from the logged-in user's own profile once it's loaded (profile is null until AuthContext's async fetch resolves) — seeded once via this ref rather than on every profile change, so it doesn't clobber anything the user has already typed/edited (e.g. after a "Skift afdeling" refresh). */
+  /** Pre-fills Kontaktperson/Kontakt e-mail/Kontakt tlf. from the logged-in user's own profile once it's loaded (profile is null until AuthContext's async fetch resolves) — seeded once via this ref rather than on every profile change, so it doesn't clobber anything the user has already typed/edited (e.g. after a "Data Filter" refresh). */
   const contactSeededRef = useRef(false);
   useEffect(() => {
     if (contactSeededRef.current || !profile) return;
@@ -127,7 +127,7 @@ export function NewVehiclePage() {
   const [showMotorApiPopup, setShowMotorApiPopup] = useState(false);
   const motorApiRef = useRef<HTMLDivElement>(null);
 
-  /** Closes the MotorAPI popup on an outside click — same pattern as PageHeader.tsx's "Skift afdeling" dropdown. */
+  /** Closes the MotorAPI popup on an outside click — same pattern as PageHeader.tsx's "Data Filter" dropdown. */
   useEffect(() => {
     if (!showMotorApiPopup) return;
 

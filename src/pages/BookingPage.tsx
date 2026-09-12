@@ -17,7 +17,6 @@ import {
   type BookingRow,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
-import { CarGlyph } from "../components/CarGlyph";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
@@ -28,6 +27,7 @@ import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingL
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
 import { supabase } from "../lib/supabase";
+import { isSettingTilladt } from "../lib/settings";
 import { useReverseGeocode } from "../lib/geocode";
 
 /** A booking as fetched fresh on mount below (see mapBookingRow) — same shape BookingDetailsPage.tsx's own fetch-by-id fallback produces, and a superset of useBookingLifecycle's own LifecycleBooking (the extra startDate/start/endDate/end fields are display strings this page's own formatBookingPeriod call below needs). */
@@ -46,10 +46,17 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * see RootRoute in App.tsx): fetches the viewer's OWN currently-active
  * booking, or if none, their soonest upcoming one — the same "end >= now OR
  * end is null, ordered by start ascending, take the first" query
- * BookingsPage.tsx's own query mirrors, just scoped to a single result.
- * Redirects straight to "/bookings" (replace, no flash) if the viewer has no
- * current/upcoming booking at all, matching BookingsPage's own "Ingen
- * kommende reservation." case rather than showing an empty page here.
+ * BookingsPage.tsx's own query mirrors, just scoped to a single result,
+ * ALSO scoped to the viewer's own current afdelingId (see the fetch effect's
+ * own comment). With none found, stays on this page instead of redirecting
+ * to "/bookings" (this page used to do that, replace/no-flash, until
+ * 2026-09-11) — shows just the header, plus two centered white cards: one
+ * pointing at picking a different department in the header's own "Data
+ * Filter" popup (if the viewer holds more than one grant — re-runs this
+ * same fetch scoped to the new department), and a second, gated by
+ * Tillad_ny_reservation (same setting/check as BookingsPage.tsx's own),
+ * either pointing at asking an admin or offering its own "Opret
+ * reservation" button straight to "/reservation".
  *
  * Mobile-first "hero card" layout (the chosen direction from a canvas
  * mock-up review, 2026-08): a big circular Lås/Lås op control
@@ -76,11 +83,16 @@ export function BookingPage() {
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const [booking, setBooking] = useState<BookingDetails | null>(null);
   const [bookingLoading, setBookingLoading] = useState(true);
+  /** Whether the viewer is allowed to create a new reservation, per Tillad_ny_reservation — drives which of the two follow-up messages the no-booking empty state below shows (and whether it also offers an "Opret reservation" button). Same setting/pattern as BookingsPage.tsx's own identical check. */
+  const [userMayCreateBooking, setUserMayCreateBooking] = useState(false);
+  useEffect(() => {
+    void isSettingTilladt("Tillad_ny_reservation", profile?.user_id, afdelingId).then(setUserMayCreateBooking);
+  }, [profile?.user_id, afdelingId]);
 
   const vehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
   const refreshVehicles = useRefreshVehicles();
-  /** Forces a fresh fleet refetch on landing here — VehicleContext's allVehicles/gpsPositions are otherwise only fetched once per login session by default (see useRefreshVehicles' own doc comment in VehicleContext.tsx), so the hero card's driving-vehicle icon below (twoHireVehicle?.tripDetected) could otherwise show a stale value for the rest of the session. Same fix as VehicleDetailsPage.tsx's identical mount effect. */
+  /** Forces a fresh fleet refetch on landing here — VehicleContext's allVehicles/gpsPositions are otherwise only fetched once per login session by default (see useRefreshVehicles' own doc comment in VehicleContext.tsx), so the map marker below could otherwise show a stale position for the rest of the session. Same fix as VehicleDetailsPage.tsx's identical mount effect. */
   useEffect(() => {
     void refreshVehicles();
   }, [refreshVehicles]);
@@ -212,16 +224,58 @@ export function BookingPage() {
     };
   }, [session?.user.id, afdelingId]);
 
-  useEffect(() => {
-    if (!booking && !bookingLoading) {
-      navigate("/bookings", { replace: true });
-    }
-  }, [booking, bookingLoading, navigate]);
-
   if (!booking) {
-    return bookingLoading ? (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>
-    ) : null;
+    if (bookingLoading) {
+      return <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>;
+    }
+    // No current/upcoming booking in the viewer's OWN active department —
+    // stays on this page (rather than redirecting to "/bookings", the
+    // original behavior here) with just the header live and two centered
+    // white cards: an explanation pointing at the header's own "Data
+    // Filter" (if the viewer holds more than one department grant, picking
+    // a different one re-runs the fetch effect above), and — depending on
+    // Tillad_ny_reservation — either a pointer to ask an admin, or a second
+    // "Opret reservation" entry point (same destination/styling as
+    // BookingsPage.tsx's own button; that one stays put there too, for
+    // creating an ADDITIONAL reservation once the viewer already has one).
+    return (
+      <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 text-brand-900">
+        <div
+          className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
+          aria-hidden="true"
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
+        >
+          <PageHeader compact />
+          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-2">
+            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              Du har ingen aktuelle eller kommende reservationer i denne afdeling.
+            </div>
+            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.
+            </div>
+            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              {userMayCreateBooking
+                ? "Du kan lave en ny reservation ved at trykke på knappen nedenunder:"
+                : "Anmod din administrator om at lave en reservation til dig."}
+            </div>
+            {userMayCreateBooking && (
+              <button
+                type="button"
+                onClick={() => navigate("/reservation")}
+                className="w-full rounded-full border border-brand-200 bg-white px-2 py-2.5 text-sm font-semibold text-brand-800 transition hover:bg-brand-50"
+              >
+                Opret reservation
+              </button>
+            )}
+          </div>
+        </motion.div>
+      </div>
+    );
   }
 
   return (
@@ -258,10 +312,6 @@ export function BookingPage() {
                     </span>
                   )}
                 </div>
-                {/* Green when 2hire's "trip_detected" signal is currently true for this vehicle (see liveVehicleDataSource.ts's tripDetected mapping) — brand-colored otherwise, same as before this signal existed. */}
-                <CarGlyph
-                  className={`h-9 w-14 shrink-0 ${twoHireVehicle?.tripDetected === "TRUE" ? "text-green-600" : "text-brand-600"}`}
-                />
               </button>
               {/* Always goes to the full list — this landing page only ever shows ONE booking (the viewer's current/next), so "Alle" ("all") is the way to see everything else. */}
               <button
