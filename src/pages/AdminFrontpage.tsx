@@ -65,7 +65,7 @@ type Costumer = {
  */
 export function AdminFrontpage() {
   const navigate = useNavigate();
-  const { profile, costumerId, costumerName, afdelingId } = useAuth();
+  const { profile, costumerId, costumerName, afdelingId, afdelingScopedToAllGrants, setAfdelingScopedToAllGrants } = useAuth();
   /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. sysadm only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
   const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
   const [costumers, setCostumers] = useState<Costumer[]>([]);
@@ -233,6 +233,31 @@ export function AdminFrontpage() {
     if (!changed || !afdelingId || !isDepartmentAdmin(profile?.role)) return;
     navigate("/department-details", { state: { costumerId, costumerName, departmentId: afdelingId } });
   }, [afdelingId, costumerId, costumerName, profile?.role, navigate]);
+
+  /**
+   * This page's own counts/buttons (departmentsCount/vehiclesCount/
+   * usersCount above, KØRETØJER/BRUGERE/AFDELINGER navigation) are always
+   * scoped to this admin's WHOLE costumer (see the fetches above — none of
+   * them filter by afdelingId), never narrowed to just afdelingId's one
+   * department. Yet the header's own Afdeling select (PageHeader.tsx)
+   * otherwise defaults to showing this admin's single current department
+   * (e.g. "Region Nord") — visually implying a filter this page doesn't
+   * actually apply. Force the header's local "Alle" (afdelingScopedToAllGrants,
+   * see AuthContext) while this page is mounted so the two stay consistent,
+   * restoring whatever it was before on unmount rather than forcing it back
+   * to false — a real single-department pick already navigates away (see
+   * prevAfdelingIdRef above), so the only way to leave this effect's "true"
+   * behind is by navigating elsewhere directly (nav bar, etc.), in which
+   * case this page never distinguished a deliberate re-pick of "Alle" here
+   * from its own default anyway.
+   */
+  const previousAllGrantsRef = useRef(afdelingScopedToAllGrants);
+  useEffect(() => {
+    if (!isDepartmentAdmin(profile?.role)) return;
+    const previous = previousAllGrantsRef.current;
+    setAfdelingScopedToAllGrants(true);
+    return () => setAfdelingScopedToAllGrants(previous);
+  }, [profile?.role, setAfdelingScopedToAllGrants]);
 
   /** AFDELINGER's own handler — DepartmentDetailsPage.tsx now fetches its own department list (given just costumerId/costumerName via router state), so this just navigates straight there; always lands on that page regardless of how many departments there are, since its whole job IS managing departments, not skipping past them. */
   const handleOpenDepartments = () => {
