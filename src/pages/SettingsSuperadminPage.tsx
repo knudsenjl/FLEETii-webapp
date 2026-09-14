@@ -1,7 +1,9 @@
 // The "sysadm" settings page ("/settings-superadmin" — reached via
 // the round settings button in PageHeader.tsx, only for role "FLEETii
-// admin"; see SettingsAdminPage.tsx/SettingsUserPage.tsx for the other two
-// roles' variants). Empty shell for now, same page frame as
+// admin"; see SettingsAdminPage.tsx for the department-wide variant, and
+// UserDetailsPage.tsx's own personal-settings section — reached via the
+// same button, self-view of "/user-details/:ownUserId" — for the personal
+// variant every role has). Empty shell for now, same page frame as
 // AdminFrontpage/CostumerAdministrationPage, no content yet.
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";

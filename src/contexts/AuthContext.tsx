@@ -52,13 +52,16 @@ type ProfileRow = {
   costumer_id: string | null;
   role: string;
   departments: { name: string; costumers: { name: string; deactivated_at: string | null } | null } | null;
+  /** Direct costumer_id embed (user_profiles_costumer_id_fkey), independent of the departments embed above — needed to resolve costumerName when department_id is null but costumer_id is set (the "Kunde only" scope, see switchDepartment/switch-department.mts): the departments embed alone resolves to null in that case since it joins through department_id. */
+  costumers: { name: string } | null;
 };
 
-/** One department a user is allowed to switch into (see user_departments_table.sql) — the set "Skift afdeling" offers, distinct from afdelingId (the one currently active). For a sysadm, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName is only ever populated on that branch, letting PageHeader.tsx disambiguate same-named departments across different costumers. */
+/** One department a user is allowed to switch into (see user_departments_table.sql) — the set PageHeader's "Data Filter" control offers, distinct from afdelingId (the one currently active). For a sysadm, this is EVERY department platform-wide rather than a personal grant list (see loadAvailableDepartments) — costumerName/costumerId are only ever populated on that branch, letting PageHeader.tsx disambiguate/group same-named departments across different costumers (name alone isn't a safe grouping key). */
 export interface DepartmentOption {
   department_id: string;
   name: string;
   costumerName?: string | null;
+  costumerId?: string | null;
 }
 
 /** Raw shape of a user_departments row as selected by loadAvailableDepartments, with the department's name embedded via FK. */
@@ -67,10 +70,11 @@ type UserDepartmentRow = {
   departments: { name: string } | null;
 };
 
-/** Raw shape of a departments row as selected by loadAvailableDepartments' sysadm branch, with its costumer's name embedded via FK. */
+/** Raw shape of a departments row as selected by loadAvailableDepartments' sysadm branch, with its costumer's name (and id, for grouping) embedded via FK. */
 type AllDepartmentsRow = {
   department_id: string;
   name: string;
+  costumer_id: string | null;
   costumers: { name: string } | null;
 };
 
@@ -87,10 +91,14 @@ interface AuthContextValue {
   costumerName: string | null;
   /** The logged-in user's costumer_id (uuid). Alias for profile?.costumer_id — compare/scope queries against this (e.g. UserDetailsPage's department dropdown, DepartmentPage's department picker), not costumerName. */
   costumerId: string | null;
-  /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by "Skift afdeling" (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
+  /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by the "Data Filter" control (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
   availableDepartments: DepartmentOption[];
-  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A sysadm may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (PageHeader.tsx never offers an "Alle" entry to switch to for them). */
-  switchDepartment: (departmentId: string | null) => Promise<string | null>;
+  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A sysadm may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (a non-sysadm's own "Alle" is the client-only afdelingScopedToAllGrants below instead — this function is never called for it, since department_id itself never actually changes). A sysadm may additionally pass a second argument, costumerId, together with a null departmentId — "just this Kunde, every department under it" — which switch-department.mts persists as department_id=null/costumer_id=<given>, distinct from plain "Alle" (both null). Ignored (never sent to the function) unless departmentId is null and the caller is a sysadm. */
+  switchDepartment: (departmentId: string | null, costumerId?: string | null) => Promise<string | null>;
+  /** Non-sysadm ONLY: true when "Alle" is locally selected in the Afdeling <select> (see this state's own doc comment above, next to its useState). Admin list pages (DepartmentPage.tsx/VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx) check this ALONGSIDE afdelingId when computing their own "effective" department scope — true means "show every department I hold a grant for", ignoring afdelingId's own (always-real, for this role) value. Always false for a sysadm. */
+  afdelingScopedToAllGrants: boolean;
+  /** Sets afdelingScopedToAllGrants — PageHeader.tsx's own Afdeling <select> calls this (never switchDepartment) when a non-sysadm picks "Alle", and clears it back to false the moment they pick a real department again. */
+  setAfdelingScopedToAllGrants: (value: boolean) => void;
   /** true once a valid auth session exists */
   isFullyAuthenticated: boolean;
   /** True if this account was created with the shared default password and hasn't set a real one yet (see create-user.mts/SetPasswordPage.tsx). ProtectedRoute forces such a session to /set-password before anything else. */
@@ -157,6 +165,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(isPasswordRecoveryCallback);
   const [deactivationMessage, setDeactivationMessage] = useState<string | null>(null);
   const [idleTimeoutMessage, setIdleTimeoutMessage] = useState<string | null>(null);
+  /** Non-sysadm ONLY: true when the admin has locally chosen "Alle" in the Afdeling <select> (see PageHeader.tsx) — widening admin list pages (DepartmentPage.tsx/VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx) back to every department they hold a user_departments grant for, WITHOUT changing which department is actually ACTIVE (afdelingId) server-side — switchDepartment can never persist departmentId=null for a non-sysadm (see its own doc comment), so this is a client-only, non-persisted override rather than a real scope change. Cleared the moment a real department is picked instead (PageHeader.tsx's own onChange), or on sign-out (below) — never meaningful across sessions/reloads. Always false for a sysadm; their own "Alle" is the real, persisted afdelingId===null state instead. */
+  const [afdelingScopedToAllGrants, setAfdelingScopedToAllGrants] = useState(false);
 
   /** True for the AuthProvider's actual mount lifetime (only flips false on real unmount, near the app root — practically never). Distinct from the idle-timeout effect's own per-run `cancelled` local below: forceSignOutForIdle's setIsFullyAuthenticated(false) call causes THAT effect to tear itself down and re-run (isFullyAuthenticated is one of its deps), which would set its `cancelled` local to true before its own in-flight signOut() resolves — silently swallowing the setLoading(false) that's supposed to clear the blank-logo loading screen, leaving it stuck forever until a manual refresh. This ref sidesteps that self-cancellation by tracking real unmount instead of "this particular effect run got superseded." */
   const isMountedRef = useRef(true);
@@ -187,7 +197,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // user_departments, so a bare "departments(...)" is now ambiguous
         // (PGRST201) and fails outright — this pins it to the direct FK.
         .select(
-          "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at))",
+          "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at)), costumers!user_profiles_costumer_id_fkey(name)",
         )
         .eq("user_id", userId)
         .maybeSingle<ProfileRow>();
@@ -205,11 +215,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data) {
       return { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     }
-    const { departments, ...profileFields } = data;
+    const { departments, costumers, ...profileFields } = data;
     return {
       profile: profileFields,
       afdeling: departments?.name ?? null,
-      costumerName: departments?.costumers?.name ?? null,
+      // The departments embed resolves costumerName via department_id, which
+      // is null in the "Kunde only" scope (see costumers's own doc comment
+      // on ProfileRow) — fall back to the direct costumer_id embed so the
+      // header's "Afdeling: <Kunde>/..." display still shows the right Kunde
+      // name in that state instead of going blank.
+      costumerName: departments?.costumers?.name ?? costumers?.name ?? null,
       // "sysadm" is exempt from the deactivation lockout, mirroring
       // is_sysadm() being left untouched by costumers_add_
       // deactivated_at.sql — see fetchCostumerDeactivatedAt's doc comment
@@ -223,7 +238,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (isSysadm(role)) {
       const { data, error } = await supabase
         .from("departments")
-        .select("department_id, name, costumers(name)")
+        .select("department_id, name, costumer_id, costumers(name)")
         .order("name", { ascending: true })
         .returns<AllDepartmentsRow[]>();
       if (error) {
@@ -234,6 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         department_id: row.department_id,
         name: row.name,
         costumerName: row.costumers?.name ?? null,
+        costumerId: row.costumer_id,
       }));
     }
 
@@ -507,6 +523,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setAvailableDepartments([]);
     setIsFullyAuthenticated(false);
     setIsPasswordRecovery(false);
+    setAfdelingScopedToAllGrants(false);
   };
 
   /**
@@ -556,10 +573,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * — so an already-revoked or foreign department_id is rejected
    * server-side, not just skipped client-side; null is never passed on this
    * path since PageHeader never offers "Alle" to a non-sysadm).
+   * A sysadm may pass costumerId alongside a null departmentId, for "just
+   * this Kunde" (see the switchDepartment doc comment on AuthContextValue);
+   * it's only ever included in the request body on that branch, so it's a
+   * no-op to pass it in any other case.
    * Re-loads profile/afdeling/costumerName on success either way, so
    * PageHeader and every afdelingId comparison update immediately.
    */
-  const switchDepartment = async (departmentId: string | null): Promise<string | null> => {
+  const switchDepartment = async (departmentId: string | null, costumerId?: string | null): Promise<string | null> => {
     if (!session) return "Ikke logget ind.";
 
     if (isSysadm(profile?.role)) {
@@ -570,7 +591,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             "Content-Type": "application/json",
             Authorization: `Bearer ${session.access_token}`,
           },
-          body: JSON.stringify({ departmentId }),
+          body: JSON.stringify(departmentId ? { departmentId } : { departmentId, costumerId }),
         });
         const result = (await response.json()) as { error?: string };
         if (!response.ok) return result.error ?? "Kunne ikke skifte afdeling.";
@@ -604,6 +625,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         costumerId: profile?.costumer_id ?? null,
         availableDepartments,
         switchDepartment,
+        afdelingScopedToAllGrants,
+        setAfdelingScopedToAllGrants,
         isFullyAuthenticated,
         mustChangePassword: session?.user.app_metadata?.must_change_password === true,
         isPasswordRecovery,

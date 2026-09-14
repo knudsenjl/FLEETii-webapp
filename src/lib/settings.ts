@@ -18,9 +18,12 @@ type SettingTextRow = { value_text: string | null };
 /** The one "Anvendelse" option that prompts for a free-text reason instead of being used as-is (ReservationPage.tsx) — every department is seeded with this value (see supabase/applied/backfill_and_seed_default_anvendelse.sql) and it's always displayed last, regardless of where it sits in the stored array (see sortAnvendelserWithAndetLast). */
 export const ANDET_VALUE = "Andet (angiv årsag)";
 
-/** Reorders an "Anvendelse" list so ANDET_VALUE (if present) always comes last, regardless of its stored position — used both by ReservationPage.tsx's dropdown and AnvendelseSettings.tsx's admin table. */
+/** Reorders an "Anvendelse" list alphabetically (Danish collation, so "æ/ø/å" sort correctly rather than falling after "z" as plain byte order would), with ANDET_VALUE (if present) always moved to last regardless of its stored position or where it'd otherwise alphabetize to — used both by ReservationPage.tsx's dropdown and AnvendelseSettings.tsx's admin table. */
 export function sortAnvendelserWithAndetLast(values: string[]): string[] {
-  return [...values.filter((value) => value !== ANDET_VALUE), ...values.filter((value) => value === ANDET_VALUE)];
+  return [
+    ...values.filter((value) => value !== ANDET_VALUE).sort((a, b) => a.localeCompare(b, "da")),
+    ...values.filter((value) => value === ANDET_VALUE),
+  ];
 }
 
 /**

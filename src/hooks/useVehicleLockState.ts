@@ -69,6 +69,18 @@ export function useVehicleLockState(
   const bookingEndIso = booking?.endIso;
 
   const reload = useCallback(async () => {
+    // vehicleId is "" on the very first render of every caller (booking/
+    // vehicle data hasn't loaded yet) — vehicle_id is a uuid column on both
+    // tables queried below, so an empty-string filter is guaranteed to fail
+    // Postgres's uuid parsing (400 "invalid input syntax for type uuid").
+    // Skip the round-trip entirely rather than firing it and discarding the
+    // error; the real reload() fires moments later once vehicleId resolves
+    // (see the deps below) and sets `loading` false itself once THAT
+    // completes — `loading` is deliberately left untouched (still its
+    // initial true) here rather than flipping false-then-true-again, since
+    // there's nothing real to show either way until the real reload runs.
+    if (!vehicleId) return;
+
     setLoading(true);
 
     const [signalResult, bookingsResult] = await Promise.all([

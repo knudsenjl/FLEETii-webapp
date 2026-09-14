@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
@@ -24,23 +24,19 @@ import { fetchDepartmentOptions, type DepartmentOption } from "../lib/department
  * vehicle and arrange device installation manually.
  *
  * A sysadm has no costumer/department of their own — for them,
- * selectedCostumerId comes strictly from router state (VehiclesPage.tsx's
- * own "Opret køretøj" button — the only real entry point onto this
- * page — "filtering by navigation" same as VehiclesPage.tsx/
- * DepartmentPage.tsx/UserDetailsPage.tsx's own "Ny bruger" form), shown as a
- * read-only "Kunde" row rather than a picker; reaching this page without it
- * (e.g. a direct URL/refresh) redirects to "/admin". Afdeling stays a real
- * picker underneath that fixed Kunde, since which department within the
- * costumer this request is for is still a genuine choice.
+ * selectedCostumerId comes straight from the global header's own
+ * costumerId (useAuth() — see "Data Filter", PageHeader.tsx), shown as a
+ * read-only "Kunde" row rather than a picker; reaching this page with the
+ * header fully unscoped ("Alle") redirects to "/admin". Afdeling stays a
+ * real picker underneath that fixed Kunde, since which department within
+ * the costumer this request is for is still a genuine choice.
  */
 export function NewVehiclePage() {
-  const { afdeling, afdelingId, session, profile } = useAuth();
+  const { afdeling, afdelingId, costumerId, costumerName, session, profile } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
-  const state = location.state as { costumerId?: string; costumerName?: string } | null;
-  /** A sysadm has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from router state rather than a picker. */
+  /** A sysadm has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from the header rather than a picker. */
   const isSysadm = isSysadmRole(profile?.role);
-  const selectedCostumerId = isSysadm ? (state?.costumerId ?? "") : "";
+  const selectedCostumerId = isSysadm ? (costumerId ?? "") : "";
   const [selectedDepartmentId, setSelectedDepartmentId] = useState("");
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   /** Whichever department's "Køretøj-ID:" gate applies — the sysadm's own pick when relevant, otherwise the viewing admin's own fixed afdelingId (unchanged from before this page had a picker at all). */
@@ -48,7 +44,7 @@ export function NewVehiclePage() {
   /** Whether identGateDepartmentId's department shows the "Køretøj-ID:" row below at all — see useIdentSettings' own doc comment. */
   const { useVehicleIdent } = useIdentSettings(identGateDepartmentId);
 
-  /** Redirects back to "/admin" if a sysadm reaches this page without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — see this component's own doc comment. A regular admin always has their own costumerId/afdelingId regardless, so this never fires for them. */
+  /** Redirects back to "/admin" if a sysadm reaches this page with the header fully unscoped (no costumerId — "Alle") — see this component's own doc comment. A regular admin always has their own costumerId/afdelingId regardless, so this never fires for them. */
   useEffect(() => {
     if (isSysadm && !selectedCostumerId) {
       navigate("/admin", { replace: true });
@@ -110,7 +106,7 @@ export function NewVehiclePage() {
   /** Which (if either) of the FLEETii-device "?" info popovers is open — mirrors UserDetailsPage.tsx's own Afdeling(er)/Hjemmeafdeling popover pattern. */
   const [openInfoPopover, setOpenInfoPopover] = useState<"device" | "deviceId" | null>(null);
 
-  /** Pre-fills Kontaktperson/Kontakt e-mail/Kontakt tlf. from the logged-in user's own profile once it's loaded (profile is null until AuthContext's async fetch resolves) — seeded once via this ref rather than on every profile change, so it doesn't clobber anything the user has already typed/edited (e.g. after a "Skift afdeling" refresh). */
+  /** Pre-fills Kontaktperson/Kontakt e-mail/Kontakt tlf. from the logged-in user's own profile once it's loaded (profile is null until AuthContext's async fetch resolves) — seeded once via this ref rather than on every profile change, so it doesn't clobber anything the user has already typed/edited (e.g. after a "Data Filter" refresh). */
   const contactSeededRef = useRef(false);
   useEffect(() => {
     if (contactSeededRef.current || !profile) return;
@@ -127,7 +123,7 @@ export function NewVehiclePage() {
   const [showMotorApiPopup, setShowMotorApiPopup] = useState(false);
   const motorApiRef = useRef<HTMLDivElement>(null);
 
-  /** Closes the MotorAPI popup on an outside click — same pattern as PageHeader.tsx's "Skift afdeling" dropdown. */
+  /** Closes the MotorAPI popup on an outside click — same pattern as PageHeader.tsx's "Data Filter" dropdown. */
   useEffect(() => {
     if (!showMotorApiPopup) return;
 
@@ -319,7 +315,7 @@ export function NewVehiclePage() {
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
                         <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
                         <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
-                          {state?.costumerName ?? "—"}
+                          {costumerName ?? "—"}
                         </span>
                       </div>
                       <div className="grid grid-cols-2 items-center gap-2 p-0.5">
