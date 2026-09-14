@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
+import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
+import { ForbiddenNotice } from "../components/ProtectedRoute";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
+import { StandardSettings, STANDARDER, type StandardSetting } from "../components/StandardSettings";
+import { AnvendelseSettings, type AnvendelseSettingsHandle } from "../components/AnvendelseSettings";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
@@ -57,7 +60,7 @@ type ProfileRow = {
  * choice — 2+ departments) is a select filtered to just userDepartmentIds
  * (staged locally pre-creation, loaded from user_departments when editing)
  * rather than every department in the costumer — you check a department
- * "Tilladt" in Afdelinger first, then it becomes choosable as Hjemmeafdeling,
+ * "Tilhører" in Afdelinger first, then it becomes choosable as Hjemmeafdeling,
  * same ordering as every other Afdeling(er)/Hjemmeafdeling pair in this
  * project. Its own Hjemmeafdeling is self-healed into userDepartmentIds
  * regardless, so create-user.mts's own historical gap (never seeding
@@ -66,14 +69,13 @@ type ProfileRow = {
  * department, thanks to that self-heal) is inserted for the new user_id.
  *
  * A sysadm has no costumerId of their own, so creating a brand-new
- * user (never editing an existing one — see targetCostumerId) requires
- * costumerId/costumerName arriving via router state (DepartmentPage's own
- * "Opret bruger" button — "filtering by navigation" same as
- * VehiclesPage.tsx/DepartmentPage.tsx): a read-only "Kunde" row shows which
- * one, and reaching the create form without it (e.g. a direct URL/refresh)
- * redirects to "/admin" instead. Nothing else on the page (the
- * Afdeling(er)/Hjemmeafdeling options) can load until targetCostumerId is
- * resolved.
+ * user (never editing an existing one — see targetCostumerId) reads its
+ * target costumer straight from the global header's own costumerId/
+ * costumerName ("Data Filter", PageHeader.tsx): a read-only "Kunde" row
+ * shows which one, and reaching the create form with the header fully
+ * unscoped ("Alle") redirects to "/admin" instead. Nothing else on the page
+ * (the Afdeling(er)/Hjemmeafdeling options) can load until targetCostumerId
+ * is resolved.
  *
  * Reachable at plain "/user-details" (create — no user, matches App.tsx's
  * route with no :userId) or "/user-details/:userId" (edit). Normally reached
@@ -83,38 +85,69 @@ type ProfileRow = {
  * redirecting to "/department" if it can't be found (deleted, archived, or
  * outside the admin's own department per RLS) — since that case was clearly
  * meant to be an edit, not silently falling into the create form.
+ *
+ * Also doubles as the personal-settings page for EVERY role (retiring the
+ * old standalone "/settings-user" — see App.tsx's SettingsUserRedirect):
+ * ":userId" matching the viewer's own profile.user_id (isSelf below) is
+ * allowed past this route's own ProtectedRoute (which, unlike every other
+ * admin-only route here, has no requireAdmin — see App.tsx), and renders
+ * every profile field read-only (a user views but never edits their own
+ * Navn/E-mail/Telefon/Rolle/Afdeling(er)/Hjemmeafdeling from here — that
+ * still requires an admin) alongside a fully-editable Standard settings/
+ * Anvendelser/Rettigheder section further down. A plain "user" requesting
+ * someone ELSE's :userId (isSelf false, isAnyAdmin(profile?.role) also
+ * false) gets ForbiddenNotice instead — this component's own check, since
+ * ProtectedRoute can't express "admin OR your own row". An admin/sysadm
+ * viewing someone else keeps the full edit form as before, PLUS a new
+ * view-only rendering of that user's own Standard settings/Anvendelser
+ * (see the readOnly StandardSettings instance below) — a capability admins
+ * didn't have before this unification.
  */
 export function UserDetailsPage() {
-  const { session, profile, costumerId } = useAuth();
+  const { session, profile, costumerId, costumerName, afdelingId, afdeling, availableDepartments } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
-  const navState = location.state as
-    | { user?: ProfileRow; costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
-    | null;
+  /** True when the requested :userId is the logged-in viewer's own row — the self-view/personal-settings case (see this component's own doc comment). */
+  const isSelf = Boolean(userId) && userId === profile?.user_id;
+  /** A plain "user" (or any non-admin role) requesting someone ELSE's :userId — never allowed, since ProtectedRoute's own check (App.tsx) can't express "admin OR your own row" and had to be loosened to let self-view through at all. Rendered as ForbiddenNotice further down, once past the hooks section. */
+  const forbiddenOtherUser = Boolean(userId) && !isSelf && !isAnyAdmin(profile?.role);
+  const navState = location.state as { user?: ProfileRow } | null;
   const stateUser = navState?.user ?? null;
-  // The department-locked BRUGERE list this page was reached from (DepartmentPage's
-  // own row click or "Opret bruger" button) — carried along purely so every
-  // "return to the list" navigate("/department", ...) call below lands back on
-  // that SAME locked scope, not a bare "/department" with no scope at all (which
-  // would just redirect to "/admin" now that DepartmentPage requires one — see its
-  // own doc comment on "filtering by navigation"). Distinct from targetCostumerId
-  // below, which is about scoping the Afdeling(er) picker to the EDITED user's own
-  // costumer, not about where to navigate back to.
-  const returnCostumerId = navState?.costumerId ?? null;
-  const returnCostumerName = navState?.costumerName ?? null;
-  const returnDepartmentId = navState?.departmentId ?? null;
-  const returnDepartmentName = navState?.departmentName ?? null;
-  const returnState = {
-    costumerId: returnCostumerId,
-    costumerName: returnCostumerName,
-    departmentId: returnDepartmentId,
-    departmentName: returnDepartmentName,
-  };
   const [fetchedUser, setFetchedUser] = useState<ProfileRow | null>(null);
   /** Starts true whenever a fetch-by-id will actually run (userId present, no stateUser) — NOT just false-by-default. The redirect-on-missing-user effect below and this page's own fetch effect both run in the SAME passive-effects pass on mount; if this started false, the redirect effect would see the pre-fetch "not loading, no user" state and bounce to /department before the fetch's setUserLoading(true) had any chance to take effect for that pass. Every existing caller (DepartmentPage) masked this by always passing router state, so `user` was already truthy and the redirect's `!user` check short-circuited — this only surfaces for a caller that navigates here by id alone (e.g. BookingDetailsPage's "Bruger" link, or a raw bookmark/refresh). */
-  const [userLoading, setUserLoading] = useState(() => Boolean(userId) && !stateUser);
-  const user = stateUser ?? fetchedUser;
+  const [userLoading, setUserLoading] = useState(() => Boolean(userId) && !stateUser && !isSelf);
+  /** Self-view's own "row" — built straight from AuthContext's own profile/afdeling/afdelingId rather than fetched, so self-view never needs a round-trip (and works even where user_profiles' SELECT RLS might otherwise be scoped away from the viewer's own admin-facing query shape). Takes priority over stateUser/fetchedUser whenever isSelf. Memoized on the underlying primitive fields (NOT just `isSelf && profile`) — every effect below keyed on `[user]` (grants loading, isLastAdmin, …) re-runs whenever this reference changes, so a fresh object literal every render here would re-trigger every one of them on every render, forever (grantsLoading flips true→false in a loop, which is exactly the Afdeling(er) "Indlæser…" flicker this used to cause). */
+  const selfAsProfileRow: ProfileRow | null = useMemo(
+    () =>
+      isSelf && profile
+        ? {
+            user_id: profile.user_id,
+            email: profile.email,
+            full_name: profile.full_name,
+            phone: profile.phone,
+            user_ident: profile.user_ident,
+            department_name: afdeling,
+            department_id: afdelingId,
+            costumer_id: profile.costumer_id,
+            role: profile.role,
+            deleted_at: null,
+          }
+        : null,
+    [
+      isSelf,
+      profile?.user_id,
+      profile?.email,
+      profile?.full_name,
+      profile?.phone,
+      profile?.user_ident,
+      profile?.costumer_id,
+      profile?.role,
+      afdeling,
+      afdelingId,
+    ],
+  );
+  const user = selfAsProfileRow ?? stateUser ?? fetchedUser;
 
   const [fullName, setFullName] = useState(user?.full_name ?? "");
   const [email, setEmail] = useState(user?.email ?? "");
@@ -133,6 +166,10 @@ export function UserDetailsPage() {
     null,
   );
   const rettighederRef = useRef<RettighederSettingsHandle>(null);
+  /** Self-view only: the embedded Anvendelser list's own exposed save()/revert() (see AnvendelseSettings.tsx's forwardRef) — wired into StandardSettings' onExtraCommit/onExtraRevert below so ONE "Opdater"/"Fortryd" governs both the Standard settings table and the Anvendelser list together, rather than Anvendelser saving each edit immediately regardless. */
+  const anvendelseRef = useRef<AnvendelseSettingsHandle>(null);
+  /** Mirrors AnvendelseSettings' own dirty/clean state (via its onDirtyChange prop) so StandardSettings' Opdater/Fortryd pair knows to stay enabled even when its OWN rows (Standard varighed/interval/Login timeout) have nothing pending but the Anvendelser list does. */
+  const [anvendelseDirty, setAnvendelseDirty] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
@@ -143,7 +180,7 @@ export function UserDetailsPage() {
 
   /** Fetch-by-id fallback for a direct URL/refresh/bookmark to "/user-details/:userId" (no router state) — skipped entirely when stateUser is already present. Includes blocked users (deleted_at set) — unlike DepartmentPage's own list, this page needs to reach them so "Genetabler brugers adgang" is reachable — and is naturally scoped to the admin's own department (or any, for a sysadm) by user_profiles' SELECT RLS policy — a userId outside it just resolves to null, same as "not found". */
   useEffect(() => {
-    if (stateUser || !userId) return;
+    if (stateUser || !userId || isSelf || forbiddenOtherUser) return;
 
     let cancelled = false;
     setUserLoading(true);
@@ -189,7 +226,7 @@ export function UserDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [userId, stateUser]);
+  }, [userId, stateUser, isSelf, forbiddenOtherUser]);
 
   // Populates the form fields once `user` resolves asynchronously (the
   // fetch-by-id path above) — the useState initializers just above only run
@@ -211,13 +248,16 @@ export function UserDetailsPage() {
   // (a :userId in the URL) but couldn't be loaded (deleted, archived, or
   // outside the admin's own department) — mirrors BookingDetailsPage/
   // VehicleDetailsPage's same redirect-on-missing-data pattern. Never fires
-  // for the plain "/user-details" create route, which has no userId at all.
+  // for the plain "/user-details" create route, which has no userId at all,
+  // nor for forbiddenOtherUser (that case renders ForbiddenNotice instead —
+  // a plain "user" requesting someone else's row was never going to resolve
+  // via this fetch regardless, so there's nothing "missing" to redirect on).
   useEffect(() => {
-    if (userId && !user && !userLoading) {
-      navigate("/department", { replace: true, state: returnState });
+    if (userId && !user && !userLoading && !forbiddenOtherUser) {
+      navigate("/department", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, user, userLoading, navigate]);
+  }, [userId, user, userLoading, forbiddenOtherUser, navigate]);
 
   /** This user's own Afdelinger grants (user_departments) — only loaded/relevant when editing an existing user (see the fetch effect below). */
   const [userDepartmentIds, setUserDepartmentIds] = useState<Set<string>>(new Set());
@@ -226,19 +266,19 @@ export function UserDetailsPage() {
   const [grantsLoading, setGrantsLoading] = useState(true);
   const [grantsError, setGrantsError] = useState<string | null>(null);
 
-  /** A sysadm has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below only ever comes from router state (DepartmentPage's own "Opret bruger" button, "filtering by navigation" same as VehiclesPage.tsx/DepartmentPage.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
+  /** A sysadm has no costumerId of their own (platform-wide role) — for a brand-new user, targetCostumerId below just follows the global header's own costumerId (useAuth() — see "Data Filter", PageHeader.tsx), never an in-page picker. Not shown/needed when editing an existing user (their own costumer_id, fetched above, is authoritative), nor for a regular admin (always their own costumerId). */
   const isSysadm = isSysadmRole(profile?.role);
-  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), router state's costumerId when a sysadm is creating a brand-new user, or otherwise the viewing admin's own costumerId. */
-  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : isSysadm ? (navState?.costumerId ?? null) : costumerId;
-  const targetCostumerName = user ? null : isSysadm ? (navState?.costumerName ?? null) : null;
+  /** The costumer departmentOptions (and thus the whole Afdeling(er)/Hjemmeafdeling picker) is scoped to — the edited user's OWN costumer when editing (never the viewing admin's), otherwise the header's own current costumerId (authoritative for both roles when creating). */
+  const targetCostumerId = user ? (user.costumer_id ?? costumerId) : costumerId;
+  const targetCostumerName = user ? null : isSysadm ? costumerName : null;
 
-  /** Redirects back to "/admin" if a sysadm reaches the CREATE form (no :userId — editing an existing user always has its own costumer_id, see targetCostumerId above) without a costumer to scope to (e.g. a direct URL/refresh, router state lost) — this form has no "pick a costumer here" fallback left (see this component's own doc comment). A regular admin always has their own costumerId regardless, and editing an existing user always resolves targetCostumerId from that user's own record, so this never fires for either of those cases. */
+  /** Redirects back to "/admin" if a sysadm reaches the CREATE form (no :userId — editing an existing user always has its own costumer_id, see targetCostumerId above) with the header fully unscoped (no costumerId — "Alle") — this form has no "pick a costumer here" fallback left (see this component's own doc comment). A regular admin always has their own costumerId regardless, and editing an existing user always resolves targetCostumerId from that user's own record, so this never fires for either of those cases. */
   useEffect(() => {
-    if (!userId && isSysadm && !navState?.costumerId) {
+    if (!userId && isSysadm && !costumerId) {
       navigate("/admin", { replace: true });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, isSysadm, navState?.costumerId]);
+  }, [userId, isSysadm, costumerId]);
 
   // Scoped to targetCostumerId, NOT the viewing admin's own costumerId —
   // otherwise a sysadm editing a user in some other costumer (or
@@ -294,7 +334,7 @@ export function UserDetailsPage() {
     };
   }, [user]);
 
-  // When exactly one department is checked "Tilladt" in the Afdeling(er)
+  // When exactly one department is checked "Tilhører" in the Afdeling(er)
   // table, there's no real Hjemmeafdeling choice left either — auto-select
   // it and lock the field (see the sole-checked-department rendering
   // below), same treatment as the "only one department in the whole
@@ -386,23 +426,87 @@ export function UserDetailsPage() {
     PHONE_PATTERN.test(phone.trim()) &&
     department.trim().length > 0 &&
     role.trim().length > 0 &&
-    // A brand-new user created by a sysadm needs a real
-    // targetCostumerId (from router state — see this component's own doc
-    // comment) — there's no viewer-own costumer to fall back to, and
-    // missing one must block submission rather than silently creating the
-    // user with no departmentOptions at all. In practice the redirect
-    // effect above already sends them to "/admin" before this would ever
-    // matter, but this stays as a defensive belt-and-braces check.
+    // A brand-new user created by a sysadm needs a real targetCostumerId
+    // (from the global header — see this component's own doc comment) —
+    // there's no viewer-own costumer to fall back to, and missing one must
+    // block submission rather than silently creating the user with no
+    // departmentOptions at all. In practice the redirect effect above
+    // already sends them to "/admin" before this would ever matter, but
+    // this stays as a defensive belt-and-braces check.
     (user || !isSysadm || Boolean(targetCostumerId));
 
-  const homeDepartmentId = departmentOptions.find((d) => d.name === department)?.department_id;
+  // isSelf reads straight off afdelingId (AuthContext's own live value,
+  // available synchronously on the very first render) rather than
+  // departmentOptions/department — departmentOptions itself only resolves
+  // once its own fetch effect completes, which would otherwise leave
+  // homeDepartmentId (and everything downstream of it, e.g. the new Standard
+  // settings section below) undefined for a render or two even though the
+  // real answer was already known.
+  const homeDepartmentId = isSelf ? afdelingId : departmentOptions.find((d) => d.name === department)?.department_id;
   /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a sysadm editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
   const { useUserIdent } = useIdentSettings(homeDepartmentId ?? null);
-  /** The one department checked "Tilladt" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
+  /** The one department checked "Tilhører" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
   const soleCheckedDepartment =
     userDepartmentIds.size === 1
       ? departmentOptions.find((d) => d.department_id === [...userDepartmentIds][0])
       : undefined;
+
+  /** True when a regular admin (never a sysadm — see [[project_admin_costumer_wide_user_edit_scope]] for why the underlying edit itself stays ALLOWED costumer-wide regardless) is about to update an EXISTING user whose own departments (userDepartmentIds — self-healed to always include their home department, see the effect above) don't overlap AT ALL with the viewing admin's own granted departments (availableDepartments, from useAuth() — "Data Filter"'s own Afdeling <select> list). Purely informational — surfaced as an extra warning line in the "Opdater bruger" ConfirmDialog below, not a block, since the server-side authorization boundary is (and stays) the whole costumer, not the admin's own grants. userDepartmentIds.size > 0 guards against a false positive while it's still loading/hasn't self-healed yet. */
+  const isCrossingDepartmentBoundary =
+    isDepartmentAdmin(profile?.role) &&
+    !isSelf &&
+    Boolean(user) &&
+    userDepartmentIds.size > 0 &&
+    !availableDepartments.some((d) => userDepartmentIds.has(d.department_id));
+
+  /** A leading "Indstillinger" subheader row (plain full-width label, no value cell — see the "custom" inputType's own doc comment on StandardSettings.tsx), then STANDARDER, then a trailing "Anvendelser" row embedding AnvendelseSettings itself — the same shape the old standalone "/settings-user"'s own userStandarder used, minus the RETTIGHEDER checkbox rows (those are handled by the separate RettighederSettings instances above/below instead, not merged into this table). AnvendelseSettings' own readOnly mirrors StandardSettings' (both flip together on isSelf). Memoized since it's passed to StandardSettings' settings prop, which that component's own load effect depends on by reference — an unmemoized inline array would re-trigger a refetch every render. */
+  const standardAndAnvendelserSettings = useMemo<StandardSetting[]>(
+    () => [
+      {
+        name: "Indstillinger_header",
+        label: "Indstillinger",
+        inputType: "custom",
+        render: () => (
+          // rounded-t-2xl matches StandardSettings.tsx's own outer wrapper
+          // rounding — this row's own distinct background would otherwise
+          // show square corners poking past the wrapper's rounded top edge,
+          // since it's the FIRST row and that wrapper isn't overflow-hidden
+          // (see its own doc comment on why). Plain div, not <tr>/<td> —
+          // StandardSettings' rows are div-based now (2026-09-14 unification,
+          // see its own doc comment), so a leftover table-cell here rendered
+          // as an orphan table-cell display box with no real <table> to size
+          // itself against, silently losing its background bar (fixed
+          // 2026-09-14: confirmed via a real screenshot next to this page's
+          // own "Bruger oplysninger"/"Tilladelser" headers, which use this
+          // same div convention and looked correctly grey).
+          <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
+            Indstillinger
+          </div>
+        ),
+      },
+      ...STANDARDER,
+      {
+        name: "Anvendelser_row",
+        label: "Anvendelser",
+        inputType: "custom",
+        info: 'Disse anvendelser er tilgængelige, som begrundelse for en reservation. Ved at vælge "Andet" kan du angive en anden begrundese',
+        render: (labelCell) => (
+          <AnvendelseSettings
+            ref={anvendelseRef}
+            labelCell={labelCell}
+            table="user_settings"
+            scopeColumn="user_id"
+            scopeId={user?.user_id ?? null}
+            departmentId={homeDepartmentId ?? null}
+            readOnly={!isSelf}
+            deferSave={isSelf}
+            onDirtyChange={setAnvendelseDirty}
+          />
+        ),
+      },
+    ],
+    [user?.user_id, homeDepartmentId, isSelf],
+  );
 
   /** Toggles a department's Afdelinger grant — refuses the one matching the current home department (a user can't lose access to their own active home department), guarded here too rather than trusting only the checkbox's disabled attribute below. */
   const toggleUserDepartment = (option: DepartmentOption, checked: boolean) => {
@@ -463,7 +567,7 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department", { replace: true, state: returnState });
+    navigate("/department", { replace: true });
   };
 
   /** Reverses handleDelete via unblock-user.mts — lifts the Auth ban and clears deleted_at, then returns to DepartmentPage. No "last admin" pre-check needed here, unlike handleDelete: restoring access only ever adds admin coverage back, never removes it. */
@@ -497,7 +601,7 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department", { replace: true, state: returnState });
+    navigate("/department", { replace: true });
   };
 
   /** Calls update-user with the form's current values for this user, authenticated with the current session's access token, then persists any pending Rettigheder checkbox changes (staged locally via deferSave — see RettighederSettings' exposed save()). Shows the server's error message (or a generic connection-failure one) inline on failure. */
@@ -580,13 +684,13 @@ export function UserDetailsPage() {
 
     setIsSubmitting(false);
     setPendingAction(null);
-    navigate("/department", { replace: true, state: returnState });
+    navigate("/department", { replace: true });
   };
 
-  /** Calls create-user with the form's values, authenticated with the current session's access token. Shows the server's error message (or a generic connection-failure one) inline on failure. */
+  /** Calls create-user with the form's values, authenticated with the current session's access token, then seeds user_departments and persists any pending "Tilladelser for den nye bruger" checkbox changes (staged locally via deferSave — see RettighederSettings' exposed save()). Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleConfirm = async () => {
     if (pendingAction === "close") {
-      navigate("/department", { replace: true, state: returnState });
+      navigate("/department", { replace: true });
       return;
     }
 
@@ -651,9 +755,20 @@ export function UserDetailsPage() {
         }
       }
 
+      // Persists whatever was toggled in the "Tilladelser for den nye
+      // bruger" section above (deferSave — see its own doc comment) — held
+      // back until now so a checkbox change there never touches
+      // department_settings unless the user is actually created.
+      const rettighederResult = await rettighederRef.current?.save();
+      if (rettighederResult?.error) {
+        setSubmitError(rettighederResult.error);
+        setIsSubmitting(false);
+        return;
+      }
+
       setIsSubmitting(false);
       setPendingAction(null);
-      navigate("/department", { replace: true, state: { ...returnState, emailWarning: result.emailSent === false } });
+      navigate("/department", { replace: true, state: { emailWarning: result.emailSent === false } });
       return;
     } catch {
       setSubmitError("Kunne ikke kontakte serveren. Prøv igen senere.");
@@ -661,6 +776,16 @@ export function UserDetailsPage() {
       return;
     }
   };
+
+  // A plain "user" (or other non-admin role) requesting someone ELSE's
+  // :userId — this route's own ProtectedRoute (App.tsx) had to drop
+  // requireAdmin entirely to let self-view through at all, so the
+  // self-vs-admin-vs-forbidden decision moves here instead. Checked after
+  // every hook above (rules-of-hooks) but before any of the fetch/rendering
+  // logic below actually needs `user` to mean anything.
+  if (forbiddenOtherUser) {
+    return <ForbiddenNotice />;
+  }
 
   // Only while a SPECIFIC user is being fetched by id (:userId present, no
   // router state yet) — without this guard, the form would flash as "Ny
@@ -690,12 +815,6 @@ export function UserDetailsPage() {
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">
-                {user
-                  ? `Opdater bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
-                  : "Opret bruger"}
-              </h2>
-
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
                     with no overflow-hidden at all) so the Afdeling(er)/
@@ -703,14 +822,24 @@ export function UserDetailsPage() {
                     descendants — aren't clipped when they overflow this
                     box's edge (same fix as RettighederSettings.tsx). */}
                 <div className="divide-y divide-brand-100 rounded-2xl bg-white">
+                  {/* The page's own title, as this table's own first row
+                      (same bar styling as the "Indstillinger"/"Tilladelser"
+                      subsubheaders below) rather than a separate <h2> sitting
+                      above the table. */}
+                  <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
+                    {isSelf
+                      ? "Dine bruger oplysninger"
+                      : user
+                        ? `Bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
+                        : "Opret bruger"}
+                  </div>
                   {!user && isSysadm && (
                     // sysadm-only "Ny bruger" Kunde row — read-only
-                    // display, not a picker: targetCostumerId already came
-                    // from router state (DepartmentPage's own "Opret ny
-                    // bruger" button), "filtering by navigation" same as
-                    // VehiclesPage.tsx/DepartmentPage.tsx, so there's
-                    // nothing left to choose here, just to confirm.
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    // display, not a picker: targetCostumerId already
+                    // follows the global header's own costumerId ("Data
+                    // Filter", PageHeader.tsx), so there's nothing left to
+                    // choose here, just to confirm.
+                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
                       <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {targetCostumerName ?? "—"}
@@ -718,132 +847,174 @@ export function UserDetailsPage() {
                     </div>
                   )}
                   {useUserIdent && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
                       <label className="text-sm font-medium text-brand-700">Bruger-ID:</label>
-                      <input
-                        type="text"
-                        value={userIdent}
-                        onChange={(e) => setUserIdent(e.target.value)}
-                        placeholder="valgfri — bruger E-mail hvis tom"
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                      />
+                      {isSelf ? (
+                        <input
+                          type="text"
+                          readOnly
+                          disabled
+                          value={userIdent || "—"}
+                          className="cursor-not-allowed rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800"
+                        />
+                      ) : (
+                        <input
+                          type="text"
+                          value={userIdent}
+                          onChange={(e) => setUserIdent(e.target.value)}
+                          placeholder="valgfri — bruger E-mail hvis tom"
+                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        />
+                      )}
                     </div>
                   )}
-                  <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} />
-                  <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
-                  <RequiredFieldRow label="Telefon:" value={phone} onChange={setPhone} type="tel" />
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                  {/* className override on all three: matches this table's own header bar's px-2 (RequiredFieldRow's own default is p-0.5, no horizontal padding) so every row's label text starts flush with the header text above it. */}
+                  <RequiredFieldRow
+                    label="Navn:"
+                    value={fullName}
+                    onChange={setFullName}
+                    readOnly={isSelf}
+                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                  />
+                  <RequiredFieldRow
+                    label="E-mail:"
+                    value={email}
+                    onChange={setEmail}
+                    type="email"
+                    readOnly={isSelf}
+                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                  />
+                  <RequiredFieldRow
+                    label="Telefon:"
+                    value={phone}
+                    onChange={setPhone}
+                    type="tel"
+                    readOnly={isSelf}
+                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                  />
+                  <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Rolle: <span className="ml-0.5 text-red-600">*</span>
+                      Rolle: {!isSelf && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
-                    <select
-                      required
-                      aria-required="true"
-                      value={role}
-                      onChange={(e) => setRole(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                    >
-                      <option value="" className="bg-brand-100">Vælg rolle:</option>
-                      <option value="user">Bruger</option>
-                      <option value="admin">Administrator</option>
-                    </select>
+                    {isSelf ? (
+                      <input
+                        type="text"
+                        readOnly
+                        disabled
+                        value={formatRoleLabel(role)}
+                        className="cursor-not-allowed rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800"
+                      />
+                    ) : (
+                      <select
+                        required
+                        aria-required="true"
+                        value={role}
+                        onChange={(e) => setRole(e.target.value)}
+                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      >
+                        <option value="" className="bg-brand-100">Vælg rolle:</option>
+                        <option value="user">Bruger</option>
+                        <option value="admin">Administrator</option>
+                      </select>
+                    )}
                   </div>
-                  {/* Afdeling(er) + Hjemmeafdeling share this box (own
-                      border, no overflow-hidden, matching rounded-2xl on the
-                      inner div) rather than being two separate rows in the
-                      outer field list — they're tightly coupled
-                      (Hjemmeafdeling can only ever be one of whichever
-                      departments are checked "Tilladt" here). */}
-                  <div className="rounded-2xl border border-brand-100 bg-brand-50/40">
-                    <div className="rounded-2xl">
-                      {isAnyAdmin(profile?.role) &&
-                        departmentOptions.length !== 1 && (
-                          <div className="grid grid-cols-2 items-start gap-2 p-0.5">
-                            <div className="relative flex items-center justify-between gap-2">
-                              <label className="text-sm font-medium text-brand-700">Afdeling(er):</label>
-                              <button
-                                type="button"
-                                onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
-                                aria-label="Mere information"
-                                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                              >
-                                ?
-                              </button>
-                              {openInfoPopover === "afdelinger" && (
-                                <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                              )}
-                              <InlinePopup
-                                visible={openInfoPopover === "afdelinger"}
-                                message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
-                                align="right"
-                              />
-                            </div>
-                            <div className="py-0.5">
-                              {grantsLoading && <span className="text-sm text-brand-500">Indlæser…</span>}
-                              {!grantsLoading && grantsError && <span className="text-sm text-red-600">{grantsError}</span>}
-                              {!grantsLoading && !grantsError && (
-                                <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
-                                  <table className="w-full border-collapse text-[0.7rem]">
-                                    <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
-                                      <tr>
-                                        <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
-                                          Afdeling
-                                        </th>
-                                        <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">
-                                          Tilladt
-                                        </th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-brand-100 bg-white">
-                                      {departmentOptions.length === 0 && (
-                                        <tr>
-                                          <td colSpan={2} className="px-2 py-1 text-center text-brand-500">
-                                            Ingen afdelinger fundet.
-                                          </td>
-                                        </tr>
-                                      )}
-                                      {departmentOptions.map((option) => {
-                                        const isHome = option.department_id === homeDepartmentId;
-                                        return (
-                                          <tr key={option.department_id}>
-                                            <td className="whitespace-nowrap px-2 py-0.5 font-medium text-brand-700">
-                                              {option.name}
-                                            </td>
-                                            <td className="px-2 py-0.5 text-center">
-                                              <span className="inline-flex items-center gap-1.5">
-                                                <input
-                                                  type="checkbox"
-                                                  checked={isHome || userDepartmentIds.has(option.department_id)}
-                                                  disabled={isHome}
-                                                  onChange={(e) => toggleUserDepartment(option, e.target.checked)}
-                                                  className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
-                                                />
-                                                {/* Always-visible, not a hover tooltip (this table can be short enough — max-h-32 — that a tap-popup risks getting clipped by its own overflow-auto) — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
-                                                {isHome && (
-                                                  <span
-                                                    className="rounded bg-brand-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-brand-700"
-                                                    title="Kan ikke fjernes fra brugerens hjemmeafdeling"
-                                                  >
-                                                    Hjem
-                                                  </span>
-                                                )}
-                                              </span>
-                                            </td>
-                                          </tr>
-                                        );
-                                      })}
-                                    </tbody>
-                                  </table>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                </div>
+              </div>
+
+              {/* Afdelingsindstillinger — its own table, same convention as
+                  "Indstillinger"/"Tilladelser" (rounded-2xl border wrapper,
+                  bg-white painted on that same rounded element so the
+                  corners render correctly with no overflow-hidden needed —
+                  see StandardSettings.tsx's own doc comment on why — plus a
+                  subsubheader row as the first child). Afdeling(er) and
+                  Hjemmeafdeling stay together here (own table, not two rows
+                  in the "Dine bruger oplysninger" field list above) since
+                  they're tightly coupled — Hjemmeafdeling can only ever be
+                  one of whichever departments are checked "Tilhører" here. */}
+              <div className="rounded-2xl border border-brand-100 bg-white">
+                <div className="divide-y divide-brand-100 rounded-2xl">
+                  <div className="relative flex items-center justify-between gap-2 rounded-t-2xl bg-brand-50/60 px-2 py-1 text-brand-600">
+                    {/* text-xs/font-semibold/uppercase/tracking-wide live on
+                        THIS span only, not the row div — InlinePopup doesn't
+                        reset text styling itself, so putting those classes on
+                        the div would have the popover message below inherit
+                        them too, rendering its normal-sentence-case message
+                        as bold, tracking-wide, ALL CAPS text. */}
+                    <span className="text-xs font-semibold uppercase tracking-wide">Afdelingsindstillinger</span>
+                    {/* The "?" that used to sit on its own "Afdeling(er):" row
+                        moved up here — that row no longer exists as a single
+                        unit now that each department is its own row below
+                        (see the departmentOptions.map right underneath). */}
+                    {(isSelf || isAnyAdmin(profile?.role)) && departmentOptions.length !== 1 && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
+                          aria-label="Mere information"
+                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
+                        >
+                          ?
+                        </button>
+                        {openInfoPopover === "afdelinger" && (
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
                         )}
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
+                        <InlinePopup
+                          visible={openInfoPopover === "afdelinger"}
+                          message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
+                          align="right"
+                        />
+                      </>
+                    )}
+                  </div>
+                  {/* Each department its own row (label = department name,
+                      value = its "Tilhører" checkbox) directly in this
+                      table, rather than nested inside a separate mini-table
+                      within one "Afdeling(er):" row's value cell. */}
+                  {(isSelf || isAnyAdmin(profile?.role)) &&
+                    departmentOptions.length !== 1 && (
+                      <>
+                        {grantsLoading && <div className="px-2 py-1 text-sm text-brand-500">Indlæser…</div>}
+                        {!grantsLoading && grantsError && (
+                          <div className="px-2 py-1 text-sm text-red-600">{grantsError}</div>
+                        )}
+                        {!grantsLoading && !grantsError && departmentOptions.length === 0 && (
+                          <div className="px-2 py-1 text-center text-sm text-brand-500">Ingen afdelinger fundet.</div>
+                        )}
+                        {!grantsLoading &&
+                          !grantsError &&
+                          departmentOptions.map((option) => {
+                            const isHome = option.department_id === homeDepartmentId;
+                            return (
+                              <div key={option.department_id} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                                <label className="text-sm font-medium text-brand-700">{option.name}:</label>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <input
+                                    type="checkbox"
+                                    checked={isHome || userDepartmentIds.has(option.department_id)}
+                                    disabled={isSelf || isHome}
+                                    onChange={isSelf ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
+                                    className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                  />
+                                  {/* Always-visible, not a hover tooltip — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
+                                  {isHome && (
+                                    <span
+                                      className="rounded bg-brand-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-brand-700"
+                                      title="Kan ikke fjernes fra brugerens hjemmeafdeling"
+                                    >
+                                      Hjem
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+                            );
+                          })}
+                      </>
+                    )}
+                      <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
                         <div className="relative flex items-center justify-between gap-2">
                           <label className="text-sm font-medium text-brand-700">
                             Hjemmeafdeling:{" "}
-                            {departmentOptions.length !== 1 && !soleCheckedDepartment && (
+                            {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
                               <span className="ml-0.5 text-red-600">*</span>
                             )}
                           </label>
@@ -861,19 +1032,25 @@ export function UserDetailsPage() {
                           <InlinePopup
                             visible={openInfoPopover === "hjemmeafdeling"}
                             message={
-                              departmentOptions.length === 1 || soleCheckedDepartment
+                              isSelf || departmentOptions.length === 1 || soleCheckedDepartment
                                 ? "Du er tilknyttet denne afdeling"
                                 : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
                             }
                             align="right"
                           />
                         </div>
-                        {departmentOptions.length === 1 || soleCheckedDepartment ? (
+                        {isSelf || departmentOptions.length === 1 || soleCheckedDepartment ? (
                           <input
                             type="text"
                             readOnly
                             disabled
-                            value={departmentOptions.length === 1 ? departmentOptions[0].name : (soleCheckedDepartment?.name ?? "")}
+                            value={
+                              isSelf
+                                ? (afdeling ?? "—")
+                                : departmentOptions.length === 1
+                                  ? departmentOptions[0].name
+                                  : (soleCheckedDepartment?.name ?? "")
+                            }
                             className="cursor-not-allowed rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800"
                           />
                         ) : (
@@ -897,8 +1074,6 @@ export function UserDetailsPage() {
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
               {emailFormatInvalid && <p className="text-xs text-red-600">Ugyldigt e-mailformat.</p>}
               {emailExists && (
@@ -908,11 +1083,13 @@ export function UserDetailsPage() {
               )}
               {phoneFormatInvalid && <p className="text-xs text-red-600">Ugyldigt telefonnummer.</p>}
 
-              <p className="text-right text-xs text-brand-500">
-                <span className="text-red-600">*</span> Feltet skal udfyldes
-              </p>
+              {!isSelf && (
+                <p className="text-right text-xs text-brand-500">
+                  <span className="text-red-600">*</span> Feltet skal udfyldes
+                </p>
+              )}
 
-              {user && user.role === "user" && (
+              {user && !isSelf && user.role === "user" && (
                 <RettighederSettings
                   ref={rettighederRef}
                   table="user_settings"
@@ -920,7 +1097,24 @@ export function UserDetailsPage() {
                   scopeId={user.user_id}
                   departmentId={homeDepartmentId ?? null}
                   deferSave
-                  heading="Rettigheder for denne bruger"
+                  heading="Tilladelser for denne bruger"
+                />
+              )}
+
+              {/* Self-view's own Tilladelser (heading defaults to that, see
+                  RettighederSettings.tsx) — read-only, shown for EVERY
+                  role (matching the old standalone "/settings-user"'s
+                  behavior), unlike the admin-edit instance just above which
+                  only ever applies to editing an existing "user"-role
+                  account. Mutually exclusive with it at runtime (isSelf vs.
+                  "admin editing someone else"), so no shared state/ref. */}
+              {isSelf && user && (
+                <RettighederSettings
+                  table="user_settings"
+                  scopeColumn="user_id"
+                  scopeId={user.user_id}
+                  departmentId={homeDepartmentId ?? null}
+                  readOnly
                 />
               )}
 
@@ -929,21 +1123,62 @@ export function UserDetailsPage() {
                 // (profile?.role), not the new user's selected role — this
                 // is a department_settings-scoped view (rights for everyone
                 // in the department, not this one new user), so who's
-                // creating the account is what matters. Same live,
-                // immediately-saving component SettingsAdminPage itself
-                // uses, scoped to whichever Hjemmeafdeling this new user is
-                // being assigned to, so it can be set up in the same flow.
+                // creating the account is what matters. Same component
+                // SettingsAdminPage itself uses, scoped to whichever
+                // Hjemmeafdeling this new user is being assigned to, so it
+                // can be set up in the same flow. deferSave (reusing
+                // rettighederRef — mutually exclusive at runtime with the
+                // admin-editing-someone-else instance above, since that one
+                // only renders when `user` exists and this one only when it
+                // doesn't) so toggling a checkbox here does NOT write to
+                // department_settings immediately: nothing is persisted
+                // until "Opret bruger" is pressed and its own ConfirmDialog
+                // confirmed (handleConfirm's create branch calls
+                // rettighederRef.current.save() right after the new user is
+                // actually created) — a checkbox toggled here, followed by
+                // "Fortryd" or just navigating away, must never silently
+                // change a real department's shared rights before the user
+                // it was meant for even exists.
                 <RettighederSettings
+                  ref={rettighederRef}
                   table="department_settings"
                   scopeColumn="department_id"
                   scopeId={homeDepartmentId ?? null}
-                  heading="Rettigheder for den nye bruger"
+                  heading="Tilladelser for den nye bruger"
+                  deferSave
+                />
+              )}
+
+              {/* Standard settings/Anvendelser — full edit for self (deferSave,
+                  same Fortryd/Opdater pair the old standalone "/settings-user"
+                  had), view-only for an admin looking at someone else's own
+                  row (a capability admins didn't have before this page
+                  absorbed "/settings-user" — see this component's own doc
+                  comment). Never shown during the CREATE flow (no `user` yet
+                  — nothing to scope these settings to). Placed AFTER every
+                  Rettigheder section above (not right after the field list)
+                  so its own embedded Fortryd/Opdater pair (deferSave, self
+                  only) ends up the last thing on the page before the
+                  submit-error/bottom action buttons, rather than sitting in
+                  the middle of the page. */}
+              {user && (
+                <StandardSettings
+                  table="user_settings"
+                  scopeColumn="user_id"
+                  scopeId={user.user_id}
+                  settings={standardAndAnvendelserSettings}
+                  departmentId={homeDepartmentId ?? null}
+                  deferSave={isSelf}
+                  readOnly={!isSelf}
+                  extraDirty={anvendelseDirty}
+                  onExtraCommit={() => anvendelseRef.current?.save() ?? Promise.resolve({ error: null })}
+                  onExtraRevert={() => anvendelseRef.current?.revert()}
                 />
               )}
 
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-              {user ? (
+              {user && !isSelf ? (
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -991,7 +1226,7 @@ export function UserDetailsPage() {
                     </div>
                   )}
                 </div>
-              ) : (
+              ) : !user ? (
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -1012,7 +1247,7 @@ export function UserDetailsPage() {
                     Fortryd
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </section>
         </motion.main>
@@ -1024,7 +1259,20 @@ export function UserDetailsPage() {
             pendingAction === "create"
               ? "Er du sikker på, at du vil oprette denne bruger?"
               : pendingAction === "update"
-                ? "Er du sikker på, at du vil opdatere denne bruger?"
+                ? (
+                    <>
+                      Er du sikker på, at du vil opdatere denne bruger?
+                      {isCrossingDepartmentBoundary && (
+                        // Informational only — the update itself is still allowed
+                        // (a regular admin's real authorization boundary is their
+                        // whole costumer, not their own granted departments — see
+                        // update-user.mts). This just makes sure they notice.
+                        <span className="mt-2 block text-amber-600">
+                          Bemærk: denne bruger er ikke i en af dine egne afdelinger — du er ved at krydse dine normale afdelingsgrænser.
+                        </span>
+                      )}
+                    </>
+                  )
                 : pendingAction === "delete"
                   ? "Er du sikker på, at du vil blokere denne bruger adgang? Brugeren kan ikke længere logge ind, men brugerens historik (fx bookinger) bevares."
                   : pendingAction === "reactivate"

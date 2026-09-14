@@ -3,7 +3,7 @@
 // useAuth() rather than taking props, so every page can just render
 // <PageHeader /> with no wiring — this is the single source of truth for
 // that layout; changing it here changes it everywhere.
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth, type DepartmentOption } from "../contexts/AuthContext";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm } from "../lib/roles";
@@ -78,29 +78,36 @@ export interface PageHeaderKundeNavigateField {
  */
 export interface PageHeaderAfdelingNavigateField {
   onSelect: (department: DepartmentOption) => void;
+  /** True while onSelect's own async work (e.g. a useScopeSwitch call) is in flight — disables the <select> so a second pick can't fire an overlapping request. */
+  disabled?: boolean;
+  /** An error message from onSelect's own async work, shown via the same InlinePopup pattern as switchError just below. */
+  error?: string | null;
 }
 
 /**
  * The settings destination(s) for a given `user_profiles.role`. A plain
  * "user" (any non-"admin"/"sysadm" role, including null/undefined,
  * matching formatRoleLabel's convention) has only one settings page
- * (personal), so the settings button navigates straight there — no menu.
- * "admin"/"sysadm" have TWO: their own personal settings (previously
- * unreachable at all — "/settings-user" required role==="user" exactly,
- * see App.tsx) alongside their department/FLEETii-wide settings page —
- * hence a small menu instead of a single destination.
+ * (personal — self-view of "/user-details/:ownUserId", see
+ * UserDetailsPage.tsx), so the settings button navigates straight there —
+ * no menu. "admin"/"sysadm" have TWO: their own personal settings (same
+ * self-view route) alongside their department/FLEETii-wide settings page —
+ * hence a small menu instead of a single destination. `ownUserId` is the
+ * viewing user's own user_id (profile.user_id) — needed here since the
+ * personal-settings destination is no longer a fixed path.
  */
-function settingsMenuItemsForRole(role?: string | null): SettingsMenuItem[] {
+function settingsMenuItemsForRole(role: string | null | undefined, ownUserId: string | undefined): SettingsMenuItem[] {
+  const personalSettingsPath = `/user-details/${ownUserId}`;
   if (isSysadm(role)) {
     return [
-      { label: "Brugerindstillinger", path: "/settings-user" },
+      { label: "Brugerindstillinger", path: personalSettingsPath },
       { label: "FLEETii-indstillinger", path: "/settings-superadmin" },
     ];
   }
   if (isDepartmentAdmin(role)) {
     return [
-      { label: "Brugerindstillinger", path: "/settings-user" },
-      { label: "Afdelingsindstillinger", path: "/settings-department" },
+      { label: "Brugerindstillinger", path: personalSettingsPath },
+      { label: "Afdelingsindstillinger", path: "/department-settings" },
     ];
   }
   return [];
@@ -174,6 +181,7 @@ export function PageHeader({
   hideKundeAlle = false,
   kundeNavigate,
   afdelingNavigate,
+  onSwitcherOpenChange,
 }: {
   compact?: boolean;
   rolleFilter?: PageHeaderFilterField;
@@ -187,6 +195,8 @@ export function PageHeader({
   hideKundeAlle?: boolean;
   kundeNavigate?: PageHeaderKundeNavigateField;
   afdelingNavigate?: PageHeaderAfdelingNavigateField;
+  /** Fires whenever the "Data Filter" popup opens/closes — optional, purely so a page whose koretoejNavigate/brugerNavigate options come from an otherwise-unconditional fetch (see useCostumerQuickJumpOptions) can defer that fetch until the popup is actually opened at least once, instead of firing it on every mount regardless of whether the admin ever opens Data Filter at all. */
+  onSwitcherOpenChange?: (open: boolean) => void;
 } = {}) {
   const {
     signOut,
@@ -205,27 +215,43 @@ export function PageHeader({
   const navigate = useNavigate();
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  useEffect(() => {
+    onSwitcherOpenChange?.(switcherOpen);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [switcherOpen]);
   const [switchError, setSwitchError] = useState<string | null>(null);
+  /** True for the duration of any in-flight handleSwitch call — disables BOTH the Kunde and Afdeling <select>s (see their disabled props below) so a second pick can't fire while the first is still resolving. Without this, picking Kunde then immediately picking Afdeling "Alle" before the first switchDepartment call resolves would read a stale, pre-switch costumerId out of this render's closure (line ~496) and silently clobber the just-made Kunde pick once both requests land. */
+  const [isSwitchingScope, setIsSwitchingScope] = useState(false);
   const [seedingBookings, setSeedingBookings] = useState(false);
   const [seedResultMessage, setSeedResultMessage] = useState<string | null>(null);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
-  const settingsMenuItems = settingsMenuItemsForRole(profile?.role);
+  const settingsMenuItems = settingsMenuItemsForRole(profile?.role, profile?.user_id);
 
   /** Whether the Kunde <select> and the Afdeling <select>'s own "Alle" option should be offered — only for a sysadm (afdelingId === null IS "Alle" — see AuthContext's switchDepartment/loadAvailableDepartments). Regular admins never see either: their afdelingId is always a real department within their own fixed costumer, and "Alle" isn't a valid state for them at all. */
   const canSwitchToAll = isSysadm(profile?.role);
 
-  /** Sysadm-only: every distinct Kunde availableDepartments spans, for the Kunde <select> below — deduped by costumerId (the grouping key, not costumerName, which can collide across costumers), sorted by name. */
-  const kundeOptions = canSwitchToAll
-    ? Array.from(
-        new Map(
-          availableDepartments
-            .filter((d): d is typeof d & { costumerId: string } => Boolean(d.costumerId))
-            .map((d) => [d.costumerId, d.costumerName ?? "Kunde"] as const),
-        ).entries(),
-      ).sort((a, b) => a[1].localeCompare(b[1]))
-    : [];
-  /** Options for the Afdeling <select> below — sysadm: every department under the currently-active Kunde (global costumerId), or every department platform-wide once Kunde is "Alle" (costumerId null); non-sysadm: their own grant list, unfiltered (they have no Kunde field to narrow by, and every entry is already within their one fixed costumer). */
-  const afdelingOptions = canSwitchToAll ? availableDepartments.filter((d) => !costumerId || d.costumerId === costumerId) : availableDepartments;
+  /** Whether any page-local filter field (Rolle/Bruger/Navn/Køretøj) is currently narrowing the list — the same set "Nulstil filter" below resets. Drives the funnel button's own active-highlight (see its className below), same red/highlighted signal every per-page funnel-filter button gave before this control absorbed them. Deliberately does NOT include Kunde/Afdeling: those are now persisted, session-wide scope (switchDepartment) rather than an ephemeral filter, so a non-sysadm's everyday, always-on department scope would otherwise make this permanently "active" for them. */
+  const hasActiveFilter = Boolean(rolleFilter?.value || brugerFilter?.value || navnFilter?.value || koretoejFilter?.value);
+
+  /** Sysadm-only: every distinct Kunde availableDepartments spans, for the Kunde <select> below — deduped by costumerId (the grouping key, not costumerName, which can collide across costumers), sorted by name. Memoized: this component re-renders often (e.g. every isSwitchingScope/notImplementedKey change, or callers passing fresh inline filter-field props), and for a sysadm availableDepartments can span every department platform-wide — no need to redo the dedupe-and-sort on renders where it hasn't actually changed. */
+  const kundeOptions = useMemo(
+    () =>
+      canSwitchToAll
+        ? Array.from(
+            new Map(
+              availableDepartments
+                .filter((d): d is typeof d & { costumerId: string } => Boolean(d.costumerId))
+                .map((d) => [d.costumerId, d.costumerName ?? "Kunde"] as const),
+            ).entries(),
+          ).sort((a, b) => a[1].localeCompare(b[1]))
+        : [],
+    [canSwitchToAll, availableDepartments],
+  );
+  /** Options for the Afdeling <select> below — sysadm: every department under the currently-active Kunde (global costumerId), or every department platform-wide once Kunde is "Alle" (costumerId null); non-sysadm: their own grant list, unfiltered (they have no Kunde field to narrow by, and every entry is already within their one fixed costumer). Memoized for the same reason as kundeOptions above. */
+  const afdelingOptions = useMemo(
+    () => (canSwitchToAll ? availableDepartments.filter((d) => !costumerId || d.costumerId === costumerId) : availableDepartments),
+    [canSwitchToAll, availableDepartments, costumerId],
+  );
 
   /**
    * departmentId null means "Alle" (no costumerId) or "just this Kunde"
@@ -237,10 +263,16 @@ export function PageHeader({
    * — same "stays open until the outside-click overlay closes it" behavior
    * as every page's own funnel-filter popup, and functionally required
    * here: picking a Kunde must leave the Afdeling <select> reachable for a
-   * second pick, not close the popup out from under it.
+   * second pick, not close the popup out from under it. DOES disable both
+   * selects for the duration (isSwitchingScope) — see that state's own doc
+   * comment for why: a second pick fired before this one resolves would
+   * read a stale costumerId/afdelingId out of a closure captured before the
+   * first switch's result had propagated.
    */
   const handleSwitch = async (departmentId: string | null, costumerId?: string | null) => {
+    setIsSwitchingScope(true);
     const error = await switchDepartment(departmentId, costumerId);
+    setIsSwitchingScope(false);
     if (error) {
       setSwitchError(error);
       triggerNotImplemented("switch-department-error");
@@ -390,7 +422,11 @@ export function PageHeader({
                 }
                 aria-label="Data Filter"
                 title="Data Filter"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
+                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border transition ${
+                  hasActiveFilter
+                    ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+                    : "border-brand-200 bg-brand-50 text-brand-700 hover:bg-brand-100"
+                }`}
               >
                 {/* Same funnel icon every page's own "Filtrer" popup uses (e.g. VehiclesPage.tsx) — this control is now that same family of filter, just app-wide/persisted for Kunde/Afdeling. */}
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
@@ -427,8 +463,9 @@ export function PageHeader({
                         ) : (
                           <select
                             value={costumerId ?? ""}
+                            disabled={isSwitchingScope}
                             onChange={(e) => void handleSwitch(null, e.target.value || null)}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             {/* Nothing meaningful to choose between with 0-1 real options. Also hidden outright when hideKundeAlle is set (CostumerDetailsPage.tsx — see its own doc comment), regardless of option count. */}
                             {kundeOptions.length > 1 && !hideKundeAlle && <option value="">Alle</option>}
@@ -442,27 +479,32 @@ export function PageHeader({
                       </label>
                     )}
                     {!hideAfdeling && (
-                    <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
+                    <label className="relative mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
                       Afdeling
                       {afdelingNavigate ? (
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            const department = afdelingOptions.find((d) => d.department_id === e.target.value);
-                            if (department) afdelingNavigate.onSelect(department);
-                          }}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          <option value="">Vælg…</option>
-                          {afdelingOptions.map((department) => (
-                            <option key={department.department_id} value={department.department_id}>
-                              {!costumerId && department.costumerName ? `${department.costumerName}/${department.name}` : department.name}
-                            </option>
-                          ))}
-                        </select>
+                        <>
+                          <select
+                            value=""
+                            disabled={afdelingNavigate.disabled}
+                            onChange={(e) => {
+                              const department = afdelingOptions.find((d) => d.department_id === e.target.value);
+                              if (department) afdelingNavigate.onSelect(department);
+                            }}
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            <option value="">Vælg…</option>
+                            {afdelingOptions.map((department) => (
+                              <option key={department.department_id} value={department.department_id}>
+                                {!costumerId && department.costumerName ? `${department.costumerName}/${department.name}` : department.name}
+                              </option>
+                            ))}
+                          </select>
+                          <InlinePopup visible={Boolean(afdelingNavigate.error)} message={afdelingNavigate.error ?? ""} align="right" />
+                        </>
                       ) : (
                         <select
                           value={!canSwitchToAll && afdelingScopedToAllGrants ? "" : (afdelingId ?? "")}
+                          disabled={isSwitchingScope}
                           onChange={(e) => {
                             const departmentId = e.target.value || null;
                             if (!canSwitchToAll) {
@@ -487,7 +529,7 @@ export function PageHeader({
                             // onChange sets, just reached from this field too.
                             void handleSwitch(departmentId, departmentId ? undefined : costumerId);
                           }}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
                         >
                           {/* Nothing meaningful to choose between with 0-1 real options — "Alle" and "that one department" (or no department at all) are the same thing, so hide the redundant choice. Shown for BOTH roles now — a non-sysadm's own "Alle" is just handled locally above (afdelingScopedToAllGrants) rather than persisted. Also hidden outright when hideAfdelingAlle is set (DepartmentDetailsPage.tsx — see its own doc comment), regardless of option count. */}
                           {afdelingOptions.length > 1 && !hideAfdelingAlle && <option value="">Alle</option>}
@@ -501,117 +543,67 @@ export function PageHeader({
                       )}
                     </label>
                     )}
-                    {/* Rolle/Bruger/Navn/Køretøj — a page's own extra filter fields (see PageHeaderFilterField), always in this fixed order regardless of which ones a given page actually supplies. mb-2 on every one but Køretøj, always the last of the four when present. */}
-                    {rolleFilter && (
-                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
-                        {rolleFilter.label}
-                        <select
-                          value={rolleFilter.value}
-                          onChange={(e) => rolleFilter.onChange(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          {/* Always shown, same reasoning as Køretøj's own — DepartmentPage.tsx resets this field to "" the moment Kunde/Afdeling changes, so it needs a real <option value=""> to land on even with only one Rolle in view. */}
-                          <option value="">Alle</option>
-                          {rolleFilter.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                    {/* Rolle/Bruger/Navn/Køretøj — a page's own extra filter fields (see PageHeaderFilterField), always in this fixed order regardless of which ones a given page actually supplies, data-driven below rather than four near-identical copies. Each always offers "Alle" (a real <option value="">) regardless of its own options.length — every page supplying one of these resets its value back to "" the moment Kunde/Afdeling changes (a previously-picked value almost certainly doesn't belong to the new scope, see e.g. DepartmentPage.tsx's/VehiclesPage.tsx's own reset effects), so that "" needs a real option to land on even with only one real choice in view — hiding "Alle" would leave the browser defaulting to showing that sole option as if deliberately picked, the exact misleading state the reset is trying to avoid. Køretøj (the last of the four when present) skips the trailing mb-2 the other three carry. */}
+                    {(
+                      [
+                        { key: "rolle", field: rolleFilter, marginBottom: true },
+                        { key: "bruger", field: brugerFilter, marginBottom: true },
+                        { key: "navn", field: navnFilter, marginBottom: true },
+                        { key: "koretoej", field: koretoejFilter, marginBottom: false },
+                      ] as const
+                    ).map(
+                      ({ key, field, marginBottom }) =>
+                        field && (
+                          <label
+                            key={key}
+                            className={`${marginBottom ? "mb-2 " : ""}block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800`}
+                          >
+                            {field.label}
+                            <select
+                              value={field.value}
+                              onChange={(e) => field.onChange(e.target.value)}
+                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            >
+                              <option value="">Alle</option>
+                              {field.options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ),
                     )}
-                    {brugerFilter && (
-                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
-                        {brugerFilter.label}
-                        <select
-                          value={brugerFilter.value}
-                          onChange={(e) => brugerFilter.onChange(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          {/* Always shown, same reasoning as Køretøj's own — DepartmentPage.tsx resets this field to "" the moment Kunde/Afdeling changes, so it needs a real <option value=""> to land on even with only one Bruger in view. */}
-                          <option value="">Alle</option>
-                          {brugerFilter.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {navnFilter && (
-                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
-                        {navnFilter.label}
-                        <select
-                          value={navnFilter.value}
-                          onChange={(e) => navnFilter.onChange(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          {/* Always shown, same reasoning as Køretøj's own — DepartmentPage.tsx resets this field to "" the moment Kunde/Afdeling changes, so it needs a real <option value=""> to land on even with only one Navn in view. */}
-                          <option value="">Alle</option>
-                          {navnFilter.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {koretoejFilter && (
-                      <label className="block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
-                        {koretoejFilter.label}
-                        <select
-                          value={koretoejFilter.value}
-                          onChange={(e) => koretoejFilter.onChange(e.target.value)}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          {/* Unlike the other fields, always shown regardless of options.length — VehiclesPage.tsx/FleetManagementPage.tsx reset this field's value back to "" the moment Kunde/Afdeling changes (a previous pick almost certainly doesn't belong to the new scope), and with only one vehicle in view, hiding "Alle" would leave no <option value=""> for that "" to actually match — the browser would just default-show the sole vehicle as if it were deliberately picked, which is exactly the misleading state the reset is trying to avoid. */}
-                          <option value="">Alle</option>
-                          {koretoejFilter.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {/* Køretøjer/Brugere — AdminFrontpage.tsx's own "quick jump straight to one specific vehicle's/user's detail page" (see PageHeaderNavigateField), never present alongside the filter fields above (mutually exclusive per page), so their own mb-2/no-mb-2 spacing doesn't need to account for these two. */}
-                    {koretoejNavigate && (
-                      <label className="mb-2 block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
-                        {koretoejNavigate.label}
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (e.target.value) koretoejNavigate.onSelect(e.target.value);
-                          }}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          <option value="">Vælg…</option>
-                          {koretoejNavigate.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    )}
-                    {brugerNavigate && (
-                      <label className="block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800">
-                        {brugerNavigate.label}
-                        <select
-                          value=""
-                          onChange={(e) => {
-                            if (e.target.value) brugerNavigate.onSelect(e.target.value);
-                          }}
-                          className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                        >
-                          <option value="">Vælg…</option>
-                          {brugerNavigate.options.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
+                    {/* Køretøjer/Brugere — AdminFrontpage.tsx's own "quick jump straight to one specific vehicle's/user's detail page" (see PageHeaderNavigateField), never present alongside the filter fields above (mutually exclusive per page), so their own mb-2/no-mb-2 spacing doesn't need to account for these two. Same data-driven rendering as the filter fields above. */}
+                    {(
+                      [
+                        { key: "koretoejNavigate", field: koretoejNavigate, marginBottom: true },
+                        { key: "brugerNavigate", field: brugerNavigate, marginBottom: false },
+                      ] as const
+                    ).map(
+                      ({ key, field, marginBottom }) =>
+                        field && (
+                          <label
+                            key={key}
+                            className={`${marginBottom ? "mb-2 " : ""}block text-[0.7rem] font-semibold uppercase tracking-wide text-brand-800`}
+                          >
+                            {field.label}
+                            <select
+                              value=""
+                              onChange={(e) => {
+                                if (e.target.value) field.onSelect(e.target.value);
+                              }}
+                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            >
+                              <option value="">Vælg…</option>
+                              {field.options.map((option) => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                        ),
                     )}
                     {(rolleFilter?.value || brugerFilter?.value || navnFilter?.value || koretoejFilter?.value) && (
                       <button
@@ -639,7 +631,7 @@ export function PageHeader({
                 type="button"
                 onClick={() =>
                   settingsMenuItems.length === 0
-                    ? navigate("/settings-user")
+                    ? navigate(`/user-details/${profile?.user_id}`)
                     : setSettingsMenuOpen((open) => !open)
                 }
                 aria-label="Indstillinger"

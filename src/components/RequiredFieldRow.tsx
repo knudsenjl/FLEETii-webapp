@@ -25,6 +25,8 @@ interface RequiredFieldRowProps {
   inputClassName?: string;
   /** Omits the red "*" marker — for a spot where that specific mark already carries a DIFFERENT meaning nearby (e.g. AnvendelseSettings' "* Kan ikke ændres eller slettes" protected-row note) and would otherwise read as a contradictory signal. The field stays functionally required (still gates its own submit button, still HTML `required`) — only the red-asterisk affordance is dropped in favor of a plain placeholder hint. Defaults to false (show it, the normal case everywhere else). */
   hideAsterisk?: boolean;
+  /** Renders a locked, non-interactive input instead (readOnly + disabled + the same muted "locked" styling UserDetailsPage.tsx uses for its own Hjemmeafdeling display) and suppresses the required asterisk (nothing to actually require when the field can't be edited here) — for UserDetailsPage's self-view, where profile fields are shown but not editable from this page. Defaults to false. */
+  readOnly?: boolean;
 }
 
 /** One required-field table row (label + red asterisk + required input). Pair with a "* Feltet skal udfyldes" legend below the table and gate the submit button on every required field being non-empty. */
@@ -38,20 +40,23 @@ export function RequiredFieldRow({
   labelClassName = DEFAULT_LABEL_CLASSNAME,
   inputClassName = DEFAULT_INPUT_CLASSNAME,
   hideAsterisk = false,
+  readOnly = false,
 }: RequiredFieldRowProps) {
   return (
     <div className={className}>
       <label className={labelClassName}>
-        {label} {!hideAsterisk && <span className="ml-0.5 text-red-600">*</span>}
+        {label} {!hideAsterisk && !readOnly && <span className="ml-0.5 text-red-600">*</span>}
       </label>
       <input
         type={type}
-        required
-        aria-required="true"
+        required={!readOnly}
+        aria-required={!readOnly}
+        readOnly={readOnly}
+        disabled={readOnly}
         placeholder={placeholder}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={inputClassName}
+        className={readOnly ? "cursor-not-allowed rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800" : inputClassName}
       />
     </div>
   );

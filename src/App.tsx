@@ -37,7 +37,6 @@ import { VehicleDeletePage } from "./pages/VehicleDeletePage";
 import { AboutPage } from "./pages/AboutPage";
 import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
 import { SettingsAdminPage } from "./pages/SettingsAdminPage";
-import { SettingsUserPage } from "./pages/SettingsUserPage";
 import { SetPasswordPage } from "./pages/SetPasswordPage";
 import { TwoHireCommandPage } from "./pages/TwoHireCommandPage";
 
@@ -74,6 +73,20 @@ function RootRoute() {
   }
 
   return <LoginPage />;
+}
+
+/**
+ * Old "/settings-user" bookmarks/links (that page was retired — see
+ * UserDetailsPage.tsx's own doc comment) redirect here to the equivalent
+ * self-view route instead of 404ing. Reads profile.user_id fresh from
+ * useAuth() rather than baking it into the route itself, since a redirect
+ * component can't take a router :param no one supplied. Falls back to "/"
+ * in the (should-be-impossible, ProtectedRoute already guarantees a session)
+ * case profile isn't loaded yet.
+ */
+function SettingsUserRedirect() {
+  const { profile } = useAuth();
+  return <Navigate to={profile?.user_id ? `/user-details/${profile.user_id}` : "/"} replace />;
 }
 
 /**
@@ -280,7 +293,7 @@ function App() {
           <Route
             path="/user-details/:userId"
             element={
-              <ProtectedRoute requireAdmin>
+              <ProtectedRoute>
                 <UserDetailsPage />
               </ProtectedRoute>
             }
@@ -342,9 +355,9 @@ function App() {
             }
           />
           <Route
-            path="/settings-department"
+            path="/department-settings"
             element={
-              <ProtectedRoute requireRole="admin">
+              <ProtectedRoute requireAdmin>
                 <SettingsAdminPage />
               </ProtectedRoute>
             }
@@ -353,7 +366,7 @@ function App() {
             path="/settings-user"
             element={
               <ProtectedRoute>
-                <SettingsUserPage />
+                <SettingsUserRedirect />
               </ProtectedRoute>
             }
           />
