@@ -10,7 +10,9 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
+import { useScopeSwitch } from "../hooks/useScopeSwitch";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `costumers` table. Fetched in full (not just costumer_id/name/deactivated_at) so the object handed to CostumerDetailsPage via router state already has everything it displays — otherwise its view would show "—" for cvr/address fields/contact_person/phone/email until its own fetch-by-id fallback kicked in. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
@@ -33,10 +35,14 @@ type Costumer = {
 export function CostumerAdministrationPage() {
   const navigate = useNavigate();
   const { costumerId, switchDepartment } = useAuth();
+  /** The Afdeling quick-jump below sets the header's scope to the picked department BEFORE navigating (DepartmentDetailsPage now reads Kunde/Afdeling purely from context, not router state). */
+  const afdelingSwitch = useScopeSwitch();
 
   const [costumers, setCostumers] = useState<Costumer[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /** Surfaces a failure from the mount-only scope-reset effect below — every other switchDepartment call site added by this rework (PageHeader's own handleSwitch, useScopeSwitch's switchAndNavigate) shows its error the same way; a silently-swallowed failure here would leave a stale Kunde scope narrowing the Afdeling quick-jump's option list with nothing hinting why. */
+  const [resetScopeError, setResetScopeError] = useState<string | null>(null);
 
   /**
    * This page's own table lists every costumer platform-wide (no
@@ -53,7 +59,10 @@ export function CostumerAdministrationPage() {
    * LIST genuinely still depends on it, so it isn't moot).
    */
   useEffect(() => {
-    if (costumerId !== null) void switchDepartment(null, null);
+    if (costumerId === null) return;
+    void switchDepartment(null, null).then((err) => {
+      if (err) setResetScopeError(err);
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -101,14 +110,15 @@ export function CostumerAdministrationPage() {
             kundeNavigate={{ onSelect: (id) => navigate(`/costumer-details/${id}`) }}
             afdelingNavigate={{
               onSelect: (department) =>
-                navigate("/department-details", {
-                  state: { costumerId: department.costumerId, costumerName: department.costumerName, departmentId: department.department_id },
-                }),
+                void afdelingSwitch.switchAndNavigate(department.department_id, department.costumerId, "/department-details"),
+              disabled: afdelingSwitch.isSwitching,
+              error: afdelingSwitch.error,
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <section className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
+            <InlinePopup visible={Boolean(resetScopeError)} message={resetScopeError ?? ""} align="right" />
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-[0.7rem]">

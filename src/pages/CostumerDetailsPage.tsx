@@ -13,6 +13,8 @@ import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useScopeSwitchGroup } from "../hooks/useScopeSwitchGroup";
+import { useCostumerQuickJumpOptions } from "../hooks/useCostumerQuickJumpOptions";
 
 /** The costumer row, as passed in via router state from CostumerAdministrationPage. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
@@ -159,10 +161,8 @@ export function CostumerDetailsPage() {
   const [usersCount, setUsersCount] = useState<number | null>(null);
   /** No single department to key useIdentSettings on here (this page spans the whole costumer, and a sysadm has no "home" department of their own) — null always resolves both flags to false (see that hook's own fail-closed doc comment), same approximation AdminFrontpage.tsx accepts for its own costumer-wide Køretøjer/Brugere quick-jump labels. */
   const { useUserIdent, useVehicleIdent } = useIdentSettings(null);
-  /** "Køretøjer" quick-jump options for the header's own Data Filter (see koretoejNavigate below) — every vehicle under this costumer, "(Blokeret)" suffixed the same way AdminFrontpage.tsx's own version is. */
-  const [vehicleOptions, setVehicleOptions] = useState<{ value: string; label: string }[]>([]);
-  /** "Brugere" quick-jump options — every user under this costumer, INCLUDING blocked ones (reversible, so still reachable to unblock) and excluding role=sysadm, same as AdminFrontpage.tsx's own version. */
-  const [userOptions, setUserOptions] = useState<{ value: string; label: string }[]>([]);
+  /** True once the Data Filter popup has been opened at least once — see useCostumerQuickJumpOptions' own `enabled` doc comment. Sticky, same as AdminFrontpage.tsx's own identical flag. */
+  const [quickJumpEnabled, setQuickJumpEnabled] = useState(false);
   /** The RAW 2hire client ID, fetched separately via the get_twohire_client_id() RPC rather than the costumer select above — see costumers_scope_twohire_client_id_to_fleetii_admin.sql: the column's SELECT grant was revoked table-wide (an OAuth2 client_id is semi-public in general, but this app scopes it to sysadm specifically, not "any of this costumer's own users"), so the RPC re-checks is_sysadm() itself and returns null for anyone else regardless of this page's own route gate. null while loading or genuinely unset — both render the same empty `<input>` below. */
   const [twoHireClientId, setTwoHireClientId] = useState<string | null>(null);
 
@@ -175,11 +175,12 @@ export function CostumerDetailsPage() {
     editPhone.trim().length > 0 &&
     editEmail.trim().length > 0;
 
-  /** Always (re)fetches the costumer by id — even when router state already has one, since that state can be stale (see costumer's own comment above). stateCostumer still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. */
+  /** Always (re)fetches the costumer by id — even when router state already has one, since that state can be stale (see costumer's own comment above). stateCostumer still avoids a loading flash for a normal navigation by giving the first paint something to show while this resolves. Resets fetchedCostumer back to undefined FIRST (not just on the initial mount, where it's already undefined) — without this, switching Kunde in the header while already sitting on this page (the "follow the header" effect below navigates to the new costumer's URL, same routed component, no remount) would leave `costumer` pointing at the PREVIOUS costumer's still-truthy fetchedCostumer value until this fetch resolves, rendering the wrong company's data under the new URL instead of the loading state. */
   useEffect(() => {
     if (!costumerId) return;
 
     let cancelled = false;
+    setFetchedCostumer(undefined);
     setCostumerLoading(true);
     void supabase
       .from("costumers")
@@ -305,6 +306,11 @@ export function CostumerDetailsPage() {
       .from("user_profiles")
       .select("user_id", { count: "exact", head: true })
       .eq("costumer_id", targetCostumerId)
+      // Excludes sysadm — that role's own costumer_id is just a Data Filter
+      // scope pointer, not real membership, same exclusion DepartmentPage.tsx's
+      // own Brugere query uses (2026-09-14 fix, same bug class as
+      // AdminFrontpage.tsx/DepartmentDetailsPage.tsx's own BRUGERE badges).
+      .neq("role", "sysadm")
       .then(({ count }) => {
         if (!cancelled) setUsersCount(count ?? 0);
       });
@@ -314,72 +320,16 @@ export function CostumerDetailsPage() {
     };
   }, [costumer?.costumer_id]);
 
-  // "Køretøjer" quick-jump options for the header's own Data Filter (see
-  // koretoejNavigate below) — every vehicle under this costumer, same shape/
-  // "(Blokeret)" suffix as AdminFrontpage.tsx's own version.
-  useEffect(() => {
-    const targetCostumerId = costumer?.costumer_id;
-    if (!targetCostumerId) {
-      setVehicleOptions([]);
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("vehicle_profiles")
-      .select("vehicle_id, vehicle_ident, number_plate, blocked_at")
-      .eq("costumer_id", targetCostumerId)
-      .order("number_plate", { ascending: true })
-      .returns<{ vehicle_id: string; vehicle_ident: string | null; number_plate: string | null; blocked_at: string | null }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setVehicleOptions(
-          (data ?? []).map((v) => ({
-            value: v.vehicle_id,
-            label:
-              ((useVehicleIdent ? v.vehicle_ident || v.number_plate : v.number_plate) ?? "—") +
-              (v.blocked_at ? " (Blokeret)" : ""),
-          })),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [costumer?.costumer_id, useVehicleIdent]);
-
-  // "Brugere" quick-jump options — every user under this costumer, INCLUDING
-  // blocked ones (reversible, so still reachable to unblock) and excluding
-  // role=sysadm, same as AdminFrontpage.tsx's own version.
-  useEffect(() => {
-    const targetCostumerId = costumer?.costumer_id;
-    if (!targetCostumerId) {
-      setUserOptions([]);
-      return;
-    }
-
-    let cancelled = false;
-    void supabase
-      .from("user_profiles")
-      .select("user_id, email, user_ident, deleted_at")
-      .eq("costumer_id", targetCostumerId)
-      .neq("role", "sysadm")
-      .order("email", { ascending: true })
-      .returns<{ user_id: string; email: string | null; user_ident: string | null; deleted_at: string | null }[]>()
-      .then(({ data }) => {
-        if (cancelled) return;
-        setUserOptions(
-          (data ?? []).map((u) => ({
-            value: u.user_id,
-            label: ((useUserIdent ? u.user_ident || u.email : u.email) ?? "—") + (u.deleted_at ? " (Blokeret)" : ""),
-          })),
-        );
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [costumer?.costumer_id, useUserIdent]);
+  // "Køretøjer"/"Brugere" quick-jump options for the header's own Data
+  // Filter (see koretoejNavigate/brugerNavigate below) — see
+  // useCostumerQuickJumpOptions' own doc comment; enabled only once the
+  // popup has actually been opened (quickJumpEnabled, wired via
+  // onSwitcherOpenChange below), same lazy-fetch fix as AdminFrontpage.tsx's
+  // own identical version of this.
+  const { vehicleOptions, userOptions } = useCostumerQuickJumpOptions(costumer?.costumer_id, quickJumpEnabled, {
+    useVehicleIdent,
+    useUserIdent,
+  });
 
   // The RAW 2hire client ID — see twoHireClientId's own comment above for
   // why this is a separate RPC call rather than part of the costumer select.
@@ -569,11 +519,8 @@ export function CostumerDetailsPage() {
     setPendingAction(null);
   };
 
-  /** KØRETØJER/BRUGERE's own handler — navigates straight to `destination` UNLOCKED (costumerId/costumerName only, no departmentId), matching what those buttons' own count badges already promised: every vehicle/user across the whole costumer, not just one department's worth. VehiclesPage/DepartmentPage both support this unlocked, whole-costumer mode (with their own in-page Afdeling filter) precisely for this button — see their own doc comments. Used to fetch this costumer's departments first and fall back to DepartmentDetailsPage as a picker whenever there wasn't exactly one department; removed 2026-08-28 at the user's request, since landing on a whole different page just to pick one felt like the wrong destination for a button whose badge already showed the full count. */
-  const goToVehiclesOrUsers = (destination: "/fleet-table" | "/department") => {
-    if (!costumer) return;
-    navigate(destination, { state: { costumerId: costumer.costumer_id, costumerName: costumer.name } });
-  };
+  /** Flådestyring/AFDELINGER/KØRETØJER/BRUGERE all target this costumer, whole-costumer (no department pre-selected) — a switchDepartment(null, costumer.costumer_id) call resolves before navigating, since the destination pages (FleetManagementPage/DepartmentDetailsPage/VehiclesPage/DepartmentPage) now read Kunde/Afdeling scope purely from the global header, not router state. One shared useScopeSwitchGroup rather than 4 independent useScopeSwitch instances — see its own doc comment: each button still shows its OWN "Vent…"/error (compared against scopeSwitch.activeKey), but isSwitching itself is shared, so clicking a second button while the first is still resolving is ignored rather than racing two switchDepartment calls against each other. */
+  const scopeSwitch = useScopeSwitchGroup();
 
   const handleConfirm = async () => {
     if (pendingAction === "update") {
@@ -620,6 +567,9 @@ export function CostumerDetailsPage() {
             hideKundeAlle
             koretoejNavigate={{ label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }}
             brugerNavigate={{ label: "Brugere", options: userOptions, onSelect: (id) => navigate(`/user-details/${id}`) }}
+            onSwitcherOpenChange={(open) => {
+              if (open) setQuickJumpEnabled(true);
+            }}
           />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
@@ -842,19 +792,21 @@ export function CostumerDetailsPage() {
 
                 <hr className="border-brand-200" />
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/fleet-map", {
-                      state: {
-                        filters: { costumerId: costumer.costumer_id, department: "", plate: "", status: "" },
-                      },
-                    })
-                  }
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
-                  Flådestyring
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={scopeSwitch.isSwitching}
+                    onClick={() => void scopeSwitch.switchAndNavigate("fleet", null, costumer.costumer_id, "/fleet-map")}
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
+                  </button>
+                  <InlinePopup
+                    visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
+                    message={scopeSwitch.error ?? ""}
+                    align="right"
+                  />
+                </div>
 
                 <hr className="border-brand-200" />
 
@@ -862,36 +814,50 @@ export function CostumerDetailsPage() {
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate("/department-details", {
-                          state: { costumerId: costumer.costumer_id, costumerName: costumer.name },
-                        })
-                      }
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("afdelinger", null, costumer.costumer_id, "/department-details")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      AFDELINGER
+                      {scopeSwitch.activeKey === "afdelinger" && scopeSwitch.isSwitching ? "Vent…" : "AFDELINGER"}
                     </button>
                     <CountBadge count={departmentsCount} />
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "afdelinger" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
                   </div>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
-                      onClick={() => goToVehiclesOrUsers("/fleet-table")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("koretojer", null, costumer.costumer_id, "/fleet-table")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      KØRETØJER
+                      {scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
                     </button>
                     <CountBadge count={vehiclesCount} />
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "koretojer" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
                   </div>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
-                      onClick={() => goToVehiclesOrUsers("/department")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("brugere", null, costumer.costumer_id, "/department")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      BRUGERE
+                      {scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
                     </button>
                     <CountBadge count={usersCount} />
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "brugere" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
                   </div>
                   <div className="relative aspect-square w-28">
                     <button
