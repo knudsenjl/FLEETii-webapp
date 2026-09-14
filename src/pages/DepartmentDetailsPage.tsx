@@ -1,12 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
+import { InlinePopup } from "../components/InlinePopup";
+import { useScopeSwitchGroup } from "../hooks/useScopeSwitchGroup";
+import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useCostumerQuickJumpOptions } from "../hooks/useCostumerQuickJumpOptions";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `departments` table, scoped to this costumer. */
@@ -15,110 +19,99 @@ type Department = { department_id: string; name: string | null; address: string 
 /** sessionStorage key prefix for the last-selected department, one entry per costumer (see the selection-persistence effect below). */
 const SELECTED_DEPARTMENT_KEY_PREFIX = "department-details:selected:";
 
-/** Pencil glyph for a row's edit icon — swaps to SaveIcon once that row is in edit mode. Same flat, currentColor-stroked style as PadlockGlyph.tsx, but local to this file since it's only used here. */
-function EditIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
-  );
-}
-
-/** Floppy-disk glyph for a row's save icon — shown in place of EditIcon while that row is being edited. */
-function SaveIcon({ className = "h-4 w-4" }: { className?: string }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      className={className}
-      fill="none"
-      stroke="currentColor"
-      strokeWidth={2}
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z" />
-      <path d="M17 21v-8H7v8" />
-      <path d="M7 3v5h8" />
-    </svg>
-  );
-}
-
 /**
  * "Afdelinger hos {costumer}" page ("/department-details") — reachable by
  * any admin (see ProtectedRoute requireAdmin in App.tsx: "admin" and
  * "sysadm" both reach this page now), from CostumerDetailsPage's
  * "Administration af afdelinger" button, AdminFrontpage's own AFDELINGER
- * button, or KØRETØJER/BRUGERE's own fallback when the target costumer has
- * more than one department to pick from (costumerId/costumerName passed via
- * router state in every case — this page has no direct-URL fallback, since
- * there's no meaningful way to reach it without already knowing which
- * costumer; missing state redirects back to "/costumers"). It fetches its
- * own department list here rather than needing it pre-fetched and passed
- * along, unlike the old EditDepartmentsPage.tsx this absorbed (see below).
+ * button, or CostumerAdministrationPage's own department quick-jump. This
+ * page has no direct-URL fallback, since there's no meaningful way to reach
+ * it without a Kunde in scope — its own costumerId/costumerName are a
+ * direct alias of the global header's own current values (useAuth()), not
+ * router state; missing costumerId (a sysadm's fully-unscoped "Alle")
+ * redirects back to "/costumers". Every caller that needs a SPECIFIC
+ * department pre-selected here (rather than falling back to
+ * sessionStorage/auto-selecting the first one — see selectedDepartmentId's
+ * own doc comment) calls switchDepartment to set the header's own Afdeling
+ * before navigating, same mechanism this page's own KØRETØJER/BRUGERE/
+ * Flådestyring buttons below use. It fetches its own department list here
+ * rather than needing it pre-fetched and passed along, unlike the old
+ * EditDepartmentsPage.tsx this absorbed (see below).
  *
  * 2026-08-28: this page absorbed EditDepartmentsPage.tsx's own table (view/
  * rename/address-edit) wholesale, at the user's request — the previous
  * AFDELINGER → this page (create/select/delete) → "Rediger afdelinger" →
  * EditDepartmentsPage (rename/address-edit) → KØRETØJER/BRUGERE flow was
- * "too complicated". EditDepartmentsPage.tsx no longer exists; every
- * "Afdelinger" flow in the app now lands here directly.
+ * "too complicated". EditDepartmentsPage.tsx no longer exists.
  *
- * Each row shows its Afdeling (name) and Adresse as plain text until its own
- * edit icon (right-aligned) is clicked, which turns just that row's two
- * fields into inputs and swaps the icon to a save icon — clicking THAT
- * writes the row's name/address straight to the DB
- * (departments_update_policy_allow_admin_own_costumer.sql — sysadm:
- * any costumer, admin: their own costumer_id only) and flips the row back to
- * plain text. Only one row is ever mid-edit at a time. Both roles get this
- * view/rename capability — create/delete stays sysadm-only below
- * (gated on profile.role, not the route itself, since a regular admin still
- * needs the same route for renaming their own costumer's departments), same
- * boundary the old two-page split enforced via DepartmentDetailsPage's own
- * sysadm-only route gate.
+ * 2026-09-14: the row-level rename/address-edit capability that migration
+ * brought along was removed again — it now duplicates
+ * SettingsAdminPage.tsx's own "Afdelingsoplysninger" section
+ * (/department-settings), which both roles can reach from here via the
+ * "Indstillinger" button below (previously admin-only; opened to sysadm too
+ * the same day, see App.tsx's route). Each row here is now plain
+ * view/select only: clicking one (anywhere on the row, not just a name)
+ * sets selectedDepartmentId (page-local UI state — deliberately NOT itself a
+ * switchDepartment call, so browsing rows here stays instant/free of
+ * network cost) — besides gating "Slet afdeling" below, this also drives
+ * the KØRETØJER/BRUGERE/Flådestyring/Indstillinger buttons below: each
+ * switches the header to match selectedDepartmentId (see useScopeSwitch)
+ * right before navigating, since VehiclesPage/DepartmentPage/
+ * FleetManagementPage/SettingsAdminPage now read Kunde/Afdeling scope purely
+ * from the header, not router state. Auto-selects the first loaded
+ * department (and re-selects the first REMAINING one after a delete) rather
+ * than leaving nothing selected, so the quick-nav always has a real target
+ * once there's at least one department to point at. Create/delete stays
+ * sysadm-only below (gated on profile.role, not the route itself, since a
+ * regular admin still needs the same route to browse/select their own
+ * costumer's departments).
  *
- * Clicking anywhere else on a row (not the icon) selects it
- * (selectedDepartmentId) — besides gating "Slet afdeling" below, this also
- * drives a KØRETØJER/BRUGERE quick-nav: "filtering by navigation", same
- * pattern this app already uses elsewhere (VehiclesPage/DepartmentPage
- * themselves — see their own doc comments): either page opens LOCKED to
- * just that one department for the whole visit; to see a different
- * department's vehicles/users, select a different row here first.
- * Auto-selects the first loaded department (and re-selects the first
- * REMAINING one after a delete) rather than leaving nothing selected, so
- * the quick-nav always has a real target once there's at least one
- * department to point at.
+ * The header's own Data Filter also gets "Køretøjer"/"Brugere" quick-jump
+ * fields (koretoejNavigate/brugerNavigate below) — same
+ * AdminFrontpage.tsx/useCostumerQuickJumpOptions pattern, for either role,
+ * since this page shows department rows to click, not vehicle/user rows.
+ * Unlike AdminFrontpage.tsx's own whole-costumer version, both the option
+ * list AND the ident flags are narrowed to whichever department is
+ * currently selectedDepartmentId (useCostumerQuickJumpOptions' own optional
+ * departmentId param, added 2026-09-14 — this page has a real per-row
+ * selection to key off, so there's no need for that page's
+ * whole-costumer approximation) — so the quick-jump only ever offers
+ * vehicles/users that actually belong to the row currently selected above,
+ * not the whole costumer regardless of it.
  */
 export function DepartmentDetailsPage() {
   const navigate = useNavigate();
-  const location = useLocation();
-  const { profile } = useAuth();
+  const {
+    profile,
+    costumerId: activeCostumerId,
+    costumerName: activeCostumerName,
+    afdelingId: activeAfdelingId,
+    afdelingScopedToAllGrants,
+    setAfdelingScopedToAllGrants,
+  } = useAuth();
   const isSysadm = isSysadmRole(profile?.role);
-  const state = location.state as { costumerId?: string; costumerName?: string } | null;
-  const costumerId = state?.costumerId ?? null;
-  const costumerName = state?.costumerName ?? null;
+  /** This page's own identity IS the global header's current Kunde — there's no separate router-state seed any more (see CostumerAdministrationPage.tsx's afdelingNavigate/kundeNavigate quick-jumps, and CostumerDetailsPage.tsx's own drill-down buttons, which both call switchDepartment before navigating here). */
+  const costumerId = activeCostumerId;
+  const costumerName = activeCostumerName;
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [departmentsLoading, setDepartmentsLoading] = useState(true);
   const [departmentsError, setDepartmentsError] = useState<string | null>(null);
-  // Which row is highlighted — set on any row click, not just the edit icon.
-  // Seeded from sessionStorage (see the persistence effect below) rather
-  // than always starting null: this page fully remounts on browser-back
-  // from KØRETØJER/BRUGERE (a different route), which would otherwise reset
-  // the selection to null and let the auto-select-first effect below pick
-  // whichever department sorts first, silently discarding whatever the
-  // admin had actually selected before navigating away.
+  // Which row is highlighted — set on any row click.
+  // activeAfdelingId (the header's own Afdeling scope at mount — e.g. a
+  // sysadm arriving via CostumerAdministrationPage's department quick-jump,
+  // which calls switchDepartment before navigating here) wins first;
+  // otherwise seeded from sessionStorage (see the persistence effect below)
+  // rather than always starting null: this page fully remounts on
+  // browser-back from KØRETØJER/BRUGERE (a different route), which would
+  // otherwise reset the selection to null and let the auto-select-first
+  // effect below pick whichever department sorts first, silently discarding
+  // whatever the admin had actually selected before navigating away. Either
+  // way, the auto-select-first effect below still validates it against the
+  // loaded list once that arrives (e.g. a stale/foreign department_id), same
+  // as for the sessionStorage path.
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string | null>(() => {
+    if (activeAfdelingId) return activeAfdelingId;
     if (!costumerId) return null;
     try {
       return sessionStorage.getItem(SELECTED_DEPARTMENT_KEY_PREFIX + costumerId);
@@ -126,12 +119,6 @@ export function DepartmentDetailsPage() {
       return null;
     }
   });
-  const [editingDepartmentId, setEditingDepartmentId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editAddress, setEditAddress] = useState("");
-  /** Distinct from isSubmitting below (create/delete's own ConfirmDialog-driven flag) — a row save has no confirmation dialog of its own, so it needs its own in-flight/error state to avoid cross-talk with create/delete. */
-  const [isSavingRow, setIsSavingRow] = useState(false);
-  const [rowUpdateError, setRowUpdateError] = useState<string | null>(null);
   const [isAddingDepartment, setIsAddingDepartment] = useState(false);
   const [newDepartmentName, setNewDepartmentName] = useState("");
   const [departmentError, setDepartmentError] = useState<string | null>(null);
@@ -140,8 +127,21 @@ export function DepartmentDetailsPage() {
   /** Row counts for the KØRETØJER/BRUGERE quick-nav below — see CostumerDetailsPage.tsx's own version of the same badge. Scoped to the selected department (matching those buttons' own department_id-filtered navigation below), not the whole costumer — re-fetched whenever selectedDepartmentId changes. */
   const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
   const [usersCount, setUsersCount] = useState<number | null>(null);
+  /** Whether afdelingId's (selectedDepartmentId's) department_settings shows Køretøj-ID/Bruger-ID — used only for the Data Filter's own Køretøjer/Brugere quick-jump labels below, exactly like AdminFrontpage.tsx's own copy of this pattern, but keyed off a real per-row selection here rather than that page's whole-costumer approximation. */
+  const { useUserIdent, useVehicleIdent } = useIdentSettings(selectedDepartmentId);
+  /** True once the Data Filter popup has been opened at least once — see useCostumerQuickJumpOptions' own `enabled` doc comment, and AdminFrontpage.tsx's identical copy of this gate. */
+  const [quickJumpEnabled, setQuickJumpEnabled] = useState(false);
+  const { vehicleOptions, userOptions } = useCostumerQuickJumpOptions(
+    costumerId,
+    quickJumpEnabled,
+    { useVehicleIdent, useUserIdent },
+    selectedDepartmentId,
+  );
 
   const canSubmitDepartment = newDepartmentName.trim().length > 0;
+
+  /** Flådestyring/KØRETØJER/BRUGERE below target selectedDepartmentId (guaranteed non-null whenever these render — see the auto-select-first effect above), which can legitimately differ from the header's own live afdelingId while just browsing rows here — so each button switches the header to match before navigating, since the destination pages (FleetManagementPage/VehiclesPage/DepartmentPage) now read scope purely from context. One shared useScopeSwitchGroup rather than 3 independent useScopeSwitch instances — see its own doc comment: each button still shows its OWN "Vent…"/error, but a second click while the first is still resolving is ignored rather than racing two switchDepartment calls against each other. */
+  const scopeSwitch = useScopeSwitchGroup();
 
   const loadDepartments = async (forCostumerId: string) => {
     setDepartmentsLoading(true);
@@ -175,6 +175,51 @@ export function DepartmentDetailsPage() {
     void loadDepartments(costumerId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [costumerId]);
+
+  /**
+   * Follows the global header's own Afdeling scope ("Data Filter",
+   * PageHeader.tsx) while this page stays mounted — costumerId/costumerName
+   * above are now a direct alias of the header's own values, so there's no
+   * separate "Kunde changed" case left to handle here (it can never differ
+   * from this page's own costumerId by construction); only a same-costumer
+   * Afdeling pick needs reflecting into the row selection. Reacts to CHANGE
+   * only (the prevRef below), not to activeAfdelingId simply differing from
+   * this page's own selection on mount — this page is routinely reached
+   * with a specific department already active in the header (see
+   * selectedDepartmentId's own doc comment), and that normal arrival must
+   * not immediately re-trigger this effect.
+   */
+  const prevActiveAfdelingIdRef = useRef(activeAfdelingId);
+  useEffect(() => {
+    const afdelingChanged = activeAfdelingId !== prevActiveAfdelingIdRef.current;
+    prevActiveAfdelingIdRef.current = activeAfdelingId;
+    if (!afdelingChanged || !activeAfdelingId) return;
+    setSelectedDepartmentId(activeAfdelingId);
+  }, [activeAfdelingId]);
+
+  /**
+   * This page's header hides the Afdeling <select>'s own "Alle" option
+   * entirely (hideAfdelingAlle below) — there's no "all departments at
+   * once" mode here, just one selectedDepartmentId at a time. For a
+   * regular admin, "Alle" is really just the local, non-persisted
+   * afdelingScopedToAllGrants override (see AuthContext/PageHeader) rather
+   * than a real department — force it back off while this page is mounted
+   * so the (now option-less) <select> never has to represent a "" value
+   * that no longer has a matching <option>, restoring whatever it was
+   * before on unmount, same non-persisting "force + restore" pattern
+   * AdminFrontpage.tsx uses for the opposite default. A sysadm's own "Alle"
+   * (afdelingId null) isn't touched here — unlike the local flag, that's
+   * real persisted state (switchDepartment), and silently changing it just
+   * because this page was visited would be a bigger, unrelated behavior
+   * change (see the deferred "Data Filter vs. navigation" question).
+   */
+  const previousAllGrantsRef = useRef(afdelingScopedToAllGrants);
+  useEffect(() => {
+    if (isSysadm) return;
+    const previous = previousAllGrantsRef.current;
+    setAfdelingScopedToAllGrants(false);
+    return () => setAfdelingScopedToAllGrants(previous);
+  }, [isSysadm, setAfdelingScopedToAllGrants]);
 
   // Keeps a real department selected whenever one exists — auto-selects the
   // first loaded department if nothing's selected yet (or the sessionStorage-
@@ -232,11 +277,16 @@ export function DepartmentDetailsPage() {
           .eq("costumer_id", costumerId);
     // Users: user_profiles.department_id IS each user's home department and
     // is what DepartmentPage's own Afdeling filter matches against directly
-    // (no bridge table involved there), so this one stays as-is.
+    // (no bridge table involved there), so this one stays as-is. Excludes
+    // sysadm — that role's own costumer_id/department_id is just a Data
+    // Filter scope pointer, not real membership, same exclusion
+    // DepartmentPage.tsx's own Brugere query uses (2026-09-14 fix: this
+    // badge could otherwise read one higher than the page it links to).
     let usersQuery = supabase
       .from("user_profiles")
       .select("user_id", { count: "exact", head: true })
-      .eq("costumer_id", costumerId);
+      .eq("costumer_id", costumerId)
+      .neq("role", "sysadm");
     if (selectedDepartmentId) {
       usersQuery = usersQuery.eq("department_id", selectedDepartmentId);
     }
@@ -252,47 +302,6 @@ export function DepartmentDetailsPage() {
       cancelled = true;
     };
   }, [costumerId, selectedDepartmentId]);
-
-  /** Seeds editName/editAddress from the department's current values and puts just this one row into edit mode — switching to a different row's edit icon while one is already mid-edit simply re-seeds these for the new target, discarding whatever was typed but never saved. */
-  const startEdit = (department: Department) => {
-    setSelectedDepartmentId(department.department_id);
-    setEditingDepartmentId(department.department_id);
-    setEditName(department.name ?? "");
-    setEditAddress(department.address ?? "");
-    setRowUpdateError(null);
-  };
-
-  /** Writes this one row's name/address straight to the DB and, on success, updates the local departments copy so the table reflects it immediately and flips the row back to plain text. */
-  const handleSaveRow = async (departmentId: string) => {
-    if (!editName.trim()) return;
-
-    setIsSavingRow(true);
-    setRowUpdateError(null);
-
-    const trimmedName = editName.trim();
-    const trimmedAddress = editAddress.trim() || null;
-
-    const { error } = await supabase
-      .from("departments")
-      .update({ name: trimmedName, address: trimmedAddress })
-      .eq("department_id", departmentId);
-
-    if (error) {
-      setRowUpdateError(error.message);
-      setIsSavingRow(false);
-      return;
-    }
-
-    setDepartments((prev) =>
-      prev.map((department) =>
-        department.department_id === departmentId
-          ? { ...department, name: trimmedName, address: trimmedAddress }
-          : department,
-      ),
-    );
-    setEditingDepartmentId(null);
-    setIsSavingRow(false);
-  };
 
   const handleCreateDepartment = async () => {
     if (!costumerId) return;
@@ -375,7 +384,14 @@ export function DepartmentDetailsPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            hideAfdelingAlle
+            koretoejNavigate={{ label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }}
+            brugerNavigate={{ label: "Brugere", options: userOptions, onSelect: (id) => navigate(`/user-details/${id}`) }}
+            onSwitcherOpenChange={(open) => {
+              if (open) setQuickJumpEnabled(true);
+            }}
+          />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <h2 className="text-xl font-semibold text-brand-800">Afdelinger hos {costumerName ?? "—"}</h2>
@@ -386,27 +402,26 @@ export function DepartmentDetailsPage() {
                   <tr>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-1 text-left">Afdeling</th>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-1 text-left">Adresse</th>
-                    <th className="w-10 border-b border-brand-200 px-2 py-1" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {departmentsLoading && (
                     <tr>
-                      <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                      <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
                         Indlæser…
                       </td>
                     </tr>
                   )}
                   {!departmentsLoading && departmentsError && (
                     <tr>
-                      <td colSpan={3} className="px-2 py-3 text-center text-red-600">
+                      <td colSpan={2} className="px-2 py-3 text-center text-red-600">
                         {departmentsError}
                       </td>
                     </tr>
                   )}
                   {!departmentsLoading && !departmentsError && departments.length === 0 && (
                     <tr>
-                      <td colSpan={3} className="px-2 py-3 text-center text-brand-500">
+                      <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
                         Ingen afdelinger fundet.
                       </td>
                     </tr>
@@ -415,7 +430,6 @@ export function DepartmentDetailsPage() {
                     !departmentsError &&
                     departments.map((department) => {
                       const isSelected = selectedDepartmentId === department.department_id;
-                      const isEditing = editingDepartmentId === department.department_id;
                       return (
                         <tr
                           key={department.department_id}
@@ -431,48 +445,10 @@ export function DepartmentDetailsPage() {
                           className={`cursor-pointer transition ${isSelected ? "bg-accent-50" : "hover:bg-brand-50"}`}
                         >
                           <td className="px-2 py-1">
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editName}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => setEditName(e.target.value)}
-                                className="w-full rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                              />
-                            ) : (
-                              <span className="text-sm font-medium text-brand-800">{department.name ?? "—"}</span>
-                            )}
+                            <span className="text-sm font-medium text-brand-800">{department.name ?? "—"}</span>
                           </td>
                           <td className="px-2 py-1">
-                            {isEditing ? (
-                              <input
-                                type="text"
-                                value={editAddress}
-                                onClick={(e) => e.stopPropagation()}
-                                onChange={(e) => setEditAddress(e.target.value)}
-                                className="w-full rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
-                              />
-                            ) : (
-                              <span className="text-sm text-brand-800">{department.address ?? "—"}</span>
-                            )}
-                          </td>
-                          <td className="px-2 py-1 text-right">
-                            <button
-                              type="button"
-                              aria-label={isEditing ? "Gem afdeling" : "Rediger afdeling"}
-                              disabled={isSavingRow || (isEditing && !editName.trim())}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (isEditing) {
-                                  void handleSaveRow(department.department_id);
-                                } else {
-                                  startEdit(department);
-                                }
-                              }}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-brand-600 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                              {isEditing ? <SaveIcon /> : <EditIcon />}
-                            </button>
+                            <span className="text-sm text-brand-800">{department.address ?? "—"}</span>
                           </td>
                         </tr>
                       );
@@ -480,8 +456,6 @@ export function DepartmentDetailsPage() {
                 </tbody>
               </table>
             </div>
-
-            {rowUpdateError && <p className="text-sm text-red-600">{rowUpdateError}</p>}
 
             {/* Create/delete stays sysadm-only — same boundary the old two-page split enforced via this page's own former sysadm-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). Moved directly under the table (rather than after the KØRETØJER/BRUGERE/Flådestyring grid) at the user's request 2026-08-28, so creating/deleting departments doesn't require scrolling past the quick-nav grid first — no divider directly above it any more (it now sits right under the table), its own former leading divider moved below it instead, see the grid section's own comment below. */}
             {isSysadm && (
@@ -548,24 +522,21 @@ export function DepartmentDetailsPage() {
                 {/* Only shown when the Opret/Slet afdeling block above actually rendered (isSysadm) — separates that block from Flådestyring below; a regular admin never sees that block, so no divider is needed here for them either. */}
                 {isSysadm && <hr className="border-brand-200" />}
 
-                <button
-                  type="button"
-                  onClick={() =>
-                    navigate("/fleet-map", {
-                      state: {
-                        filters: {
-                          costumerId: costumerId ?? "",
-                          department: selectedDepartmentId ?? "",
-                          plate: "",
-                          status: "",
-                        },
-                      },
-                    })
-                  }
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
-                  Flådestyring
-                </button>
+                <div className="relative">
+                  <button
+                    type="button"
+                    disabled={scopeSwitch.isSwitching}
+                    onClick={() => void scopeSwitch.switchAndNavigate("fleet", selectedDepartmentId, costumerId, "/fleet-map")}
+                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
+                  </button>
+                  <InlinePopup
+                    visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
+                    message={scopeSwitch.error ?? ""}
+                    align="right"
+                  />
+                </div>
 
                 <hr className="border-brand-200" />
 
@@ -577,40 +548,50 @@ export function DepartmentDetailsPage() {
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate("/fleet-table", {
-                          state: {
-                            costumerId,
-                            costumerName,
-                            departmentId: selectedDepartmentId ?? undefined,
-                            departmentName: selectedDepartment?.name ?? undefined,
-                          },
-                        })
-                      }
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("koretojer", selectedDepartmentId, costumerId, "/fleet-table")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      KØRETØJER
+                      {scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
                     </button>
                     <CountBadge count={vehiclesCount} />
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "koretojer" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
                   </div>
                   <div className="relative aspect-square w-28">
                     <button
                       type="button"
-                      onClick={() =>
-                        navigate("/department", {
-                          state: {
-                            costumerId,
-                            costumerName,
-                            departmentId: selectedDepartmentId ?? undefined,
-                            departmentName: selectedDepartment?.name ?? undefined,
-                          },
-                        })
-                      }
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("brugere", selectedDepartmentId, costumerId, "/department")}
+                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
-                      BRUGERE
+                      {scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
                     </button>
                     <CountBadge count={usersCount} />
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "brugere" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
+                  </div>
+                  {/* Indstillinger — a col-span-2 row in this SAME grid (both roles now: 2026-09-14, opened to sysadm too, alongside App.tsx's /department-settings route relaxing to requireAdmin — see this page's own top doc comment), rather than its own full-width block below a divider like Flådestyring above — sized to match KØRETØJER+BRUGERE's own combined width instead of the section's full width, and grouped with them as one visual cluster with no divider, since all three ("department-specific actions") belong together once a department is selected, whereas Flådestyring above stays full-width/undivided as the one department-independent action. Same switch-then-navigate pattern as Flådestyring/KØRETØJER/BRUGERE. */}
+                  <div className="relative col-span-2">
+                    <button
+                      type="button"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("indstillinger", selectedDepartmentId, costumerId, "/department-settings")}
+                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {scopeSwitch.activeKey === "indstillinger" && scopeSwitch.isSwitching ? "Vent…" : "Indstillinger"}
+                    </button>
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "indstillinger" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
                   </div>
                 </div>
               </>

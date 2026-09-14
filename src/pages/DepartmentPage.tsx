@@ -1,11 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
-import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
+import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
 import { supabase } from "../lib/supabase";
 
 /** A row from the `user_profiles` table, as listed/selected on this page. department_name is resolved via the department_id FK's embedded join (see loadUsers) — used both for display in the table and passed through via router state to UserDetailsPage's create-user form. */
@@ -40,29 +41,22 @@ type ProfileQueryRow = {
 };
 
 /**
- * Admin "user management" page ("/department"): two modes, both scoped to a
- * target costumer (costumerId/costumerName via router state, or the
- * viewer's own costumerId for a regular admin).
+ * Admin "user management" page ("/department"): scoped to a target
+ * costumer (the global header's own costumerId — see "Data Filter",
+ * PageHeader.tsx) and, optionally, one specific department within it (the
+ * header's own afdelingId, membership-checked below — e.g.
+ * DepartmentDetailsPage.tsx's own BRUGERE button switches the header to a
+ * specific department before navigating here; absent means "every user
+ * across the whole target costumer", matching AdminFrontpage's/
+ * CostumerDetailsPage's own BRUGERE button and its count badge).
  *
- * LOCKED (departmentId also given — DepartmentDetailsPage's own BRUGERE
- * button, a department row already selected there): lists just that ONE
- * department's users, no in-page way to widen back out — "filtering by
- * navigation", same pattern this app already uses for costumerId scoping
- * elsewhere. To see a different department's users, go back and select a
- * different row on DepartmentDetailsPage.
- *
- * UNLOCKED (no departmentId — AdminFrontpage/CostumerDetailsPage's own
- * BRUGERE button, straight there): lists every user across the WHOLE target
- * costumer (matching what that button's own count badge already showed),
- * with an in-page Afdeling filter to narrow it back down —
- * CostumerDetailsPage's own BRUGERE used to fall back to DepartmentDetailsPage
- * as a picker whenever the costumer had 0 or 2+ departments; this replaced
- * that (2026-08-28, at the user's request) since landing on a whole
- * different page just to pick one felt like the wrong destination for a
- * button whose badge already promised "every user here". A regular admin's
- * own users are always within their own single department already (RLS
- * itself enforces that regardless of mode — see user_profiles_select_admin_own_department),
- * so none of this distinction is visible to them in practice.
+ * This page's users list always follows the global header ("Data Filter")
+ * live, for BOTH Kunde and Afdeling, regardless of how it was reached —
+ * there's no router-state seed or "stays frozen for this visit" mode any
+ * more. A regular admin's own users are always within their own single
+ * department already (RLS itself enforces that regardless — see
+ * user_profiles_select_admin_own_department), so none of this distinction
+ * is visible to them in practice.
  *
  * Reaching this page with neither a costumerId a sysadm could resolve
  * nor one of their own (a regular admin always has one) redirects back to
@@ -76,23 +70,24 @@ type ProfileQueryRow = {
  * is reversible and they need to stay reachable to unblock.
  */
 export function DepartmentPage() {
-  const { costumerId, profile } = useAuth();
+  const { costumerId, costumerName, afdeling, profile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const state = location.state as
-    | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string; emailWarning?: boolean }
-    | null;
+  /** Only emailWarning still travels via router state — see UserDetailsPage.tsx's create-success navigate — a one-off banner flag, unrelated to Kunde/Afdeling scope. */
+  const state = location.state as { emailWarning?: boolean } | null;
   const emailWarning = state?.emailWarning ?? false;
   /** Column count for this table — Bruger/Navn/Afdeling/Rolle, always 4. */
   const columnCount = 4;
 
-  /** A sysadm has no costumer of their own — for them, targetCostumerId only ever comes from router state. */
+  /** A sysadm has no costumer of their own — for them, targetCostumerId just follows the global header directly. */
   const isSysadm = isSysadmRole(profile?.role);
-  const targetCostumerId = state?.costumerId ?? costumerId;
-  const targetCostumerName = isSysadm ? (state?.costumerName ?? null) : null;
-  /** When set, the whole visit is LOCKED to just this one department — see this component's own doc comment. Optional: absent means UNLOCKED (whole costumer, filterable). */
-  const targetDepartmentId = state?.departmentId ?? null;
-  const targetDepartmentName = state?.departmentName ?? null;
+  const targetCostumerId = costumerId;
+  const targetCostumerName = isSysadm ? costumerName : null;
+
+  /** See useEffectiveAfdelingId's own doc comment — shared with VehiclesPage.tsx/FleetManagementPage.tsx. */
+  const effectiveAfdelingId = useEffectiveAfdelingId(targetCostumerId);
+  const targetDepartmentId = effectiveAfdelingId;
+  const targetDepartmentName = targetDepartmentId ? afdeling : null;
 
   /** Whether targetDepartmentId's OWN department_settings shows "Bruger-ID" (vs. plain E-mail) as the first column's value below — deliberately the LISTED department's own setting, not the viewing admin's currently-active one. Same "revert" pattern as AllBookingsPage.tsx: the column itself never disappears, only its value source swaps. UNLOCKED mode (targetDepartmentId null) has no single department's setting to apply across users from several departments at once, so useIdentSettings' own fail-closed default (plain E-mail) applies uniformly there instead. */
   const { useUserIdent } = useIdentSettings(targetDepartmentId);
@@ -125,6 +120,13 @@ export function DepartmentPage() {
         .select(
           "user_id, email, full_name, phone, user_ident, department_id, costumer_id, role, deleted_at, departments!user_profiles_department_id_fkey(name)",
         )
+        // A sysadm's own department_id/costumer_id is just their current
+        // "Data Filter" scope pointer (see AuthContext's switchDepartment),
+        // never real department membership — without this exclusion, a
+        // sysadm who has ever switched their own scope into this
+        // department/costumer would show up in this list as if they were a
+        // genuine assigned user of it.
+        .neq("role", "sysadm")
         .order("full_name", { ascending: true });
       // LOCKED mode: scope straight to targetDepartmentId (a department_id
       // already determines its own costumer, so no separate costumer_id
@@ -167,59 +169,45 @@ export function DepartmentPage() {
   // before.
   const departmentUsers = users;
 
-  /** Same popup-filter pattern as VehiclesPage's fleet-table filter: a funnel button toggles an InlinePopup of dropdown selects, each populated from the actual rows in view (not free-text search) so every option is guaranteed to match something. */
-  const [filterOpen, setFilterOpen] = useState(false);
+  /** Page-local, transient (not persisted) — all three surfaced inside PageHeader's "Data Filter" popup as Rolle/Bruger/Navn <select> fields (see PageHeaderFilterField) rather than a separate funnel popup of this page's own; the popup is genuinely gone now, not just shrunk — nothing left here to give it a button for. */
   const [filterBruger, setFilterBruger] = useState("");
   const [filterNavn, setFilterNavn] = useState("");
-  /** UNLOCKED mode only — narrows the whole-costumer user list down to one department, same role LOCKED mode's targetDepartmentId plays but adjustable in-page instead of fixed for the whole visit. Never rendered/set in LOCKED mode. */
-  const [filterAfdeling, setFilterAfdeling] = useState("");
   const [filterRolle, setFilterRolle] = useState("");
-  const filterRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!filterOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (filterRef.current && !filterRef.current.contains(event.target as Node)) {
-        setFilterOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [filterOpen]);
+  /** Resets all three back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked Rolle/Bruger/Navn almost certainly doesn't correspond to the NEW scope's users (the picked Bruger/Navn might not even be a user of the new department/costumer at all), so leaving them selected would silently show an empty or misleading result. Same reasoning/mechanism as VehiclesPage.tsx's/FleetManagementPage.tsx's/AllBookingsPage.tsx's own identical resets, now shared — see useResetOnScopeChange's own doc comment. */
+  useResetOnScopeChange([targetCostumerId, effectiveAfdelingId], () => {
+    setFilterRolle("");
+    setFilterBruger("");
+    setFilterNavn("");
+  });
 
   /** Mirrors the Bruger column's own display logic (useUserIdent toggle) so the filter's dropdown values and matching always agree with what's actually shown in the table. */
   const brugerValue = (user: ProfileRow) => (useUserIdent ? user.user_ident || user.email : user.email) ?? "—";
+  /** UNLOCKED mode only — the global header's Afdeling (effectiveAfdelingId above) narrows departmentUsers before the Rolle > Bruger/Navn filter hierarchy below applies on top; LOCKED mode's departmentUsers is already just one department, so this is a no-op there. Kept as its own name purely so the rest of this file's filter-chain reads the same as before the local Afdeling picker was removed. */
+  const afdelingScopedUsers = effectiveAfdelingId ? departmentUsers.filter((u) => u.department_id === effectiveAfdelingId) : departmentUsers;
   /**
-   * The filter fields form a hierarchy — Afdeling > Rolle > Bruger/Navn (UNLOCKED
-   * mode only — LOCKED mode has no Afdeling tier at all, departmentUsers above
-   * is already scoped to one department there, and the dropdown below isn't
-   * rendered) — where each field's own option list is scoped down by whatever
-   * is picked ABOVE it, never by a field at its own level or below. Bruger and
-   * Navn sit at the same bottom rung (both identify one specific user), so they
-   * share the same scope rather than narrowing each other.
+   * The filter fields form a hierarchy — Rolle > Bruger/Navn — where each
+   * field's own option list is scoped down by whatever is picked ABOVE it,
+   * never by a field at its own level or below. Bruger and Navn sit at the
+   * same bottom rung (both identify one specific user), so they share the
+   * same scope rather than narrowing each other. All three now render
+   * together in PageHeader's popup (see rolleFilter/brugerFilter/navnFilter
+   * below), so the cross-fill onChange handlers below stay meaningful —
+   * unlike a field split off into a physically separate popup, every pick
+   * here is visible in the same place the others are.
    */
-  const afdelingScopedUsers = filterAfdeling ? departmentUsers.filter((u) => u.department_id === filterAfdeling) : departmentUsers;
   const rolleScopedUsers = filterRolle ? afdelingScopedUsers.filter((u) => u.role === filterRolle) : afdelingScopedUsers;
-  /** Deduped by department_id (the filter's actual match key) while keeping department_name for the option label — a Map collapses repeats from users sharing the same department. UNLOCKED mode only; stays empty (and unused) in LOCKED mode since departmentUsers there is already just one department. */
-  const afdelingOptions = Array.from(
-    new Map(departmentUsers.map((u) => [u.department_id, u.department_name] as const)).entries(),
-  )
-    .filter((entry): entry is [string, string] => entry[0] !== null && entry[1] !== null)
-    .sort((a, b) => a[1].localeCompare(b[1]));
   const roleOptions = Array.from(new Set(afdelingScopedUsers.map((u) => u.role))).sort();
   const brugerOptions = Array.from(new Set(rolleScopedUsers.map(brugerValue))).sort();
   const navnOptions = Array.from(new Set(rolleScopedUsers.map((u) => u.full_name ?? "—"))).sort();
 
-  const filteredUsers = departmentUsers.filter(
+  const filteredUsers = afdelingScopedUsers.filter(
     (u) =>
       (!filterBruger || brugerValue(u) === filterBruger) &&
       (!filterNavn || (u.full_name ?? "—") === filterNavn) &&
-      (!filterAfdeling || u.department_id === filterAfdeling) &&
       (!filterRolle || u.role === filterRolle),
   );
-  const hasActiveFilter = Boolean(filterBruger || filterNavn || filterAfdeling || filterRolle);
+  /** Drives the "Ingen brugere matcher filteret." vs. "Ingen brugere fundet." choice below — includes targetDepartmentId (a specific department narrower than the whole-costumer view), not just the page-local Rolle/Bruger/Navn filters: a department with genuinely zero users should read as "doesn't match this scope," not "nothing exists at all," since a different department under the same costumer might have plenty. */
+  const hasActiveFilter = Boolean(filterBruger || filterNavn || filterRolle || targetDepartmentId);
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
@@ -235,7 +223,59 @@ export function DepartmentPage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-w-0 min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          <PageHeader
+            rolleFilter={{
+              label: "Rolle",
+              value: filterRolle,
+              onChange: (value) => {
+                setFilterRolle(value);
+                setFilterBruger("");
+                setFilterNavn("");
+              },
+              options: roleOptions.map((role) => ({ value: role, label: role })),
+            }}
+            brugerFilter={{
+              label: "Bruger",
+              value: filterBruger,
+              onChange: (value) => {
+                setFilterBruger(value);
+                if (!value) return;
+                // Bruger/Navn each identify one specific user, so — unlike
+                // Rolle above — picking one flows UP the hierarchy instead
+                // of down: it fills in Rolle (and the other of Bruger/Navn)
+                // from that user's own actual values, even if those were
+                // still "Alle" beforehand. Matched against the full
+                // departmentUsers list (not the already-scoped option
+                // source) since Bruger/Navn values (email/user_ident) are
+                // unique per user, so the match is unambiguous regardless
+                // of the current scope.
+                const match = departmentUsers.find((u) => brugerValue(u) === value);
+                if (match) {
+                  setFilterRolle(match.role);
+                  setFilterNavn(match.full_name ?? "—");
+                }
+              },
+              options: brugerOptions.map((bruger) => ({ value: bruger, label: bruger })),
+            }}
+            navnFilter={{
+              label: "Navn",
+              value: filterNavn,
+              onChange: (value) => {
+                setFilterNavn(value);
+                if (!value) return;
+                // Same up-the-hierarchy fill as Bruger above. Names aren't
+                // guaranteed unique the way email/user_ident is, so this
+                // takes the first matching user — an accepted approximation
+                // for this edge case.
+                const match = departmentUsers.find((u) => (u.full_name ?? "—") === value);
+                if (match) {
+                  setFilterRolle(match.role);
+                  setFilterBruger(brugerValue(match));
+                }
+              },
+              options: navnOptions.map((navn) => ({ value: navn, label: navn })),
+            }}
+          />
 
           <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
@@ -244,151 +284,6 @@ export function DepartmentPage() {
                   Brugere{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                   {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
                 </h2>
-                <div className="relative" ref={filterRef}>
-                  <button
-                    type="button"
-                    onClick={() => setFilterOpen((prev) => !prev)}
-                    aria-label="Filtrer"
-                    className={`flex h-5 w-5 items-center justify-center rounded-full border transition ${
-                      hasActiveFilter
-                        ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
-                        : "border-brand-300 text-brand-600 hover:bg-brand-50"
-                    }`}
-                  >
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                      <polygon points="4 4 20 4 14 12.5 14 19 10 21 10 12.5 4 4" />
-                    </svg>
-                  </button>
-                  <InlinePopup
-                    visible={filterOpen}
-                    align="right"
-                    message={
-                      <>
-                        <p className="mb-2">Du kan her udvælge brugere på disse kriterier:</p>
-                        {/* LOCKED mode (targetDepartmentId set) hides this entirely — nothing to widen back out to from in-page, see this component's own doc comment. */}
-                        {!targetDepartmentId && (
-                          <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                            Afdeling
-                            <select
-                              value={filterAfdeling}
-                              onChange={(e) => {
-                                // Changing an upstream field invalidates every field below it in
-                                // the Afdeling > Rolle > Bruger/Navn hierarchy, so all of them
-                                // reset rather than risking a stale, now-impossible combination.
-                                setFilterAfdeling(e.target.value);
-                                setFilterRolle("");
-                                setFilterBruger("");
-                                setFilterNavn("");
-                              }}
-                              className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                            >
-                              <option value="">Alle</option>
-                              {afdelingOptions.map(([departmentId, departmentName]) => (
-                                <option key={departmentId} value={departmentId}>
-                                  {departmentName}
-                                </option>
-                              ))}
-                            </select>
-                          </label>
-                        )}
-                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Rolle
-                          <select
-                            value={filterRolle}
-                            onChange={(e) => {
-                              setFilterRolle(e.target.value);
-                              setFilterBruger("");
-                              setFilterNavn("");
-                            }}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {roleOptions.map((role) => (
-                              <option key={role} value={role}>
-                                {role}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="mb-2 block text-[0.7rem] font-medium text-brand-700">
-                          Bruger
-                          <select
-                            value={filterBruger}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFilterBruger(value);
-                              if (!value) return;
-                              // Bruger/Navn each identify one specific user, so — unlike
-                              // Afdeling/Rolle above — picking one flows UP the hierarchy instead
-                              // of down: it fills in Afdeling/Rolle (and the other of
-                              // Bruger/Navn) from that user's own actual values, even if those
-                              // were still "Alle" beforehand. Matched against the full
-                              // departmentUsers list (not the already-scoped option source)
-                              // since Bruger/Navn values (email/user_ident) are unique per user,
-                              // so the match is unambiguous regardless of the current scope.
-                              const match = departmentUsers.find((u) => brugerValue(u) === value);
-                              if (match) {
-                                setFilterAfdeling(match.department_id ?? "");
-                                setFilterRolle(match.role);
-                                setFilterNavn(match.full_name ?? "—");
-                              }
-                            }}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {brugerOptions.map((bruger) => (
-                              <option key={bruger} value={bruger}>
-                                {bruger}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        <label className="block text-[0.7rem] font-medium text-brand-700">
-                          Navn
-                          <select
-                            value={filterNavn}
-                            onChange={(e) => {
-                              const value = e.target.value;
-                              setFilterNavn(value);
-                              if (!value) return;
-                              // Same up-the-hierarchy fill as Bruger above. Names aren't
-                              // guaranteed unique the way email/user_ident is, so this takes the
-                              // first matching user — an accepted approximation for this edge case.
-                              const match = departmentUsers.find((u) => (u.full_name ?? "—") === value);
-                              if (match) {
-                                setFilterAfdeling(match.department_id ?? "");
-                                setFilterRolle(match.role);
-                                setFilterBruger(brugerValue(match));
-                              }
-                            }}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
-                          >
-                            <option value="">Alle</option>
-                            {navnOptions.map((navn) => (
-                              <option key={navn} value={navn}>
-                                {navn}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {hasActiveFilter && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setFilterBruger("");
-                              setFilterNavn("");
-                              setFilterAfdeling("");
-                              setFilterRolle("");
-                            }}
-                            className="mt-2 text-[0.7rem] font-medium text-accent-600 hover:underline"
-                          >
-                            Nulstil filter
-                          </button>
-                        )}
-                      </>
-                    }
-                  />
-                </div>
               </div>
 
               {emailWarning && (
@@ -437,16 +332,7 @@ export function DepartmentPage() {
                       !error &&
                       filteredUsers.map((user, index) => {
                         const isAlternate = index % 2 === 1;
-                        const goToUser = () =>
-                          navigate(`/user-details/${user.user_id}`, {
-                            state: {
-                              user,
-                              costumerId: targetCostumerId,
-                              costumerName: targetCostumerName,
-                              departmentId: targetDepartmentId,
-                              departmentName: targetDepartmentName,
-                            },
-                          });
+                        const goToUser = () => navigate(`/user-details/${user.user_id}`, { state: { user } });
                         return (
                           <tr
                             key={user.user_id}
@@ -489,16 +375,7 @@ export function DepartmentPage() {
               <div className="flex gap-3">
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate("/user-details", {
-                      state: {
-                        costumerId: targetCostumerId,
-                        costumerName: targetCostumerName,
-                        departmentId: targetDepartmentId,
-                        departmentName: targetDepartmentName,
-                      },
-                    })
-                  }
+                  onClick={() => navigate("/user-details")}
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                 >
                   Opret bruger

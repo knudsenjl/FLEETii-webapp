@@ -11,6 +11,9 @@ import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
+import { useIdentSettings } from "../hooks/useIdentSettings";
+import { useCostumerQuickJumpOptions } from "../hooks/useCostumerQuickJumpOptions";
+import { useScopeSwitch } from "../hooks/useScopeSwitch";
 
 /** A row from the `costumers` table, for the embedded list below — same fields CostumerAdministrationPage.tsx's own full-page version fetches, so the object handed to CostumerDetailsPage via router state already has everything it displays. */
 type Costumer = {
@@ -51,11 +54,23 @@ type Costumer = {
  * all, so manages any given costumer's equivalents through
  * CostumerDetailsPage instead. AFDELINGER jumps straight to
  * DepartmentDetailsPage.tsx (see handleOpenDepartments below), which now
- * fetches that admin's own costumer's departments itself.
+ * fetches that admin's own costumer's departments itself. For a regular
+ * admin with more than one department grant, picking one in the header's
+ * own "Data Filter" (afdelingNavigate below) jumps straight to
+ * DepartmentDetailsPage.tsx too, pre-scoped to that department — same
+ * repurposed-<select> pattern CostumerAdministrationPage.tsx's own
+ * afdelingNavigate uses, restored 2026-09-14 (an earlier version of this
+ * page instead left the select as a silent scope switch with no
+ * navigation; the AFDELINGER button was the only way there). The same
+ * "Data Filter" popup also gets two regular-admin-only quick-jump fields,
+ * "Køretøjer"/"Brugere" (see vehicleOptions/userOptions below, and
+ * PageHeaderNavigateField) — since this page shows no vehicle/user list of
+ * its own to click a row on, picking one there navigates straight to that
+ * specific vehicle's/user's own detail page instead.
  */
 export function AdminFrontpage() {
   const navigate = useNavigate();
-  const { profile, costumerId, costumerName } = useAuth();
+  const { profile, costumerId, afdelingId, setAfdelingScopedToAllGrants } = useAuth();
   /** Every costumer_orders row currently pending — an "Opret" row is deleted the moment its vehicle is fully registered (see VehicleCreatePage.tsx's handleRegisterVehicle), and a "Nedlæg" row once VehicleDeletePage.tsx's own delete-vehicle.mts call finishes, so any row still present here IS by definition unfinished. Drives the count badge on the "INSTALLATIONER" button below. sysadm only, fetched via count-only head:true so this doesn't pull every row's data just to size a badge. */
   const [pendingInstallationsCount, setPendingInstallationsCount] = useState<number | null>(null);
   const [costumers, setCostumers] = useState<Costumer[]>([]);
@@ -67,6 +82,17 @@ export function AdminFrontpage() {
   const [departmentsCount, setDepartmentsCount] = useState<number | null>(null);
   const [vehiclesCount, setVehiclesCount] = useState<number | null>(null);
   const [usersCount, setUsersCount] = useState<number | null>(null);
+  /** Whether afdelingId's (this admin's own CURRENT department's) department_settings shows Køretøj-ID/Bruger-ID — used only for the "Data Filter" quick-jump labels below, same fail-closed-to-plain-plate/email approximation DepartmentPage.tsx's own UNLOCKED mode uses when listing across more than one department at once (there's no single department's setting to apply costumer-wide here either). */
+  const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
+  /** True once the Data Filter popup has been opened at least once — see useCostumerQuickJumpOptions' own `enabled` doc comment for why this gates its fetch instead of firing unconditionally on mount. Sticky (never reset back to false): once fetched, the options stay valid via that hook's own re-fetch-on-dependency-change, so there's no reason to re-hide them behind `enabled` again on a later close. */
+  const [quickJumpEnabled, setQuickJumpEnabled] = useState(false);
+  const { vehicleOptions, userOptions } = useCostumerQuickJumpOptions(
+    isDepartmentAdmin(profile?.role) ? costumerId : null,
+    quickJumpEnabled,
+    { useVehicleIdent, useUserIdent },
+  );
+  /** Backs the Afdeling <select>'s own afdelingNavigate below — a regular admin picking a department in the Data Filter jumps straight to DepartmentDetailsPage.tsx pre-scoped to it, same useScopeSwitch/switchAndNavigate pattern CostumerAdministrationPage.tsx's own afdelingNavigate uses. */
+  const afdelingSwitch = useScopeSwitch();
 
   useEffect(() => {
     if (!isDepartmentAdmin(profile?.role) || !costumerId) return;
@@ -90,6 +116,14 @@ export function AdminFrontpage() {
       .from("user_profiles")
       .select("user_id", { count: "exact", head: true })
       .eq("costumer_id", costumerId)
+      // Excludes sysadm — that role's own costumer_id is just a Data Filter
+      // scope pointer left over from having switched Kunde at some point,
+      // not real membership (same exclusion DepartmentPage.tsx's own
+      // Brugere query and useCostumerQuickJumpOptions.ts already use) — a
+      // sysadm who'd ever scoped into this costumer was otherwise counted
+      // here but never actually listed on /department, so BRUGERE's own
+      // badge could read one higher than the page it links to (2026-09-14 fix).
+      .neq("role", "sysadm")
       .then(({ count }) => {
         if (!cancelled) setUsersCount(count ?? 0);
       });
@@ -135,16 +169,46 @@ export function AdminFrontpage() {
     };
   }, [profile?.role]);
 
-  /** AFDELINGER's own handler — DepartmentDetailsPage.tsx now fetches its own department list (given just costumerId/costumerName via router state), so this just navigates straight there; always lands on that page regardless of how many departments there are, since its whole job IS managing departments, not skipping past them. */
+  /**
+   * This page's own counts/buttons (departmentsCount/vehiclesCount/
+   * usersCount above, KØRETØJER/BRUGERE/AFDELINGER navigation) are always
+   * scoped to this admin's WHOLE costumer (see the fetches above — none of
+   * them filter by afdelingId), never narrowed to just afdelingId's one
+   * department. Yet the header's own Afdeling select (PageHeader.tsx)
+   * otherwise defaults to showing this admin's single current department
+   * (e.g. "Region Nord") — visually implying a filter this page doesn't
+   * actually apply. Force the header's local "Alle" (afdelingScopedToAllGrants,
+   * see AuthContext) while this page is mounted so the two stay consistent.
+   *
+   * Deliberately does NOT restore the previous value on unmount (an earlier
+   * version did) — KØRETØJER/BRUGERE below now navigate with a bare
+   * navigate() and no scope switch of their own (VehiclesPage/DepartmentPage
+   * read this same flag straight from context), relying on it staying true
+   * across that navigation for their own "every vehicle/user in the
+   * costumer" promise to hold. A restore-on-unmount cleanup runs in the same
+   * commit that mounts the destination page, which read the browser through
+   * as true-then-immediately-false-again — VehiclesPage's list would
+   * genuinely show every vehicle for one render, then narrow to just this
+   * admin's own department a moment later, an unrequested scope change. Once
+   * turned on for a department-admin, leaving it on is a harmless resting
+   * state (same as it already is for a sysadm, who has no restore concept
+   * here at all).
+   */
+  useEffect(() => {
+    if (!isDepartmentAdmin(profile?.role)) return;
+    setAfdelingScopedToAllGrants(true);
+  }, [profile?.role, setAfdelingScopedToAllGrants]);
+
+  /** AFDELINGER's own handler — this admin's own costumerId/afdelingId are already the global header's own current values (useAuth()), and DepartmentDetailsPage now reads its Kunde/Afdeling scope purely from that same header — so no state to pass, no scope to switch, just a plain navigate. Always lands on DepartmentDetailsPage regardless of how many departments there are, since its whole job IS managing departments, not skipping past them. */
   const handleOpenDepartments = () => {
     if (!costumerId) return;
-    navigate("/department-details", { state: { costumerId, costumerName } });
+    navigate("/department-details");
   };
 
-  /** KØRETØJER/BRUGERE's own handler — navigates straight to `destination` UNLOCKED (costumerId/costumerName only, no departmentId), matching what those buttons' own count badges already promised: every vehicle/user across this admin's whole costumer, not just one department's worth. VehiclesPage/DepartmentPage both support this unlocked, whole-costumer mode (with their own in-page Afdeling filter) precisely for this button — see their own doc comments. Used to fetch this costumer's departments first and fall back to DepartmentDetailsPage as a picker whenever there wasn't exactly one department; removed 2026-08-28 at the user's request (mirroring the same change on CostumerDetailsPage.tsx's own version of this handler), since landing on a whole different page just to pick one felt like the wrong destination for a button whose badge already showed the full count. */
+  /** KØRETØJER/BRUGERE's own handler — navigates straight to `destination` UNLOCKED (this admin's own whole costumer, no department pre-selected), matching what those buttons' own count badges already promised: every vehicle/user across this admin's whole costumer, not just one department's worth. VehiclesPage/DepartmentPage both support this unlocked, whole-costumer mode (with their own in-page Afdeling filter) precisely for this button — see their own doc comments. Since both pages now read that scope straight from the header (already this admin's own values), no state needs passing here. */
   const goToVehiclesOrUsers = (destination: "/fleet-table" | "/department") => {
     if (!costumerId) return;
-    navigate(destination, { state: { costumerId, costumerName } });
+    navigate(destination);
   };
 
   return (
@@ -161,7 +225,49 @@ export function AdminFrontpage() {
           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
           className="flex min-h-0 flex-1 flex-col"
         >
-          <PageHeader />
+          {/*
+            hideAfdeling/kundeNavigate (sysadm only): the sysadm branch of
+            this page (costumer list + pendingInstallationsCount above) has
+            no Afdeling concept at all and never reads costumerId either
+            (unlike the isDepartmentAdmin branch's own AFDELINGER/KØRETØJER/
+            BRUGERE, which genuinely depend on both — see
+            handleOpenDepartments/goToVehiclesOrUsers) — so Afdeling is
+            simply dropped, and Kunde is repurposed the same way
+            TwoHireCommandPage.tsx's own header is: picking a Kunde jumps
+            straight to its /costumer-details instead of persisting a scope
+            switch nothing on this page's sysadm view would ever read.
+          */}
+          <PageHeader
+            koretoejNavigate={
+              isDepartmentAdmin(profile?.role)
+                ? { label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }
+                : undefined
+            }
+            brugerNavigate={
+              isDepartmentAdmin(profile?.role)
+                ? { label: "Brugere", options: userOptions, onSelect: (id) => navigate(`/user-details/${id}`) }
+                : undefined
+            }
+            afdelingNavigate={
+              isDepartmentAdmin(profile?.role)
+                ? {
+                    onSelect: (department) =>
+                      void afdelingSwitch.switchAndNavigate(department.department_id, department.costumerId, "/department-details"),
+                    disabled: afdelingSwitch.isSwitching,
+                    error: afdelingSwitch.error,
+                  }
+                : undefined
+            }
+            hideAfdeling={isSysadm(profile?.role)}
+            kundeNavigate={
+              isSysadm(profile?.role)
+                ? { onSelect: (id) => navigate(`/costumer-details/${id}`) }
+                : undefined
+            }
+            onSwitcherOpenChange={(open) => {
+              if (open) setQuickJumpEnabled(true);
+            }}
+          />
 
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">

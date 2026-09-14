@@ -17,8 +17,8 @@ import { isAnyAdmin } from "../lib/roles";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { Modal } from "./Modal";
 
-/** Shown when a user's role doesn't satisfy a route's requireAdmin/requireRole check. Auto-redirects to "/" after 5 seconds. Deliberately role-agnostic wording — this guards routes restricted to admins, to "sysadm" exactly, and (for the per-role settings pages) to "user" exactly, so it can't claim the page is "for administrators" when that isn't always true. */
-function ForbiddenNotice() {
+/** Shown when a user's role doesn't satisfy a route's requireAdmin/requireRole check. Auto-redirects to "/" after 5 seconds. Deliberately role-agnostic wording — this guards routes restricted to admins, to "sysadm" exactly, and (for the per-role settings pages) to "user" exactly, so it can't claim the page is "for administrators" when that isn't always true. Exported so UserDetailsPage.tsx can render the identical denial UI for its own route-param-aware check (a plain "user" requesting someone ELSE's ":userId") — something ProtectedRoute itself can't express, since it has no knowledge of route params. */
+export function ForbiddenNotice() {
   const navigate = useNavigate();
 
   useEffect(() => {
