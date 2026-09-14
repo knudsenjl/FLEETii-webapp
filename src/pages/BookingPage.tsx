@@ -26,6 +26,7 @@ import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingLifecycle";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
+import { useScopeDisplayName } from "../hooks/useScopeDisplayName";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import { useReverseGeocode } from "../lib/geocode";
@@ -78,7 +79,9 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  */
 export function BookingPage() {
   const navigate = useNavigate();
-  const { session, profile, afdelingId } = useAuth();
+  const { session, profile, afdelingId, afdelingScopedToAllGrants, availableDepartments } = useAuth();
+  /** Header text below — "Reservation i {name}" — see useScopeDisplayName's own doc comment. */
+  const scopeName = useScopeDisplayName();
   /** Whether afdelingId's department shows the Bruger-ID value (vs. plain E-mail) in the "Bruger:" row below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/DepartmentPage.tsx: the label is always "Bruger", only the value source swaps — who a booking belongs to is core information, not an optional extra. */
   const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
   const [booking, setBooking] = useState<BookingDetails | null>(null);
@@ -189,7 +192,7 @@ export function BookingPage() {
 
     let cancelled = false;
     setBookingLoading(true);
-    void supabase
+    let query = supabase
       .from("bookings")
       .select(BOOKINGS_SELECT_COLUMNS)
       // "end >= now" OR "end is null" — a plain .gte() would silently drop
@@ -201,15 +204,22 @@ export function BookingPage() {
       // visible (department-wide, not just this user's), so the "earliest
       // upcoming" row picked here could be a DIFFERENT employee's booking
       // rather than the viewer's own.
-      .eq(USER_ID_COLUMN, userId)
-      // ALSO scope to the viewer's CURRENT department, matching
-      // BookingsPage.tsx's departmentBookings filter (activeBookings.filter
-      // by afdelingId) — a user can have old bookings still on record under
-      // a department they've since moved on from (e.g. after a transfer);
-      // without this, the earliest-starting one of those could outrank a
-      // genuinely current booking in the user's actual department, since
-      // ordering is by start date alone.
-      .eq(DEPARTMENT_COLUMN, afdelingId)
+      .eq(USER_ID_COLUMN, userId);
+    // ALSO scope to the viewer's CURRENT department (or, while the header's
+    // own Afdeling "Alle" override is active, every department the viewer
+    // actually holds a grant for — see scopeName's own doc comment above),
+    // matching BookingsPage.tsx's departmentBookings filter. A user can have
+    // old bookings still on record under a department they've since moved
+    // on from (e.g. after a transfer); without this, the earliest-starting
+    // one of those could outrank a genuinely current booking in one of the
+    // viewer's actual departments, since ordering is by start date alone.
+    query = afdelingScopedToAllGrants
+      ? query.in(
+          DEPARTMENT_COLUMN,
+          availableDepartments.map((d) => d.department_id),
+        )
+      : query.eq(DEPARTMENT_COLUMN, afdelingId);
+    void query
       .order("start", { ascending: true })
       .limit(1)
       .returns<BookingRow[]>()
@@ -222,7 +232,7 @@ export function BookingPage() {
     return () => {
       cancelled = true;
     };
-  }, [session?.user.id, afdelingId]);
+  }, [session?.user.id, afdelingId, afdelingScopedToAllGrants, availableDepartments]);
 
   if (!booking) {
     if (bookingLoading) {
@@ -251,6 +261,7 @@ export function BookingPage() {
           className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
         >
           <PageHeader compact />
+          <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservation i {scopeName}</h2>
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-2">
             <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
               Du har ingen aktuelle eller kommende reservationer i denne afdeling.
@@ -292,6 +303,7 @@ export function BookingPage() {
         className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
       >
         <PageHeader compact />
+        <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservation i {scopeName}</h2>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pb-4">
           {/* Hero card: vehicle (tap through to VehicleDetailsPage) + big circular lock control + Blink/Horn, the mobile-first landing page's primary controls. */}

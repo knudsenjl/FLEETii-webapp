@@ -9,6 +9,7 @@ import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
+import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
 import { supabase } from "../lib/supabase";
 import {
   BOOKINGS_SELECT_COLUMNS,
@@ -75,11 +76,11 @@ export function AllBookingsPage() {
   /** Page-local, transient (not persisted) — both surfaced inside PageHeader's "Data Filter" popup as Bruger/Køretøj <select> fields rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterUser, setFilterUser] = useState("");
   const [filterVehicle, setFilterVehicle] = useState("");
-  /** Resets both back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked Bruger/Køretøj almost certainly doesn't correspond to the NEW scope's bookings, so leaving them selected would silently show an empty or misleading result. Same reasoning/fix as VehiclesPage.tsx's own Køretøj reset and DepartmentPage.tsx's Rolle/Bruger/Navn reset. */
-  useEffect(() => {
+  /** Resets both back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked Bruger/Køretøj almost certainly doesn't correspond to the NEW scope's bookings, so leaving them selected would silently show an empty or misleading result. Same reasoning/mechanism as VehiclesPage.tsx's/DepartmentPage.tsx's/FleetManagementPage.tsx's own identical resets, now shared — see useResetOnScopeChange's own doc comment. */
+  useResetOnScopeChange([costumerId, afdelingId, afdelingScopedToAllGrants], () => {
     setFilterUser("");
     setFilterVehicle("");
-  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
+  });
   /** Every department under the global header's active costumerId (sysadm only) — still needed for scopedDepartmentIds below, to turn a Kunde-only scope (costumerId set, afdelingId null) into a department-id set the client-side booking filter can match against. */
   const [departmentOptions, setDepartmentOptions] = useState<{ department_id: string; name: string }[]>([]);
 
@@ -133,6 +134,10 @@ export function AllBookingsPage() {
   const filteredBookings = departmentBookings.filter(
     (b) => (!filterUser || b.userId === filterUser) && (!filterVehicle || b.vehicle === filterVehicle),
   );
+  /** Drives the "Ingen reservationer matcher filteret." vs. "Ingen aktive reservationer." choice below — includes the Kunde/Afdeling scope actually narrowing something (not just the page-local Bruger/Køretøj filters), so a genuinely empty department doesn't read as "nothing exists at all" when a different Kunde/department might have plenty: for a sysadm, any Kunde/Afdeling pick narrower than fully unscoped "Alle"; for a regular admin, being narrowed to one specific department while holding more than one grant (their single-grant case has nowhere else to look, so "nothing exists" is already the correct read there). */
+  const hasActiveFilter =
+    Boolean(filterUser || filterVehicle) ||
+    (isSysadm ? Boolean(costumerId || afdelingId) : !afdelingScopedToAllGrants && availableDepartments.length > 1);
   const departmentUsers = isSysadm
     ? users
     : users.filter((u) => (afdelingScopedToAllGrants ? grantedDepartmentIds.has(u.department_id ?? "") : u.department_id === afdelingId));
@@ -284,9 +289,7 @@ export function AllBookingsPage() {
                     {!loading && !error && filteredBookings.length === 0 && (
                       <tr>
                         <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {filterUser || filterVehicle
-                            ? "Ingen reservationer matcher filteret."
-                            : "Ingen aktive reservationer."}
+                          {hasActiveFilter ? "Ingen reservationer matcher filteret." : "Ingen aktive reservationer."}
                         </td>
                       </tr>
                     )}

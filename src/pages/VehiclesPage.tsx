@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
@@ -11,19 +11,22 @@ import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
+import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
 
 type Vehicle = DisplayVehicle;
 
 /**
  * Admin "Administration af køretøjer" page ("/fleet-table", reached via
  * FleetManagementPage.tsx's "Liste af køretøjer" button, among others):
- * scoped to a target costumer (costumerId/costumerName via router state, or
- * the viewer's own costumerId for a regular admin) and, optionally, one
- * specific department within it (departmentId — e.g. DepartmentDetailsPage's
- * own KØRETØJER button, a department row already selected there; absent
- * means "every vehicle across the whole target costumer", matching
- * AdminFrontpage's/CostumerDetailsPage's own KØRETØJER button and its count
- * badge — CostumerDetailsPage's own KØRETØJER used to fall back to
+ * scoped to a target costumer (the global header's own costumerId — see
+ * "Data Filter", PageHeader.tsx) and, optionally, one specific department
+ * within it (the header's own afdelingId, membership-checked below — e.g.
+ * DepartmentDetailsPage's own KØRETØJER button switches the header to a
+ * specific department before navigating here; absent means "every vehicle
+ * across the whole target costumer", matching AdminFrontpage's/
+ * CostumerDetailsPage's own KØRETØJER button and its count badge —
+ * CostumerDetailsPage's own KØRETØJER used to fall back to
  * DepartmentDetailsPage as a picker whenever the costumer had 0 or 2+
  * departments; this replaced that (2026-08-28, at the user's request) since
  * landing on a whole different page just to pick one felt like the wrong
@@ -48,99 +51,28 @@ type Vehicle = DisplayVehicle;
  * Clicking a row navigates straight to VehicleDetailsPage (editing/deleting
  * a vehicle both live there too), or create a new one via NewVehiclePage.
  *
- * Either way, the router-state seed above is only ever the INITIAL scope —
- * the global header ("Data Filter", PageHeader.tsx) always wins outright the
- * moment it's touched (headerTouched below), for BOTH Kunde and Afdeling,
- * regardless of how this page was reached — INCLUDING the true LOCKED case
- * (departmentId also given). There's no "go back and pick a different row"
- * carve-out left here any more (see headerTouched's own doc comment for the
- * full reasoning) — this page's vehicle list always follows "Data Filter"
- * live. Only the Køretøj filter stays page-local (narrows the
+ * This page's vehicle list always follows the global header ("Data Filter")
+ * live, for BOTH Kunde and Afdeling, regardless of how the page was
+ * reached — there's no router-state seed or "stays frozen for this visit"
+ * mode any more. Only the Køretøj filter stays page-local (narrows the
  * already-scoped list by plate).
  */
 export function VehiclesPage() {
-  const { costumerId, costumerName, afdelingId, afdeling, availableDepartments, afdelingScopedToAllGrants, profile } = useAuth();
+  const { costumerId, costumerName, afdeling, profile } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const twoHireVehicles = use2hireVehicle();
   const gpsPositions = use2hireGPS();
-  /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below only ever comes from router state or the global header, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
+  /** A sysadm has no costumerId of their own (platform-wide role) — for them, targetCostumerId below just follows the global header directly, and can genuinely stay unset (ALL-COSTUMERS mode, see this component's own doc comment) rather than always falling back to something. */
   const isSysadm = isSysadmRole(profile?.role);
 
-  const state = location.state as
-    | { costumerId?: string; costumerName?: string; departmentId?: string; departmentName?: string }
-    | null;
-  /**
-   * Whether the header's own Kunde/Afdeling scope has genuinely changed
-   * since this page mounted (either one) — once it has, it wins outright
-   * over any router-state seed (state?.costumerId/departmentId) for the
-   * rest of this visit, INCLUDING true LOCKED visits (DepartmentDetailsPage's
-   * own KØRETØJER button, a department row already selected there). Same
-   * "header always wins once touched" redesign as DepartmentPage.tsx's own
-   * headerTouched, applied here per explicit, repeated request — there's no
-   * "go back and pick a different row" carve-out left on this page either
-   * now. Without this at all, a page reached via a router-state seed would
-   * have that seed permanently override the header, and subsequent Kunde/
-   * Afdeling picks in "Data Filter" would silently do nothing — the header
-   * used to be a page-local, always-live picker before the filter-redesign
-   * work moved it up here, so this restores that same "changing Kunde/
-   * Afdeling always actually changes the list" behavior regardless of how
-   * the page was reached.
-   *
-   * Sticky (via state, not a live comparison) rather than "does costumerId/
-   * afdelingId currently differ from its mount-time value" — a live
-   * comparison would incorrectly revert to trusting the stale seed again if
-   * the header ever cycles back to exactly its mount-time values.
-   */
-  const [headerTouched, setHeaderTouched] = useState(false);
-  const mountedCostumerIdRef = useRef(costumerId);
-  const mountedAfdelingIdRef = useRef(afdelingId);
-  const mountedAllGrantsRef = useRef(afdelingScopedToAllGrants);
-  useEffect(() => {
-    if (
-      costumerId !== mountedCostumerIdRef.current ||
-      afdelingId !== mountedAfdelingIdRef.current ||
-      afdelingScopedToAllGrants !== mountedAllGrantsRef.current
-    ) {
-      mountedCostumerIdRef.current = costumerId;
-      mountedAfdelingIdRef.current = afdelingId;
-      mountedAllGrantsRef.current = afdelingScopedToAllGrants;
-      setHeaderTouched(true);
-    }
-  }, [costumerId, afdelingId, afdelingScopedToAllGrants]);
-  /** Navigation (router state) wins over the global header ONLY until the header itself is touched (see headerTouched above) — otherwise follows the header's own costumerId directly (global for every role, not just sysadm — a regular admin's costumerId is always their own anyway). */
-  const targetCostumerId = headerTouched ? costumerId : (state?.costumerId ?? costumerId);
-  /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. Same headerTouched gate as targetCostumerId above — without it, the "Køretøjer hos {targetCostumerName}" heading would keep showing the router-state-seeded name even after the header (and thus the actual vehicle list) had already moved on to a different Kunde. */
-  const targetCostumerName = isSysadm ? (headerTouched ? costumerName : (state?.costumerName ?? costumerName)) : null;
+  const targetCostumerId = costumerId;
+  /** Display-only; shown for a sysadm alone, matching this page's pre-consolidation behavior of never repeating a regular admin's own (already-implied) costumer name back at them. */
+  const targetCostumerName = isSysadm ? costumerName : null;
 
-  /**
-   * The global header's active afdelingId, carried over IF it actually
-   * belongs to targetCostumerId's departments (checked via
-   * availableDepartments), else null (no narrowing, whole-costumer view).
-   * Same "navigation wins" membership check as DepartmentPage.tsx's own
-   * effectiveAfdelingId — without it, switching costumer via router state
-   * while the header still has a DIFFERENT costumer's department active
-   * would incorrectly try to scope vehicles to a department outside
-   * targetCostumerId.
-   *
-   * afdelingScopedToAllGrants (non-sysadm's own local "Alle", see
-   * AuthContext.tsx's own doc comment) forces this to null regardless of
-   * afdelingId — a regular admin's afdelingId is never null, so without
-   * this check they could never actually reach the whole-costumer view
-   * this page's own UNLOCKED mode is supposed to offer them, same gap
-   * DepartmentPage.tsx had.
-   */
-  const effectiveAfdelingId =
-    !isSysadm && afdelingScopedToAllGrants
-      ? null
-      : afdelingId && availableDepartments.some((d) => d.department_id === afdelingId && (!isSysadm || d.costumerId === targetCostumerId))
-        ? afdelingId
-        : null;
-  /** Router-state seed (DepartmentDetailsPage's own KØRETØJER button, true LOCKED) wins ONLY until the header is touched (see headerTouched above) — once it is, effectiveAfdelingId takes over outright, same as targetCostumerId, for the rest of the visit. Null means UNLOCKED (whole costumer) or, for a sysadm with no targetCostumerId either, ALL-COSTUMERS. */
-  const targetDepartmentId = headerTouched ? effectiveAfdelingId : (state?.departmentId ?? effectiveAfdelingId);
-  const targetDepartmentName = headerTouched
-    ? (targetDepartmentId ? afdeling : null)
-    : (state?.departmentName ?? (targetDepartmentId ? afdeling : null));
+  /** See useEffectiveAfdelingId's own doc comment — shared with DepartmentPage.tsx/FleetManagementPage.tsx. */
+  const effectiveAfdelingId = useEffectiveAfdelingId(targetCostumerId);
+  const targetDepartmentId = effectiveAfdelingId;
+  const targetDepartmentName = targetDepartmentId ? afdeling : null;
 
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   /** UNLOCKED/ALL-COSTUMERS modes only (see this component's own doc comment) — the target costumer's own departments (or, in ALL-COSTUMERS mode, every department platform-wide), both for the Afdeling filter's options and (via their department_ids) which vehicles are in scope. Stays empty, unused, in LOCKED mode. */
@@ -150,10 +82,8 @@ export function VehiclesPage() {
 
   /** Page-local, transient (not persisted) — surfaced inside PageHeader's "Data Filter" popup as a Køretøj <select> rather than a separate funnel popup of this page's own; see PageHeaderFilterField's own doc comment. */
   const [filterPlate, setFilterPlate] = useState("");
-  /** Resets back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked vehicle almost certainly doesn't belong to the NEW scope (it may not even be in `vehicles` at all any more), so leaving it selected would either silently show nothing or, worse, keep matching a vehicle that's no longer actually in view. Same reasoning the page's own local Kunde/Afdeling filter used to apply to this same field before Kunde/Afdeling moved into the header. */
-  useEffect(() => {
-    setFilterPlate("");
-  }, [targetCostumerId, targetDepartmentId]);
+  /** Resets back to "Alle" whenever the Kunde/Afdeling scope itself changes — a previously-picked vehicle almost certainly doesn't belong to the NEW scope (it may not even be in `vehicles` at all any more), so leaving it selected would either silently show nothing or, worse, keep matching a vehicle that's no longer actually in view. Same reasoning/mechanism as DepartmentPage.tsx's/FleetManagementPage.tsx's/AllBookingsPage.tsx's own identical resets, now shared — see useResetOnScopeChange's own doc comment. */
+  useResetOnScopeChange([targetCostumerId, targetDepartmentId], () => setFilterPlate(""));
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter((v) => !filterPlate || v.plate === filterPlate);
@@ -335,9 +265,7 @@ export function VehiclesPage() {
                   type="button"
                   disabled={!targetCostumerId}
                   title={!targetCostumerId ? "Vælg en kunde for at oprette et køretøj" : undefined}
-                  onClick={() =>
-                    navigate("/new-vehicle", { state: { costumerId: targetCostumerId, costumerName: targetCostumerName } })
-                  }
+                  onClick={() => navigate("/new-vehicle")}
                   className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-50"
                 >
                   Opret køretøj

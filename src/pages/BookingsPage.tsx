@@ -7,6 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { CarGlyph } from "../components/CarGlyph";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
+import { useScopeDisplayName } from "../hooks/useScopeDisplayName";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import {
@@ -51,7 +52,7 @@ type Booking = {
  * here, so this page no longer needs its own admin branch.
  */
 export function BookingsPage() {
-  const { session, profile, afdelingId } = useAuth();
+  const { session, profile, afdelingId, afdelingScopedToAllGrants, availableDepartments } = useAuth();
   const navigate = useNavigate();
   const vehicles = use2hireVehicle();
   const user = session?.user.id ?? "";
@@ -59,7 +60,11 @@ export function BookingsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const departmentBookings = activeBookings.filter((b) => b.departmentId === afdelingId);
+  /** Header text below — "Reservationer i {name}" — see useScopeDisplayName's own doc comment. */
+  const scopeName = useScopeDisplayName();
+  /** activeBookings already spans every department the viewer has EVER had a booking under (the query itself has no department filter) — narrowed here to just the viewer's CURRENT department, or, while the header's own Afdeling "Alle" override is active, every department the viewer actually holds a grant for (availableDepartments) rather than every department they've merely ever had a stale booking under. Already sorted (the query orders by start ascending), so this filter alone keeps that order. */
+  const relevantDepartmentIds = afdelingScopedToAllGrants ? new Set(availableDepartments.map((d) => d.department_id)) : new Set([afdelingId]);
+  const departmentBookings = activeBookings.filter((b) => b.departmentId !== null && relevantDepartmentIds.has(b.departmentId));
 
   /** Whether afdelingId's department shows Køretøj-ID (vs. plain Reg.nr/number_plate) in the new first column below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/FleetManagementPage.tsx. */
   const { useVehicleIdent } = useIdentSettings(afdelingId);
@@ -169,7 +174,7 @@ export function BookingsPage() {
       >
         <PageHeader compact />
 
-        <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Dine reservationer</h2>
+        <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservationer i {scopeName}</h2>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {loading && <p className="py-3 text-center text-sm text-brand-500">Indlæser reservationer…</p>}
