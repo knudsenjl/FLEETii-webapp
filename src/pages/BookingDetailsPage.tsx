@@ -75,9 +75,7 @@ export function BookingDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { bookingId } = useParams<{ bookingId: string }>();
-  const { profile, afdelingId } = useAuth();
-  /** Whether afdelingId's department shows the Bruger-ID value (vs. plain E-mail) in the "Bruger:" row below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/DepartmentPage.tsx: the label is always "Bruger", only the value source swaps — who a booking belongs to is core information, not an optional extra. */
-  const { useUserIdent, useVehicleIdent } = useIdentSettings(afdelingId);
+  const { profile } = useAuth();
   const stateBooking = (location.state as { booking?: BookingDetails } | null)?.booking ?? null;
   const [fetchedBooking, setFetchedBooking] = useState<BookingDetails | null>(null);
   // Starts true whenever a fetch-by-id is actually needed (no stateBooking)
@@ -88,6 +86,8 @@ export function BookingDetailsPage() {
   // commit aren't visible to a later effect until the next render).
   const [bookingLoading, setBookingLoading] = useState(!stateBooking);
   const booking = stateBooking ?? fetchedBooking;
+  /** Whether the BOOKING's OWN department (not the admin viewer's ambient/header-selected afdelingId — an admin/sysadm viewing another department's booking would otherwise get that department's Bruger-ID/permission settings applied to this one) shows the Bruger-ID value (vs. plain E-mail) in the "Bruger:" row below — see useIdentSettings' own doc comment. Same pattern as AllBookingsPage.tsx/DepartmentPage.tsx: the label is always "Bruger", only the value source swaps — who a booking belongs to is core information, not an optional extra. */
+  const { useUserIdent, useVehicleIdent } = useIdentSettings(booking?.departmentId ?? null);
 
   const vehicles = use2hireVehicle();
   /** The freshest live data for this booking's vehicle — re-derived every render from VehicleContext's `vehicles` (patched instantly by the "trip_detected" broadcast, see VehicleContext.tsx), unlike `booking` above which is a router-state/fetch-by-id snapshot frozen at whatever moment it was loaded. Used below for the Live-toggle default and its auto-stop-when-parked effect. Null until `vehicles` contains this vehicle. */
@@ -189,7 +189,7 @@ export function BookingDetailsPage() {
     isAdminLock: isAdmin,
     useUserIdent,
     userId: profile?.user_id,
-    afdelingId,
+    afdelingId: booking?.departmentId ?? null,
   });
   /** "Slet reservation" is always shown for role=admin; for role=user, only when Tillad_slet_reservation is true for this department. */
   const canShowDeleteButton = isAdmin || userMayDeleteBooking;

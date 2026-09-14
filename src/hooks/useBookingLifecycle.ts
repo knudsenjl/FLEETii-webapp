@@ -60,6 +60,7 @@ export function useBookingLifecycle(
     /** Whether to use userAnsatId(booking) instead of booking.userEmail as goToEditBooking's userLabel prefill — see useIdentSettings' own doc comment. */
     useUserIdent: boolean;
     userId: string | undefined;
+    /** The BOOKING's OWN department (booking.departmentId), for the Tillad_slet_reservation/Tillad_rediger_reservation checks below — NOT the viewer's ambient/header-selected afdelingId. For BookingPage.tsx (role "user") the two happen to be identical (a user only ever has bookings in their own department); BookingDetailsPage.tsx (admin/sysadm, who can view any department's booking) must pass the booking's own departmentId explicitly instead. */
     afdelingId: string | null;
   },
 ) {
