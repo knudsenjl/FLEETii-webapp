@@ -92,11 +92,19 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * mirroring "Opret køretøj"'s request-based flow in reverse. Normally
  * reached with the vehicle pre-filled via router state (VehiclesPage/
  * FleetManagementPage/BookingDetailsPage), which skips a round-trip; a
- * direct URL/refresh/bookmark (no router state) falls back to looking the
- * :vehicleId route param up in the already-loaded VehicleContext fleet list
- * (see useVehiclesLoading — no extra fetch needed, the whole fleet is loaded
- * on auth anyway), redirecting to the fleet table if it can't be found there
- * either. A regular user can land here too (e.g. via their own booking's map
+ * direct URL/refresh/bookmark — or PageHeader's own koretoejNavigate
+ * quick-jump (AdminFrontpage.tsx/DepartmentDetailsPage.tsx), which navigates
+ * here with a bare vehicleId and no state at all — falls back to looking the
+ * :vehicleId route param up in VehicleContext's fleet list, forcing a fresh
+ * refetch first (vehiclesRefreshed below) rather than trusting whatever
+ * snapshot happened to already be cached from login time, before concluding
+ * it's genuinely missing and redirecting to the fleet table (2026-09-14 fix:
+ * the snapshot-trusting version raced ahead of that refetch, so a vehicle
+ * absent from login's original snapshot — the common case for a quick-jump,
+ * which pulls its option list straight from the DB rather than that
+ * snapshot — bounced to /fleet-table every time, even after a hard refresh,
+ * since that just re-ran the same race rather than fixing it). A regular
+ * user can land here too (e.g. via their own booking's map
  * marker on BookingDetailsPage), so the map and both actions are gated on
  * profile.role rather than the route itself.
  */
@@ -177,9 +185,18 @@ export function VehicleDetailsPage() {
   );
   const setLiveTracking = useSetLiveTracking();
   const refreshVehicles = useRefreshVehicles();
-  /** Forces a fresh fleet refetch every time this page is opened (or the :vehicleId changes without a remount) — see `liveVehicle`'s own doc comment above for why this is needed at all: otherwise this vehicle's trip_detected/online/etc. signals could be showing whatever they were at login (or the last refreshVehicles() call anywhere in the app), arbitrarily stale. */
+  /** True once THIS mount's refetch below has resolved — gates the "not found" redirect effect further down, so a vehicle that's genuinely in the DB but missing from allVehicles' possibly-stale, once-per-login snapshot (e.g. reached via PageHeader's koretoejNavigate quick-jump — AdminFrontpage.tsx/DepartmentDetailsPage.tsx — which navigates here with a bare vehicleId and no router-state vehicle object to fall back on, unlike every other entry point) gets one authoritative refetch before being declared missing, rather than bouncing to /fleet-table off a snapshot that simply hadn't caught up yet (2026-09-14 fix — confirmed reproducible: hard refresh alone didn't help, since a hard refresh re-runs this exact same race, not just clears a stale cache). Reset to false on every vehicleId change so switching between two vehicle-details pages in a row (browser back/forward, or picking a different quick-jump entry) re-arms this gate rather than reusing a stale "already refreshed" flag from the PREVIOUS vehicle. */
+  const [vehiclesRefreshed, setVehiclesRefreshed] = useState(false);
+  /** Forces a fresh fleet refetch every time this page is opened (or the :vehicleId changes without a remount) — see `liveVehicle`'s own doc comment above for why this is needed at all: otherwise this vehicle's trip_detected/online/etc. signals could be showing whatever they were at login (or the last refreshVehicles() call anywhere in the app), arbitrarily stale — and, per vehiclesRefreshed above, so the "not found" redirect effect further down has an authoritative answer instead of a possibly-stale snapshot. */
   useEffect(() => {
-    void refreshVehicles();
+    setVehiclesRefreshed(false);
+    let cancelled = false;
+    void refreshVehicles().then(() => {
+      if (!cancelled) setVehiclesRefreshed(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [vehicleId, refreshVehicles]);
   useEffect(() => {
     setLiveTracking(liveEnabled);
@@ -261,7 +278,7 @@ export function VehicleDetailsPage() {
   const { activeKey: lockConfirmationKey, trigger: triggerLockConfirmation } = useTimedFlag();
   const { isLocating, locateError, locate } = useLocateVehicle();
 
-  /** Fetch-by-id fallback for a direct URL/refresh/bookmark (no router state) — looks the :vehicleId up in the already-loaded VehicleContext fleet list rather than issuing a new query (see useVehiclesLoading's doc comment for why vehiclesLoading matters here: allVehicles starts empty and this effect would otherwise resolve to "not found" before the context's own fetch has even finished). Skipped entirely when stateVehicle is already present. */
+  /** Fetch-by-id fallback for a direct URL/refresh/bookmark/quick-jump (no router state) — looks the :vehicleId up in VehicleContext's fleet list rather than issuing its own separate query (see useVehiclesLoading's doc comment for why vehiclesLoading matters here: allVehicles starts empty and this effect would otherwise resolve to "not found" before the context's own initial fetch has even finished). Re-runs as allVehicles updates, so once the mount effect above's own forced refetch resolves, a vehicle absent from the ORIGINAL (possibly stale) snapshot is picked up here automatically — the "not found" redirect effect below is what actually waits for that refetch (vehiclesRefreshed) before trusting a still-null result here as final. Skipped entirely when stateVehicle is already present. */
   useEffect(() => {
     if (stateVehicle || !vehicleId || vehiclesLoading) return;
     const twoHireVehicle = allVehicles.find((v) => v.vehicleId === vehicleId);
@@ -269,10 +286,10 @@ export function VehicleDetailsPage() {
   }, [stateVehicle, vehicleId, vehiclesLoading, allVehicles]);
 
   useEffect(() => {
-    if (!vehicle && !vehiclesLoading) {
+    if (!vehicle && !vehiclesLoading && vehiclesRefreshed) {
       navigate("/fleet-table", { replace: true });
     }
-  }, [vehicle, vehiclesLoading, navigate]);
+  }, [vehicle, vehiclesLoading, vehiclesRefreshed, navigate]);
 
   /**
    * Loads the departments this vehicle currently belongs to
