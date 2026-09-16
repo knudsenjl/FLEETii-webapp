@@ -29,7 +29,9 @@
       "PowerShell(Get-CimInstance Win32_Process -Filter \"ProcessId=9764 or ProcessId=27300 or ProcessId=7612\")",
       "PowerShell(Get-NetTCPConnection -LocalPort 8888,5173 -State Listen -ErrorAction SilentlyContinue)",
       "WebFetch(domain:developer.2hire.io)",
-      "Read(//c/Users/JørgenLindskovKnudse/OneDrive - MH3 ApS/Shared folders/Documents-FLEETii/FLEETii webapp/**)"
+      "Read(//c/Users/JørgenLindskovKnudse/OneDrive - MH3 ApS/Shared folders/Documents-FLEETii/FLEETii webapp/**)",
+      "Bash(gh pr create --base production*)",
+      "Bash(gh pr merge*)"
     ]
   }
 }
