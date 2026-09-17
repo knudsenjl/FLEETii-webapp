@@ -7,6 +7,7 @@ import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, u
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
+import { fadeInUp } from "../lib/motionVariants";
 import { CarGlyph } from "../components/CarGlyph";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -550,9 +551,7 @@ export function VehicleDetailsPage() {
 
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeInUp}
           className="flex min-h-0 flex-1 flex-col"
         >
           <PageHeader />

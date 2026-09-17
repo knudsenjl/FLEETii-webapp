@@ -9,6 +9,7 @@ import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useScopeDisplayName } from "../hooks/useScopeDisplayName";
 import { supabase } from "../lib/supabase";
+import { fadeInUp } from "../lib/motionVariants";
 import { isSettingTilladt } from "../lib/settings";
 import {
   BOOKINGS_SELECT_COLUMNS,
@@ -167,9 +168,7 @@ export function BookingsPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeInUp}
         className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
       >
         <PageHeader compact />

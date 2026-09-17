@@ -10,6 +10,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { FieldInfoButton } from "../components/FieldInfoButton";
+import { fadeInUp } from "../lib/motionVariants";
 import { SettingsRow } from "../components/SettingsRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { ForbiddenNotice } from "../components/ProtectedRoute";
@@ -809,9 +810,7 @@ export function UserDetailsPage() {
 
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeInUp}
           className="flex min-h-0 flex-1 flex-col"
         >
           <PageHeader />

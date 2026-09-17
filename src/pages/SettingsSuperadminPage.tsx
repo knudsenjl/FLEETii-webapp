@@ -7,6 +7,7 @@
 // AdminFrontpage/CostumerAdministrationPage, no content yet.
 import { motion } from "framer-motion";
 import { PageHeader } from "../components/PageHeader";
+import { fadeInUp } from "../lib/motionVariants";
 
 /** Settings page for role "sysadm". */
 export function SettingsSuperadminPage() {
@@ -19,9 +20,7 @@ export function SettingsSuperadminPage() {
 
       <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
         <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeInUp}
           className="flex min-h-0 flex-1 flex-col"
         >
           <PageHeader />

@@ -17,6 +17,7 @@ import {
   type BookingRow,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
+import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -257,9 +258,7 @@ export function BookingPage() {
           aria-hidden="true"
         />
         <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+          {...fadeInUp}
           className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
         >
           <PageHeader compact />
@@ -299,9 +298,7 @@ export function BookingPage() {
       />
 
       <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+        {...fadeInUp}
         className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
       >
         <PageHeader compact />
