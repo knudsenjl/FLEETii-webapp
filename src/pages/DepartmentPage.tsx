@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -348,9 +349,7 @@ export function DepartmentPage() {
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">
                               {user.deleted_at ? (
-                                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                  Blokeret
-                                </span>
+                                <BlockedBadge />
                               ) : (
                                 user.role
                               )}

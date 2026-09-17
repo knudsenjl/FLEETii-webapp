@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
@@ -162,9 +163,7 @@ export function CostumerAdministrationPage() {
                               <span>{costumer.name ?? "—"}</span>
                               <div className="flex shrink-0 items-center gap-2">
                                 {costumer.deactivated_at && (
-                                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                    Adgang blokeret
-                                  </span>
+                                  <BlockedBadge>Adgang blokeret</BlockedBadge>
                                 )}
                                 {!costumer.has_twohire_credentials && (
                                   <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">

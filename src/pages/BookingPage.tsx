@@ -19,6 +19,8 @@ import {
 import { PageHeader } from "../components/PageHeader";
 import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
+import { MapOverlayMessage } from "../components/MapOverlayMessage";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { PageLoading } from "../components/PageLoading";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -318,9 +320,7 @@ export function BookingPage() {
                   <span className="truncate text-base font-semibold text-brand-800">{vehicleTitle}</span>
                   <span className="truncate text-xs text-brand-500">{vehicleSubtitle}</span>
                   {vehicleIdentInfo?.blocked && (
-                    <span className="mt-0.5 w-fit rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                      Blokeret
-                    </span>
+                    <BlockedBadge className="mt-0.5 w-fit" />
                   )}
                 </div>
               </button>
@@ -416,11 +416,7 @@ export function BookingPage() {
                   followMarker
                 />
                 {!position && (
-                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                      Der er ingen GPS position tilgængelig for dette køretøj
-                    </div>
-                  </div>
+                  <MapOverlayMessage>Der er ingen GPS position tilgængelig for dette køretøj</MapOverlayMessage>
                 )}
               </div>
 

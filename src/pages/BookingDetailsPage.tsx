@@ -5,6 +5,8 @@ import { Button } from "../components/Button";
 import { FieldRow } from "../components/FieldRow";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
+import { MapOverlayMessage } from "../components/MapOverlayMessage";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { isAnyAdmin } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
@@ -320,9 +322,7 @@ export function BookingDetailsPage() {
                         <span className="text-sm text-brand-800">{vehicleLabel}</span>
                       )}
                       {vehicleIdentInfo?.blocked && (
-                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                          Blokeret
-                        </span>
+                        <BlockedBadge className="ml-2" />
                       )}
                     </span>
                   </FieldRow>
@@ -373,11 +373,7 @@ export function BookingDetailsPage() {
                       followMarker
                     />
                     {!position && (
-                      <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                        <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                          Der er ingen GPS position tilgængelig for dette køretøj
-                        </div>
-                      </div>
+                      <MapOverlayMessage>Der er ingen GPS position tilgængelig for dette køretøj</MapOverlayMessage>
                     )}
                   </div>
 

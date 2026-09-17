@@ -5,6 +5,7 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
@@ -320,9 +321,7 @@ export function AllBookingsPage() {
                                 useVehicleIdent,
                               )}
                               {identByVehicleId[booking.vehicle]?.blocked && (
-                                <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                  Blokeret
-                                </span>
+                                <BlockedBadge className="ml-2" />
                               )}
                             </td>
                             <td

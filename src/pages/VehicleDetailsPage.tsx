@@ -7,6 +7,8 @@ import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
+import { MapOverlayMessage } from "../components/MapOverlayMessage";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { CarGlyph } from "../components/CarGlyph";
 import { FieldRow } from "../components/FieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -580,9 +582,7 @@ export function VehicleDetailsPage() {
                       )}
                       {/* Same "Blokeret" badge convention as CostumerAdministrationPage.tsx's blocked-costumer row — mirrors blockedAt (vehicle_profiles.blocked_at) everywhere this vehicle is shown. */}
                       {blockedAt && (
-                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                          Blokeret
-                        </span>
+                        <BlockedBadge className="ml-2" />
                       )}
                     </span>
                   </FieldRow>
@@ -729,11 +729,7 @@ export function VehicleDetailsPage() {
                       followMarker
                     />
                     {!position && (
-                      <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                        <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                          Der er ingen GPS position tilgængelig for dette køretøj
-                        </div>
-                      </div>
+                      <MapOverlayMessage>Der er ingen GPS position tilgængelig for dette køretøj</MapOverlayMessage>
                     )}
                   </div>
 

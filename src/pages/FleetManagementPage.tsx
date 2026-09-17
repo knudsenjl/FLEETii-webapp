@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
@@ -357,22 +358,20 @@ export function FleetManagementPage() {
                   className="absolute inset-0"
                 />
                 {showEmptyNotice && (
-                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                      {filteredVehicles.length === 0
-                        ? filterPlate
-                          ? "Ingen køretøjer matcher filteret"
-                          : "Der er ingen køretøjer i afdelingen"
-                        : // filteredVehicles.length > 0 but departmentGpsPositions is
-                          // still empty (the actual trigger for showEmptyNotice, see
-                          // its own effect above) — real vehicles ARE in scope, they
-                          // just haven't reported a single 2hire signal yet (brand new,
-                          // never driven/connected), so there's no lat/lng to plot.
-                          // Distinguishing this from "no vehicles" avoids the map
-                          // wrongly claiming a just-created vehicle doesn't exist.
-                          "Ingen af køretøjerne har endnu en GPS-position"}
-                    </div>
-                  </div>
+                  <MapOverlayMessage>
+                    {filteredVehicles.length === 0
+                      ? filterPlate
+                        ? "Ingen køretøjer matcher filteret"
+                        : "Der er ingen køretøjer i afdelingen"
+                      : // filteredVehicles.length > 0 but departmentGpsPositions is
+                        // still empty (the actual trigger for showEmptyNotice, see
+                        // its own effect above) — real vehicles ARE in scope, they
+                        // just haven't reported a single 2hire signal yet (brand new,
+                        // never driven/connected), so there's no lat/lng to plot.
+                        // Distinguishing this from "no vehicles" avoids the map
+                        // wrongly claiming a just-created vehicle doesn't exist.
+                        "Ingen af køretøjerne har endnu en GPS-position"}
+                  </MapOverlayMessage>
                 )}
               </div>
 

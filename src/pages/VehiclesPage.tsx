@@ -5,6 +5,7 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
@@ -223,9 +224,7 @@ export function VehiclesPage() {
                           <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
                             {vehicle.plate}
                             {blockedByVehicleId[vehicle.vehicleId] && (
-                              <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                Blokeret
-                              </span>
+                              <BlockedBadge className="ml-2" />
                             )}
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5">
