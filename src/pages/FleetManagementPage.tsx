@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -376,13 +377,9 @@ export function FleetManagementPage() {
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate("/fleet-table")}
-                className="mt-4 w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-              >
+              <Button variant="secondary" type="button" onClick={() => navigate("/fleet-table")} className="mt-4 w-full">
                 Liste af køretøjer
-              </button>
+              </Button>
             </section>
           </motion.main>
         </div>

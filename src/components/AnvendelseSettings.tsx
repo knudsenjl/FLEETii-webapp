@@ -56,6 +56,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Modal } from "./Modal";
+import { Button } from "./Button";
 import { supabase } from "../lib/supabase";
 import { ANDET_VALUE, sortAnvendelserWithAndetLast } from "../lib/settings";
 
@@ -526,7 +527,8 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
             />
             {submitError && <p className="mt-2 text-sm text-red-600">{submitError}</p>}
             <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
+              <Button
+                variant="secondary"
                 type="button"
                 onClick={() => {
                   setFieldValue("");
@@ -534,18 +536,12 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
                   setMode("view");
                 }}
                 disabled={isSubmitting}
-                className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Fortryd
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                disabled={!canSubmitField || isSubmitting}
-                className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="secondary" type="button" onClick={() => void handleCreate()} disabled={!canSubmitField || isSubmitting}>
                 {isSubmitting ? "Gemmer…" : "Gem"}
-              </button>
+              </Button>
             </div>
           </Modal>
         </div>

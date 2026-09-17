@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { supabase } from "../lib/supabase";
@@ -261,22 +262,19 @@ export function VehiclesPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   disabled={!targetCostumerId}
                   title={!targetCostumerId ? "Vælg en kunde for at oprette et køretøj" : undefined}
                   onClick={() => navigate("/new-vehicle")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-50"
+                  className="flex-1 disabled:hover:bg-brand-50"
                 >
                   Opret køretøj
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/import-vehicles")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                </Button>
+                <Button variant="secondary" type="button" onClick={() => navigate("/import-vehicles")} className="flex-1">
                   Opret køretøjer fra fil
-                </button>
+                </Button>
               </div>
             </div>
           </section>

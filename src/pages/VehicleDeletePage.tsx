@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
@@ -309,14 +310,9 @@ export function VehicleDeletePage() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                <button
-                  type="button"
-                  disabled={isDeleting}
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="w-full rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                <Button variant="danger" type="button" disabled={isDeleting} onClick={() => setShowDeleteConfirm(true)} className="w-full">
                   Afregistrer 2hire device og slet køretøjet
-                </button>
+                </Button>
               </div>
             )}
 

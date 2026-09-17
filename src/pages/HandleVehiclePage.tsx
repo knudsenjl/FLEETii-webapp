@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
@@ -791,22 +792,18 @@ export function HandleVehiclePage() {
               {saveError && <p className="text-sm text-red-600">{saveError}</p>}
 
               <div className="flex flex-row gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={!canSave || isSaving}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   {isSaving ? "Gemmer…" : "Gem ændringer"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  disabled={isSaving}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="secondary" type="button" onClick={() => navigate(-1)} disabled={isSaving} className="flex-1">
                   Fortryd
-                </button>
+                </Button>
               </div>
             </div>
           </section>

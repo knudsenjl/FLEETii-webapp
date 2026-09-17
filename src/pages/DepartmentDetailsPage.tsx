@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
@@ -472,46 +473,46 @@ export function DepartmentDetailsPage() {
 
                 {isAddingDepartment ? (
                   <div className="grid grid-cols-2 gap-3">
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => setPendingAction("create-department")}
                       disabled={!canSubmitDepartment}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Opret afdeling
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => {
                         setNewDepartmentName("");
                         setIsAddingDepartment(false);
                       }}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Annuller
-                    </button>
+                    </Button>
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-3">
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => {
                         setNewDepartmentName("");
                         setDepartmentError(null);
                         setIsAddingDepartment(true);
                       }}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Opret afdeling
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="danger"
                       type="button"
                       onClick={() => setPendingAction("delete-department")}
                       disabled={!selectedDepartmentId}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Slet afdeling
-                    </button>
+                    </Button>
                   </div>
                 )}
               </>
@@ -523,14 +524,15 @@ export function DepartmentDetailsPage() {
                 {isSysadm && <hr className="border-brand-200" />}
 
                 <div className="relative">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     disabled={scopeSwitch.isSwitching}
                     onClick={() => void scopeSwitch.switchAndNavigate("fleet", selectedDepartmentId, costumerId, "/fleet-map")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
-                  </button>
+                  </Button>
                   <InlinePopup
                     visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
                     message={scopeSwitch.error ?? ""}
@@ -579,14 +581,15 @@ export function DepartmentDetailsPage() {
                   </div>
                   {/* Indstillinger — a col-span-2 row in this SAME grid (both roles now: 2026-09-14, opened to sysadm too, alongside App.tsx's /department-settings route relaxing to requireAdmin — see this page's own top doc comment), rather than its own full-width block below a divider like Flådestyring above — sized to match KØRETØJER+BRUGERE's own combined width instead of the section's full width, and grouped with them as one visual cluster with no divider, since all three ("department-specific actions") belong together once a department is selected, whereas Flådestyring above stays full-width/undivided as the one department-independent action. Same switch-then-navigate pattern as Flådestyring/KØRETØJER/BRUGERE. */}
                   <div className="relative col-span-2">
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       disabled={scopeSwitch.isSwitching}
                       onClick={() => void scopeSwitch.switchAndNavigate("indstillinger", selectedDepartmentId, costumerId, "/department-settings")}
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full"
                     >
                       {scopeSwitch.activeKey === "indstillinger" && scopeSwitch.isSwitching ? "Vent…" : "Indstillinger"}
-                    </button>
+                    </Button>
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "indstillinger" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}

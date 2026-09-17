@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { Button } from "../components/Button";
 import { isAnyAdmin } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
@@ -429,58 +430,63 @@ export function BookingDetailsPage() {
                   }
                 />
                 <div className="group relative flex-1">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => void handleLocate()}
                     disabled={isLocating}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2"
                   >
                     <HeadlightIcon />
                     {isLocating ? "Blinker…" : "Blink"}
-                  </button>
+                  </Button>
                   <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>
                 <div className="group relative flex-1">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={handleHonk}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="flex w-full items-center justify-center gap-2"
                   >
                     <HornIcon />
                     Horn
-                  </button>
+                  </Button>
                   <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
                 </div>
               </div>
 
               {/* Afslut/Rediger/Slet, all on one row (labels shortened from "... reservation" since the section they're in already makes that context clear). shrink-0 for the same reason as the Lås/Blink/Horn row above. */}
               <div className="flex shrink-0 gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => setShowFinishConfirm(true)}
                   disabled={!canFinishBooking || isFinishing}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   Afslut
-                </button>
+                </Button>
                 {canShowEditButton && (
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={goToEditBooking}
-                    className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="flex-1"
                   >
                     Rediger
-                  </button>
+                  </Button>
                 )}
                 {canShowDeleteButton && (
-                  <button
+                  <Button
+                    variant="danger"
                     type="button"
                     onClick={() => setShowCancelConfirm(true)}
                     disabled={isCancelling}
-                    className="flex-1 rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex-1"
                   >
                     {isCancelling ? "Aflyser…" : "Slet"}
-                  </button>
+                  </Button>
                 )}
               </div>
 

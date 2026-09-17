@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { supabase } from "../lib/supabase";
@@ -256,15 +257,17 @@ export function AvailablePage() {
 
               <div className={editingBookingId ? "grid grid-cols-2 gap-3 pt-2" : "flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end"}>
                 {editingBookingId && (
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => navigate(`/booking-details/${editingBookingId}`)}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     Fortryd
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   disabled={!selectedVehicle}
                   onClick={() => {
@@ -289,10 +292,10 @@ export function AvailablePage() {
                       },
                     });
                   }}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full"
                 >
                   {editingBookingId ? "Opdater" : "Reserver"}
-                </button>
+                </Button>
               </div>
             </div>
           </section>

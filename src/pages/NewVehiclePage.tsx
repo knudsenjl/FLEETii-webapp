@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { Modal } from "../components/Modal";
@@ -563,14 +564,9 @@ export function NewVehiclePage() {
                   Bestillingen er sendt
                 </span>
               ) : (
-                <button
-                  type="button"
-                  disabled={!canSend}
-                  onClick={() => void handleSend()}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                <Button variant="secondary" type="button" disabled={!canSend} onClick={() => void handleSend()} className="w-full">
                   {isSending ? "Sender…" : "Send bestilling til FLEETii"}
-                </button>
+                </Button>
               )}
 
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">

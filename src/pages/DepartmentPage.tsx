@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
 import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
@@ -373,20 +374,12 @@ export function DepartmentPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate("/user-details")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                <Button variant="secondary" type="button" onClick={() => navigate("/user-details")} className="flex-1">
                   Opret bruger
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/import-users")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                </Button>
+                <Button variant="secondary" type="button" onClick={() => navigate("/import-users")} className="flex-1">
                   Opret brugere fra fil
-                </button>
+                </Button>
               </div>
             </div>
           </section>

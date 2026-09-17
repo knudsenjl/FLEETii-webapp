@@ -34,6 +34,7 @@
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { InlinePopup } from "./InlinePopup";
+import { Button } from "./Button";
 import { supabase } from "../lib/supabase";
 import { invalidateIdentSettingsCache } from "../hooks/useIdentSettings";
 
@@ -520,22 +521,22 @@ export function StandardSettings({
       {/* deferSave only — SettingsAdminPage.tsx's own table has no equivalent, since every edit there still saves immediately on change/blur/toggle. Disabled with nothing to do (no dirty rows, or a save already in flight) rather than hidden, so the row doesn't jump around as edits are made/reverted. Neither button acts directly anymore — each opens its own ConfirmDialog below instead (guarding both the discard and the actual write behind an explicit "Er du sikker?" step, same as every other confirmable action in this app). */}
       {deferSave && !readOnly && !loading && !loadError && (
         <div className="grid grid-cols-2 gap-3">
-          <button
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => setPendingRevert(true)}
             disabled={(dirtySettings.length === 0 && !extraDirty) || isUpdating}
-            className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Fortryd
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => setPendingUpdate(true)}
             disabled={(dirtySettings.length === 0 && !extraDirty) || isUpdating}
-            className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Opdater
-          </button>
+          </Button>
         </div>
       )}
 

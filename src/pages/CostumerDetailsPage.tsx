@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -650,15 +651,11 @@ export function CostumerDetailsPage() {
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("update")}
-                    disabled={!canSubmitEdit}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("update")} disabled={!canSubmitEdit}>
                     Opdater kunde
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => {
                       setEditName(costumer.name ?? "");
@@ -673,10 +670,9 @@ export function CostumerDetailsPage() {
                       setEditTwoHireClientSecret("");
                       setIsEditing(false);
                     }}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Fortryd
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
@@ -740,27 +736,30 @@ export function CostumerDetailsPage() {
                           is blocked — only two actions are meaningful for a
                           blocked costumer: restore access, or purge it for
                           good. */}
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => setPendingAction("reactivate")}
-                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                        className="col-span-2"
                       >
                         Genetabler kundens adgang
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="danger"
                         type="button"
                         onClick={() => {
                           setPurgeConfirmText("");
                           setPendingAction("delete");
                         }}
-                        className="col-span-2 rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        className="col-span-2"
                       >
                         Slet kunden permanent
-                      </button>
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => {
                           setEditName(costumer.name ?? "");
@@ -775,17 +774,12 @@ export function CostumerDetailsPage() {
                           setEditTwoHireClientSecret("");
                           setIsEditing(true);
                         }}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                       >
                         Rediger kunde
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPendingAction("deactivate")}
-                        className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                      >
+                      </Button>
+                      <Button variant="danger" type="button" onClick={() => setPendingAction("deactivate")}>
                         Bloker kundens adgang
-                      </button>
+                      </Button>
                     </>
                   )}
                 </div>
@@ -793,14 +787,15 @@ export function CostumerDetailsPage() {
                 <hr className="border-brand-200" />
 
                 <div className="relative">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     disabled={scopeSwitch.isSwitching}
                     onClick={() => void scopeSwitch.switchAndNavigate("fleet", null, costumer.costumer_id, "/fleet-map")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
-                  </button>
+                  </Button>
                   <InlinePopup
                     visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
                     message={scopeSwitch.error ?? ""}

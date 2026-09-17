@@ -17,6 +17,7 @@ import {
   type BookingRow,
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
@@ -454,14 +455,16 @@ export function BookingPage() {
               </button>
             )}
             {userMayDeleteBooking && (
-              <button
+              <Button
+                variant="danger"
+                pill
                 type="button"
                 onClick={() => setShowCancelConfirm(true)}
                 disabled={isCancelling}
-                className="min-h-11 flex-1 rounded-full border-2 border-red-600 bg-white text-xs font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex-1"
               >
                 {isCancelling ? "Aflyser…" : "Slet"}
-              </button>
+              </Button>
             )}
           </div>
 

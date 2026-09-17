@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { QrScanButton } from "../components/QrScanButton";
@@ -868,14 +869,9 @@ export function VehicleCreatePage() {
               {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
               {vehicleRegistered ? (
                 <div className="flex flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete()}
-                    disabled={isDeleting}
-                    className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  <Button variant="secondary" type="button" onClick={() => void handleDelete()} disabled={isDeleting} className="flex-1">
                     {isDeleting ? "Sletter…" : "Slet"}
-                  </button>
+                  </Button>
                   <span className="flex flex-1 items-center justify-center rounded-lg bg-green-600 px-2 py-1.5 text-center text-sm font-semibold text-white">
                     ✓ Køretøj registreret i 2hire
                   </span>
@@ -990,41 +986,26 @@ export function VehicleCreatePage() {
                   {orderEditError && <p className="text-sm text-red-600">{orderEditError}</p>}
                   {isEditingOrder ? (
                     <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={handleCancelEditOrder}
-                        disabled={isSavingOrderEdit}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                      <Button variant="secondary" type="button" onClick={handleCancelEditOrder} disabled={isSavingOrderEdit}>
                         Fortryd
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => setConfirmUpdateOpen(true)}
                         disabled={!canSubmitOrderEdit || isSavingOrderEdit}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isSavingOrderEdit ? "Opdaterer…" : "Opdater"}
-                      </button>
+                      </Button>
                     </div>
                   ) : (
                     <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={handleStartEditOrder}
-                        disabled={isRegistering}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                      <Button variant="secondary" type="button" onClick={handleStartEditOrder} disabled={isRegistering}>
                         Rediger
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteOpen(true)}
-                        disabled={isDeleting || isRegistering}
-                        className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                      </Button>
+                      <Button variant="danger" type="button" onClick={() => setConfirmDeleteOpen(true)} disabled={isDeleting || isRegistering}>
                         Slet
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </div>

@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
@@ -350,13 +351,14 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="w-full"
                 >
                   Opret reservation
-                </button>
+                </Button>
               </div>
             </div>
           </section>

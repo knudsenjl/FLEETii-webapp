@@ -5,6 +5,7 @@
 // pending, showing an error) stays consistent everywhere.
 import type { ReactNode } from "react";
 import { Modal } from "./Modal";
+import { Button } from "./Button";
 
 /** Props for ConfirmDialog. Only message/onCancel/onConfirm are required — labels and pending state are opt-in for callers that need them. */
 interface ConfirmDialogProps {
@@ -39,22 +40,12 @@ export function ConfirmDialog({
       <p className="text-sm font-medium text-brand-800">{message}</p>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
       <div className="mt-4 grid grid-cols-2 gap-3">
-        <button
-          type="button"
-          onClick={onCancel}
-          disabled={isPending}
-          className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        <Button variant="secondary" type="button" onClick={onCancel} disabled={isPending}>
           {cancelLabel}
-        </button>
-        <button
-          type="button"
-          onClick={onConfirm}
-          disabled={isPending || confirmDisabled}
-          className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-        >
+        </Button>
+        <Button variant="secondary" type="button" onClick={onConfirm} disabled={isPending || confirmDisabled}>
           {isPending && confirmPendingLabel ? confirmPendingLabel : confirmLabel}
-        </button>
+        </Button>
       </div>
     </Modal>
   );

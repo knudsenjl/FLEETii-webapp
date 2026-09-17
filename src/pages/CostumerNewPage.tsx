@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
@@ -292,13 +293,9 @@ export function CostumerNewPage() {
             {step === "success" ? (
               <>
                 <p className="text-sm text-brand-800">Den nye kunde er nu registreret i 2hire, og klar til brug.</p>
-                <button
-                  type="button"
-                  onClick={() => navigate("/costumers")}
-                  className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                <Button variant="secondary" type="button" onClick={() => navigate("/costumers")}>
                   Til kundeliste
-                </button>
+                </Button>
               </>
             ) : step === "register" ? (
               <>
@@ -335,21 +332,17 @@ export function CostumerNewPage() {
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => setPendingAction("register")}
                     disabled={!canSubmitRegister}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Registrer i 2hire
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("discardDraft")}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("discardDraft")}>
                     Fortryd
-                  </button>
+                  </Button>
                 </div>
               </>
             ) : (
@@ -407,21 +400,17 @@ export function CostumerNewPage() {
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => setPendingAction("create")}
                     disabled={!canSubmitCreate}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret kunde
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("closeCreate")}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("closeCreate")}>
                     Fortryd
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

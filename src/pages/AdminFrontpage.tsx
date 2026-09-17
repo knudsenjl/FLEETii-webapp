@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { useAuth } from "../contexts/AuthContext";
@@ -272,30 +273,33 @@ export function AdminFrontpage() {
           <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className="flex flex-col gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="w-full"
                 >
                   Opret reservation
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/allbookings")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="w-full"
                 >
                   Reservationer
-                </button>
+                </Button>
                 {!isDepartmentAdmin(profile?.role) && (
                   <>
                     <hr className="border-brand-200" />
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => navigate("/fleet-map")}
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                      className="w-full"
                     >
                       Flådestyring
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -306,13 +310,14 @@ export function AdminFrontpage() {
 
                   <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => navigate("/fleet-map")}
-                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                        className="col-span-2"
                       >
                         Flådestyring
-                      </button>
+                      </Button>
                       <div className="relative aspect-square w-28">
                         <button
                           type="button"
@@ -454,10 +459,11 @@ export function AdminFrontpage() {
 
                   <hr className="border-brand-200" />
 
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => navigate("/sysadm-installations")}
-                    className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="relative w-full"
                   >
                     INSTALLATIONER
                     {Boolean(pendingInstallationsCount) && (
@@ -465,15 +471,16 @@ export function AdminFrontpage() {
                         {pendingInstallationsCount}
                       </span>
                     )}
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => navigate("/2hire-command")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="w-full"
                   >
                     2HIRE KOMMANDO
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

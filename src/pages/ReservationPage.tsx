@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { supabase } from "../lib/supabase";
@@ -804,32 +805,30 @@ export function ReservationPage() {
 
               {editing ? (
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     Bekræft/skift køretøj
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={handleCancelEdit} className="w-full">
                     Fortryd
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     Find ledigt køretøj
-                  </button>
+                  </Button>
                 </div>
               )}
             </div>

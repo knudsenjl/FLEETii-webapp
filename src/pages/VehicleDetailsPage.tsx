@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -787,26 +788,23 @@ export function VehicleDetailsPage() {
                   }
                 />
                 <div className="group relative flex-1">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => void handleLocate()}
                     disabled={isLocating}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex w-full items-center justify-center gap-2"
                   >
                     <HeadlightIcon />
                     {isLocating ? "Blinker…" : "Blink"}
-                  </button>
+                  </Button>
                   <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
                 </div>
                 <div className="group relative flex-1">
-                  <button
-                    type="button"
-                    onClick={handleHonk}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  <Button variant="secondary" type="button" onClick={handleHonk} className="flex w-full items-center justify-center gap-2">
                     <HornIcon />
                     Horn
-                  </button>
+                  </Button>
                   <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
                 </div>
               </div>
@@ -816,43 +814,27 @@ export function VehicleDetailsPage() {
 
               {isAdmin && (
                 <div className="grid shrink-0 grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  <Button variant="secondary" type="button" onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}>
                     Rediger
-                  </button>
+                  </Button>
                   {/* Toggles to "Frigiv" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
                   {blockedAt ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowBlockConfirm(true)}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                    >
+                    <Button variant="danger" type="button" onClick={() => setShowBlockConfirm(true)}>
                       Frigiv
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowBlockConfirm(true)}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                    >
+                    <Button variant="danger" type="button" onClick={() => setShowBlockConfirm(true)}>
                       Bloker
-                    </button>
+                    </Button>
                   )}
                   {deleteRequestSent ? (
                     <span className="flex items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
                       Anmodning om sletning er sendt
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                    >
+                    <Button variant="danger" type="button" onClick={() => setShowDeleteConfirm(true)}>
                       Slet
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}

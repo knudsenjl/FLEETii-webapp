@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { useAuth } from "../contexts/AuthContext";
 import { useScopeSwitch } from "../hooks/useScopeSwitch";
@@ -191,13 +192,14 @@ export function CostumerAdministrationPage() {
               </table>
             </div>
 
-            <button
+            <Button
+              variant="secondary"
               type="button"
               onClick={() => navigate("/costumer-new")}
-              className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+              className="w-full"
             >
               Opret kunde
-            </button>
+            </Button>
           </section>
         </motion.main>
       </div>

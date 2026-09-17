@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { supabase } from "../lib/supabase";
 import {
   BOOKING_ID_COLUMN,
@@ -254,22 +255,24 @@ export function ConfirmPage() {
               {error && <p className="text-sm text-red-600">{error}</p>}
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/available", { state })}
                   disabled={isSubmitting}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   Annuller
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => void handleConfirm()}
                   disabled={isSubmitting}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   {isSubmitting ? "Bekræfter…" : editingBookingId ? "Bekræft ændring" : "Bekræft reservation"}
-                </button>
+                </Button>
               </div>
             </div>
           </section>

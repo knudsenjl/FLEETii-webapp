@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
@@ -1180,31 +1181,32 @@ export function UserDetailsPage() {
 
               {user && !isSelf ? (
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => {
                       setSubmitError(null);
                       setPendingAction("update");
                     }}
                     disabled={!canSubmit}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opdater bruger
-                  </button>
+                  </Button>
                   {user.deleted_at ? (
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => {
                         setSubmitError(null);
                         setPendingAction("reactivate");
                       }}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Genetabler brugers adgang
-                    </button>
+                    </Button>
                   ) : (
                     <div className="relative">
-                      <button
+                      <Button
+                        variant="danger"
                         type="button"
                         onClick={() => {
                           if (isLastAdmin) {
@@ -1214,10 +1216,10 @@ export function UserDetailsPage() {
                           setSubmitError(null);
                           setPendingAction("delete");
                         }}
-                        className="w-full rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        className="w-full"
                       >
                         Bloker brugers adgang
-                      </button>
+                      </Button>
                       <InlinePopup
                         visible={warningKey === "last-admin"}
                         message="Kan ikke arkivere den sidste administrator i afdelingen."
@@ -1228,24 +1230,20 @@ export function UserDetailsPage() {
                 </div>
               ) : !user ? (
                 <div className="grid grid-cols-2 gap-3">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => {
                       setSubmitError(null);
                       setPendingAction("create");
                     }}
                     disabled={!canSubmit}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret bruger
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("close")}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("close")}>
                     Fortryd
-                  </button>
+                  </Button>
                 </div>
               ) : null}
             </div>
