@@ -31,6 +31,8 @@
 // immediately, rather than via a round-trip DB error.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InlinePopup } from "./InlinePopup";
+import { SettingsRow } from "./SettingsRow";
+import { SettingsSectionHeading } from "./SettingsSectionHeading";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 
@@ -297,11 +299,9 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
               {/* The section heading, as the table's own first row (same
                   bar styling as StandardSettings.tsx's "Indstillinger" row)
                   rather than a separate <h3> sitting above the table. */}
-              <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-                {heading}
-              </div>
+              <SettingsSectionHeading>{heading}</SettingsSectionHeading>
               {RETTIGHEDER.map(({ name, label, info, infoUser }) => (
-                <div key={name} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                <SettingsRow key={name}>
                   <div className="relative flex items-center justify-between gap-1">
                     <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
                       {label}:
@@ -378,7 +378,7 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                       {errorByName[name] && <span className="text-xs text-red-600">{errorByName[name]}</span>}
                     </div>
                   )}
-                </div>
+                </SettingsRow>
               ))}
             </div>
           </div>

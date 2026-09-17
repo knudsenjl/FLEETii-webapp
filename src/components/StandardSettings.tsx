@@ -35,6 +35,7 @@ import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } fro
 import { ConfirmDialog } from "./ConfirmDialog";
 import { InlinePopup } from "./InlinePopup";
 import { Button } from "./Button";
+import { SettingsRow } from "./SettingsRow";
 import { supabase } from "../lib/supabase";
 import { invalidateIdentSettingsCache } from "../hooks/useIdentSettings";
 
@@ -449,7 +450,7 @@ export function StandardSettings({
               }
 
               return (
-                <div key={setting.name} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                <SettingsRow key={setting.name}>
                   {labelContent}
                   {setting.inputType === "checkbox" ? (
                     <div className="flex items-center gap-2">
@@ -513,7 +514,7 @@ export function StandardSettings({
                       {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
                     </div>
                   )}
-                </div>
+                </SettingsRow>
               );
             })}
         </div>

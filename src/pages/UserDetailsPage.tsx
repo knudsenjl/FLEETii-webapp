@@ -8,6 +8,8 @@ import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
+import { SettingsRow } from "../components/SettingsRow";
+import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { ForbiddenNotice } from "../components/ProtectedRoute";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
 import { StandardSettings, STANDARDER, type StandardSetting } from "../components/StandardSettings";
@@ -480,9 +482,7 @@ export function UserDetailsPage() {
           // 2026-09-14: confirmed via a real screenshot next to this page's
           // own "Bruger oplysninger"/"Tilladelser" headers, which use this
           // same div convention and looked correctly grey).
-          <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-            Indstillinger
-          </div>
+          <SettingsSectionHeading>Indstillinger</SettingsSectionHeading>
         ),
       },
       ...STANDARDER,
@@ -827,28 +827,28 @@ export function UserDetailsPage() {
                       (same bar styling as the "Indstillinger"/"Tilladelser"
                       subsubheaders below) rather than a separate <h2> sitting
                       above the table. */}
-                  <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
+                  <SettingsSectionHeading>
                     {isSelf
                       ? "Dine bruger oplysninger"
                       : user
                         ? `Bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
                         : "Opret bruger"}
-                  </div>
+                  </SettingsSectionHeading>
                   {!user && isSysadm && (
                     // sysadm-only "Ny bruger" Kunde row — read-only
                     // display, not a picker: targetCostumerId already
                     // follows the global header's own costumerId ("Data
                     // Filter", PageHeader.tsx), so there's nothing left to
                     // choose here, just to confirm.
-                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                    <SettingsRow>
                       <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {targetCostumerName ?? "—"}
                       </span>
-                    </div>
+                    </SettingsRow>
                   )}
                   {useUserIdent && (
-                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                    <SettingsRow>
                       <label className="text-sm font-medium text-brand-700">Bruger-ID:</label>
                       {isSelf ? (
                         <input
@@ -867,7 +867,7 @@ export function UserDetailsPage() {
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       )}
-                    </div>
+                    </SettingsRow>
                   )}
                   {/* className override on all three: matches this table's own header bar's px-2 (RequiredFieldRow's own default is p-0.5, no horizontal padding) so every row's label text starts flush with the header text above it. */}
                   <RequiredFieldRow
@@ -893,7 +893,7 @@ export function UserDetailsPage() {
                     readOnly={isSelf}
                     className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
                   />
-                  <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                  <SettingsRow>
                     <label className="flex items-center text-sm font-medium text-brand-700">
                       Rolle: {!isSelf && <span className="ml-0.5 text-red-600">*</span>}
                     </label>
@@ -918,7 +918,7 @@ export function UserDetailsPage() {
                         <option value="admin">Administrator</option>
                       </select>
                     )}
-                  </div>
+                  </SettingsRow>
                 </div>
               </div>
 
@@ -986,7 +986,7 @@ export function UserDetailsPage() {
                           departmentOptions.map((option) => {
                             const isHome = option.department_id === homeDepartmentId;
                             return (
-                              <div key={option.department_id} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                              <SettingsRow key={option.department_id}>
                                 <label className="text-sm font-medium text-brand-700">{option.name}:</label>
                                 <span className="inline-flex items-center gap-1.5">
                                   <input
@@ -1006,12 +1006,12 @@ export function UserDetailsPage() {
                                     </span>
                                   )}
                                 </span>
-                              </div>
+                              </SettingsRow>
                             );
                           })}
                       </>
                     )}
-                      <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                      <SettingsRow>
                         <div className="relative flex items-center justify-between gap-2">
                           <label className="text-sm font-medium text-brand-700">
                             Hjemmeafdeling:{" "}
@@ -1072,7 +1072,7 @@ export function UserDetailsPage() {
                               ))}
                           </select>
                         )}
-                      </div>
+                      </SettingsRow>
                     </div>
                   </div>
 

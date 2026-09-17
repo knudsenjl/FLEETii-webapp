@@ -57,6 +57,7 @@ import { forwardRef, useEffect, useImperativeHandle, useState, type ReactNode } 
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
+import { SettingsRow } from "./SettingsRow";
 import { supabase } from "../lib/supabase";
 import { ANDET_VALUE, sortAnvendelserWithAndetLast } from "../lib/settings";
 
@@ -322,7 +323,7 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
           the list box is usually taller than one line of label text —
           the div-row equivalent of the old table row's align-top on both
           cells. */}
-      <div className="grid grid-cols-[14rem_1fr] items-start gap-2 px-2 py-0.5">
+      <SettingsRow align="start">
         <div className="relative font-medium text-brand-700">
           {/* "+" (Tilføj anvendelse) — absolutely positioned so it sits
               immediately to the LEFT of labelCell's own "?" info button
@@ -491,7 +492,7 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
             </table>
           </div>
         </div>
-      </div>
+      </SettingsRow>
 
       {/* mode==="add"/pendingAction below still get a plain wrapping <div>
           (not just rendering <Modal>/<ConfirmDialog> bare as a sibling) —

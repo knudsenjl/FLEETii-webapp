@@ -41,6 +41,8 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
+import { SettingsRow } from "../components/SettingsRow";
+import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { AnvendelseSettings } from "../components/AnvendelseSettings";
 import { StandardSettings, STANDARDER, type StandardSetting } from "../components/StandardSettings";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
@@ -212,9 +214,7 @@ export function SettingsAdminPage() {
           // 2026-09-14: confirmed via a real screenshot next to the
           // Afdelingsoplysninger/Tilladelser headers, which use this same div
           // convention and looked correctly grey).
-          <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-            Indstillinger
-          </div>
+          <SettingsSectionHeading>Indstillinger</SettingsSectionHeading>
         ),
       },
       ...STANDARDER,
@@ -262,9 +262,7 @@ export function SettingsAdminPage() {
                 place. */}
             <div className="rounded-2xl border border-brand-100 bg-white">
               <div className="divide-y divide-brand-100 rounded-2xl">
-                <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-                  Afdelingsoplysninger
-                </div>
+                <SettingsSectionHeading>Afdelingsoplysninger</SettingsSectionHeading>
                 {afdelingsoplysningerLoading && (
                   <div className="px-2 py-3 text-center text-sm text-brand-500">Indlæser…</div>
                 )}
@@ -279,7 +277,7 @@ export function SettingsAdminPage() {
                       onChange={setDeptName}
                       className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
                     />
-                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                    <SettingsRow>
                       <label className="text-sm font-medium text-brand-700">Adresse:</label>
                       <input
                         type="text"
@@ -287,7 +285,7 @@ export function SettingsAdminPage() {
                         onChange={(e) => setDeptAddress(e.target.value)}
                         className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
-                    </div>
+                    </SettingsRow>
                     {(
                       [
                         {
@@ -306,7 +304,7 @@ export function SettingsAdminPage() {
                         },
                       ] as const
                     ).map((row) => (
-                      <div key={row.name} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
+                      <SettingsRow key={row.name}>
                         <div className="relative flex items-center justify-between gap-1">
                           <label htmlFor={`afdelingsoplysning-${row.name}`} className="text-sm font-medium text-brand-700">
                             {row.label}:
@@ -331,7 +329,7 @@ export function SettingsAdminPage() {
                           onChange={(e) => row.onToggle(e.target.checked)}
                           className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
                         />
-                      </div>
+                      </SettingsRow>
                     ))}
                   </>
                 )}
