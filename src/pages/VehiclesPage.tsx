@@ -7,7 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { BlockedBadge } from "../components/BlockedBadge";
-import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
@@ -179,7 +179,7 @@ export function VehiclesPage() {
               </div>
 
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
-                <table className="w-full border-collapse text-[0.7rem]">
+                <table className={TABLE_CLASSNAME}>
                   <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>

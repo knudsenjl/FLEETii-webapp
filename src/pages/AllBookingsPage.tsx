@@ -7,7 +7,7 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { BlockedBadge } from "../components/BlockedBadge";
-import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -258,7 +258,7 @@ export function AllBookingsPage() {
                     intrinsic width to the auto-layout algorithm), it absorbs
                     whatever space the others leave over, same end result as
                     the old table-fixed approach. */}
-                <table className="w-full border-collapse text-[0.7rem]">
+                <table className={TABLE_CLASSNAME}>
                   <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>

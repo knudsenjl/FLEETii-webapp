@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { BlockedBadge } from "../components/BlockedBadge";
-import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
@@ -362,7 +362,7 @@ export function AdminFrontpage() {
                   <hr className="border-brand-200" />
 
                   <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                    <table className="w-full border-collapse text-[0.7rem]">
+                    <table className={TABLE_CLASSNAME}>
                       <thead className={STICKY_THEAD_CLASSNAME}>
                         <tr>
                           <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">
