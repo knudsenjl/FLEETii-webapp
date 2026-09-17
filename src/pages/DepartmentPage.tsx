@@ -4,6 +4,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
@@ -299,7 +300,7 @@ export function DepartmentPage() {
                     row together — table-layout:auto sizes each column to fit its
                     widest actual content, rather than a fixed/1fr split. */}
                 <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                  <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>

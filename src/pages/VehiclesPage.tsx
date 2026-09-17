@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
@@ -189,7 +190,7 @@ export function VehiclesPage() {
 
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
                 <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                  <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Model</th>
