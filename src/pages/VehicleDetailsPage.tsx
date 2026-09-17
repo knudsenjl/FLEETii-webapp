@@ -11,6 +11,7 @@ import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { CarGlyph } from "../components/CarGlyph";
 import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
 import { PageSection } from "../components/PageSection";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -563,9 +564,7 @@ export function VehicleDetailsPage() {
                 )}
               </div>
 
-              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
+              <FieldList>
                   {/* Single merged row (was two: "Køretøj-ID:" + "Nummerplade:") —
                       "{vehicle_ident} - {number_plate}" when this vehicle's
                       department shows vehicle_ident AND it's actually set,
@@ -696,8 +695,7 @@ export function VehicleDetailsPage() {
                       )}
                     </>
                   )}
-                </div>
-              </div>
+              </FieldList>
 
               {isAdmin && (
                 // Deliberately no min-h-0 here (unlike the scrolling ancestor

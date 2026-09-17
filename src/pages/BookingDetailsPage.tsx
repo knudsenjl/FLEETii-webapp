@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/Button";
 import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
 import { MapOverlayMessage } from "../components/MapOverlayMessage";
@@ -282,9 +283,7 @@ export function BookingDetailsPage() {
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="shrink-0 text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
 
-              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
+              <FieldList>
                   <FieldRow label="Periode:">
                     <span className="text-sm text-brand-800">{formatBookingPeriod(booking, true)}</span>
                   </FieldRow>
@@ -347,8 +346,7 @@ export function BookingDetailsPage() {
                         : ""}
                     </span>
                   </FieldRow>
-                </div>
-              </div>
+              </FieldList>
 
               {mapVisible && (
                 // Deliberately no min-h-0 here — see VehicleDetailsPage.tsx's

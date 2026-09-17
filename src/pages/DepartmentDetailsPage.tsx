@@ -8,6 +8,7 @@ import { PageSection } from "../components/PageSection";
 import { DashboardTile } from "../components/DashboardTile";
 import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
+import { FieldList } from "../components/FieldList";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
 import { InlinePopup } from "../components/InlinePopup";
@@ -453,11 +454,9 @@ export function DepartmentDetailsPage() {
             {isSysadm && (
               <>
                 {isAddingDepartment && (
-                  <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                    <div className="divide-y divide-brand-100 bg-white">
-                      <RequiredFieldRow label="Opret afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
-                    </div>
-                  </div>
+                  <FieldList>
+                    <RequiredFieldRow label="Opret afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
+                  </FieldList>
                 )}
 
                 {departmentError && <p className="text-sm text-red-600">{departmentError}</p>}

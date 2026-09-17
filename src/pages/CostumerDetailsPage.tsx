@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
 import { InlinePopup } from "../components/InlinePopup";
@@ -573,9 +574,7 @@ export function CostumerDetailsPage() {
 
             {isEditing ? (
               <>
-                {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
+                <FieldList>
                     <FieldRow label="CVR.">
                       {/* Locked — CVR is the unique Danish company registration number and shouldn't change after the fact (see costumers_cvr_unique.sql). Read-only here, unlike every other field in this form. Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left. */}
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
@@ -631,8 +630,7 @@ export function CostumerDetailsPage() {
                         />
                       )}
                     </FieldRow>
-                  </div>
-                </div>
+                </FieldList>
 
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
@@ -667,9 +665,7 @@ export function CostumerDetailsPage() {
               </>
             ) : (
               <>
-                {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
+                <FieldList>
                     <FieldRow label="CVR.">
                       <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
                     </FieldRow>
@@ -700,8 +696,7 @@ export function CostumerDetailsPage() {
                         )}
                       </span>
                     </FieldRow>
-                  </div>
-                </div>
+                </FieldList>
 
                 {deactivatedAt && (
                   <p className="text-sm font-medium text-red-600">

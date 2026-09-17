@@ -5,6 +5,7 @@ import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
+import { FieldList } from "../components/FieldList";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
@@ -593,9 +594,7 @@ export function ReservationPage() {
                 {editing ? "Rediger reservation" : "Opret reservation"}
               </h2>
 
-              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
+              <FieldList>
                   {isSysadm && (
                     // sysadm-only — a sysadm has no department
                     // of their own, so this booking's target department must
@@ -783,8 +782,7 @@ export function ReservationPage() {
                       variant="warning"
                     />
                   </div>
-                </div>
-              </div>
+              </FieldList>
 
               <p className="text-right text-xs text-brand-500">
                 <span className="text-red-600">*</span> Feltet skal udfyldes

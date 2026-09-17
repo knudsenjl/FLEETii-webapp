@@ -6,6 +6,7 @@ import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
@@ -290,9 +291,7 @@ export function CostumerNewPage() {
               </>
             ) : step === "register" ? (
               <>
-                {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
+                <FieldList>
                     {/* Matches the 2hire inputs' own border/padding (just transparent) below so this static text lines up with theirs instead of sitting flush left. */}
                     <FieldRow label="CVR.">
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
@@ -311,8 +310,7 @@ export function CostumerNewPage() {
                       onChange={setTwoHireClientSecret}
                       type="password"
                     />
-                  </div>
-                </div>
+                </FieldList>
 
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
@@ -336,8 +334,7 @@ export function CostumerNewPage() {
               </>
             ) : (
               <>
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
+                <FieldList>
                     <FieldRow label={<>CVR: <span className="ml-0.5 text-red-600">*</span></>}>
                       <div className="flex items-center gap-1.5">
                         <input
@@ -376,8 +373,7 @@ export function CostumerNewPage() {
                     <RequiredFieldRow label="Kontaktperson:" value={contactPerson} onChange={setContactPerson} />
                     <RequiredFieldRow label="Tlf:" value={phone} onChange={setPhone} type="tel" />
                     <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
-                  </div>
-                </div>
+                </FieldList>
 
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
