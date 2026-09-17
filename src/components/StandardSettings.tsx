@@ -33,7 +33,7 @@
 // Anvendelser saving each of its own edits immediately regardless.
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { InlinePopup } from "./InlinePopup";
+import { FieldInfoButton } from "./FieldInfoButton";
 import { Button } from "./Button";
 import { SettingsRow } from "./SettingsRow";
 import { supabase } from "../lib/supabase";
@@ -425,18 +425,11 @@ export function StandardSettings({
                   <span className="min-w-0 break-words">{setting.label}:</span>
                   {setting.info && (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))}
-                        aria-label="Mere information"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                      >
-                        ?
-                      </button>
-                      {openInfoName === setting.name && (
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                      )}
-                      <InlinePopup visible={openInfoName === setting.name} message={setting.info} />
+                      <FieldInfoButton
+                        open={openInfoName === setting.name}
+                        onToggle={() => setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))}
+                        message={setting.info}
+                      />
                     </>
                   )}
                 </div>

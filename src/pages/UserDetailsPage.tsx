@@ -9,6 +9,7 @@ import { PageLoading } from "../components/PageLoading";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
+import { FieldInfoButton } from "../components/FieldInfoButton";
 import { SettingsRow } from "../components/SettingsRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { ForbiddenNotice } from "../components/ProtectedRoute";
@@ -949,19 +950,9 @@ export function UserDetailsPage() {
                         (see the departmentOptions.map right underneath). */}
                     {(isSelf || isAnyAdmin(profile?.role)) && departmentOptions.length !== 1 && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
-                          aria-label="Mere information"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                        >
-                          ?
-                        </button>
-                        {openInfoPopover === "afdelinger" && (
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                        )}
-                        <InlinePopup
-                          visible={openInfoPopover === "afdelinger"}
+                        <FieldInfoButton
+                          open={openInfoPopover === "afdelinger"}
+                          onToggle={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
                           message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
                           align="right"
                         />
@@ -1020,19 +1011,9 @@ export function UserDetailsPage() {
                               <span className="ml-0.5 text-red-600">*</span>
                             )}
                           </label>
-                          <button
-                            type="button"
-                            onClick={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
-                            aria-label="Mere information"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                          >
-                            ?
-                          </button>
-                          {openInfoPopover === "hjemmeafdeling" && (
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                          )}
-                          <InlinePopup
-                            visible={openInfoPopover === "hjemmeafdeling"}
+                          <FieldInfoButton
+                            open={openInfoPopover === "hjemmeafdeling"}
+                            onToggle={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
                             message={
                               isSelf || departmentOptions.length === 1 || soleCheckedDepartment
                                 ? "Du er tilknyttet denne afdeling"

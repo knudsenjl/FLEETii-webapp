@@ -31,6 +31,7 @@
 // immediately, rather than via a round-trip DB error.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InlinePopup } from "./InlinePopup";
+import { FieldInfoButton } from "./FieldInfoButton";
 import { SettingsRow } from "./SettingsRow";
 import { SettingsSectionHeading } from "./SettingsSectionHeading";
 import { useTimedFlag } from "../hooks/useTimedFlag";
@@ -306,19 +307,9 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                     <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
                       {label}:
                     </label>
-                    <button
-                      type="button"
-                      onClick={() => setOpenInfoName((prev) => (prev === name ? null : name))}
-                      aria-label="Mere information"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                    >
-                      ?
-                    </button>
-                    {openInfoName === name && (
-                      <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                    )}
-                    <InlinePopup
-                      visible={openInfoName === name}
+                    <FieldInfoButton
+                      open={openInfoName === name}
+                      onToggle={() => setOpenInfoName((prev) => (prev === name ? null : name))}
                       message={readOnly ? READONLY_INFO_MESSAGE : table === "user_settings" ? (infoUser ?? info) : info}
                     />
                   </div>

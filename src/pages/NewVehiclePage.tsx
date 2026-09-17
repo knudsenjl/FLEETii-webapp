@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
+import { FieldInfoButton } from "../components/FieldInfoButton";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { Modal } from "../components/Modal";
@@ -474,19 +475,9 @@ export function NewVehiclePage() {
                       <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
                         FLEETii device skal installeres:
                       </label>
-                      <button
-                        type="button"
-                        onClick={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
-                        aria-label="Mere information"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                      >
-                        ?
-                      </button>
-                      {openInfoPopover === "device" && (
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                      )}
-                      <InlinePopup
-                        visible={openInfoPopover === "device"}
+                      <FieldInfoButton
+                        open={openInfoPopover === "device"}
+                        onToggle={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
                         message="Hvis der ikke er et FLEETii device installeret i køretøjet, skal du tikke denne af"
                         align="right"
                       />
@@ -505,19 +496,9 @@ export function NewVehiclePage() {
                         <label htmlFor="fleetii-device-id" className="flex-1 text-right text-sm font-medium text-brand-700">
                           FLEETii device id: <span className="text-red-600">*</span>
                         </label>
-                        <button
-                          type="button"
-                          onClick={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
-                          aria-label="Mere information"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                        >
-                          ?
-                        </button>
-                        {openInfoPopover === "deviceId" && (
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                        )}
-                        <InlinePopup
-                          visible={openInfoPopover === "deviceId"}
+                        <FieldInfoButton
+                          open={openInfoPopover === "deviceId"}
+                          onToggle={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
                           message="Angiv id-nummeret på det eksisterende IoT device i køretøjet"
                           align="right"
                         />

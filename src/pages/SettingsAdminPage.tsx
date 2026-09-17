@@ -40,7 +40,7 @@ import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
-import { InlinePopup } from "../components/InlinePopup";
+import { FieldInfoButton } from "../components/FieldInfoButton";
 import { SettingsRow } from "../components/SettingsRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { AnvendelseSettings } from "../components/AnvendelseSettings";
@@ -309,18 +309,11 @@ export function SettingsAdminPage() {
                           <label htmlFor={`afdelingsoplysning-${row.name}`} className="text-sm font-medium text-brand-700">
                             {row.label}:
                           </label>
-                          <button
-                            type="button"
-                            onClick={() => setOpenInfoName((prev) => (prev === row.name ? null : row.name))}
-                            aria-label="Mere information"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                          >
-                            ?
-                          </button>
-                          {openInfoName === row.name && (
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                          )}
-                          <InlinePopup visible={openInfoName === row.name} message={row.info} />
+                          <FieldInfoButton
+                            open={openInfoName === row.name}
+                            onToggle={() => setOpenInfoName((prev) => (prev === row.name ? null : row.name))}
+                            message={row.info}
+                          />
                         </div>
                         <input
                           id={`afdelingsoplysning-${row.name}`}
