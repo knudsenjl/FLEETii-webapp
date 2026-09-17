@@ -20,6 +20,7 @@ import { PageHeader } from "../components/PageHeader";
 import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
 import { MapOverlayMessage } from "../components/MapOverlayMessage";
+import { InfoCard } from "../components/InfoCard";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { PageLoading } from "../components/PageLoading";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -266,17 +267,13 @@ export function BookingPage() {
           <PageHeader compact />
           <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservation i {scopeName}</h2>
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-2">
-            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
-              Du har ingen aktuelle eller kommende reservationer i denne afdeling.
-            </div>
-            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
-              Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.
-            </div>
-            <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+            <InfoCard>Du har ingen aktuelle eller kommende reservationer i denne afdeling.</InfoCard>
+            <InfoCard>Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.</InfoCard>
+            <InfoCard>
               {userMayCreateBooking
                 ? "Du kan lave en ny reservation ved at trykke på knappen nedenunder:"
                 : "Anmod din administrator om at lave en reservation til dig."}
-            </div>
+            </InfoCard>
             {userMayCreateBooking && (
               <button
                 type="button"

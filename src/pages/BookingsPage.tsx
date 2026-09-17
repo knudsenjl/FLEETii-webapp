@@ -10,6 +10,7 @@ import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useScopeDisplayName } from "../hooks/useScopeDisplayName";
 import { supabase } from "../lib/supabase";
 import { fadeInUp } from "../lib/motionVariants";
+import { InfoCard } from "../components/InfoCard";
 import { isSettingTilladt } from "../lib/settings";
 import {
   BOOKINGS_SELECT_COLUMNS,
@@ -185,17 +186,13 @@ export function BookingsPage() {
             // rather than pinned to the top of the page. Same card styling
             // as BookingPage.tsx's own identical empty state.
             <div className="flex flex-1 flex-col items-center justify-center gap-2.5 py-3">
-              <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
-                Du har ingen aktuelle eller kommende reservationer i denne afdeling.
-              </div>
-              <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
-                Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.
-              </div>
-              <div className="w-full rounded-2xl border border-brand-100 bg-white p-4 text-center text-sm text-brand-700 shadow-sm shadow-brand-900/5">
+              <InfoCard>Du har ingen aktuelle eller kommende reservationer i denne afdeling.</InfoCard>
+              <InfoCard>Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.</InfoCard>
+              <InfoCard>
                 {canShowNewBookingButton
                   ? "Du kan lave en ny reservation ved at trykke på knappen nedenunder:"
                   : "Anmod din administrator om at lave en reservation til dig."}
-              </div>
+              </InfoCard>
             </div>
           )}
           {!loading && !error && departmentBookings.length > 0 && (
