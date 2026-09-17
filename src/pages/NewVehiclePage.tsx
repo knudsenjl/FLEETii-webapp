@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
@@ -475,7 +476,7 @@ export function NewVehiclePage() {
                       type="checkbox"
                       checked={needsFleetiiDevice}
                       onChange={(e) => setNeedsFleetiiDevice(e.target.checked)}
-                      className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                      className={CHECKBOX_CLASSNAME}
                     />
                   </div>
                   {!needsFleetiiDevice && (

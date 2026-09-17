@@ -31,6 +31,7 @@
 // immediately, rather than via a round-trip DB error.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InlinePopup } from "./InlinePopup";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { FieldInfoButton } from "./FieldInfoButton";
 import { SettingsRow } from "./SettingsRow";
 import { SettingsSectionHeading } from "./SettingsSectionHeading";
@@ -345,7 +346,7 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                             }
                             void handleToggle(name, false);
                           }}
-                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                          className={CHECKBOX_CLASSNAME}
                         />
                         <InlinePopup
                           visible={blockedKey === name}
@@ -364,7 +365,7 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                         checked={values[name] ?? false}
                         disabled={savingName === name}
                         onChange={(e) => void handleToggle(name, e.target.checked)}
-                        className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                        className={CHECKBOX_CLASSNAME}
                       />
                       {errorByName[name] && <span className="text-xs text-red-600">{errorByName[name]}</span>}
                     </div>

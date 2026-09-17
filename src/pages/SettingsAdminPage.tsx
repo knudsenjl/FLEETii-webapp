@@ -37,6 +37,7 @@
 // indstillingerSettings and the Afdelingsoplysninger state below.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
@@ -309,7 +310,7 @@ export function SettingsAdminPage() {
                           type="checkbox"
                           checked={row.checked}
                           onChange={(e) => row.onToggle(e.target.checked)}
-                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                          className={CHECKBOX_CLASSNAME}
                         />
                       </SettingsRow>
                     ))}

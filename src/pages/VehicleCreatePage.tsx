@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
@@ -773,7 +774,7 @@ export function VehicleCreatePage() {
                               type="checkbox"
                               checked={needsFleetiiDeviceInput}
                               onChange={(e) => setNeedsFleetiiDeviceInput(e.target.checked)}
-                              className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                              className={CHECKBOX_CLASSNAME}
                             />
                             Nyt device
                           </label>

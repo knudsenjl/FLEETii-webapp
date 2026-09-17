@@ -33,6 +33,7 @@
 // Anvendelser saving each of its own edits immediately regardless.
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { FieldInfoButton } from "./FieldInfoButton";
 import { Button } from "./Button";
 import { SettingsRow } from "./SettingsRow";
@@ -457,7 +458,7 @@ export function StandardSettings({
                         disabled={readOnly || setting.readOnly || (deferSave ? isUpdating : savingName === setting.name)}
                         readOnly={readOnly || setting.readOnly}
                         onChange={readOnly || setting.readOnly ? undefined : (e) => void handleToggle(setting.name, e.target.checked)}
-                        className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                        className={CHECKBOX_CLASSNAME}
                       />
                       {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
                     </div>

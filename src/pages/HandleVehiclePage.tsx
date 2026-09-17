@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { PageShell } from "../components/PageShell";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
@@ -627,7 +628,7 @@ export function HandleVehiclePage() {
                                               type="checkbox"
                                               checked={selectedDepartmentIds.has(department.department_id)}
                                               onChange={(e) => toggleDepartment(department, e.target.checked)}
-                                              className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                              className={CHECKBOX_CLASSNAME}
                                             />
                                           </td>
                                         </tr>

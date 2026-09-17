@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
@@ -976,7 +977,7 @@ export function UserDetailsPage() {
                                     checked={isHome || userDepartmentIds.has(option.department_id)}
                                     disabled={isSelf || isHome}
                                     onChange={isSelf ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
-                                    className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                    className={CHECKBOX_CLASSNAME}
                                   />
                                   {/* Always-visible, not a hover tooltip — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
                                   {isHome && (
