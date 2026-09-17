@@ -5,6 +5,7 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
+import { DashboardTile } from "../components/DashboardTile";
 import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -537,38 +538,30 @@ export function DepartmentDetailsPage() {
                   <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
                     {selectedDepartment ? (selectedDepartment.name ?? "—") : "Ingen afdeling valgt"}
                   </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("koretojer", selectedDepartmentId, costumerId, "/fleet-table")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
-                    </button>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("koretojer", selectedDepartmentId, costumerId, "/fleet-table")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
+                  >
                     <CountBadge count={vehiclesCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "koretojer" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("brugere", selectedDepartmentId, costumerId, "/department")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("brugere", selectedDepartmentId, costumerId, "/department")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
+                  >
                     <CountBadge count={usersCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "brugere" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
+                  </DashboardTile>
                   {/* Indstillinger — a col-span-2 row in this SAME grid (both roles now: 2026-09-14, opened to sysadm too, alongside App.tsx's /department-settings route relaxing to requireAdmin — see this page's own top doc comment), rather than its own full-width block below a divider like Flådestyring above — sized to match KØRETØJER+BRUGERE's own combined width instead of the section's full width, and grouped with them as one visual cluster with no divider, since all three ("department-specific actions") belong together once a department is selected, whereas Flådestyring above stays full-width/undivided as the one department-independent action. Same switch-then-navigate pattern as Flådestyring/KØRETØJER/BRUGERE. */}
                   <div className="relative col-span-2">
                     <Button

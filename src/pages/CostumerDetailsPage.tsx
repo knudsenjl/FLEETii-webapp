@@ -12,6 +12,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
 import { EyeGlyph } from "../components/EyeGlyph";
 import { PageSection } from "../components/PageSection";
+import { DashboardTile } from "../components/DashboardTile";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
@@ -787,67 +788,48 @@ export function CostumerDetailsPage() {
                 <hr className="border-brand-200" />
 
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("afdelinger", null, costumer.costumer_id, "/department-details")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "afdelinger" && scopeSwitch.isSwitching ? "Vent…" : "AFDELINGER"}
-                    </button>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("afdelinger", null, costumer.costumer_id, "/department-details")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "afdelinger" && scopeSwitch.isSwitching ? "Vent…" : "AFDELINGER"}
+                  >
                     <CountBadge count={departmentsCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "afdelinger" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("koretojer", null, costumer.costumer_id, "/fleet-table")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("koretojer", null, costumer.costumer_id, "/fleet-table")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
+                  >
                     <CountBadge count={vehiclesCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "koretojer" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("brugere", null, costumer.costumer_id, "/department")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("brugere", null, costumer.costumer_id, "/department")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
+                  >
                     <CountBadge count={usersCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "brugere" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      onClick={() => setShowRapporterInfo((prev) => !prev)}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
-                    >
-                      RAPPORTER
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
                     {showRapporterInfo && (
                       <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
                     )}
                     <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
-                  </div>
+                  </DashboardTile>
                 </div>
               </>
             )}

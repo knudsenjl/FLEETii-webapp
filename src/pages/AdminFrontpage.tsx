@@ -12,6 +12,7 @@ import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { PageSection } from "../components/PageSection";
+import { DashboardTile } from "../components/DashboardTile";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
@@ -309,49 +310,21 @@ export function AdminFrontpage() {
                       >
                         Flådestyring
                       </Button>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={handleOpenDepartments}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                        >
-                          AFDELINGER
-                        </button>
+                      <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
                         <CountBadge count={departmentsCount} />
-                      </div>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={() => goToVehiclesOrUsers("/fleet-table")}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                        >
-                          KØRETØJER
-                        </button>
+                      </DashboardTile>
+                      <DashboardTile onClick={() => goToVehiclesOrUsers("/fleet-table")} label="KØRETØJER">
                         <CountBadge count={vehiclesCount} />
-                      </div>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={() => goToVehiclesOrUsers("/department")}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                        >
-                          BRUGERE
-                        </button>
+                      </DashboardTile>
+                      <DashboardTile onClick={() => goToVehiclesOrUsers("/department")} label="BRUGERE">
                         <CountBadge count={usersCount} />
-                      </div>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={() => setShowRapporterInfo((prev) => !prev)}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
-                        >
-                          RAPPORTER
-                        </button>
+                      </DashboardTile>
+                      <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
                         {showRapporterInfo && (
                           <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
                         )}
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
-                      </div>
+                      </DashboardTile>
                     </div>
                   </div>
                 </>
