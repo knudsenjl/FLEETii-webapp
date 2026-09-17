@@ -5,6 +5,7 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
+import { FieldRow } from "../components/FieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
@@ -272,10 +273,9 @@ export function VehicleDeletePage() {
             <div className="rounded-2xl border border-brand-100">
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">
                 {rows.map(([label, value]) => (
-                  <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                  <FieldRow key={label} label={label}>
                     <span className="text-sm text-brand-800">{value}</span>
-                  </div>
+                  </FieldRow>
                 ))}
               </div>
             </div>

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/Button";
+import { FieldRow } from "../components/FieldRow";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
 import { isAnyAdmin } from "../lib/roles";
@@ -281,17 +282,14 @@ export function BookingDetailsPage() {
               {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
               <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
+                  <FieldRow label="Periode:">
                     <span className="text-sm text-brand-800">{formatBookingPeriod(booking, true)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kunde/afdeling:</label>
+                  </FieldRow>
+                  <FieldRow label="Kunde/afdeling:">
                     <span className="text-sm text-brand-800">{departmentLabel}</span>
-                  </div>
+                  </FieldRow>
                   {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
+                    <FieldRow label="Bruger:">
                       {booking.userId ? (
                         <button
                           type="button"
@@ -303,14 +301,12 @@ export function BookingDetailsPage() {
                       ) : (
                         <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
                       )}
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Anvendelse:</label>
+                  <FieldRow label="Anvendelse:">
                     <span className="text-sm text-brand-800">{booking.use}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
+                  </FieldRow>
+                  <FieldRow label="Køretøj:">
                     <span>
                       {twoHireVehicle ? (
                         <button
@@ -329,29 +325,27 @@ export function BookingDetailsPage() {
                         </span>
                       )}
                     </span>
-                  </div>
+                  </FieldRow>
                   {/* Kilometerstand is only shown to admin/sysadm — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
                   {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <FieldRow label="Kilometerstand:">
                       <span className="text-sm text-brand-800">
                         {twoHireVehicle?.distanceCovered ? formatKilometerstand(twoHireVehicle.distanceCovered) : "—"}
                         {twoHireVehicle?.distanceCoveredUpdatedAt
                           ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
                           : ""}
                       </span>
-                    </div>
+                    </FieldRow>
                   )}
                   {/* Drivmiddelniveau (fuel/battery %) is appended onto this same row rather than shown as its own — the two are closely related enough not to need a separate label. */}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                  <FieldRow label="Drivmiddel:">
                     <span className="text-sm text-brand-800">
                       {vehicleIdentInfo?.drivmiddel ?? "—"}
                       {twoHireVehicle?.autonomyPercentage
                         ? ` ${twoHireVehicle.autonomyPercentage}${isAdmin && twoHireVehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})` : ""}`
                         : ""}
                     </span>
-                  </div>
+                  </FieldRow>
                 </div>
               </div>
 

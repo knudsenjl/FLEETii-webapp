@@ -5,6 +5,7 @@ import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
+import { FieldRow } from "../components/FieldRow";
 import { PageShell } from "../components/PageShell";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -665,8 +666,7 @@ export function VehicleCreatePage() {
                   // loads the data.
                   if (label === "Drivmiddel:" && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <select
                           value={drivmiddelInput}
                           onChange={(e) => setDrivmiddelInput(e.target.value)}
@@ -678,7 +678,7 @@ export function VehicleCreatePage() {
                             </option>
                           ))}
                         </select>
-                      </div>
+                      </FieldRow>
                     );
                   }
 
@@ -703,8 +703,7 @@ export function VehicleCreatePage() {
                   // Nummerplade keeps its MotorAPI lookup button alongside the input while editing — same button/popup as the read-only branch further below, just paired with an input instead of a plain span.
                   if (editableField && label === "Nummerplade:" && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <div className="flex min-w-0 items-center gap-1">
                           <input
                             type="text"
@@ -746,29 +745,27 @@ export function VehicleCreatePage() {
                             />
                           </div>
                         </div>
-                      </div>
+                      </FieldRow>
                     );
                   }
 
                   if (editableField && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <input
                           type="text"
                           value={editableField.value}
                           onChange={(e) => editableField.setValue(e.target.value)}
                           className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
-                      </div>
+                      </FieldRow>
                     );
                   }
 
                   // FLEETii device combines two columns (needs_fleetii_device/fleetii_device_id) into one displayed row — same special-casing as Drivmiddel/Nummerplade above, editable while isEditingOrder.
                   if (label === "FLEETii device:" && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <div className="flex min-w-0 items-center gap-2">
                           <label className="flex items-center gap-1 text-sm text-brand-800">
                             <input
@@ -789,13 +786,12 @@ export function VehicleCreatePage() {
                             />
                           )}
                         </div>
-                      </div>
+                      </FieldRow>
                     );
                   }
 
                   return label === "Nummerplade:" ? (
-                    <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                    <FieldRow key={label} label={label}>
                       <div className="flex min-w-0 items-center gap-1">
                         {/* Plain text, same transparent-border look as Kunde/Afdeling/every other genuinely non-editable row below — a bordered input-shaped box here would visually claim this field is editable when it isn't. */}
                         <span className="min-w-0 flex-1 truncate rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
@@ -840,17 +836,16 @@ export function VehicleCreatePage() {
                           />
                         </div>
                       </div>
-                    </div>
+                    </FieldRow>
                   ) : (
-                    <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                    <FieldRow key={label} label={label}>
                       {/* Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left — same trick as CostumerDetailsPage's locked CVR row. whitespace-pre-wrap on Kommentarer only, since that's the one multi-line free-text field here (NewVehiclePage.tsx's textarea) — collapsing its line breaks would run the note together. */}
                       <span
                         className={`rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800 ${label === "Kommentarer:" ? "whitespace-pre-wrap" : ""}`}
                       >
                         {value}
                       </span>
-                    </div>
+                    </FieldRow>
                   );
                 })}
               </div>

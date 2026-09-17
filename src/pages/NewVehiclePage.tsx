@@ -5,6 +5,7 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { FieldInfoButton } from "../components/FieldInfoButton";
+import { FieldRow } from "../components/FieldRow";
 import { PageShell } from "../components/PageShell";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
@@ -303,16 +304,18 @@ export function NewVehiclePage() {
                   {isSysadm ? (
                     <>
                       {/* sysadm-only Kunde (read-only, from router state — see this component's own doc comment) / Afdeling (a real required select — see canSend/handleSend above) rows. */}
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
+                      <FieldRow label="Kunde:">
                         <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                           {costumerName ?? "—"}
                         </span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">
-                          Afdeling: <span className="ml-0.5 text-red-600">*</span>
-                        </label>
+                      </FieldRow>
+                      <FieldRow
+                        label={
+                          <>
+                            Afdeling: <span className="ml-0.5 text-red-600">*</span>
+                          </>
+                        }
+                      >
                         <select
                           required
                           aria-required="true"
@@ -330,26 +333,23 @@ export function NewVehiclePage() {
                             </option>
                           ))}
                         </select>
-                      </div>
+                      </FieldRow>
                     </>
                   ) : (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
+                    <FieldRow label="Afdeling:">
                       <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
+                  <FieldRow label="P-plads:">
                     <input
                       type="text"
                       value={parking}
                       onChange={(e) => setParking(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                  </div>
+                  </FieldRow>
                   {useVehicleIdent && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Køretøj-ID:</label>
+                    <FieldRow label="Køretøj-ID:">
                       <input
                         type="text"
                         value={vehicleIdent}
@@ -357,12 +357,15 @@ export function NewVehiclePage() {
                         placeholder="valgfri — bruger Nummerplade hvis tom"
                         className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                       />
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Nummerplade: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
+                  <FieldRow
+                    label={
+                      <>
+                        Nummerplade: <span className="ml-0.5 text-red-600">*</span>
+                      </>
+                    }
+                  >
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
@@ -404,36 +407,32 @@ export function NewVehiclePage() {
                         />
                       </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Mærke:</label>
+                  </FieldRow>
+                  <FieldRow label="Mærke:">
                     <input
                       type="text"
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Model:</label>
+                  </FieldRow>
+                  <FieldRow label="Model:">
                     <input
                       type="text"
                       value={maerke}
                       onChange={(e) => setMaerke(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Årgang:</label>
+                  </FieldRow>
+                  <FieldRow label="Årgang:">
                     <input
                       type="text"
                       value={aargang}
                       onChange={(e) => setAargang(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                  </FieldRow>
+                  <FieldRow label="Drivmiddel:">
                     <select
                       value={drivmiddel}
                       onChange={(e) => setDrivmiddel(e.target.value)}
@@ -446,16 +445,15 @@ export function NewVehiclePage() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
+                  </FieldRow>
+                  <FieldRow label="Drivmiddelniveau:">
                     <input
                       type="text"
                       value={fuelLevel}
                       onChange={(e) => setFuelLevel(e.target.value)}
                       className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                     />
-                  </div>
+                  </FieldRow>
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
                   <RequiredFieldRow label="Kontakt e-mail:" value={kontaktemail} onChange={setKontaktemail} type="email" />
                   <RequiredFieldRow label="Kontakt tlf.:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />

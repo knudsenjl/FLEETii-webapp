@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
+import { FieldRow } from "../components/FieldRow";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { supabase } from "../lib/supabase";
@@ -292,18 +293,16 @@ export function CostumerNewPage() {
                 <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
                     {/* Matches the 2hire inputs' own border/padding (just transparent) below so this static text lines up with theirs instead of sitting flush left. */}
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                    <FieldRow label="CVR.">
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {costumer?.cvr ?? "—"}
                       </span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Navn:</label>
+                    </FieldRow>
+                    <FieldRow label="Navn:">
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {costumer?.name ?? "—"}
                       </span>
-                    </div>
+                    </FieldRow>
                     <RequiredFieldRow label="2hire client ID:" value={twoHireClientId} onChange={setTwoHireClientId} />
                     <RequiredFieldRow
                       label="2hire client secret:"
@@ -338,10 +337,7 @@ export function CostumerNewPage() {
               <>
                 <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        CVR: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
+                    <FieldRow label={<>CVR: <span className="ml-0.5 text-red-600">*</span></>}>
                       <div className="flex items-center gap-1.5">
                         <input
                           type="text"
@@ -370,7 +366,7 @@ export function CostumerNewPage() {
                           )}
                         </button>
                       </div>
-                    </div>
+                    </FieldRow>
                     {cvrLookupError && <p className="px-0.5 pb-1 text-xs text-red-600">{cvrLookupError}</p>}
                     <RequiredFieldRow label="Navn:" value={name} onChange={setName} />
                     <RequiredFieldRow label="Vej og husnr.:" value={street} onChange={setStreet} />

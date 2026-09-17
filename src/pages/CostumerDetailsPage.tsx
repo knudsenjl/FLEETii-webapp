@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
+import { FieldRow } from "../components/FieldRow";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
 import { InlinePopup } from "../components/InlinePopup";
@@ -573,13 +574,12 @@ export function CostumerDetailsPage() {
                 {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
                 <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                    <FieldRow label="CVR.">
                       {/* Locked — CVR is the unique Danish company registration number and shouldn't change after the fact (see costumers_cvr_unique.sql). Read-only here, unlike every other field in this form. Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left. */}
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {editCvr || "—"}
                       </span>
-                    </div>
+                    </FieldRow>
                     <RequiredFieldRow label="Navn:" value={editName} onChange={setEditName} />
                     <RequiredFieldRow label="Vej og husnr.:" value={editStreet} onChange={setEditStreet} />
                     <RequiredFieldRow label="Postnr. og by:" value={editPostalCity} onChange={setEditPostalCity} />
@@ -587,8 +587,7 @@ export function CostumerDetailsPage() {
                     <RequiredFieldRow label="Kontaktperson:" value={editContactPerson} onChange={setEditContactPerson} />
                     <RequiredFieldRow label="Tlf:" value={editPhone} onChange={setEditPhone} type="tel" />
                     <RequiredFieldRow label="E-mail:" value={editEmail} onChange={setEditEmail} type="email" />
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">2hire client ID:</label>
+                    <FieldRow label="2hire client ID:">
                       {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, but is scoped to sysadm only, see costumers_scope_twohire_client_id_to_fleetii_admin.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. twoHireClientId comes from a separate RPC (see its own state comment above), so this briefly shows the empty <input> while that resolves even for an already-configured costumer. Masked by default (fixed-length, same as the client secret row below) with a right-aligned eye button that reveals the real value for 5s — see useTimedFlag above. */}
                       {twoHireClientId ? (
                         <span className="relative flex items-center rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
@@ -613,9 +612,8 @@ export function CostumerDetailsPage() {
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       )}
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">2hire client secret:</label>
+                    </FieldRow>
+                    <FieldRow label="2hire client secret:">
                       {/* Never the raw secret — a fixed mask once set, same locked treatment as the ID row above. Only editable while genuinely empty. */}
                       {costumer.has_twohire_client_secret ? (
                         <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
@@ -630,7 +628,7 @@ export function CostumerDetailsPage() {
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
                       )}
-                    </div>
+                    </FieldRow>
                   </div>
                 </div>
 
@@ -670,36 +668,28 @@ export function CostumerDetailsPage() {
                 {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
                 <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
                   <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                    <FieldRow label="CVR.">
                       <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
+                    </FieldRow>
+                    <FieldRow label="Vej og husnr.:">
                       <span className="text-sm text-brand-800">{costumer.address_street ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
+                    </FieldRow>
+                    <FieldRow label="Postnr. og by:">
                       <span className="text-sm text-brand-800">{costumer.address_postal_city ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
+                    </FieldRow>
+                    <FieldRow label="Land:">
                       <span className="text-sm text-brand-800">{costumer.address_country ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
+                    </FieldRow>
+                    <FieldRow label="Kontaktperson:">
                       <span className="text-sm text-brand-800">{costumer.contact_person ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
+                    </FieldRow>
+                    <FieldRow label="Tlf:">
                       <span className="text-sm text-brand-800">{costumer.phone ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
+                    </FieldRow>
+                    <FieldRow label="E-mail:">
                       <span className="text-sm text-brand-800">{costumer.email ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">2hire:</label>
+                    </FieldRow>
+                    <FieldRow label="2hire:">
                       <span className="text-sm text-brand-800">
                         {costumer.has_twohire_credentials ? (
                           <span className="font-semibold text-green-700">Konfigureret</span>
@@ -707,7 +697,7 @@ export function CostumerDetailsPage() {
                           <span className="font-semibold text-amber-700">Ikke konfigureret</span>
                         )}
                       </span>
-                    </div>
+                    </FieldRow>
                   </div>
                 </div>
 

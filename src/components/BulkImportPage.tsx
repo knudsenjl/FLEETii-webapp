@@ -12,6 +12,7 @@ import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "./PageHeader";
 import { PageShell } from "./PageShell";
 import { Button } from "./Button";
+import { FieldRow } from "./FieldRow";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -174,10 +175,7 @@ export function BulkImportPage({
               // sysadm-only Kunde picker — the two import buttons
               // below stay disabled until one's chosen: there's no
               // meaningful default costumer for a platform-wide role.
-              <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                <label className="flex items-center text-sm font-medium text-brand-700">
-                  Kunde: <span className="ml-0.5 text-red-600">*</span>
-                </label>
+              <FieldRow label={<>Kunde: <span className="ml-0.5 text-red-600">*</span></>}>
                 <select
                   required
                   aria-required="true"
@@ -192,7 +190,7 @@ export function BulkImportPage({
                     </option>
                   ))}
                 </select>
-              </div>
+              </FieldRow>
             )}
 
             <div className="flex gap-3">
