@@ -6,6 +6,7 @@ import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
 import { CarGlyph } from "../components/CarGlyph";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
@@ -394,7 +395,7 @@ export function VehicleDetailsPage() {
 
   if (!vehicle) {
     return vehiclesLoading ? (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser køretøj…</div>
+      <PageLoading label="Indlæser køretøj…" />
     ) : null;
   }
 

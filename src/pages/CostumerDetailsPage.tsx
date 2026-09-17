@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
 import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -540,7 +541,7 @@ export function CostumerDetailsPage() {
   // read costumer.* before it exists.
   if (costumerId && !costumer && costumerLoading) {
     return (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser kunde…</div>
+      <PageLoading label="Indlæser kunde…" />
     );
   }
   // costumerId present but the fetch confirmed it's gone — the redirect

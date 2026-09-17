@@ -3,6 +3,7 @@ import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
 import { isAnyAdmin } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
@@ -264,7 +265,7 @@ export function BookingDetailsPage() {
 
   if (!booking) {
     return bookingLoading ? (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>
+      <PageLoading label="Indlæser reservation…" />
     ) : null;
   }
 

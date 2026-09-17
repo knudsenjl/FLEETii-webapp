@@ -5,6 +5,7 @@ import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
@@ -794,7 +795,7 @@ export function UserDetailsPage() {
   // and `user` becomes non-null.
   if (userId && !user && userLoading) {
     return (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser bruger…</div>
+      <PageLoading label="Indlæser bruger…" />
     );
   }
 

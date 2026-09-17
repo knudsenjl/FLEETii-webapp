@@ -5,6 +5,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { QrScanButton } from "../components/QrScanButton";
@@ -498,7 +499,7 @@ export function VehicleCreatePage() {
   // toward "/sysadm-installations" for a moment before the fetch resolves.
   if (orderId && !order && orderLoading) {
     return (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser bestilling…</div>
+      <PageLoading label="Indlæser bestilling…" />
     );
   }
 
