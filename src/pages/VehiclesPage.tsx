@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
-import { fadeInUp } from "../lib/motionVariants";
 import { CarGlyph } from "../components/CarGlyph";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { supabase } from "../lib/supabase";
@@ -158,18 +157,8 @@ export function VehiclesPage() {
   }, [vehicles]);
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          {...fadeInUp}
-          className="flex min-w-0 min-h-0 flex-1 flex-col"
-        >
-          <PageHeader
+    <PageShell minWidth0>
+      <PageHeader
             koretoejFilter={{
               label: "Køretøj",
               value: filterPlate,
@@ -278,8 +267,6 @@ export function VehiclesPage() {
               </div>
             </div>
           </section>
-        </motion.main>
-      </div>
-    </div>
+    </PageShell>
   );
 }

@@ -3,10 +3,9 @@
 // departments fetch and the sysadm-only costumers/installations
 // fetches below, just links to every other admin-only section of the app.
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
-import { fadeInUp } from "../lib/motionVariants";
+import { PageShell } from "../components/PageShell";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
@@ -215,18 +214,8 @@ export function AdminFrontpage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          {...fadeInUp}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          {/*
+    <PageShell>
+      {/*
             hideAfdeling/kundeNavigate (sysadm only): the sysadm branch of
             this page (costumer list + pendingInstallationsCount above) has
             no Afdeling concept at all and never reads costumerId either
@@ -485,8 +474,6 @@ export function AdminFrontpage() {
               )}
             </div>
           </section>
-        </motion.main>
-      </div>
-    </div>
+    </PageShell>
   );
 }

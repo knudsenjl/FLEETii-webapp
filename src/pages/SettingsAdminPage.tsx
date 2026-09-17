@@ -36,12 +36,11 @@
 // wires its embedded AnvendelseSettings into that same mechanism. See
 // indstillingerSettings and the Afdelingsoplysninger state below.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { FieldInfoButton } from "../components/FieldInfoButton";
-import { fadeInUp } from "../lib/motionVariants";
 import { SettingsRow } from "../components/SettingsRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { AnvendelseSettings } from "../components/AnvendelseSettings";
@@ -238,18 +237,8 @@ export function SettingsAdminPage() {
   );
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          {...fadeInUp}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
+    <PageShell>
+      <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             {/* Afdelingsoplysninger — same rounded-2xl/bg-white + header-bar
@@ -354,8 +343,6 @@ export function SettingsAdminPage() {
               }}
             />
           </section>
-        </motion.main>
-      </div>
-    </div>
+    </PageShell>
   );
 }

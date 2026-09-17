@@ -1,9 +1,8 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
-import { fadeInUp } from "../lib/motionVariants";
+import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -271,17 +270,8 @@ export function CostumerNewPage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          {...fadeInUp}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
@@ -414,8 +404,7 @@ export function CostumerNewPage() {
               </>
             )}
           </section>
-        </motion.main>
-      </div>
+      </PageShell>
 
       {pendingAction && (
         <ConfirmDialog
@@ -437,6 +426,6 @@ export function CostumerNewPage() {
           }
         />
       )}
-    </div>
+    </>
   );
 }

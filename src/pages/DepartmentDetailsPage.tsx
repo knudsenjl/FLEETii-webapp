@@ -1,10 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
-import { fadeInUp } from "../lib/motionVariants";
+import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -373,17 +372,8 @@ export function DepartmentDetailsPage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          {...fadeInUp}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader
             hideAfdelingAlle
             koretoejNavigate={{ label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }}
@@ -599,8 +589,7 @@ export function DepartmentDetailsPage() {
               </>
             )}
           </section>
-        </motion.main>
-      </div>
+      </PageShell>
 
       {pendingAction && (
         <ConfirmDialog
@@ -616,6 +605,6 @@ export function DepartmentDetailsPage() {
           confirmPendingLabel={pendingAction === "delete-department" ? "Sletter…" : "Vent…"}
         />
       )}
-    </div>
+    </>
   );
 }
