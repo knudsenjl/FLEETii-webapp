@@ -8,6 +8,7 @@ import { useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { InlinePopup } from "../components/InlinePopup";
+import { PageSection } from "../components/PageSection";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm } from "../lib/roles";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
@@ -58,7 +59,7 @@ export function AboutPage() {
     <PageShell>
       <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Om FLEETii</h2>
@@ -185,7 +186,7 @@ export function AboutPage() {
                 </div>
               </div>
             </div>
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

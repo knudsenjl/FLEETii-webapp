@@ -6,6 +6,7 @@ import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
+import { PageSection } from "../components/PageSection";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
@@ -493,7 +494,7 @@ export function HandleVehiclePage() {
     <PageShell>
       <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="text-xl font-semibold text-brand-800">Køretøj detaljer</h2>
 
@@ -795,7 +796,7 @@ export function HandleVehiclePage() {
                 </Button>
               </div>
             </div>
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { Button } from "../components/Button";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -383,7 +384,7 @@ export function DepartmentDetailsPage() {
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection className="gap-4 overflow-y-auto">
             <h2 className="text-xl font-semibold text-brand-800">Afdelinger hos {costumerName ?? "—"}</h2>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
@@ -588,7 +589,7 @@ export function DepartmentDetailsPage() {
                 </div>
               </>
             )}
-          </section>
+          </PageSection>
       </PageShell>
 
       {pendingAction && (

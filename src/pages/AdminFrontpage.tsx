@@ -11,6 +11,7 @@ import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
+import { PageSection } from "../components/PageSection";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
@@ -260,7 +261,7 @@ export function AdminFrontpage() {
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className="flex flex-col gap-3">
                 <Button
@@ -472,7 +473,7 @@ export function AdminFrontpage() {
                 </div>
               )}
             </div>
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

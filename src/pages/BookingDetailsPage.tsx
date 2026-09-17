@@ -7,6 +7,7 @@ import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
 import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { BlockedBadge } from "../components/BlockedBadge";
+import { PageSection } from "../components/PageSection";
 import { isAnyAdmin } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
@@ -277,7 +278,7 @@ export function BookingDetailsPage() {
       <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <h2 className="shrink-0 text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
 
@@ -475,7 +476,7 @@ export function BookingDetailsPage() {
 
               {error && <p className="shrink-0 text-sm text-red-600">{error}</p>}
             </div>
-          </section>
+          </PageSection>
       </PageShell>
 
       {showCancelConfirm && (

@@ -39,6 +39,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { FieldInfoButton } from "../components/FieldInfoButton";
 import { SettingsRow } from "../components/SettingsRow";
@@ -240,7 +241,7 @@ export function SettingsAdminPage() {
     <PageShell>
       <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection className="gap-4 overflow-y-auto">
             {/* Afdelingsoplysninger — same rounded-2xl/bg-white + header-bar
                 convention as the tables below, hand-rolled since Navn/Adresse
                 (departments.name/address) don't fit StandardSettings' own
@@ -342,7 +343,7 @@ export function SettingsAdminPage() {
                 rettighederRef.current?.revert();
               }}
             />
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

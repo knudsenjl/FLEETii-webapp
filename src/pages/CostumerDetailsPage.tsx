@@ -11,6 +11,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
 import { EyeGlyph } from "../components/EyeGlyph";
+import { PageSection } from "../components/PageSection";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
@@ -564,7 +565,7 @@ export function CostumerDetailsPage() {
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection className="gap-4 overflow-y-auto">
             <h2 className="text-xl font-semibold text-brand-800">
               {isEditing ? `Rediger ${costumer.name ?? "—"}` : (costumer.name ?? "—")}
             </h2>
@@ -850,7 +851,7 @@ export function CostumerDetailsPage() {
                 </div>
               </>
             )}
-          </section>
+          </PageSection>
       </PageShell>
 
       {pendingAction && (

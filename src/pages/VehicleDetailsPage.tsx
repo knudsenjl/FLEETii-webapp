@@ -11,6 +11,7 @@ import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { CarGlyph } from "../components/CarGlyph";
 import { FieldRow } from "../components/FieldRow";
+import { PageSection } from "../components/PageSection";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
@@ -549,7 +550,7 @@ export function VehicleDetailsPage() {
       <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className="flex shrink-0 items-center justify-between">
                 <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
@@ -817,7 +818,7 @@ export function VehicleDetailsPage() {
                 </div>
               )}
             </div>
-          </section>
+          </PageSection>
       </PageShell>
 
       {showDeleteConfirm && (

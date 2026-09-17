@@ -5,6 +5,7 @@ import { isSysadm } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -161,7 +162,7 @@ export function AvailablePage() {
     <PageShell minWidth0>
       <PageHeader />
 
-          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection minWidth0>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
                 <h2 className="text-xl font-semibold text-brand-800">Ledige køretøjer</h2>
@@ -287,7 +288,7 @@ export function AvailablePage() {
                 </Button>
               </div>
             </div>
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

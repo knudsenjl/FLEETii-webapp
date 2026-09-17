@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { FieldRow } from "../components/FieldRow";
@@ -267,7 +268,7 @@ export function VehicleDeletePage() {
     <PageShell>
       <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection className="gap-4 overflow-y-auto">
             <h2 className="text-xl font-semibold text-brand-800">Slet køretøj</h2>
 
             <div className="rounded-2xl border border-brand-100">
@@ -315,7 +316,7 @@ export function VehicleDeletePage() {
                 confirmPendingLabel="Sletter…"
               />
             )}
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

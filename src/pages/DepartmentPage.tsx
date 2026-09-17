@@ -4,6 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
@@ -268,7 +269,7 @@ export function DepartmentPage() {
             }}
           />
 
-          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection minWidth0>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <h2 className="text-xl font-semibold text-brand-800">
@@ -370,7 +371,7 @@ export function DepartmentPage() {
                 </Button>
               </div>
             </div>
-          </section>
+          </PageSection>
     </PageShell>
   );
 }

@@ -9,6 +9,7 @@ import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { FieldInfoButton } from "../components/FieldInfoButton";
+import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
 import { SettingsRow } from "../components/SettingsRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
@@ -805,7 +806,7 @@ export function UserDetailsPage() {
       <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
@@ -1218,7 +1219,7 @@ export function UserDetailsPage() {
                 </div>
               ) : null}
             </div>
-          </section>
+          </PageSection>
       </PageShell>
 
       {pendingAction && (
