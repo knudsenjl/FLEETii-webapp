@@ -37,7 +37,8 @@ import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { FieldInfoButton } from "./FieldInfoButton";
 import { Button } from "./Button";
 import { ButtonRow } from "./ButtonRow";
-import { SettingsRow } from "./SettingsRow";
+import { FieldRow } from "./FieldRow";
+import { TableMessageRow } from "./TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { invalidateIdentSettingsCache } from "../hooks/useIdentSettings";
 
@@ -405,11 +406,11 @@ export function StandardSettings({
             same page. A grid row's own columns are independent of every
             OTHER row, so that whole class of bug can't happen here. */}
         <div className="divide-y divide-brand-100 rounded-2xl">
-          {loading && (
-            <div className="px-2 py-3 text-center text-sm text-brand-500">Indlæser indstillinger…</div>
-          )}
+          {loading && <TableMessageRow as="div">Indlæser indstillinger…</TableMessageRow>}
           {!loading && loadError && (
-            <div className="px-2 py-3 text-center text-sm text-red-600">{loadError}</div>
+            <TableMessageRow as="div" variant="error">
+              {loadError}
+            </TableMessageRow>
           )}
           {!loading &&
             !loadError &&
@@ -445,8 +446,7 @@ export function StandardSettings({
               }
 
               return (
-                <SettingsRow key={setting.name}>
-                  {labelContent}
+                <FieldRow key={setting.name} variant="settings" rawLabel label={labelContent}>
                   {setting.inputType === "checkbox" ? (
                     <div className="flex items-center gap-2">
                       <input
@@ -509,7 +509,7 @@ export function StandardSettings({
                       {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
                     </div>
                   )}
-                </SettingsRow>
+                </FieldRow>
               );
             })}
         </div>

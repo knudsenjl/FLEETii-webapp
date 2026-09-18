@@ -7,6 +7,7 @@ import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { FieldList } from "../components/FieldList";
 import { RequiredMark } from "../components/RequiredMark";
+import { FieldRow } from "../components/FieldRow";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
@@ -603,10 +604,7 @@ export function ReservationPage() {
                     // of their own, so this booking's target department must
                     // be picked explicitly before AvailablePage can even show
                     // a scoped vehicle list.
-                    <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Kunde/afdeling <RequiredMark />
-                      </label>
+                    <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Kunde/afdeling <RequiredMark /></>}>
                       <select
                         value={selectedDepartmentId}
                         onChange={(e) => {
@@ -628,12 +626,9 @@ export function ReservationPage() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Bruger {isAdmin && <RequiredMark />}
-                    </label>
+                  <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Bruger {isAdmin && <RequiredMark />}</>}>
                     {isAdmin ? (
                       <select
                         value={bruger}
@@ -657,7 +652,7 @@ export function ReservationPage() {
                         className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"
                       />
                     )}
-                  </div>
+                  </FieldRow>
                   {/* Anvendelse + (conditionally) Angiv årsag are wrapped
                       together in one div so they count as a SINGLE child of
                       the parent's divide-y — that border only ever lands
@@ -666,10 +661,7 @@ export function ReservationPage() {
                       rather than relying on a border-t-0 override to beat it
                       on specificity. */}
                   <div>
-                    <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Anvendelse <RequiredMark />
-                      </label>
+                    <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Anvendelse <RequiredMark /></>}>
                       {/* text-[16px], not text-sm — every role (incl. plain "user" on a phone) reaches this field, so it needs the same iOS-zoom-on-focus protection as LoginPage.tsx's own inputs (see its comment) — unlike the sysadm-only Kunde/afdeling and admin-only Bruger <select>s above, which stay text-sm since a Bruger never focuses those. */}
                       <select
                         required
@@ -685,12 +677,13 @@ export function ReservationPage() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </FieldRow>
                     {anvendelseOption === ANDET_VALUE && (
-                      <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
-                        <label className="flex items-center justify-end text-sm font-medium text-brand-700">
-                          Angiv årsag <RequiredMark />
-                        </label>
+                      <FieldRow
+                        className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 sm:pb-4"
+                        labelClassName="flex items-center justify-end text-sm font-medium text-brand-700"
+                        label={<>Angiv årsag <RequiredMark /></>}
+                      >
                         {/* text-[16px] — same iOS-zoom reasoning as the Anvendelse <select> above. */}
                         <input
                           type="text"
@@ -700,7 +693,7 @@ export function ReservationPage() {
                           onChange={(e) => setAnvendelseCustom(e.target.value)}
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-[16px] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
-                      </div>
+                      </FieldRow>
                     )}
                   </div>
                   <div className="relative grid grid-cols-[4rem_3.5rem_1fr_1fr] items-center gap-0.5 p-3 sm:p-4">

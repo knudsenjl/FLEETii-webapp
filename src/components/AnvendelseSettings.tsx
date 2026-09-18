@@ -58,7 +58,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
 import { ButtonRow } from "./ButtonRow";
-import { SettingsRow } from "./SettingsRow";
+import { FieldRow } from "./FieldRow";
 import { TableMessageRow } from "./TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { ANDET_VALUE, sortAnvendelserWithAndetLast } from "../lib/settings";
@@ -325,8 +325,12 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
           the list box is usually taller than one line of label text —
           the div-row equivalent of the old table row's align-top on both
           cells. */}
-      <SettingsRow align="start">
-        <div className="relative font-medium text-brand-700">
+      <FieldRow
+        variant="settings"
+        rawLabel
+        align="start"
+        label={
+          <div className="relative font-medium text-brand-700">
           {/* "+" (Tilføj anvendelse) — absolutely positioned so it sits
               immediately to the LEFT of labelCell's own "?" info button
               (which stays flush against this box's right edge, unchanged)
@@ -353,7 +357,9 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
             </button>
           )}
           {labelCell}
-        </div>
+          </div>
+        }
+      >
         <div className="select-none">
           <div className="select-none max-h-64 overflow-auto rounded-none border border-brand-100">
             <table className="w-full border-collapse text-sm">
@@ -488,7 +494,7 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
             </table>
           </div>
         </div>
-      </SettingsRow>
+      </FieldRow>
 
       {/* mode==="add"/pendingAction below still get a plain wrapping <div>
           (not just rendering <Modal>/<ConfirmDialog> bare as a sibling) —

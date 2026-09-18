@@ -462,18 +462,22 @@ export function NewVehiclePage() {
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
                   <RequiredFieldRow label="Kontakt e-mail:" value={kontaktemail} onChange={setKontaktemail} type="email" />
                   <RequiredFieldRow label="Kontakt tlf.:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <div className="relative flex items-center justify-between gap-2">
-                      <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
-                        FLEETii device skal installeres:
-                      </label>
-                      <FieldInfoButton
-                        open={openInfoPopover === "device"}
-                        onToggle={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
-                        message="Hvis der ikke er et FLEETii device installeret i køretøjet, skal du tikke denne af"
-                        align="right"
-                      />
-                    </div>
+                  <FieldRow
+                    rawLabel
+                    label={
+                      <div className="relative flex items-center justify-between gap-2">
+                        <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
+                          FLEETii device skal installeres:
+                        </label>
+                        <FieldInfoButton
+                          open={openInfoPopover === "device"}
+                          onToggle={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
+                          message="Hvis der ikke er et FLEETii device installeret i køretøjet, skal du tikke denne af"
+                          align="right"
+                        />
+                      </div>
+                    }
+                  >
                     <input
                       id="needs-fleetii-device"
                       type="checkbox"
@@ -481,20 +485,24 @@ export function NewVehiclePage() {
                       onChange={(e) => setNeedsFleetiiDevice(e.target.checked)}
                       className={CHECKBOX_CLASSNAME}
                     />
-                  </div>
+                  </FieldRow>
                   {!needsFleetiiDevice && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <div className="relative flex items-center justify-between gap-2">
-                        <label htmlFor="fleetii-device-id" className="flex-1 text-right text-sm font-medium text-brand-700">
-                          FLEETii device id: <span className="text-red-600">*</span>
-                        </label>
-                        <FieldInfoButton
-                          open={openInfoPopover === "deviceId"}
-                          onToggle={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
-                          message="Angiv id-nummeret på det eksisterende IoT device i køretøjet"
-                          align="right"
-                        />
-                      </div>
+                    <FieldRow
+                      rawLabel
+                      label={
+                        <div className="relative flex items-center justify-between gap-2">
+                          <label htmlFor="fleetii-device-id" className="flex-1 text-right text-sm font-medium text-brand-700">
+                            FLEETii device id: <RequiredMark />
+                          </label>
+                          <FieldInfoButton
+                            open={openInfoPopover === "deviceId"}
+                            onToggle={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
+                            message="Angiv id-nummeret på det eksisterende IoT device i køretøjet"
+                            align="right"
+                          />
+                        </div>
+                      }
+                    >
                       <input
                         id="fleetii-device-id"
                         type="text"
@@ -504,7 +512,7 @@ export function NewVehiclePage() {
                         onChange={(e) => setFleetiiDeviceId(e.target.value)}
                         className={TEXT_INPUT_CLASSNAME}
                       />
-                    </div>
+                    </FieldRow>
                   )}
                 </div>
               </div>

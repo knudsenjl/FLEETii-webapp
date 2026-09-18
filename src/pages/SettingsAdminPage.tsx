@@ -43,7 +43,8 @@ import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { FieldInfoButton } from "../components/FieldInfoButton";
-import { SettingsRow } from "../components/SettingsRow";
+import { FieldRow, SETTINGS_ROW_CLASSNAME } from "../components/FieldRow";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { AnvendelseSettings } from "../components/AnvendelseSettings";
 import { StandardSettings, STANDARDER, type StandardSetting } from "../components/StandardSettings";
@@ -253,29 +254,23 @@ export function SettingsAdminPage() {
             <div className="rounded-2xl border border-brand-100 bg-white">
               <div className="divide-y divide-brand-100 rounded-2xl">
                 <SettingsSectionHeading>Afdelingsoplysninger</SettingsSectionHeading>
-                {afdelingsoplysningerLoading && (
-                  <div className="px-2 py-3 text-center text-sm text-brand-500">Indlæser…</div>
-                )}
+                {afdelingsoplysningerLoading && <TableMessageRow as="div">Indlæser…</TableMessageRow>}
                 {!afdelingsoplysningerLoading && afdelingsoplysningerError && (
-                  <div className="px-2 py-3 text-center text-sm text-red-600">{afdelingsoplysningerError}</div>
+                  <TableMessageRow as="div" variant="error">
+                    {afdelingsoplysningerError}
+                  </TableMessageRow>
                 )}
                 {!afdelingsoplysningerLoading && !afdelingsoplysningerError && (
                   <>
-                    <RequiredFieldRow
-                      label="Navn:"
-                      value={deptName}
-                      onChange={setDeptName}
-                      className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
-                    />
-                    <SettingsRow>
-                      <label className="text-sm font-medium text-brand-700">Adresse:</label>
+                    <RequiredFieldRow label="Navn:" value={deptName} onChange={setDeptName} className={SETTINGS_ROW_CLASSNAME} />
+                    <FieldRow variant="settings" rawLabel label={<label className="text-sm font-medium text-brand-700">Adresse:</label>}>
                       <input
                         type="text"
                         value={deptAddress}
                         onChange={(e) => setDeptAddress(e.target.value)}
                         className={TEXT_INPUT_CLASSNAME}
                       />
-                    </SettingsRow>
+                    </FieldRow>
                     {(
                       [
                         {
@@ -294,17 +289,23 @@ export function SettingsAdminPage() {
                         },
                       ] as const
                     ).map((row) => (
-                      <SettingsRow key={row.name}>
-                        <div className="relative flex items-center justify-between gap-1">
-                          <label htmlFor={`afdelingsoplysning-${row.name}`} className="text-sm font-medium text-brand-700">
-                            {row.label}:
-                          </label>
-                          <FieldInfoButton
-                            open={openInfoName === row.name}
-                            onToggle={() => setOpenInfoName((prev) => (prev === row.name ? null : row.name))}
-                            message={row.info}
-                          />
-                        </div>
+                      <FieldRow
+                        key={row.name}
+                        variant="settings"
+                        rawLabel
+                        label={
+                          <div className="relative flex items-center justify-between gap-1">
+                            <label htmlFor={`afdelingsoplysning-${row.name}`} className="text-sm font-medium text-brand-700">
+                              {row.label}:
+                            </label>
+                            <FieldInfoButton
+                              open={openInfoName === row.name}
+                              onToggle={() => setOpenInfoName((prev) => (prev === row.name ? null : row.name))}
+                              message={row.info}
+                            />
+                          </div>
+                        }
+                      >
                         <input
                           id={`afdelingsoplysning-${row.name}`}
                           type="checkbox"
@@ -312,7 +313,7 @@ export function SettingsAdminPage() {
                           onChange={(e) => row.onToggle(e.target.checked)}
                           className={CHECKBOX_CLASSNAME}
                         />
-                      </SettingsRow>
+                      </FieldRow>
                     ))}
                   </>
                 )}

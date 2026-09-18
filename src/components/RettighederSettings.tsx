@@ -33,7 +33,7 @@ import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "r
 import { InlinePopup } from "./InlinePopup";
 import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { FieldInfoButton } from "./FieldInfoButton";
-import { SettingsRow } from "./SettingsRow";
+import { FieldRow } from "./FieldRow";
 import { SettingsSectionHeading } from "./SettingsSectionHeading";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
@@ -303,17 +303,23 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                   rather than a separate <h3> sitting above the table. */}
               <SettingsSectionHeading>{heading}</SettingsSectionHeading>
               {RETTIGHEDER.map(({ name, label, info, infoUser }) => (
-                <SettingsRow key={name}>
-                  <div className="relative flex items-center justify-between gap-1">
-                    <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
-                      {label}:
-                    </label>
-                    <FieldInfoButton
-                      open={openInfoName === name}
-                      onToggle={() => setOpenInfoName((prev) => (prev === name ? null : name))}
-                      message={readOnly ? READONLY_INFO_MESSAGE : table === "user_settings" ? (infoUser ?? info) : info}
-                    />
-                  </div>
+                <FieldRow
+                  key={name}
+                  variant="settings"
+                  rawLabel
+                  label={
+                    <div className="relative flex items-center justify-between gap-1">
+                      <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
+                        {label}:
+                      </label>
+                      <FieldInfoButton
+                        open={openInfoName === name}
+                        onToggle={() => setOpenInfoName((prev) => (prev === name ? null : name))}
+                        message={readOnly ? READONLY_INFO_MESSAGE : table === "user_settings" ? (infoUser ?? info) : info}
+                      />
+                    </div>
+                  }
+                >
                   {table === "user_settings" ? (
                     readOnly ? (
                       // Plain italic "Tilladt"/"Ikke tilladt" text instead of
@@ -370,7 +376,7 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                       {errorByName[name] && <span className="text-xs text-red-600">{errorByName[name]}</span>}
                     </div>
                   )}
-                </SettingsRow>
+                </FieldRow>
               ))}
             </div>
           </div>

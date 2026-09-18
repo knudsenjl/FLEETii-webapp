@@ -15,7 +15,7 @@ import { FieldInfoButton } from "../components/FieldInfoButton";
 import { PageSection } from "../components/PageSection";
 import { PageSectionBody } from "../components/PageSectionBody";
 import { PageShell } from "../components/PageShell";
-import { SettingsRow } from "../components/SettingsRow";
+import { FieldRow, SETTINGS_ROW_CLASSNAME } from "../components/FieldRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { ForbiddenNotice } from "../components/ProtectedRoute";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
@@ -836,16 +836,14 @@ export function UserDetailsPage() {
                     // follows the global header's own costumerId ("Data
                     // Filter", PageHeader.tsx), so there's nothing left to
                     // choose here, just to confirm.
-                    <SettingsRow>
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
+                    <FieldRow variant="settings" rawLabel label={<label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>}>
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {targetCostumerName ?? "—"}
                       </span>
-                    </SettingsRow>
+                    </FieldRow>
                   )}
                   {useUserIdent && (
-                    <SettingsRow>
-                      <label className="text-sm font-medium text-brand-700">Bruger-ID:</label>
+                    <FieldRow variant="settings" rawLabel label={<label className="text-sm font-medium text-brand-700">Bruger-ID:</label>}>
                       {isSelf ? (
                         <input
                           type="text"
@@ -863,23 +861,17 @@ export function UserDetailsPage() {
                           className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
-                    </SettingsRow>
+                    </FieldRow>
                   )}
                   {/* className override on all three: matches this table's own header bar's px-2 (RequiredFieldRow's own default is p-0.5, no horizontal padding) so every row's label text starts flush with the header text above it. */}
-                  <RequiredFieldRow
-                    label="Navn:"
-                    value={fullName}
-                    onChange={setFullName}
-                    readOnly={isSelf}
-                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
-                  />
+                  <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} readOnly={isSelf} className={SETTINGS_ROW_CLASSNAME} />
                   <RequiredFieldRow
                     label="E-mail:"
                     value={email}
                     onChange={setEmail}
                     type="email"
                     readOnly={isSelf}
-                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                    className={SETTINGS_ROW_CLASSNAME}
                   />
                   <RequiredFieldRow
                     label="Telefon:"
@@ -887,12 +879,17 @@ export function UserDetailsPage() {
                     onChange={setPhone}
                     type="tel"
                     readOnly={isSelf}
-                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                    className={SETTINGS_ROW_CLASSNAME}
                   />
-                  <SettingsRow>
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Rolle: {!isSelf && <RequiredMark />}
-                    </label>
+                  <FieldRow
+                    variant="settings"
+                    rawLabel
+                    label={
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Rolle: {!isSelf && <RequiredMark />}
+                      </label>
+                    }
+                  >
                     {isSelf ? (
                       <input
                         type="text"
@@ -914,7 +911,7 @@ export function UserDetailsPage() {
                         <option value="admin">Administrator</option>
                       </select>
                     )}
-                  </SettingsRow>
+                  </FieldRow>
                 </div>
               </div>
 
@@ -972,8 +969,12 @@ export function UserDetailsPage() {
                           departmentOptions.map((option) => {
                             const isHome = option.department_id === homeDepartmentId;
                             return (
-                              <SettingsRow key={option.department_id}>
-                                <label className="text-sm font-medium text-brand-700">{option.name}:</label>
+                              <FieldRow
+                                key={option.department_id}
+                                variant="settings"
+                                rawLabel
+                                label={<label className="text-sm font-medium text-brand-700">{option.name}:</label>}
+                              >
                                 <span className="inline-flex items-center gap-1.5">
                                   <input
                                     type="checkbox"
@@ -992,30 +993,35 @@ export function UserDetailsPage() {
                                     </span>
                                   )}
                                 </span>
-                              </SettingsRow>
+                              </FieldRow>
                             );
                           })}
                       </>
                     )}
-                      <SettingsRow>
-                        <div className="relative flex items-center justify-between gap-2">
-                          <label className="text-sm font-medium text-brand-700">
-                            Hjemmeafdeling:{" "}
-                            {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
-                              <RequiredMark />
-                            )}
-                          </label>
-                          <FieldInfoButton
-                            open={openInfoPopover === "hjemmeafdeling"}
-                            onToggle={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
-                            message={
-                              isSelf || departmentOptions.length === 1 || soleCheckedDepartment
-                                ? "Du er tilknyttet denne afdeling"
-                                : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
-                            }
-                            align="right"
-                          />
-                        </div>
+                      <FieldRow
+                        variant="settings"
+                        rawLabel
+                        label={
+                          <div className="relative flex items-center justify-between gap-2">
+                            <label className="text-sm font-medium text-brand-700">
+                              Hjemmeafdeling:{" "}
+                              {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
+                                <RequiredMark />
+                              )}
+                            </label>
+                            <FieldInfoButton
+                              open={openInfoPopover === "hjemmeafdeling"}
+                              onToggle={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
+                              message={
+                                isSelf || departmentOptions.length === 1 || soleCheckedDepartment
+                                  ? "Du er tilknyttet denne afdeling"
+                                  : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
+                              }
+                              align="right"
+                            />
+                          </div>
+                        }
+                      >
                         {isSelf || departmentOptions.length === 1 || soleCheckedDepartment ? (
                           <input
                             type="text"
@@ -1048,7 +1054,7 @@ export function UserDetailsPage() {
                               ))}
                           </select>
                         )}
-                      </SettingsRow>
+                      </FieldRow>
                     </div>
                   </div>
 
