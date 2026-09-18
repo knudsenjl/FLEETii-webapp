@@ -11,6 +11,7 @@ import { useScopeDisplayName } from "../hooks/useScopeDisplayName";
 import { supabase } from "../lib/supabase";
 import { fadeInUp } from "../lib/motionVariants";
 import { InfoCard } from "../components/InfoCard";
+import { SectionHeading } from "../components/SectionHeading";
 import { isSettingTilladt } from "../lib/settings";
 import {
   BOOKINGS_SELECT_COLUMNS,
@@ -174,7 +175,7 @@ export function BookingsPage() {
       >
         <PageHeader compact />
 
-        <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservationer i {scopeName}</h2>
+        <SectionHeading className="shrink-0 pb-1">Reservationer i {scopeName}</SectionHeading>
 
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
           {loading && <p className="py-3 text-center text-sm text-brand-500">Indlæser reservationer…</p>}

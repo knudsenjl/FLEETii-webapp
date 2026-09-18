@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { ClickOutsideOverlay } from "./ClickOutsideOverlay";
 import { InlinePopup } from "./InlinePopup";
 
 interface FieldInfoButtonProps {
@@ -27,7 +28,7 @@ export function FieldInfoButton({ open, onToggle, message, align }: FieldInfoBut
       >
         ?
       </button>
-      {open && <div className="fixed inset-0 z-10" onClick={onToggle} />}
+      {open && <ClickOutsideOverlay onClick={onToggle} />}
       <InlinePopup visible={open} message={message} align={align} />
     </>
   );

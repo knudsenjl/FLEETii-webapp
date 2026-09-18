@@ -11,6 +11,7 @@ import { VehicleMapCard } from "../components/VehicleMapCard";
 import { VehicleLockControlsRow } from "../components/VehicleLockControlsRow";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { PageSection } from "../components/PageSection";
+import { SectionHeading } from "../components/SectionHeading";
 import { isAnyAdmin } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
@@ -278,7 +279,7 @@ export function BookingDetailsPage() {
 
           <PageSection>
             <PageSectionBody>
-              <h2 className="shrink-0 text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
+              <SectionHeading className="shrink-0">Reservationsdetaljer</SectionHeading>
 
               <FieldList>
                   <FieldRow label="Periode:">

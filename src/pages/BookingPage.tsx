@@ -21,6 +21,7 @@ import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
 import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { InfoCard } from "../components/InfoCard";
+import { SectionHeading } from "../components/SectionHeading";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { PageLoading } from "../components/PageLoading";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -265,7 +266,7 @@ export function BookingPage() {
           className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
         >
           <PageHeader compact />
-          <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservation i {scopeName}</h2>
+          <SectionHeading className="shrink-0 pb-1">Reservation i {scopeName}</SectionHeading>
           <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3.5 px-2">
             <InfoCard>Du har ingen aktuelle eller kommende reservationer i denne afdeling.</InfoCard>
             <InfoCard>Hvis du har reservationer i en anden afdeling, så vælg denne afdeling i filteret øverst på denne side.</InfoCard>
@@ -301,7 +302,7 @@ export function BookingPage() {
         className="mx-auto flex min-h-0 w-full max-w-md flex-1 flex-col px-4 pt-4"
       >
         <PageHeader compact />
-        <h2 className="shrink-0 pb-1 text-xl font-semibold text-brand-800">Reservation i {scopeName}</h2>
+        <SectionHeading className="shrink-0 pb-1">Reservation i {scopeName}</SectionHeading>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pb-4">
           {/* Hero card: vehicle (tap through to VehicleDetailsPage) + big circular lock control + Blink/Horn, the mobile-first landing page's primary controls. */}
@@ -359,26 +360,23 @@ export function BookingPage() {
 
             <div className="flex w-full gap-2.5">
               <div className="group relative flex-1">
-                <button
+                <Button
                   type="button"
                   onClick={() => void handleLocate()}
                   disabled={isLocating}
-                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  pill
+                  className="flex w-full items-center justify-center gap-1.5 px-2 py-2"
                 >
                   <HeadlightIcon className="h-4 w-4" />
                   {isLocating ? "Blinker…" : "Blink"}
-                </button>
+                </Button>
                 <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
               </div>
               <div className="group relative flex-1">
-                <button
-                  type="button"
-                  onClick={handleHonk}
-                  className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-full border border-brand-200 bg-brand-50 px-2 py-2 text-xs font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                <Button type="button" onClick={handleHonk} pill className="flex w-full items-center justify-center gap-1.5 px-2 py-2">
                   <HornIcon className="h-4 w-4" />
                   Horn
-                </button>
+                </Button>
                 <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
               </div>
             </div>
