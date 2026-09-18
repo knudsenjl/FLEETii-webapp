@@ -6,9 +6,13 @@
 // "administration af kunder" half lives on its own page — see
 // CostumerAdministrationPage.tsx ("/costumers").
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
+import { SectionHeading } from "../components/SectionHeading";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -129,27 +133,15 @@ export function InstallationAdministrationPage() {
   }, []);
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
+    <PageShell>
+      <PageHeader />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
-
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Bestilte installationer</h2>
+          <PageSection className="gap-4 overflow-y-auto">
+            <SectionHeading>Bestilte installationer</SectionHeading>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-              <table className="w-full border-collapse text-[0.7rem]">
-                <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+              <table className={TABLE_CLASSNAME}>
+                <thead className={STICKY_THEAD_CLASSNAME}>
                   <tr>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Type</th>
                     <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Kunde</th>
@@ -159,19 +151,13 @@ export function InstallationAdministrationPage() {
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {ordersLoading && (
-                    <tr>
-                      <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser installationer…</td>
-                    </tr>
+                    <TableMessageRow colSpan={4}>Indlæser installationer…</TableMessageRow>
                   )}
                   {!ordersLoading && ordersError && (
-                    <tr>
-                      <td colSpan={4} className="px-2 py-3 text-center text-red-600">{ordersError}</td>
-                    </tr>
+                    <TableMessageRow colSpan={4} variant="error">{ordersError}</TableMessageRow>
                   )}
                   {!ordersLoading && !ordersError && costumerOrders.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Ingen installationer fundet.</td>
-                    </tr>
+                    <TableMessageRow colSpan={4}>Ingen installationer fundet.</TableMessageRow>
                   )}
                   {!ordersLoading &&
                     !ordersError &&
@@ -215,9 +201,7 @@ export function InstallationAdministrationPage() {
                 </tbody>
               </table>
             </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+          </PageSection>
+    </PageShell>
   );
 }

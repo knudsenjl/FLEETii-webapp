@@ -1,12 +1,19 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
+import { FieldRow } from "../components/FieldRow";
+import { ButtonRow } from "../components/ButtonRow";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { QrScanButton } from "../components/QrScanButton";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS, formatVehicleIdentLabel } from "../lib/bookings";
@@ -497,7 +504,7 @@ export function VehicleCreatePage() {
   // toward "/sysadm-installations" for a moment before the fetch resolves.
   if (orderId && !order && orderLoading) {
     return (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser bestilling…</div>
+      <PageLoading label="Indlæser bestilling…" />
     );
   }
 
@@ -640,23 +647,12 @@ export function VehicleCreatePage() {
   ];
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Opret køretøj</h2>
+          <PageSection className="gap-4 overflow-y-auto">
+            <SectionHeading>Opret køretøj</SectionHeading>
 
             <div className="rounded-2xl border border-brand-100">
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">
@@ -674,8 +670,7 @@ export function VehicleCreatePage() {
                   // loads the data.
                   if (label === "Drivmiddel:" && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <select
                           value={drivmiddelInput}
                           onChange={(e) => setDrivmiddelInput(e.target.value)}
@@ -687,7 +682,7 @@ export function VehicleCreatePage() {
                             </option>
                           ))}
                         </select>
-                      </div>
+                      </FieldRow>
                     );
                   }
 
@@ -712,8 +707,7 @@ export function VehicleCreatePage() {
                   // Nummerplade keeps its MotorAPI lookup button alongside the input while editing — same button/popup as the read-only branch further below, just paired with an input instead of a plain span.
                   if (editableField && label === "Nummerplade:" && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <div className="flex min-w-0 items-center gap-1">
                           <input
                             type="text"
@@ -755,36 +749,34 @@ export function VehicleCreatePage() {
                             />
                           </div>
                         </div>
-                      </div>
+                      </FieldRow>
                     );
                   }
 
                   if (editableField && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <input
                           type="text"
                           value={editableField.value}
                           onChange={(e) => editableField.setValue(e.target.value)}
                           className="w-full min-w-0 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
-                      </div>
+                      </FieldRow>
                     );
                   }
 
                   // FLEETii device combines two columns (needs_fleetii_device/fleetii_device_id) into one displayed row — same special-casing as Drivmiddel/Nummerplade above, editable while isEditingOrder.
                   if (label === "FLEETii device:" && isEditingOrder && !vehicleRegistered) {
                     return (
-                      <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                      <FieldRow key={label} label={label}>
                         <div className="flex min-w-0 items-center gap-2">
                           <label className="flex items-center gap-1 text-sm text-brand-800">
                             <input
                               type="checkbox"
                               checked={needsFleetiiDeviceInput}
                               onChange={(e) => setNeedsFleetiiDeviceInput(e.target.checked)}
-                              className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                              className={CHECKBOX_CLASSNAME}
                             />
                             Nyt device
                           </label>
@@ -798,13 +790,12 @@ export function VehicleCreatePage() {
                             />
                           )}
                         </div>
-                      </div>
+                      </FieldRow>
                     );
                   }
 
                   return label === "Nummerplade:" ? (
-                    <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                    <FieldRow key={label} label={label}>
                       <div className="flex min-w-0 items-center gap-1">
                         {/* Plain text, same transparent-border look as Kunde/Afdeling/every other genuinely non-editable row below — a bordered input-shaped box here would visually claim this field is editable when it isn't. */}
                         <span className="min-w-0 flex-1 truncate rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
@@ -849,17 +840,16 @@ export function VehicleCreatePage() {
                           />
                         </div>
                       </div>
-                    </div>
+                    </FieldRow>
                   ) : (
-                    <div key={label} className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">{label}</label>
+                    <FieldRow key={label} label={label}>
                       {/* Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left — same trick as CostumerDetailsPage's locked CVR row. whitespace-pre-wrap on Kommentarer only, since that's the one multi-line free-text field here (NewVehiclePage.tsx's textarea) — collapsing its line breaks would run the note together. */}
                       <span
                         className={`rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800 ${label === "Kommentarer:" ? "whitespace-pre-wrap" : ""}`}
                       >
                         {value}
                       </span>
-                    </div>
+                    </FieldRow>
                   );
                 })}
               </div>
@@ -868,14 +858,9 @@ export function VehicleCreatePage() {
               {deleteError && <p className="text-sm text-red-600">{deleteError}</p>}
               {vehicleRegistered ? (
                 <div className="flex flex-row gap-3">
-                  <button
-                    type="button"
-                    onClick={() => void handleDelete()}
-                    disabled={isDeleting}
-                    className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  <Button variant="secondary" type="button" onClick={() => void handleDelete()} disabled={isDeleting} className="flex-1">
                     {isDeleting ? "Sletter…" : "Slet"}
-                  </button>
+                  </Button>
                   <span className="flex flex-1 items-center justify-center rounded-lg bg-green-600 px-2 py-1.5 text-center text-sm font-semibold text-white">
                     ✓ Køretøj registreret i 2hire
                   </span>
@@ -989,50 +974,34 @@ export function VehicleCreatePage() {
                   </div>
                   {orderEditError && <p className="text-sm text-red-600">{orderEditError}</p>}
                   {isEditingOrder ? (
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={handleCancelEditOrder}
-                        disabled={isSavingOrderEdit}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                    <ButtonRow>
+                      <Button variant="secondary" type="button" onClick={handleCancelEditOrder} disabled={isSavingOrderEdit}>
                         Fortryd
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => setConfirmUpdateOpen(true)}
                         disabled={!canSubmitOrderEdit || isSavingOrderEdit}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {isSavingOrderEdit ? "Opdaterer…" : "Opdater"}
-                      </button>
-                    </div>
+                      </Button>
+                    </ButtonRow>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
-                      <button
-                        type="button"
-                        onClick={handleStartEditOrder}
-                        disabled={isRegistering}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                    <ButtonRow>
+                      <Button variant="secondary" type="button" onClick={handleStartEditOrder} disabled={isRegistering}>
                         Rediger
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setConfirmDeleteOpen(true)}
-                        disabled={isDeleting || isRegistering}
-                        className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
+                      </Button>
+                      <Button variant="danger" type="button" onClick={() => setConfirmDeleteOpen(true)} disabled={isDeleting || isRegistering}>
                         Slet
-                      </button>
-                    </div>
+                      </Button>
+                    </ButtonRow>
                   )}
                 </div>
               )}
             </div>
-          </section>
-        </motion.main>
-      </div>
+          </PageSection>
+      </PageShell>
 
       {confirmDeleteOpen && (
         <ConfirmDialog
@@ -1055,6 +1024,6 @@ export function VehicleCreatePage() {
           confirmPendingLabel="Opdaterer…"
         />
       )}
-    </div>
+    </>
   );
 }

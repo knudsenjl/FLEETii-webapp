@@ -31,6 +31,10 @@
 // immediately, rather than via a round-trip DB error.
 import { forwardRef, useEffect, useImperativeHandle, useMemo, useState } from "react";
 import { InlinePopup } from "./InlinePopup";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
+import { FieldInfoButton } from "./FieldInfoButton";
+import { FieldRow } from "./FieldRow";
+import { SettingsSectionHeading } from "./SettingsSectionHeading";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 
@@ -297,31 +301,25 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
               {/* The section heading, as the table's own first row (same
                   bar styling as StandardSettings.tsx's "Indstillinger" row)
                   rather than a separate <h3> sitting above the table. */}
-              <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-                {heading}
-              </div>
+              <SettingsSectionHeading>{heading}</SettingsSectionHeading>
               {RETTIGHEDER.map(({ name, label, info, infoUser }) => (
-                <div key={name} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                  <div className="relative flex items-center justify-between gap-1">
-                    <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
-                      {label}:
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setOpenInfoName((prev) => (prev === name ? null : name))}
-                      aria-label="Mere information"
-                      className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                    >
-                      ?
-                    </button>
-                    {openInfoName === name && (
-                      <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                    )}
-                    <InlinePopup
-                      visible={openInfoName === name}
-                      message={readOnly ? READONLY_INFO_MESSAGE : table === "user_settings" ? (infoUser ?? info) : info}
-                    />
-                  </div>
+                <FieldRow
+                  key={name}
+                  variant="settings"
+                  rawLabel
+                  label={
+                    <div className="relative flex items-center justify-between gap-1">
+                      <label htmlFor={`rettighed-${name}`} className="whitespace-normal break-words text-sm font-medium text-brand-700">
+                        {label}:
+                      </label>
+                      <FieldInfoButton
+                        open={openInfoName === name}
+                        onToggle={() => setOpenInfoName((prev) => (prev === name ? null : name))}
+                        message={readOnly ? READONLY_INFO_MESSAGE : table === "user_settings" ? (infoUser ?? info) : info}
+                      />
+                    </div>
+                  }
+                >
                   {table === "user_settings" ? (
                     readOnly ? (
                       // Plain italic "Tilladt"/"Ikke tilladt" text instead of
@@ -354,7 +352,7 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                             }
                             void handleToggle(name, false);
                           }}
-                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                          className={CHECKBOX_CLASSNAME}
                         />
                         <InlinePopup
                           visible={blockedKey === name}
@@ -373,12 +371,12 @@ export const RettighederSettings = forwardRef<RettighederSettingsHandle, Rettigh
                         checked={values[name] ?? false}
                         disabled={savingName === name}
                         onChange={(e) => void handleToggle(name, e.target.checked)}
-                        className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                        className={CHECKBOX_CLASSNAME}
                       />
                       {errorByName[name] && <span className="text-xs text-red-600">{errorByName[name]}</span>}
                     </div>
                   )}
-                </div>
+                </FieldRow>
               ))}
             </div>
           </div>

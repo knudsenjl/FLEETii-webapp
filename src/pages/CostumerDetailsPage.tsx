@@ -1,13 +1,23 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
+import { PageLoading } from "../components/PageLoading";
+import { PageShell } from "../components/PageShell";
 import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
+import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { EyeGlyph } from "../components/EyeGlyph";
+import { PageSection } from "../components/PageSection";
+import { DashboardTile } from "../components/DashboardTile";
+import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
+import { ButtonRow } from "../components/ButtonRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
@@ -539,7 +549,7 @@ export function CostumerDetailsPage() {
   // read costumer.* before it exists.
   if (costumerId && !costumer && costumerLoading) {
     return (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser kunde…</div>
+      <PageLoading label="Indlæser kunde…" />
     );
   }
   // costumerId present but the fetch confirmed it's gone — the redirect
@@ -550,19 +560,8 @@ export function CostumerDetailsPage() {
   }
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader
             hideKundeAlle
             koretoejNavigate={{ label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }}
@@ -572,23 +571,20 @@ export function CostumerDetailsPage() {
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">
+          <PageSection className="gap-4 overflow-y-auto">
+            <SectionHeading>
               {isEditing ? `Rediger ${costumer.name ?? "—"}` : (costumer.name ?? "—")}
-            </h2>
+            </SectionHeading>
 
             {isEditing ? (
               <>
-                {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                <FieldList>
+                    <FieldRow label="CVR.">
                       {/* Locked — CVR is the unique Danish company registration number and shouldn't change after the fact (see costumers_cvr_unique.sql). Read-only here, unlike every other field in this form. Matches the editable inputs' own border/padding (just transparent) so its text lines up with theirs instead of sitting flush left. */}
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {editCvr || "—"}
                       </span>
-                    </div>
+                    </FieldRow>
                     <RequiredFieldRow label="Navn:" value={editName} onChange={setEditName} />
                     <RequiredFieldRow label="Vej og husnr.:" value={editStreet} onChange={setEditStreet} />
                     <RequiredFieldRow label="Postnr. og by:" value={editPostalCity} onChange={setEditPostalCity} />
@@ -596,8 +592,7 @@ export function CostumerDetailsPage() {
                     <RequiredFieldRow label="Kontaktperson:" value={editContactPerson} onChange={setEditContactPerson} />
                     <RequiredFieldRow label="Tlf:" value={editPhone} onChange={setEditPhone} type="tel" />
                     <RequiredFieldRow label="E-mail:" value={editEmail} onChange={setEditEmail} type="email" />
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">2hire client ID:</label>
+                    <FieldRow label="2hire client ID:">
                       {/* Locked once set (same "shown, not editable" treatment as CVR above) — the actual id (client_id isn't secret the way client_secret is, but is scoped to sysadm only, see costumers_scope_twohire_client_id_to_fleetii_admin.sql), not a status word, since the value itself already communicates "configured". Only editable while genuinely empty. twoHireClientId comes from a separate RPC (see its own state comment above), so this briefly shows the empty <input> while that resolves even for an already-configured costumer. Masked by default (fixed-length, same as the client secret row below) with a right-aligned eye button that reveals the real value for 5s — see useTimedFlag above. */}
                       {twoHireClientId ? (
                         <span className="relative flex items-center rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
@@ -619,12 +614,11 @@ export function CostumerDetailsPage() {
                           value={editTwoHireClientId}
                           onChange={(e) => setEditTwoHireClientId(e.target.value)}
                           placeholder="Indtast 2hire Client ID her"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">2hire client secret:</label>
+                    </FieldRow>
+                    <FieldRow label="2hire client secret:">
                       {/* Never the raw secret — a fixed mask once set, same locked treatment as the ID row above. Only editable while genuinely empty. */}
                       {costumer.has_twohire_client_secret ? (
                         <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
@@ -636,12 +630,11 @@ export function CostumerDetailsPage() {
                           value={editTwoHireClientSecret}
                           onChange={(e) => setEditTwoHireClientSecret(e.target.value)}
                           placeholder="Indtast 2hire Client Secret her"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
-                    </div>
-                  </div>
-                </div>
+                    </FieldRow>
+                </FieldList>
 
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
@@ -649,16 +642,12 @@ export function CostumerDetailsPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("update")}
-                    disabled={!canSubmitEdit}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                <ButtonRow>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("update")} disabled={!canSubmitEdit}>
                     Opdater kunde
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => {
                       setEditName(costumer.name ?? "");
@@ -673,47 +662,36 @@ export function CostumerDetailsPage() {
                       setEditTwoHireClientSecret("");
                       setIsEditing(false);
                     }}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                   >
                     Fortryd
-                  </button>
-                </div>
+                  </Button>
+                </ButtonRow>
               </>
             ) : (
               <>
-                {/* shrink-0: without it, a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior, not a bug) — under vertical space pressure the flex column can squeeze this whole box to zero height, clipping every row invisibly while sibling elements (no overflow-hidden, so a real content-based floor) stay visible. Confirmed live in a real browser session 2026-08-28: DOM had the correct data the whole time, this was purely a layout collapse. */}
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                <FieldList>
+                    <FieldRow label="CVR.">
                       <span className="text-sm text-brand-800">{costumer.cvr ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Vej og husnr.:</label>
+                    </FieldRow>
+                    <FieldRow label="Vej og husnr.:">
                       <span className="text-sm text-brand-800">{costumer.address_street ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Postnr. og by:</label>
+                    </FieldRow>
+                    <FieldRow label="Postnr. og by:">
                       <span className="text-sm text-brand-800">{costumer.address_postal_city ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Land:</label>
+                    </FieldRow>
+                    <FieldRow label="Land:">
                       <span className="text-sm text-brand-800">{costumer.address_country ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kontaktperson:</label>
+                    </FieldRow>
+                    <FieldRow label="Kontaktperson:">
                       <span className="text-sm text-brand-800">{costumer.contact_person ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Tlf:</label>
+                    </FieldRow>
+                    <FieldRow label="Tlf:">
                       <span className="text-sm text-brand-800">{costumer.phone ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">E-mail:</label>
+                    </FieldRow>
+                    <FieldRow label="E-mail:">
                       <span className="text-sm text-brand-800">{costumer.email ?? "—"}</span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">2hire:</label>
+                    </FieldRow>
+                    <FieldRow label="2hire:">
                       <span className="text-sm text-brand-800">
                         {costumer.has_twohire_credentials ? (
                           <span className="font-semibold text-green-700">Konfigureret</span>
@@ -721,9 +699,8 @@ export function CostumerDetailsPage() {
                           <span className="font-semibold text-amber-700">Ikke konfigureret</span>
                         )}
                       </span>
-                    </div>
-                  </div>
-                </div>
+                    </FieldRow>
+                </FieldList>
 
                 {deactivatedAt && (
                   <p className="text-sm font-medium text-red-600">
@@ -733,34 +710,37 @@ export function CostumerDetailsPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   {deactivatedAt ? (
                     <>
                       {/* Rediger kunde is intentionally hidden while access
                           is blocked — only two actions are meaningful for a
                           blocked costumer: restore access, or purge it for
                           good. */}
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => setPendingAction("reactivate")}
-                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                        className="col-span-2"
                       >
                         Genetabler kundens adgang
-                      </button>
-                      <button
+                      </Button>
+                      <Button
+                        variant="danger"
                         type="button"
                         onClick={() => {
                           setPurgeConfirmText("");
                           setPendingAction("delete");
                         }}
-                        className="col-span-2 rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        className="col-span-2"
                       >
                         Slet kunden permanent
-                      </button>
+                      </Button>
                     </>
                   ) : (
                     <>
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => {
                           setEditName(costumer.name ?? "");
@@ -775,32 +755,28 @@ export function CostumerDetailsPage() {
                           setEditTwoHireClientSecret("");
                           setIsEditing(true);
                         }}
-                        className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                       >
                         Rediger kunde
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPendingAction("deactivate")}
-                        className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                      >
+                      </Button>
+                      <Button variant="danger" type="button" onClick={() => setPendingAction("deactivate")}>
                         Bloker kundens adgang
-                      </button>
+                      </Button>
                     </>
                   )}
-                </div>
+                </ButtonRow>
 
                 <hr className="border-brand-200" />
 
                 <div className="relative">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     disabled={scopeSwitch.isSwitching}
                     onClick={() => void scopeSwitch.switchAndNavigate("fleet", null, costumer.costumer_id, "/fleet-map")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
-                  </button>
+                  </Button>
                   <InlinePopup
                     visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
                     message={scopeSwitch.error ?? ""}
@@ -811,73 +787,53 @@ export function CostumerDetailsPage() {
                 <hr className="border-brand-200" />
 
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("afdelinger", null, costumer.costumer_id, "/department-details")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "afdelinger" && scopeSwitch.isSwitching ? "Vent…" : "AFDELINGER"}
-                    </button>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("afdelinger", null, costumer.costumer_id, "/department-details")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "afdelinger" && scopeSwitch.isSwitching ? "Vent…" : "AFDELINGER"}
+                  >
                     <CountBadge count={departmentsCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "afdelinger" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("koretojer", null, costumer.costumer_id, "/fleet-table")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("koretojer", null, costumer.costumer_id, "/fleet-table")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
+                  >
                     <CountBadge count={vehiclesCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "koretojer" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("brugere", null, costumer.costumer_id, "/department")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("brugere", null, costumer.costumer_id, "/department")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
+                  >
                     <CountBadge count={usersCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "brugere" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      onClick={() => setShowRapporterInfo((prev) => !prev)}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
-                    >
-                      RAPPORTER
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
                     {showRapporterInfo && (
-                      <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
+                      <ClickOutsideOverlay onClick={() => setShowRapporterInfo(false)} />
                     )}
                     <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
-                  </div>
+                  </DashboardTile>
                 </div>
               </>
             )}
-          </section>
-        </motion.main>
-      </div>
+          </PageSection>
+      </PageShell>
 
       {pendingAction && (
         <ConfirmDialog
@@ -923,6 +879,6 @@ export function CostumerDetailsPage() {
           }
         />
       )}
-    </div>
+    </>
   );
 }

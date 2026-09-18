@@ -33,7 +33,12 @@
 // Anvendelser saving each of its own edits immediately regardless.
 import { Fragment, useEffect, useState, type CSSProperties, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
-import { InlinePopup } from "./InlinePopup";
+import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
+import { FieldInfoButton } from "./FieldInfoButton";
+import { Button } from "./Button";
+import { ButtonRow } from "./ButtonRow";
+import { FieldRow } from "./FieldRow";
+import { TableMessageRow } from "./TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { invalidateIdentSettingsCache } from "../hooks/useIdentSettings";
 
@@ -401,11 +406,11 @@ export function StandardSettings({
             same page. A grid row's own columns are independent of every
             OTHER row, so that whole class of bug can't happen here. */}
         <div className="divide-y divide-brand-100 rounded-2xl">
-          {loading && (
-            <div className="px-2 py-3 text-center text-sm text-brand-500">Indlæser indstillinger…</div>
-          )}
+          {loading && <TableMessageRow as="div">Indlæser indstillinger…</TableMessageRow>}
           {!loading && loadError && (
-            <div className="px-2 py-3 text-center text-sm text-red-600">{loadError}</div>
+            <TableMessageRow as="div" variant="error">
+              {loadError}
+            </TableMessageRow>
           )}
           {!loading &&
             !loadError &&
@@ -423,18 +428,11 @@ export function StandardSettings({
                   <span className="min-w-0 break-words">{setting.label}:</span>
                   {setting.info && (
                     <>
-                      <button
-                        type="button"
-                        onClick={() => setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))}
-                        aria-label="Mere information"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                      >
-                        ?
-                      </button>
-                      {openInfoName === setting.name && (
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                      )}
-                      <InlinePopup visible={openInfoName === setting.name} message={setting.info} />
+                      <FieldInfoButton
+                        open={openInfoName === setting.name}
+                        onToggle={() => setOpenInfoName((prev) => (prev === setting.name ? null : setting.name))}
+                        message={setting.info}
+                      />
                     </>
                   )}
                 </div>
@@ -448,8 +446,7 @@ export function StandardSettings({
               }
 
               return (
-                <div key={setting.name} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                  {labelContent}
+                <FieldRow key={setting.name} variant="settings" rawLabel label={labelContent}>
                   {setting.inputType === "checkbox" ? (
                     <div className="flex items-center gap-2">
                       <input
@@ -462,7 +459,7 @@ export function StandardSettings({
                         disabled={readOnly || setting.readOnly || (deferSave ? isUpdating : savingName === setting.name)}
                         readOnly={readOnly || setting.readOnly}
                         onChange={readOnly || setting.readOnly ? undefined : (e) => void handleToggle(setting.name, e.target.checked)}
-                        className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                        className={CHECKBOX_CLASSNAME}
                       />
                       {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
                     </div>
@@ -512,31 +509,31 @@ export function StandardSettings({
                       {errorByName[setting.name] && <span className="text-xs text-red-600">{errorByName[setting.name]}</span>}
                     </div>
                   )}
-                </div>
+                </FieldRow>
               );
             })}
         </div>
       </div>
       {/* deferSave only — SettingsAdminPage.tsx's own table has no equivalent, since every edit there still saves immediately on change/blur/toggle. Disabled with nothing to do (no dirty rows, or a save already in flight) rather than hidden, so the row doesn't jump around as edits are made/reverted. Neither button acts directly anymore — each opens its own ConfirmDialog below instead (guarding both the discard and the actual write behind an explicit "Er du sikker?" step, same as every other confirmable action in this app). */}
       {deferSave && !readOnly && !loading && !loadError && (
-        <div className="grid grid-cols-2 gap-3">
-          <button
+        <ButtonRow>
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => setPendingRevert(true)}
             disabled={(dirtySettings.length === 0 && !extraDirty) || isUpdating}
-            className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Fortryd
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="secondary"
             type="button"
             onClick={() => setPendingUpdate(true)}
             disabled={(dirtySettings.length === 0 && !extraDirty) || isUpdating}
-            className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Opdater
-          </button>
-        </div>
+          </Button>
+        </ButtonRow>
       )}
 
       {pendingRevert && (

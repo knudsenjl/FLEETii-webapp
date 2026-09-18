@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
+import { BlockedBadge } from "../components/BlockedBadge";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
@@ -203,20 +209,8 @@ export function AllBookingsPage() {
   const identByVehicleId = useVehicleIdentLookup(bookings.map((b) => b.vehicle));
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-w-0 min-h-0 flex-1 flex-col"
-        >
-          <PageHeader
+    <PageShell minWidth0>
+      <PageHeader
             brugerFilter={{
               label: useUserIdent ? "Bruger-ID" : "Bruger",
               value: filterUser,
@@ -234,10 +228,10 @@ export function AllBookingsPage() {
             }}
           />
 
-          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
+                <SectionHeading>Aktive reservationer</SectionHeading>
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <button
@@ -266,8 +260,8 @@ export function AllBookingsPage() {
                     intrinsic width to the auto-layout algorithm), it absorbs
                     whatever space the others leave over, same end result as
                     the old table-fixed approach. */}
-                <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <table className={TABLE_CLASSNAME}>
+                  <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
@@ -277,21 +271,15 @@ export function AllBookingsPage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
-                      </tr>
+                      <TableMessageRow colSpan={4}>Indlæser reservationer…</TableMessageRow>
                     )}
                     {!loading && error && (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-red-600">{error}</td>
-                      </tr>
+                      <TableMessageRow colSpan={4} variant="error">{error}</TableMessageRow>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {hasActiveFilter ? "Ingen reservationer matcher filteret." : "Ingen aktive reservationer."}
-                        </td>
-                      </tr>
+                      <TableMessageRow colSpan={4}>
+                        {hasActiveFilter ? "Ingen reservationer matcher filteret." : "Ingen aktive reservationer."}
+                      </TableMessageRow>
                     )}
                     {!loading &&
                       !error &&
@@ -330,9 +318,7 @@ export function AllBookingsPage() {
                                 useVehicleIdent,
                               )}
                               {identByVehicleId[booking.vehicle]?.blocked && (
-                                <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                  Blokeret
-                                </span>
+                                <BlockedBadge className="ml-2" />
                               )}
                             </td>
                             <td
@@ -350,18 +336,17 @@ export function AllBookingsPage() {
               </div>
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="w-full"
                 >
                   Opret reservation
-                </button>
+                </Button>
               </div>
             </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+          </PageSection>
+    </PageShell>
   );
 }

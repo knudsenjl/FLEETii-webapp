@@ -8,6 +8,7 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
+    "audit:classnames": "node scripts/find-duplicate-classnames.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

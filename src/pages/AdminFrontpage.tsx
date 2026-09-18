@@ -3,11 +3,19 @@
 // departments fetch and the sysadm-only costumers/installations
 // fetches below, just links to every other admin-only section of the app.
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { BlockedBadge } from "../components/BlockedBadge";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
+import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
+import { DashboardTile } from "../components/DashboardTile";
+import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
@@ -212,20 +220,8 @@ export function AdminFrontpage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          {/*
+    <PageShell>
+      {/*
             hideAfdeling/kundeNavigate (sysadm only): the sysadm branch of
             this page (costumer list + pendingInstallationsCount above) has
             no Afdeling concept at all and never reads costumerId either
@@ -269,33 +265,36 @@ export function AdminFrontpage() {
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <PageSection>
+            <PageSectionBody>
               <div className="flex flex-col gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/reservation")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="w-full"
                 >
                   Opret reservation
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/allbookings")}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                  className="w-full"
                 >
                   Reservationer
-                </button>
+                </Button>
                 {!isDepartmentAdmin(profile?.role) && (
                   <>
                     <hr className="border-brand-200" />
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => navigate("/fleet-map")}
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                      className="w-full"
                     >
                       Flådestyring
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>
@@ -306,56 +305,29 @@ export function AdminFrontpage() {
 
                   <div className="flex flex-col gap-3">
                     <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                      <button
+                      <Button
+                        variant="secondary"
                         type="button"
                         onClick={() => navigate("/fleet-map")}
-                        className="col-span-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                        className="col-span-2"
                       >
                         Flådestyring
-                      </button>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={handleOpenDepartments}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                        >
-                          AFDELINGER
-                        </button>
+                      </Button>
+                      <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
                         <CountBadge count={departmentsCount} />
-                      </div>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={() => goToVehiclesOrUsers("/fleet-table")}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                        >
-                          KØRETØJER
-                        </button>
+                      </DashboardTile>
+                      <DashboardTile onClick={() => goToVehiclesOrUsers("/fleet-table")} label="KØRETØJER">
                         <CountBadge count={vehiclesCount} />
-                      </div>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={() => goToVehiclesOrUsers("/department")}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100"
-                        >
-                          BRUGERE
-                        </button>
+                      </DashboardTile>
+                      <DashboardTile onClick={() => goToVehiclesOrUsers("/department")} label="BRUGERE">
                         <CountBadge count={usersCount} />
-                      </div>
-                      <div className="relative aspect-square w-28">
-                        <button
-                          type="button"
-                          onClick={() => setShowRapporterInfo((prev) => !prev)}
-                          className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 opacity-50 transition hover:bg-brand-100"
-                        >
-                          RAPPORTER
-                        </button>
+                      </DashboardTile>
+                      <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
                         {showRapporterInfo && (
-                          <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
+                          <ClickOutsideOverlay onClick={() => setShowRapporterInfo(false)} />
                         )}
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
-                      </div>
+                      </DashboardTile>
                     </div>
                   </div>
                 </>
@@ -366,8 +338,8 @@ export function AdminFrontpage() {
                   <hr className="border-brand-200" />
 
                   <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                    <table className="w-full border-collapse text-[0.7rem]">
-                      <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                    <table className={TABLE_CLASSNAME}>
+                      <thead className={STICKY_THEAD_CLASSNAME}>
                         <tr>
                           <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">
                             <div className="flex items-center justify-between gap-2">
@@ -390,19 +362,13 @@ export function AdminFrontpage() {
                       </thead>
                       <tbody className="divide-y divide-brand-100 bg-white">
                         {costumersLoading && (
-                          <tr>
-                            <td className="px-2 py-3 text-center text-brand-500">Indlæser kunder…</td>
-                          </tr>
+                          <TableMessageRow>Indlæser kunder…</TableMessageRow>
                         )}
                         {!costumersLoading && costumersError && (
-                          <tr>
-                            <td className="px-2 py-3 text-center text-red-600">{costumersError}</td>
-                          </tr>
+                          <TableMessageRow variant="error">{costumersError}</TableMessageRow>
                         )}
                         {!costumersLoading && !costumersError && costumers.length === 0 && (
-                          <tr>
-                            <td className="px-2 py-3 text-center text-brand-500">Ingen kunder fundet.</td>
-                          </tr>
+                          <TableMessageRow>Ingen kunder fundet.</TableMessageRow>
                         )}
                         {!costumersLoading &&
                           !costumersError &&
@@ -433,9 +399,7 @@ export function AdminFrontpage() {
                                     <span>{costumer.name ?? "—"}</span>
                                     <div className="flex shrink-0 items-center gap-2">
                                       {costumer.deactivated_at && (
-                                        <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                          Adgang blokeret
-                                        </span>
+                                        <BlockedBadge>Adgang blokeret</BlockedBadge>
                                       )}
                                       {!costumer.has_twohire_credentials && (
                                         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
@@ -454,10 +418,11 @@ export function AdminFrontpage() {
 
                   <hr className="border-brand-200" />
 
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => navigate("/sysadm-installations")}
-                    className="relative w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="relative w-full"
                   >
                     INSTALLATIONER
                     {Boolean(pendingInstallationsCount) && (
@@ -465,21 +430,20 @@ export function AdminFrontpage() {
                         {pendingInstallationsCount}
                       </span>
                     )}
-                  </button>
+                  </Button>
 
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => navigate("/2hire-command")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="w-full"
                   >
                     2HIRE KOMMANDO
-                  </button>
+                  </Button>
                 </div>
               )}
-            </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+            </PageSectionBody>
+          </PageSection>
+    </PageShell>
   );
 }

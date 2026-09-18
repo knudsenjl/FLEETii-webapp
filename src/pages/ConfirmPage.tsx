@@ -1,9 +1,13 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { Button } from "../components/Button";
+import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
+import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import {
   BOOKING_ID_COLUMN,
@@ -219,26 +223,14 @@ export function ConfirmPage() {
   ];
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
+    <PageShell>
+      <PageHeader />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
-
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">
+          <PageSection>
+            <PageSectionBody>
+              <SectionHeading>
                 {editingBookingId ? "Rediger reservation" : "Opret reservation"}
-              </h2>
+              </SectionHeading>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">
@@ -254,27 +246,27 @@ export function ConfirmPage() {
               {error && <p className="text-sm text-red-600">{error}</p>}
 
               <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => navigate("/available", { state })}
                   disabled={isSubmitting}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   Annuller
-                </button>
-                <button
+                </Button>
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => void handleConfirm()}
                   disabled={isSubmitting}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   {isSubmitting ? "Bekræfter…" : editingBookingId ? "Bekræft ændring" : "Bekræft reservation"}
-                </button>
+                </Button>
               </div>
-            </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+            </PageSectionBody>
+          </PageSection>
+    </PageShell>
   );
 }
