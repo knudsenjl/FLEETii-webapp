@@ -11,9 +11,13 @@ import { InlinePopup } from "../components/InlinePopup";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
+import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { EyeGlyph } from "../components/EyeGlyph";
 import { PageSection } from "../components/PageSection";
 import { DashboardTile } from "../components/DashboardTile";
+import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
+import { ButtonRow } from "../components/ButtonRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing } from "../lib/textNormalization";
@@ -568,9 +572,9 @@ export function CostumerDetailsPage() {
           />
 
           <PageSection className="gap-4 overflow-y-auto">
-            <h2 className="text-xl font-semibold text-brand-800">
+            <SectionHeading>
               {isEditing ? `Rediger ${costumer.name ?? "—"}` : (costumer.name ?? "—")}
-            </h2>
+            </SectionHeading>
 
             {isEditing ? (
               <>
@@ -610,7 +614,7 @@ export function CostumerDetailsPage() {
                           value={editTwoHireClientId}
                           onChange={(e) => setEditTwoHireClientId(e.target.value)}
                           placeholder="Indtast 2hire Client ID her"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
                     </FieldRow>
@@ -626,7 +630,7 @@ export function CostumerDetailsPage() {
                           value={editTwoHireClientSecret}
                           onChange={(e) => setEditTwoHireClientSecret(e.target.value)}
                           placeholder="Indtast 2hire Client Secret her"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
                     </FieldRow>
@@ -638,7 +642,7 @@ export function CostumerDetailsPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   <Button variant="secondary" type="button" onClick={() => setPendingAction("update")} disabled={!canSubmitEdit}>
                     Opdater kunde
                   </Button>
@@ -661,7 +665,7 @@ export function CostumerDetailsPage() {
                   >
                     Fortryd
                   </Button>
-                </div>
+                </ButtonRow>
               </>
             ) : (
               <>
@@ -706,7 +710,7 @@ export function CostumerDetailsPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   {deactivatedAt ? (
                     <>
                       {/* Rediger kunde is intentionally hidden while access
@@ -759,7 +763,7 @@ export function CostumerDetailsPage() {
                       </Button>
                     </>
                   )}
-                </div>
+                </ButtonRow>
 
                 <hr className="border-brand-200" />
 
@@ -821,7 +825,7 @@ export function CostumerDetailsPage() {
                   </DashboardTile>
                   <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
                     {showRapporterInfo && (
-                      <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
+                      <ClickOutsideOverlay onClick={() => setShowRapporterInfo(false)} />
                     )}
                     <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                   </DashboardTile>

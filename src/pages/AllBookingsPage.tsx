@@ -10,6 +10,8 @@ import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { useTimedFlag } from "../hooks/useTimedFlag";
@@ -229,7 +231,7 @@ export function AllBookingsPage() {
           <PageSection minWidth0>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">Aktive reservationer</h2>
+                <SectionHeading>Aktive reservationer</SectionHeading>
                 <div className="flex items-center gap-2">
                   <div className="relative">
                     <button
@@ -269,21 +271,15 @@ export function AllBookingsPage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser reservationer…</td>
-                      </tr>
+                      <TableMessageRow colSpan={4}>Indlæser reservationer…</TableMessageRow>
                     )}
                     {!loading && error && (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-red-600">{error}</td>
-                      </tr>
+                      <TableMessageRow colSpan={4} variant="error">{error}</TableMessageRow>
                     )}
                     {!loading && !error && filteredBookings.length === 0 && (
-                      <tr>
-                        <td colSpan={4} className="px-2 py-3 text-center text-brand-500">
-                          {hasActiveFilter ? "Ingen reservationer matcher filteret." : "Ingen aktive reservationer."}
-                        </td>
-                      </tr>
+                      <TableMessageRow colSpan={4}>
+                        {hasActiveFilter ? "Ingen reservationer matcher filteret." : "Ingen aktive reservationer."}
+                      </TableMessageRow>
                     )}
                     {!loading &&
                       !error &&

@@ -10,6 +10,7 @@ import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { formatVehicleIdentLabel, toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
@@ -283,9 +284,9 @@ export function FleetManagementPage() {
 
             <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-2 space-y-4">
-                <h2 className="text-xl font-semibold text-brand-800">
+                <SectionHeading>
                   Flådestyring{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
-                </h2>
+                </SectionHeading>
                 <div className="flex shrink-0 items-center gap-2">
                   {vehiclesWithoutGps.length > 0 && (
                     // z-[1001] — Leaflet's own controls/panes reach z-index 1000 (see the empty-notice's z-[1000] further down); this div otherwise has no z-index of its own, so its InlinePopup would lose to Leaflet's much higher values in the shared ambient stacking context and render underneath the map.

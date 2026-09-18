@@ -13,6 +13,9 @@ import { PageHeader } from "./PageHeader";
 import { PageShell } from "./PageShell";
 import { Button } from "./Button";
 import { FieldRow } from "./FieldRow";
+import { RequiredMark } from "./RequiredMark";
+import { SectionHeading } from "./SectionHeading";
+import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -137,7 +140,7 @@ export function BulkImportPage({
       <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">{pageTitle}</h2>
+            <SectionHeading>{pageTitle}</SectionHeading>
             <p className="text-sm text-brand-800">
               Her kan du oprette en række {nounPlural.toLowerCase()} på én gang ved at give oplysninger om de nye{" "}
               {nounPlural.toLowerCase()} i en fil, enten i{" "}
@@ -175,13 +178,13 @@ export function BulkImportPage({
               // sysadm-only Kunde picker — the two import buttons
               // below stay disabled until one's chosen: there's no
               // meaningful default costumer for a platform-wide role.
-              <FieldRow label={<>Kunde: <span className="ml-0.5 text-red-600">*</span></>}>
+              <FieldRow label={<>Kunde: <RequiredMark /></>}>
                 <select
                   required
                   aria-required="true"
                   value={filterCostumerId}
                   onChange={(e) => setFilterCostumerId(e.target.value)}
-                  className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                  className={TEXT_INPUT_CLASSNAME}
                 >
                   <option value="" className="bg-brand-100">Vælg kunde:</option>
                   {costumerOptions.map((costumer) => (

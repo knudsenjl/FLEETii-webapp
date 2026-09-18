@@ -37,7 +37,7 @@
 // indstillingerSettings and the Afdelingsoplysninger state below.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
-import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
@@ -273,7 +273,7 @@ export function SettingsAdminPage() {
                         type="text"
                         value={deptAddress}
                         onChange={(e) => setDeptAddress(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </SettingsRow>
                     {(

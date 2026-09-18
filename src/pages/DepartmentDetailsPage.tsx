@@ -7,11 +7,14 @@ import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { DashboardTile } from "../components/DashboardTile";
 import { Button } from "../components/Button";
+import { ButtonRow } from "../components/ButtonRow";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { FieldList } from "../components/FieldList";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
 import { InlinePopup } from "../components/InlinePopup";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { useScopeSwitchGroup } from "../hooks/useScopeSwitchGroup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useCostumerQuickJumpOptions } from "../hooks/useCostumerQuickJumpOptions";
@@ -387,7 +390,7 @@ export function DepartmentDetailsPage() {
           />
 
           <PageSection className="gap-4 overflow-y-auto">
-            <h2 className="text-xl font-semibold text-brand-800">Afdelinger hos {costumerName ?? "—"}</h2>
+            <SectionHeading>Afdelinger hos {costumerName ?? "—"}</SectionHeading>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-sm">
@@ -399,25 +402,13 @@ export function DepartmentDetailsPage() {
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {departmentsLoading && (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                        Indlæser…
-                      </td>
-                    </tr>
+                    <TableMessageRow colSpan={2}>Indlæser…</TableMessageRow>
                   )}
                   {!departmentsLoading && departmentsError && (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-3 text-center text-red-600">
-                        {departmentsError}
-                      </td>
-                    </tr>
+                    <TableMessageRow colSpan={2} variant="error">{departmentsError}</TableMessageRow>
                   )}
                   {!departmentsLoading && !departmentsError && departments.length === 0 && (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                        Ingen afdelinger fundet.
-                      </td>
-                    </tr>
+                    <TableMessageRow colSpan={2}>Ingen afdelinger fundet.</TableMessageRow>
                   )}
                   {!departmentsLoading &&
                     !departmentsError &&
@@ -462,7 +453,7 @@ export function DepartmentDetailsPage() {
                 {departmentError && <p className="text-sm text-red-600">{departmentError}</p>}
 
                 {isAddingDepartment ? (
-                  <div className="grid grid-cols-2 gap-3">
+                  <ButtonRow>
                     <Button
                       variant="secondary"
                       type="button"
@@ -481,9 +472,9 @@ export function DepartmentDetailsPage() {
                     >
                       Annuller
                     </Button>
-                  </div>
+                  </ButtonRow>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
+                  <ButtonRow>
                     <Button
                       variant="secondary"
                       type="button"
@@ -503,7 +494,7 @@ export function DepartmentDetailsPage() {
                     >
                       Slet afdeling
                     </Button>
-                  </div>
+                  </ButtonRow>
                 )}
               </>
             )}

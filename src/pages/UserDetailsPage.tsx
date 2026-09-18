@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
-import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
+import { RequiredMark } from "../components/RequiredMark";
+import { ButtonRow } from "../components/ButtonRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { FieldInfoButton } from "../components/FieldInfoButton";
@@ -858,7 +860,7 @@ export function UserDetailsPage() {
                           value={userIdent}
                           onChange={(e) => setUserIdent(e.target.value)}
                           placeholder="valgfri — bruger E-mail hvis tom"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
                     </SettingsRow>
@@ -889,7 +891,7 @@ export function UserDetailsPage() {
                   />
                   <SettingsRow>
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Rolle: {!isSelf && <span className="ml-0.5 text-red-600">*</span>}
+                      Rolle: {!isSelf && <RequiredMark />}
                     </label>
                     {isSelf ? (
                       <input
@@ -905,7 +907,7 @@ export function UserDetailsPage() {
                         aria-required="true"
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       >
                         <option value="" className="bg-brand-100">Vælg rolle:</option>
                         <option value="user">Bruger</option>
@@ -1000,7 +1002,7 @@ export function UserDetailsPage() {
                           <label className="text-sm font-medium text-brand-700">
                             Hjemmeafdeling:{" "}
                             {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
-                              <span className="ml-0.5 text-red-600">*</span>
+                              <RequiredMark />
                             )}
                           </label>
                           <FieldInfoButton
@@ -1034,7 +1036,7 @@ export function UserDetailsPage() {
                             aria-required="true"
                             value={department}
                             onChange={(e) => setDepartment(e.target.value)}
-                            className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            className={TEXT_INPUT_CLASSNAME}
                           >
                             <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
                             {departmentOptions
@@ -1154,7 +1156,7 @@ export function UserDetailsPage() {
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
               {user && !isSelf ? (
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   <Button
                     variant="secondary"
                     type="button"
@@ -1201,9 +1203,9 @@ export function UserDetailsPage() {
                       />
                     </div>
                   )}
-                </div>
+                </ButtonRow>
               ) : !user ? (
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   <Button
                     variant="secondary"
                     type="button"
@@ -1218,7 +1220,7 @@ export function UserDetailsPage() {
                   <Button variant="secondary" type="button" onClick={() => setPendingAction("close")}>
                     Fortryd
                   </Button>
-                </div>
+                </ButtonRow>
               ) : null}
             </PageSectionBody>
           </PageSection>

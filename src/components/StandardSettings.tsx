@@ -36,6 +36,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { FieldInfoButton } from "./FieldInfoButton";
 import { Button } from "./Button";
+import { ButtonRow } from "./ButtonRow";
 import { SettingsRow } from "./SettingsRow";
 import { supabase } from "../lib/supabase";
 import { invalidateIdentSettingsCache } from "../hooks/useIdentSettings";
@@ -515,7 +516,7 @@ export function StandardSettings({
       </div>
       {/* deferSave only — SettingsAdminPage.tsx's own table has no equivalent, since every edit there still saves immediately on change/blur/toggle. Disabled with nothing to do (no dirty rows, or a save already in flight) rather than hidden, so the row doesn't jump around as edits are made/reverted. Neither button acts directly anymore — each opens its own ConfirmDialog below instead (guarding both the discard and the actual write behind an explicit "Er du sikker?" step, same as every other confirmable action in this app). */}
       {deferSave && !readOnly && !loading && !loadError && (
-        <div className="grid grid-cols-2 gap-3">
+        <ButtonRow>
           <Button
             variant="secondary"
             type="button"
@@ -532,7 +533,7 @@ export function StandardSettings({
           >
             Opdater
           </Button>
-        </div>
+        </ButtonRow>
       )}
 
       {pendingRevert && (

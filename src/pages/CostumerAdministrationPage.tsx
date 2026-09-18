@@ -14,6 +14,8 @@ import { BlockedBadge } from "../components/BlockedBadge";
 import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { useAuth } from "../contexts/AuthContext";
 import { useScopeSwitch } from "../hooks/useScopeSwitch";
 import { supabase } from "../lib/supabase";
@@ -108,7 +110,7 @@ export function CostumerAdministrationPage() {
           />
 
           <section className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
+            <SectionHeading>Administration af kunder</SectionHeading>
             <InlinePopup visible={Boolean(resetScopeError)} message={resetScopeError ?? ""} align="right" />
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
@@ -120,19 +122,13 @@ export function CostumerAdministrationPage() {
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {loading && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-brand-500">Indlæser kunder…</td>
-                    </tr>
+                    <TableMessageRow>Indlæser kunder…</TableMessageRow>
                   )}
                   {!loading && error && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-red-600">{error}</td>
-                    </tr>
+                    <TableMessageRow variant="error">{error}</TableMessageRow>
                   )}
                   {!loading && !error && costumers.length === 0 && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-brand-500">Ingen kunder fundet.</td>
-                    </tr>
+                    <TableMessageRow>Ingen kunder fundet.</TableMessageRow>
                   )}
                   {!loading &&
                     !error &&

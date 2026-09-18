@@ -8,6 +8,8 @@ import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
+import { SectionHeading } from "../components/SectionHeading";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { supabase } from "../lib/supabase";
@@ -165,7 +167,7 @@ export function AvailablePage() {
           <PageSection minWidth0>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-brand-800">Ledige køretøjer</h2>
+                <SectionHeading>Ledige køretøjer</SectionHeading>
                 {reservationStart && reservationEnd && (
                   <span className="text-[0.7rem] text-brand-600">
                     Periode: {formatDanishDateTimeShort(reservationStart)} -{" "}
@@ -187,19 +189,13 @@ export function AvailablePage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loadingBookings && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Henter ledige køretøjer…</td>
-                      </tr>
+                      <TableMessageRow colSpan={3}>Henter ledige køretøjer…</TableMessageRow>
                     )}
                     {!loadingBookings && bookingsError && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{bookingsError}</td>
-                      </tr>
+                      <TableMessageRow colSpan={3} variant="error">{bookingsError}</TableMessageRow>
                     )}
                     {!loadingBookings && !bookingsError && availableVehicles.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Ingen ledige køretøjer.</td>
-                      </tr>
+                      <TableMessageRow colSpan={3}>Ingen ledige køretøjer.</TableMessageRow>
                     )}
                     {!loadingBookings &&
                       !bookingsError &&

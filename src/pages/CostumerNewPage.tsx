@@ -6,9 +6,13 @@ import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { FieldRow } from "../components/FieldRow";
+import { RequiredMark } from "../components/RequiredMark";
+import { ButtonRow } from "../components/ButtonRow";
 import { FieldList } from "../components/FieldList";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { SectionHeading } from "../components/SectionHeading";
+import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing, stripNumberSpacing } from "../lib/textNormalization";
@@ -278,9 +282,9 @@ export function CostumerNewPage() {
           <PageHeader />
 
           <PageSection className="gap-4 overflow-y-auto">
-            <h2 className="text-xl font-semibold text-brand-800">
+            <SectionHeading>
               {step === "success" ? "Kunde registreret" : step === "register" ? "Registrer kunde i 2hire" : "Opret kunde"}
-            </h2>
+            </SectionHeading>
 
             {step === "success" ? (
               <>
@@ -318,7 +322,7 @@ export function CostumerNewPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   <Button
                     variant="secondary"
                     type="button"
@@ -330,12 +334,12 @@ export function CostumerNewPage() {
                   <Button variant="secondary" type="button" onClick={() => setPendingAction("discardDraft")}>
                     Fortryd
                   </Button>
-                </div>
+                </ButtonRow>
               </>
             ) : (
               <>
                 <FieldList>
-                    <FieldRow label={<>CVR: <span className="ml-0.5 text-red-600">*</span></>}>
+                    <FieldRow label={<>CVR: <RequiredMark /></>}>
                       <div className="flex items-center gap-1.5">
                         <input
                           type="text"
@@ -343,7 +347,7 @@ export function CostumerNewPage() {
                           aria-required="true"
                           value={cvr}
                           onChange={(e) => setCvr(e.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={`min-w-0 flex-1 ${TEXT_INPUT_CLASSNAME}`}
                         />
                         <button
                           type="button"
@@ -381,7 +385,7 @@ export function CostumerNewPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
+                <ButtonRow>
                   <Button
                     variant="secondary"
                     type="button"
@@ -393,7 +397,7 @@ export function CostumerNewPage() {
                   <Button variant="secondary" type="button" onClick={() => setPendingAction("closeCreate")}>
                     Fortryd
                   </Button>
-                </div>
+                </ButtonRow>
               </>
             )}
           </PageSection>

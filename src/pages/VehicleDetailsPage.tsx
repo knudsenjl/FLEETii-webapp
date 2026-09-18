@@ -18,6 +18,7 @@ import { PageSectionBody } from "../components/PageSectionBody";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
 import { EyeGlyph } from "../components/EyeGlyph";
+import { SectionHeading } from "../components/SectionHeading";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
@@ -551,7 +552,7 @@ export function VehicleDetailsPage() {
           <PageSection>
             <PageSectionBody>
               <div className="flex shrink-0 items-center justify-between">
-                <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
+                <SectionHeading>Køretøjsdetaljer</SectionHeading>
                 {/* Driving-vehicle icon (only while 2hire's trip_detected is currently true) + red "!" health button — both admin/sysadm-only, right-aligned next to this heading. Replaces the old standalone Status row (removed 2026-09-11) as the header-level admin health summary for this vehicle — see lib/vehicleHealth.ts, shared with VehiclesPage.tsx's fleet table. */}
                 {isAdmin && (
                   <span className="flex items-center gap-1.5">

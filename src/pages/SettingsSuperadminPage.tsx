@@ -7,6 +7,7 @@
 // AdminFrontpage/CostumerAdministrationPage, no content yet.
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { SectionHeading } from "../components/SectionHeading";
 
 /** Settings page for role "sysadm". */
 export function SettingsSuperadminPage() {
@@ -15,7 +16,7 @@ export function SettingsSuperadminPage() {
       <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Indstillinger</h2>
+            <SectionHeading>Indstillinger</SectionHeading>
             <p className="text-sm text-red-600">Denne side er ikke designet endnu.</p>
             <p className="text-sm text-red-600">
               Denne side skal indeholde de indstillinger, der er nødvendige for Robert.

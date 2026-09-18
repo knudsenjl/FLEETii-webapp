@@ -17,6 +17,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
+import { SectionHeading } from "../components/SectionHeading";
 
 /** The shape 2hire-raw-command.mts always resolves to on a 200 — either this or {error} (see handleExecute). */
 type RawCommandResult = { requestUrl: string; status: number; ok: boolean; result: unknown };
@@ -112,9 +113,9 @@ export function TwoHireCommandPage() {
 
           <PageSection className="gap-4 overflow-y-auto">
             <div>
-              <h2 className="text-xl font-semibold text-brand-800">
+              <SectionHeading>
                 2hire kommando (Kun til testformål - fjernes når test er overstået)
-              </h2>
+              </SectionHeading>
               <p className="mt-1 text-sm text-brand-600">
                 Skriv en 2hire-forespørgsel som "METODE /sti", f.eks.{" "}
                 <code className="rounded bg-brand-50 px-1 py-0.5 text-xs">POST /api/v1/vehicle/{"{AB12345}"}/command/generic/locate</code>.
@@ -181,7 +182,7 @@ export function TwoHireCommandPage() {
 
             <div className="mt-4 flex flex-col gap-4 border-t border-brand-100 pt-4">
               <div>
-                <h2 className="text-xl font-semibold text-brand-800">Signal-backfill</h2>
+                <SectionHeading>Signal-backfill</SectionHeading>
                 <p className="mt-1 text-sm text-brand-600">
                   Engangsopgave: henter distance_covered/autonomy_percentage/autonomy_meters/position/online
                   (generic) og trip_detected (specific) direkte fra 2hire for ethvert køretøj, der endnu ikke har en

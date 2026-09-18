@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { FieldRow } from "../components/FieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel } from "../lib/bookings";
@@ -269,7 +270,7 @@ export function VehicleDeletePage() {
       <PageHeader />
 
           <PageSection className="gap-4 overflow-y-auto">
-            <h2 className="text-xl font-semibold text-brand-800">Slet køretøj</h2>
+            <SectionHeading>Slet køretøj</SectionHeading>
 
             <div className="rounded-2xl border border-brand-100">
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">

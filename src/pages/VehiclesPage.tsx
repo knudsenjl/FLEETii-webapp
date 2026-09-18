@@ -11,6 +11,8 @@ import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
+import { SectionHeading } from "../components/SectionHeading";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
@@ -172,10 +174,10 @@ export function VehiclesPage() {
           <PageSection minWidth0>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">
+                <SectionHeading>
                   Køretøjer{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                   {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
-                </h2>
+                </SectionHeading>
               </div>
 
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
@@ -188,15 +190,13 @@ export function VehiclesPage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {filteredVehicles.length === 0 && (
-                      <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                          {!targetCostumerId && !isSysadm
-                            ? "Ingen kunde valgt."
-                            : filterPlate
-                              ? "Ingen køretøjer matcher filteret."
-                              : "Ingen køretøjer fundet."}
-                        </td>
-                      </tr>
+                      <TableMessageRow colSpan={2}>
+                        {!targetCostumerId && !isSysadm
+                          ? "Ingen kunde valgt."
+                          : filterPlate
+                            ? "Ingen køretøjer matcher filteret."
+                            : "Ingen køretøjer fundet."}
+                      </TableMessageRow>
                     )}
                     {filteredVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;

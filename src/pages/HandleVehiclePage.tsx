@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
-import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { PageShell } from "../components/PageShell";
 import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
@@ -9,6 +9,7 @@ import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
 import { PageSectionBody } from "../components/PageSectionBody";
+import { SectionHeading } from "../components/SectionHeading";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
@@ -498,7 +499,7 @@ export function HandleVehiclePage() {
 
           <PageSection>
             <PageSectionBody>
-              <h2 className="text-xl font-semibold text-brand-800">Køretøj detaljer</h2>
+              <SectionHeading>Køretøj detaljer</SectionHeading>
 
               {loading && <p className="text-sm text-brand-500">Indlæser…</p>}
               {!loading && loadError && <p className="text-sm text-red-600">{loadError}</p>}
@@ -514,7 +515,7 @@ export function HandleVehiclePage() {
                           value={vehicleIdent}
                           onChange={(e) => setVehicleIdent(e.target.value)}
                           placeholder="valgfri — bruger Nummerplade hvis tom"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       </div>
                     )}
@@ -524,7 +525,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={plate}
                         onChange={(e) => setPlate(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
@@ -533,7 +534,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={make}
                         onChange={(e) => setMake(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
@@ -542,7 +543,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={model}
                         onChange={(e) => setModel(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
@@ -551,7 +552,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={year}
                         onChange={(e) => setYear(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     {readOnlyRows.map(([label, value]) => (
@@ -567,7 +568,7 @@ export function HandleVehiclePage() {
                         <select
                           value={drivmiddel}
                           onChange={(e) => setDrivmiddel(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         >
                           {DRIVMIDDEL_OPTIONS.map((option) => (
                             <option key={option} value={option}>
@@ -655,7 +656,7 @@ export function HandleVehiclePage() {
                             <select
                               value={homeDepartmentId ?? ""}
                               onChange={(e) => setHomeDepartmentId(e.target.value || null)}
-                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                              className={TEXT_INPUT_CLASSNAME}
                             >
                               <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
                               {departmentOptions

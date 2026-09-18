@@ -14,6 +14,8 @@ import { CountBadge } from "../components/CountBadge";
 import { PageSection } from "../components/PageSection";
 import { PageSectionBody } from "../components/PageSectionBody";
 import { DashboardTile } from "../components/DashboardTile";
+import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { supabase } from "../lib/supabase";
@@ -322,7 +324,7 @@ export function AdminFrontpage() {
                       </DashboardTile>
                       <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
                         {showRapporterInfo && (
-                          <div className="fixed inset-0 z-10" onClick={() => setShowRapporterInfo(false)} />
+                          <ClickOutsideOverlay onClick={() => setShowRapporterInfo(false)} />
                         )}
                         <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                       </DashboardTile>
@@ -360,19 +362,13 @@ export function AdminFrontpage() {
                       </thead>
                       <tbody className="divide-y divide-brand-100 bg-white">
                         {costumersLoading && (
-                          <tr>
-                            <td className="px-2 py-3 text-center text-brand-500">Indlæser kunder…</td>
-                          </tr>
+                          <TableMessageRow>Indlæser kunder…</TableMessageRow>
                         )}
                         {!costumersLoading && costumersError && (
-                          <tr>
-                            <td className="px-2 py-3 text-center text-red-600">{costumersError}</td>
-                          </tr>
+                          <TableMessageRow variant="error">{costumersError}</TableMessageRow>
                         )}
                         {!costumersLoading && !costumersError && costumers.length === 0 && (
-                          <tr>
-                            <td className="px-2 py-3 text-center text-brand-500">Ingen kunder fundet.</td>
-                          </tr>
+                          <TableMessageRow>Ingen kunder fundet.</TableMessageRow>
                         )}
                         {!costumersLoading &&
                           !costumersError &&

@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import { Modal } from "./Modal";
 import { Button } from "./Button";
+import { ButtonRow } from "./ButtonRow";
 
 /** Props for ConfirmDialog. Only message/onCancel/onConfirm are required — labels and pending state are opt-in for callers that need them. */
 interface ConfirmDialogProps {
@@ -39,14 +40,14 @@ export function ConfirmDialog({
     <Modal>
       <p className="text-sm font-medium text-brand-800">{message}</p>
       {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
-      <div className="mt-4 grid grid-cols-2 gap-3">
+      <ButtonRow className="mt-4">
         <Button variant="secondary" type="button" onClick={onCancel} disabled={isPending}>
           {cancelLabel}
         </Button>
         <Button variant="secondary" type="button" onClick={onConfirm} disabled={isPending || confirmDisabled}>
           {isPending && confirmPendingLabel ? confirmPendingLabel : confirmLabel}
         </Button>
-      </div>
+      </ButtonRow>
     </Modal>
   );
 }

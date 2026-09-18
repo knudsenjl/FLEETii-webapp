@@ -6,10 +6,12 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { FieldList } from "../components/FieldList";
+import { RequiredMark } from "../components/RequiredMark";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
 import { PageSectionBody } from "../components/PageSectionBody";
+import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import type { EditingBooking } from "../lib/bookings";
 import {
@@ -591,9 +593,9 @@ export function ReservationPage() {
 
           <PageSection>
             <PageSectionBody>
-              <h2 className="text-xl font-semibold text-brand-800">
+              <SectionHeading>
                 {editing ? "Rediger reservation" : "Opret reservation"}
-              </h2>
+              </SectionHeading>
 
               <FieldList>
                   {isSysadm && (
@@ -603,7 +605,7 @@ export function ReservationPage() {
                     // a scoped vehicle list.
                     <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                       <label className="flex items-center text-sm font-medium text-brand-700">
-                        Kunde/afdeling <span className="ml-0.5 text-red-600">*</span>
+                        Kunde/afdeling <RequiredMark />
                       </label>
                       <select
                         value={selectedDepartmentId}
@@ -630,7 +632,7 @@ export function ReservationPage() {
                   )}
                   <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                     <label className="flex items-center text-sm font-medium text-brand-700">
-                      Bruger {isAdmin && <span className="ml-0.5 text-red-600">*</span>}
+                      Bruger {isAdmin && <RequiredMark />}
                     </label>
                     {isAdmin ? (
                       <select
@@ -666,7 +668,7 @@ export function ReservationPage() {
                   <div>
                     <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
                       <label className="flex items-center text-sm font-medium text-brand-700">
-                        Anvendelse <span className="ml-0.5 text-red-600">*</span>
+                        Anvendelse <RequiredMark />
                       </label>
                       {/* text-[16px], not text-sm — every role (incl. plain "user" on a phone) reaches this field, so it needs the same iOS-zoom-on-focus protection as LoginPage.tsx's own inputs (see its comment) — unlike the sysadm-only Kunde/afdeling and admin-only Bruger <select>s above, which stay text-sm since a Bruger never focuses those. */}
                       <select
@@ -687,7 +689,7 @@ export function ReservationPage() {
                     {anvendelseOption === ANDET_VALUE && (
                       <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
                         <label className="flex items-center justify-end text-sm font-medium text-brand-700">
-                          Angiv årsag <span className="ml-0.5 text-red-600">*</span>
+                          Angiv årsag <RequiredMark />
                         </label>
                         {/* text-[16px] — same iOS-zoom reasoning as the Anvendelse <select> above. */}
                         <input

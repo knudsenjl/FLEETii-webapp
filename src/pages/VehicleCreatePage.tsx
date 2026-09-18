@@ -7,11 +7,13 @@ import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { FieldRow } from "../components/FieldRow";
+import { ButtonRow } from "../components/ButtonRow";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { InlinePopup } from "../components/InlinePopup";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { QrScanButton } from "../components/QrScanButton";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS, formatVehicleIdentLabel } from "../lib/bookings";
@@ -650,7 +652,7 @@ export function VehicleCreatePage() {
           <PageHeader />
 
           <PageSection className="gap-4 overflow-y-auto">
-            <h2 className="text-xl font-semibold text-brand-800">Opret køretøj</h2>
+            <SectionHeading>Opret køretøj</SectionHeading>
 
             <div className="rounded-2xl border border-brand-100">
               <div className="divide-y divide-brand-100 rounded-2xl bg-white">
@@ -972,7 +974,7 @@ export function VehicleCreatePage() {
                   </div>
                   {orderEditError && <p className="text-sm text-red-600">{orderEditError}</p>}
                   {isEditingOrder ? (
-                    <div className="grid grid-cols-2 gap-3">
+                    <ButtonRow>
                       <Button variant="secondary" type="button" onClick={handleCancelEditOrder} disabled={isSavingOrderEdit}>
                         Fortryd
                       </Button>
@@ -984,16 +986,16 @@ export function VehicleCreatePage() {
                       >
                         {isSavingOrderEdit ? "Opdaterer…" : "Opdater"}
                       </Button>
-                    </div>
+                    </ButtonRow>
                   ) : (
-                    <div className="grid grid-cols-2 gap-3">
+                    <ButtonRow>
                       <Button variant="secondary" type="button" onClick={handleStartEditOrder} disabled={isRegistering}>
                         Rediger
                       </Button>
                       <Button variant="danger" type="button" onClick={() => setConfirmDeleteOpen(true)} disabled={isDeleting || isRegistering}>
                         Slet
                       </Button>
-                    </div>
+                    </ButtonRow>
                   )}
                 </div>
               )}

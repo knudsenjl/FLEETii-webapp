@@ -10,6 +10,7 @@ import { isAnyAdmin, isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
+import { ClickOutsideOverlay } from "./ClickOutsideOverlay";
 
 /** One entry in the settings button's dropdown menu (admin/sysadm only — see settingsMenuItemsForRole). */
 type SettingsMenuItem = { label: string; path: string };
@@ -435,7 +436,7 @@ export function PageHeader({
               </button>
               <InlinePopup visible={notImplementedKey === "no-other-departments"} message="Ingen afdelinger tilgængelige" align="right" />
               <InlinePopup visible={notImplementedKey === "switch-department-error"} message={switchError ?? "Kunne ikke skifte afdeling."} align="right" />
-              {switcherOpen && <div className="fixed inset-0 z-10" onClick={() => setSwitcherOpen(false)} />}
+              {switcherOpen && <ClickOutsideOverlay onClick={() => setSwitcherOpen(false)} />}
               {/* Same InlinePopup shell + labeled <select> fields every "Filtrer" funnel popup uses (VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx/DepartmentPage.tsx) — card/border/shadow/text size/fade-in AND the select's own bg-brand-50/60 box styling, for visual consistency now that this control and those popups are the same "narrow what I'm looking at" family, just persisted here instead of page-local. */}
               <InlinePopup
                 visible={switcherOpen}
@@ -645,7 +646,7 @@ export function PageHeader({
               </button>
               {settingsMenuOpen && settingsMenuItems.length > 0 && (
                 <>
-                  <div className="fixed inset-0 z-10" onClick={() => setSettingsMenuOpen(false)} />
+                  <ClickOutsideOverlay onClick={() => setSettingsMenuOpen(false)} />
                   <div className="absolute right-0 top-full z-20 mt-2 w-56 overflow-hidden rounded-lg border border-brand-200 bg-white py-1 text-sm shadow-lg">
                     {settingsMenuItems.map((item) => (
                       <button

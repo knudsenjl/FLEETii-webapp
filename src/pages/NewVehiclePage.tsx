@@ -1,18 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { FieldInfoButton } from "../components/FieldInfoButton";
 import { FieldRow } from "../components/FieldRow";
+import { RequiredMark } from "../components/RequiredMark";
 import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
 import { PageSectionBody } from "../components/PageSectionBody";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { Modal } from "../components/Modal";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
@@ -295,7 +297,7 @@ export function NewVehiclePage() {
 
           <PageSection>
             <PageSectionBody>
-              <h2 className="text-xl font-semibold text-brand-800">Opret køretøj</h2>
+              <SectionHeading>Opret køretøj</SectionHeading>
 
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
@@ -315,7 +317,7 @@ export function NewVehiclePage() {
                       <FieldRow
                         label={
                           <>
-                            Afdeling: <span className="ml-0.5 text-red-600">*</span>
+                            Afdeling: <RequiredMark />
                           </>
                         }
                       >
@@ -348,7 +350,7 @@ export function NewVehiclePage() {
                       type="text"
                       value={parking}
                       onChange={(e) => setParking(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
                   </FieldRow>
                   {useVehicleIdent && (
@@ -358,14 +360,14 @@ export function NewVehiclePage() {
                         value={vehicleIdent}
                         onChange={(e) => setVehicleIdent(e.target.value)}
                         placeholder="valgfri — bruger Nummerplade hvis tom"
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </FieldRow>
                   )}
                   <FieldRow
                     label={
                       <>
-                        Nummerplade: <span className="ml-0.5 text-red-600">*</span>
+                        Nummerplade: <RequiredMark />
                       </>
                     }
                   >
@@ -376,7 +378,7 @@ export function NewVehiclePage() {
                         aria-required="true"
                         value={nummerplade}
                         onChange={(e) => setNummerplade(e.target.value)}
-                        className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={`min-w-0 flex-1 ${TEXT_INPUT_CLASSNAME}`}
                       />
                       {/* Same lookup-button look/behavior as VehicleCreatePage.tsx's own Køretøj-row button (magnifying glass, spinner while in flight, JSON popup) — see handleOpenMotorApiPopup/autofillFromMotorApi above for why this one always fetches fresh instead of caching. */}
                       <div className="relative shrink-0" ref={motorApiRef}>
@@ -416,7 +418,7 @@ export function NewVehiclePage() {
                       type="text"
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
                   </FieldRow>
                   <FieldRow label="Model:">
@@ -424,7 +426,7 @@ export function NewVehiclePage() {
                       type="text"
                       value={maerke}
                       onChange={(e) => setMaerke(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
                   </FieldRow>
                   <FieldRow label="Årgang:">
@@ -432,14 +434,14 @@ export function NewVehiclePage() {
                       type="text"
                       value={aargang}
                       onChange={(e) => setAargang(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
                   </FieldRow>
                   <FieldRow label="Drivmiddel:">
                     <select
                       value={drivmiddel}
                       onChange={(e) => setDrivmiddel(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     >
                       <option value="">Vælg drivmiddel</option>
                       {DRIVMIDDEL_OPTIONS.map((option) => (
@@ -454,7 +456,7 @@ export function NewVehiclePage() {
                       type="text"
                       value={fuelLevel}
                       onChange={(e) => setFuelLevel(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
                   </FieldRow>
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
@@ -500,7 +502,7 @@ export function NewVehiclePage() {
                         aria-required="true"
                         value={fleetiiDeviceId}
                         onChange={(e) => setFleetiiDeviceId(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                   )}

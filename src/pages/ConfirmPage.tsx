@@ -7,6 +7,7 @@ import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { PageSection } from "../components/PageSection";
 import { PageSectionBody } from "../components/PageSectionBody";
+import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import {
   BOOKING_ID_COLUMN,
@@ -227,9 +228,9 @@ export function ConfirmPage() {
 
           <PageSection>
             <PageSectionBody>
-              <h2 className="text-xl font-semibold text-brand-800">
+              <SectionHeading>
                 {editingBookingId ? "Rediger reservation" : "Opret reservation"}
-              </h2>
+              </SectionHeading>
 
               <div className="overflow-hidden rounded-none border border-brand-100">
                 <div className="divide-y divide-brand-100 bg-white">

@@ -6,8 +6,10 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { BlockedBadge } from "../components/BlockedBadge";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { Button } from "../components/Button";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
 import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
@@ -272,10 +274,10 @@ export function DepartmentPage() {
           <PageSection minWidth0>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">
+                <SectionHeading>
                   Brugere{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                   {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
-                </h2>
+                </SectionHeading>
               </div>
 
               {emailWarning && (
@@ -300,25 +302,19 @@ export function DepartmentPage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
-                      <tr>
-                        <td colSpan={columnCount} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
-                      </tr>
+                      <TableMessageRow colSpan={columnCount}>Indlæser brugere…</TableMessageRow>
                     )}
                     {!loading && error && (
-                      <tr>
-                        <td colSpan={columnCount} className="px-2 py-3 text-center text-red-600">{error}</td>
-                      </tr>
+                      <TableMessageRow colSpan={columnCount} variant="error">{error}</TableMessageRow>
                     )}
                     {!loading && !error && filteredUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={columnCount} className="px-2 py-3 text-center text-brand-500">
-                          {departmentUsers.length === 0
-                            ? "Ingen brugere fundet."
-                            : hasActiveFilter
-                              ? "Ingen brugere matcher filteret."
-                              : "Ingen brugere fundet."}
-                        </td>
-                      </tr>
+                      <TableMessageRow colSpan={columnCount}>
+                        {departmentUsers.length === 0
+                          ? "Ingen brugere fundet."
+                          : hasActiveFilter
+                            ? "Ingen brugere matcher filteret."
+                            : "Ingen brugere fundet."}
+                      </TableMessageRow>
                     )}
                     {!loading &&
                       !error &&

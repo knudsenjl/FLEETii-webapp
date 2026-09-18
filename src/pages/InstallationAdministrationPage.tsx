@@ -10,6 +10,8 @@ import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
+import { SectionHeading } from "../components/SectionHeading";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
 import { supabase } from "../lib/supabase";
 
@@ -135,7 +137,7 @@ export function InstallationAdministrationPage() {
       <PageHeader />
 
           <PageSection className="gap-4 overflow-y-auto">
-            <h2 className="text-xl font-semibold text-brand-800">Bestilte installationer</h2>
+            <SectionHeading>Bestilte installationer</SectionHeading>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className={TABLE_CLASSNAME}>
@@ -149,19 +151,13 @@ export function InstallationAdministrationPage() {
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {ordersLoading && (
-                    <tr>
-                      <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Indlæser installationer…</td>
-                    </tr>
+                    <TableMessageRow colSpan={4}>Indlæser installationer…</TableMessageRow>
                   )}
                   {!ordersLoading && ordersError && (
-                    <tr>
-                      <td colSpan={4} className="px-2 py-3 text-center text-red-600">{ordersError}</td>
-                    </tr>
+                    <TableMessageRow colSpan={4} variant="error">{ordersError}</TableMessageRow>
                   )}
                   {!ordersLoading && !ordersError && costumerOrders.length === 0 && (
-                    <tr>
-                      <td colSpan={4} className="px-2 py-3 text-center text-brand-500">Ingen installationer fundet.</td>
-                    </tr>
+                    <TableMessageRow colSpan={4}>Ingen installationer fundet.</TableMessageRow>
                   )}
                   {!ordersLoading &&
                     !ordersError &&

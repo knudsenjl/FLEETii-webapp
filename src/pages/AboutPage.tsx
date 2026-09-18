@@ -7,8 +7,10 @@
 import { useState } from "react";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
+import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
+import { SectionHeading } from "../components/SectionHeading";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm } from "../lib/roles";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
@@ -62,7 +64,7 @@ export function AboutPage() {
           <PageSection>
             <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-brand-800">Om FLEETii</h2>
+                <SectionHeading>Om FLEETii</SectionHeading>
                 <div className="flex shrink-0 flex-col gap-2">
                   {brugerguideUrl && (
                     <a
@@ -180,7 +182,7 @@ export function AboutPage() {
                     Uautoriseret kopiering eller efterligning af denne software er ikke tilladt.
                   </button>
                   {showCopyrightNotice && (
-                    <div className="fixed inset-0 z-10" onClick={() => setShowCopyrightNotice(false)} />
+                    <ClickOutsideOverlay onClick={() => setShowCopyrightNotice(false)} />
                   )}
                   <InlinePopup visible={showCopyrightNotice} position="top" message={ANTI_CLONING_NOTICE} />
                 </div>
