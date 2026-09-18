@@ -7,7 +7,8 @@ import { PageHeader } from "../components/PageHeader";
 import { Button } from "../components/Button";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
-import { MapOverlayMessage } from "../components/MapOverlayMessage";
+import { VehicleMapCard } from "../components/VehicleMapCard";
+import { VehicleLockControlsRow } from "../components/VehicleLockControlsRow";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { CarGlyph } from "../components/CarGlyph";
 import { FieldRow } from "../components/FieldRow";
@@ -15,12 +16,7 @@ import { FieldList } from "../components/FieldList";
 import { PageSection } from "../components/PageSection";
 import { PageSectionBody } from "../components/PageSectionBody";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { HeadlightIcon } from "../components/HeadlightIcon";
-import { HornIcon } from "../components/HornIcon";
-import { InlinePopup } from "../components/InlinePopup";
-import { LeafletMap } from "../components/LeafletMap";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
-import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { EyeGlyph } from "../components/EyeGlyph";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -699,93 +695,45 @@ export function VehicleDetailsPage() {
               </FieldList>
 
               {isAdmin && (
-                // Deliberately no min-h-0 here (unlike the scrolling ancestor
-                // above, which needs it): this wrapper's own automatic
-                // minimum height must stay content-based, so it can never be
-                // flex-shrunk below what its map child's explicit
-                // min-h-[12rem] requires. With min-h-0, overflow-y-auto on
-                // the ancestor let this wrapper collapse toward 0 while the
-                // map (overflow-hidden, so bounded to its own box) still
-                // rendered its full 192px — but since a shrunk PARENT box
-                // doesn't clip a child sized by its own min-height, the map
-                // visually spilled downward past where the flex layout
-                // thought this wrapper ended, painting over the Lås/Blink/
-                // Horn button row directly below it. Keeping this wrapper's
-                // height honest fixes that without needing overflow-hidden
-                // here (which would just clip the map's bottom edge instead).
-                <div className="flex flex-1 flex-col gap-1">
-                  <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                    <LeafletMap
-                      lat={savedMapView?.lat ?? stableCenter.lat}
-                      lng={savedMapView?.lng ?? stableCenter.lng}
-                      zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
-                      markerLat={position?.lat ?? DENMARK_CENTER.lat}
-                      markerLng={position?.lng ?? DENMARK_CENTER.lng}
-                      onViewChange={handleMapViewChange}
-                      showMarker={Boolean(position)}
-                      markerTooltip={vehicle.plate}
-                      className="absolute inset-0"
-                      liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
-                      followMarker
-                    />
-                    {!position && (
-                      <MapOverlayMessage>Der er ingen GPS position tilgængelig for dette køretøj</MapOverlayMessage>
-                    )}
-                  </div>
-
-                  {/* Reverse-geocoded address of the map position above (Nominatim) — full width, smaller text than the detail rows since it's supplementary context, not a primary field. Kept in the same flex-col as the map (gap-1) rather than a sibling of it, so it sits closer to the map than the parent's own gap-4 would otherwise allow. Only rendered with a real GPS fix. Blank (not "Ingen adresse fundet") while Live is on — the lookup itself is suppressed then (see useReverseGeocode's own `enabled` argument above), so showing the "not found" message would be actively misleading; the row just goes quiet until Live stops and a fresh lookup fires. */}
-                  {position && (
-                    <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
-                      {addressLoading ? "Henter adresse…" : liveEnabled ? "" : (address ?? "Ingen adresse fundet")}
-                    </div>
-                  )}
-                </div>
+                <VehicleMapCard
+                  lat={savedMapView?.lat ?? stableCenter.lat}
+                  lng={savedMapView?.lng ?? stableCenter.lng}
+                  zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
+                  markerLat={position?.lat ?? DENMARK_CENTER.lat}
+                  markerLng={position?.lng ?? DENMARK_CENTER.lng}
+                  hasPosition={Boolean(position)}
+                  onViewChange={handleMapViewChange}
+                  markerTooltip={vehicle.plate}
+                  liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
+                  addressLoading={addressLoading}
+                  liveEnabled={liveEnabled}
+                  address={address}
+                />
               )}
 
-              {/* shrink-0: without this, overflow-y-auto on the scrolling ancestor above lets this row's automatic minimum size collapse below its own content height under vertical space pressure (a short window) — the row's box shrinks toward zero while its buttons keep their natural size, so the buttons render overlapping the map above instead of pushing it up and being scrolled to. Same fix applied to the Rediger/Bloker/Slet row below, which showed the same collapse (hidden entirely under the map). */}
-              <div className="flex shrink-0 gap-3">
-                <VehicleLockToggle
-                  className="flex-1"
-                  locked={vehicleLocked}
-                  lockEnabled={lockEnabled}
-                  unlockEnabled={unlockEnabled}
-                  loading={lockStateLoading}
-                  onToggle={async (nextLocked) => {
-                    const success = await setLock(nextLocked);
-                    if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
-                    return success;
-                  }}
-                  cannotUnlockMessage="Du kan først låse op, når din reservation er startet"
-                  cannotLockMessage="Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en anden"
-                  confirmationMessage={
-                    lockConfirmationKey === "unlocked"
-                      ? "Køretøjet er nu låst op. God tur"
-                      : lockConfirmationKey === "locked"
-                        ? "Køretøjet er nu låst"
-                        : null
-                  }
-                />
-                <div className="group relative flex-1">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => void handleLocate()}
-                    disabled={isLocating}
-                    className="flex w-full items-center justify-center gap-2"
-                  >
-                    <HeadlightIcon />
-                    {isLocating ? "Blinker…" : "Blink"}
-                  </Button>
-                  <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
-                </div>
-                <div className="group relative flex-1">
-                  <Button variant="secondary" type="button" onClick={handleHonk} className="flex w-full items-center justify-center gap-2">
-                    <HornIcon />
-                    Horn
-                  </Button>
-                  <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
-                </div>
-              </div>
+              <VehicleLockControlsRow
+                locked={vehicleLocked}
+                lockEnabled={lockEnabled}
+                unlockEnabled={unlockEnabled}
+                lockLoading={lockStateLoading}
+                onToggleLock={async (nextLocked) => {
+                  const success = await setLock(nextLocked);
+                  if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
+                  return success;
+                }}
+                lockConfirmationMessage={
+                  lockConfirmationKey === "unlocked"
+                    ? "Køretøjet er nu låst op. God tur"
+                    : lockConfirmationKey === "locked"
+                      ? "Køretøjet er nu låst"
+                      : null
+                }
+                isLocating={isLocating}
+                locateConfirmationVisible={lockConfirmationKey === "located"}
+                onLocate={() => void handleLocate()}
+                honkConfirmationVisible={lockConfirmationKey === "horn"}
+                onHonk={handleHonk}
+              />
 
               {lockError && <p className="shrink-0 text-sm text-red-600">{lockError}</p>}
               {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
