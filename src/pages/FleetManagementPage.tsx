@@ -5,8 +5,12 @@ import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { MapOverlayMessage } from "../components/MapOverlayMessage";
+import { fadeInUp } from "../lib/motionVariants";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { formatVehicleIdentLabel, toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
@@ -266,9 +270,7 @@ export function FleetManagementPage() {
       <div className="flex min-h-0 flex-1 flex-col px-4 py-6 sm:px-6 lg:px-8">
         <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
           <motion.main
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+            {...fadeInUp}
             className="flex min-h-0 flex-1 flex-col"
           >
             <PageHeader
@@ -282,9 +284,9 @@ export function FleetManagementPage() {
 
             <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-2 space-y-4">
-                <h2 className="text-xl font-semibold text-brand-800">
+                <SectionHeading>
                   Flådestyring{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
-                </h2>
+                </SectionHeading>
                 <div className="flex shrink-0 items-center gap-2">
                   {vehiclesWithoutGps.length > 0 && (
                     // z-[1001] — Leaflet's own controls/panes reach z-index 1000 (see the empty-notice's z-[1000] further down); this div otherwise has no z-index of its own, so its InlinePopup would lose to Leaflet's much higher values in the shared ambient stacking context and render underneath the map.
@@ -357,32 +359,26 @@ export function FleetManagementPage() {
                   className="absolute inset-0"
                 />
                 {showEmptyNotice && (
-                  <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                    <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                      {filteredVehicles.length === 0
-                        ? filterPlate
-                          ? "Ingen køretøjer matcher filteret"
-                          : "Der er ingen køretøjer i afdelingen"
-                        : // filteredVehicles.length > 0 but departmentGpsPositions is
-                          // still empty (the actual trigger for showEmptyNotice, see
-                          // its own effect above) — real vehicles ARE in scope, they
-                          // just haven't reported a single 2hire signal yet (brand new,
-                          // never driven/connected), so there's no lat/lng to plot.
-                          // Distinguishing this from "no vehicles" avoids the map
-                          // wrongly claiming a just-created vehicle doesn't exist.
-                          "Ingen af køretøjerne har endnu en GPS-position"}
-                    </div>
-                  </div>
+                  <MapOverlayMessage>
+                    {filteredVehicles.length === 0
+                      ? filterPlate
+                        ? "Ingen køretøjer matcher filteret"
+                        : "Der er ingen køretøjer i afdelingen"
+                      : // filteredVehicles.length > 0 but departmentGpsPositions is
+                        // still empty (the actual trigger for showEmptyNotice, see
+                        // its own effect above) — real vehicles ARE in scope, they
+                        // just haven't reported a single 2hire signal yet (brand new,
+                        // never driven/connected), so there's no lat/lng to plot.
+                        // Distinguishing this from "no vehicles" avoids the map
+                        // wrongly claiming a just-created vehicle doesn't exist.
+                        "Ingen af køretøjerne har endnu en GPS-position"}
+                  </MapOverlayMessage>
                 )}
               </div>
 
-              <button
-                type="button"
-                onClick={() => navigate("/fleet-table")}
-                className="mt-4 w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-              >
+              <Button variant="secondary" type="button" onClick={() => navigate("/fleet-table")} className="mt-4 w-full">
                 Liste af køretøjer
-              </button>
+              </Button>
             </section>
           </motion.main>
         </div>

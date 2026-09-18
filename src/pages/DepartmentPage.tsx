@@ -1,9 +1,15 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
+import { BlockedBadge } from "../components/BlockedBadge";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
 import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
@@ -210,20 +216,8 @@ export function DepartmentPage() {
   const hasActiveFilter = Boolean(filterBruger || filterNavn || filterRolle || targetDepartmentId);
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-w-0 min-h-0 flex-1 flex-col"
-        >
-          <PageHeader
+    <PageShell minWidth0>
+      <PageHeader
             rolleFilter={{
               label: "Rolle",
               value: filterRolle,
@@ -277,13 +271,13 @@ export function DepartmentPage() {
             }}
           />
 
-          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">
+                <SectionHeading>
                   Brugere{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                   {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
-                </h2>
+                </SectionHeading>
               </div>
 
               {emailWarning && (
@@ -297,8 +291,8 @@ export function DepartmentPage() {
                     so column widths are computed once across the header AND every
                     row together — table-layout:auto sizes each column to fit its
                     widest actual content, rather than a fixed/1fr split. */}
-                <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <table className={TABLE_CLASSNAME}>
+                  <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
@@ -308,25 +302,19 @@ export function DepartmentPage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loading && (
-                      <tr>
-                        <td colSpan={columnCount} className="px-2 py-3 text-center text-brand-500">Indlæser brugere…</td>
-                      </tr>
+                      <TableMessageRow colSpan={columnCount}>Indlæser brugere…</TableMessageRow>
                     )}
                     {!loading && error && (
-                      <tr>
-                        <td colSpan={columnCount} className="px-2 py-3 text-center text-red-600">{error}</td>
-                      </tr>
+                      <TableMessageRow colSpan={columnCount} variant="error">{error}</TableMessageRow>
                     )}
                     {!loading && !error && filteredUsers.length === 0 && (
-                      <tr>
-                        <td colSpan={columnCount} className="px-2 py-3 text-center text-brand-500">
-                          {departmentUsers.length === 0
-                            ? "Ingen brugere fundet."
-                            : hasActiveFilter
-                              ? "Ingen brugere matcher filteret."
-                              : "Ingen brugere fundet."}
-                        </td>
-                      </tr>
+                      <TableMessageRow colSpan={columnCount}>
+                        {departmentUsers.length === 0
+                          ? "Ingen brugere fundet."
+                          : hasActiveFilter
+                            ? "Ingen brugere matcher filteret."
+                            : "Ingen brugere fundet."}
+                      </TableMessageRow>
                     )}
                     {!loading &&
                       !error &&
@@ -358,9 +346,7 @@ export function DepartmentPage() {
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">
                               {user.deleted_at ? (
-                                <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                  Blokeret
-                                </span>
+                                <BlockedBadge />
                               ) : (
                                 user.role
                               )}
@@ -373,25 +359,15 @@ export function DepartmentPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => navigate("/user-details")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                <Button variant="secondary" type="button" onClick={() => navigate("/user-details")} className="flex-1">
                   Opret bruger
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/import-users")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                </Button>
+                <Button variant="secondary" type="button" onClick={() => navigate("/import-users")} className="flex-1">
                   Opret brugere fra fil
-                </button>
+                </Button>
               </div>
             </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+          </PageSection>
+    </PageShell>
   );
 }

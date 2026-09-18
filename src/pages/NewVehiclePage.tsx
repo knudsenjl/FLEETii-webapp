@@ -1,12 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { FieldInfoButton } from "../components/FieldInfoButton";
+import { FieldRow } from "../components/FieldRow";
+import { RequiredMark } from "../components/RequiredMark";
+import { PageSection } from "../components/PageSection";
+import { PageShell } from "../components/PageShell";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { Modal } from "../components/Modal";
+import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { DRIVMIDDEL_OPTIONS } from "../lib/bookings";
@@ -283,24 +291,13 @@ export function NewVehiclePage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Opret køretøj</h2>
+          <PageSection>
+            <PageSectionBody>
+              <SectionHeading>Opret køretøj</SectionHeading>
 
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
@@ -312,16 +309,18 @@ export function NewVehiclePage() {
                   {isSysadm ? (
                     <>
                       {/* sysadm-only Kunde (read-only, from router state — see this component's own doc comment) / Afdeling (a real required select — see canSend/handleSend above) rows. */}
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
+                      <FieldRow label="Kunde:">
                         <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                           {costumerName ?? "—"}
                         </span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">
-                          Afdeling: <span className="ml-0.5 text-red-600">*</span>
-                        </label>
+                      </FieldRow>
+                      <FieldRow
+                        label={
+                          <>
+                            Afdeling: <RequiredMark />
+                          </>
+                        }
+                      >
                         <select
                           required
                           aria-required="true"
@@ -339,39 +338,39 @@ export function NewVehiclePage() {
                             </option>
                           ))}
                         </select>
-                      </div>
+                      </FieldRow>
                     </>
                   ) : (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Afdeling:</label>
+                    <FieldRow label="Afdeling:">
                       <span className="text-sm text-brand-800">{afdeling ?? "—"}</span>
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
+                  <FieldRow label="P-plads:">
                     <input
                       type="text"
                       value={parking}
                       onChange={(e) => setParking(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
-                  </div>
+                  </FieldRow>
                   {useVehicleIdent && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Køretøj-ID:</label>
+                    <FieldRow label="Køretøj-ID:">
                       <input
                         type="text"
                         value={vehicleIdent}
                         onChange={(e) => setVehicleIdent(e.target.value)}
                         placeholder="valgfri — bruger Nummerplade hvis tom"
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Nummerplade: <span className="ml-0.5 text-red-600">*</span>
-                    </label>
+                  <FieldRow
+                    label={
+                      <>
+                        Nummerplade: <RequiredMark />
+                      </>
+                    }
+                  >
                     <div className="flex items-center gap-1">
                       <input
                         type="text"
@@ -379,7 +378,7 @@ export function NewVehiclePage() {
                         aria-required="true"
                         value={nummerplade}
                         onChange={(e) => setNummerplade(e.target.value)}
-                        className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={`min-w-0 flex-1 ${TEXT_INPUT_CLASSNAME}`}
                       />
                       {/* Same lookup-button look/behavior as VehicleCreatePage.tsx's own Køretøj-row button (magnifying glass, spinner while in flight, JSON popup) — see handleOpenMotorApiPopup/autofillFromMotorApi above for why this one always fetches fresh instead of caching. */}
                       <div className="relative shrink-0" ref={motorApiRef}>
@@ -413,40 +412,36 @@ export function NewVehiclePage() {
                         />
                       </div>
                     </div>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Mærke:</label>
+                  </FieldRow>
+                  <FieldRow label="Mærke:">
                     <input
                       type="text"
                       value={brand}
                       onChange={(e) => setBrand(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Model:</label>
+                  </FieldRow>
+                  <FieldRow label="Model:">
                     <input
                       type="text"
                       value={maerke}
                       onChange={(e) => setMaerke(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Årgang:</label>
+                  </FieldRow>
+                  <FieldRow label="Årgang:">
                     <input
                       type="text"
                       value={aargang}
                       onChange={(e) => setAargang(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                  </FieldRow>
+                  <FieldRow label="Drivmiddel:">
                     <select
                       value={drivmiddel}
                       onChange={(e) => setDrivmiddel(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     >
                       <option value="">Vælg drivmiddel</option>
                       {DRIVMIDDEL_OPTIONS.map((option) => (
@@ -455,72 +450,59 @@ export function NewVehiclePage() {
                         </option>
                       ))}
                     </select>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddelniveau:</label>
+                  </FieldRow>
+                  <FieldRow label="Drivmiddelniveau:">
                     <input
                       type="text"
                       value={fuelLevel}
                       onChange={(e) => setFuelLevel(e.target.value)}
-                      className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                      className={TEXT_INPUT_CLASSNAME}
                     />
-                  </div>
+                  </FieldRow>
                   <RequiredFieldRow label="Kontaktperson:" value={kontaktperson} onChange={setKontaktperson} />
                   <RequiredFieldRow label="Kontakt e-mail:" value={kontaktemail} onChange={setKontaktemail} type="email" />
                   <RequiredFieldRow label="Kontakt tlf.:" value={kontaktnummer} onChange={setKontaktnummer} type="tel" />
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <div className="relative flex items-center justify-between gap-2">
-                      <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
-                        FLEETii device skal installeres:
-                      </label>
-                      <button
-                        type="button"
-                        onClick={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
-                        aria-label="Mere information"
-                        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                      >
-                        ?
-                      </button>
-                      {openInfoPopover === "device" && (
-                        <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                      )}
-                      <InlinePopup
-                        visible={openInfoPopover === "device"}
-                        message="Hvis der ikke er et FLEETii device installeret i køretøjet, skal du tikke denne af"
-                        align="right"
-                      />
-                    </div>
+                  <FieldRow
+                    rawLabel
+                    label={
+                      <div className="relative flex items-center justify-between gap-2">
+                        <label htmlFor="needs-fleetii-device" className="text-sm font-medium text-brand-700">
+                          FLEETii device skal installeres:
+                        </label>
+                        <FieldInfoButton
+                          open={openInfoPopover === "device"}
+                          onToggle={() => setOpenInfoPopover((key) => (key === "device" ? null : "device"))}
+                          message="Hvis der ikke er et FLEETii device installeret i køretøjet, skal du tikke denne af"
+                          align="right"
+                        />
+                      </div>
+                    }
+                  >
                     <input
                       id="needs-fleetii-device"
                       type="checkbox"
                       checked={needsFleetiiDevice}
                       onChange={(e) => setNeedsFleetiiDevice(e.target.checked)}
-                      className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                      className={CHECKBOX_CLASSNAME}
                     />
-                  </div>
+                  </FieldRow>
                   {!needsFleetiiDevice && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <div className="relative flex items-center justify-between gap-2">
-                        <label htmlFor="fleetii-device-id" className="flex-1 text-right text-sm font-medium text-brand-700">
-                          FLEETii device id: <span className="text-red-600">*</span>
-                        </label>
-                        <button
-                          type="button"
-                          onClick={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
-                          aria-label="Mere information"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                        >
-                          ?
-                        </button>
-                        {openInfoPopover === "deviceId" && (
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                        )}
-                        <InlinePopup
-                          visible={openInfoPopover === "deviceId"}
-                          message="Angiv id-nummeret på det eksisterende IoT device i køretøjet"
-                          align="right"
-                        />
-                      </div>
+                    <FieldRow
+                      rawLabel
+                      label={
+                        <div className="relative flex items-center justify-between gap-2">
+                          <label htmlFor="fleetii-device-id" className="flex-1 text-right text-sm font-medium text-brand-700">
+                            FLEETii device id: <RequiredMark />
+                          </label>
+                          <FieldInfoButton
+                            open={openInfoPopover === "deviceId"}
+                            onToggle={() => setOpenInfoPopover((key) => (key === "deviceId" ? null : "deviceId"))}
+                            message="Angiv id-nummeret på det eksisterende IoT device i køretøjet"
+                            align="right"
+                          />
+                        </div>
+                      }
+                    >
                       <input
                         id="fleetii-device-id"
                         type="text"
@@ -528,9 +510,9 @@ export function NewVehiclePage() {
                         aria-required="true"
                         value={fleetiiDeviceId}
                         onChange={(e) => setFleetiiDeviceId(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
-                    </div>
+                    </FieldRow>
                   )}
                 </div>
               </div>
@@ -563,14 +545,9 @@ export function NewVehiclePage() {
                   Bestillingen er sendt
                 </span>
               ) : (
-                <button
-                  type="button"
-                  disabled={!canSend}
-                  onClick={() => void handleSend()}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                <Button variant="secondary" type="button" disabled={!canSend} onClick={() => void handleSend()} className="w-full">
                   {isSending ? "Sender…" : "Send bestilling til FLEETii"}
-                </button>
+                </Button>
               )}
 
               <div className="flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
@@ -598,10 +575,9 @@ export function NewVehiclePage() {
                   </div>
                 </div>
               </div>
-            </div>
-          </section>
-        </motion.main>
-      </div>
+            </PageSectionBody>
+          </PageSection>
+      </PageShell>
 
       {duplicatePlateOpen && (
         <Modal>
@@ -617,6 +593,6 @@ export function NewVehiclePage() {
           </button>
         </Modal>
       )}
-    </div>
+    </>
   );
 }

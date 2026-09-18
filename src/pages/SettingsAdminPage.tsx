@@ -36,11 +36,16 @@
 // wires its embedded AnvendelseSettings into that same mechanism. See
 // indstillingerSettings and the Afdelingsoplysninger state below.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
-import { InlinePopup } from "../components/InlinePopup";
+import { FieldInfoButton } from "../components/FieldInfoButton";
+import { FieldRow, SETTINGS_ROW_CLASSNAME } from "../components/FieldRow";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { AnvendelseSettings } from "../components/AnvendelseSettings";
 import { StandardSettings, STANDARDER, type StandardSetting } from "../components/StandardSettings";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
@@ -212,9 +217,7 @@ export function SettingsAdminPage() {
           // 2026-09-14: confirmed via a real screenshot next to the
           // Afdelingsoplysninger/Tilladelser headers, which use this same div
           // convention and looked correctly grey).
-          <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-            Indstillinger
-          </div>
+          <SettingsSectionHeading>Indstillinger</SettingsSectionHeading>
         ),
       },
       ...STANDARDER,
@@ -237,22 +240,10 @@ export function SettingsAdminPage() {
   );
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
+    <PageShell>
+      <PageHeader />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
-
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection className="gap-4 overflow-y-auto">
             {/* Afdelingsoplysninger — same rounded-2xl/bg-white + header-bar
                 convention as the tables below, hand-rolled since Navn/Adresse
                 (departments.name/address) don't fit StandardSettings' own
@@ -262,32 +253,24 @@ export function SettingsAdminPage() {
                 place. */}
             <div className="rounded-2xl border border-brand-100 bg-white">
               <div className="divide-y divide-brand-100 rounded-2xl">
-                <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-                  Afdelingsoplysninger
-                </div>
-                {afdelingsoplysningerLoading && (
-                  <div className="px-2 py-3 text-center text-sm text-brand-500">Indlæser…</div>
-                )}
+                <SettingsSectionHeading>Afdelingsoplysninger</SettingsSectionHeading>
+                {afdelingsoplysningerLoading && <TableMessageRow as="div">Indlæser…</TableMessageRow>}
                 {!afdelingsoplysningerLoading && afdelingsoplysningerError && (
-                  <div className="px-2 py-3 text-center text-sm text-red-600">{afdelingsoplysningerError}</div>
+                  <TableMessageRow as="div" variant="error">
+                    {afdelingsoplysningerError}
+                  </TableMessageRow>
                 )}
                 {!afdelingsoplysningerLoading && !afdelingsoplysningerError && (
                   <>
-                    <RequiredFieldRow
-                      label="Navn:"
-                      value={deptName}
-                      onChange={setDeptName}
-                      className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
-                    />
-                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                      <label className="text-sm font-medium text-brand-700">Adresse:</label>
+                    <RequiredFieldRow label="Navn:" value={deptName} onChange={setDeptName} className={SETTINGS_ROW_CLASSNAME} />
+                    <FieldRow variant="settings" rawLabel label={<label className="text-sm font-medium text-brand-700">Adresse:</label>}>
                       <input
                         type="text"
                         value={deptAddress}
                         onChange={(e) => setDeptAddress(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
-                    </div>
+                    </FieldRow>
                     {(
                       [
                         {
@@ -306,32 +289,31 @@ export function SettingsAdminPage() {
                         },
                       ] as const
                     ).map((row) => (
-                      <div key={row.name} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                        <div className="relative flex items-center justify-between gap-1">
-                          <label htmlFor={`afdelingsoplysning-${row.name}`} className="text-sm font-medium text-brand-700">
-                            {row.label}:
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setOpenInfoName((prev) => (prev === row.name ? null : row.name))}
-                            aria-label="Mere information"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                          >
-                            ?
-                          </button>
-                          {openInfoName === row.name && (
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenInfoName(null)} />
-                          )}
-                          <InlinePopup visible={openInfoName === row.name} message={row.info} />
-                        </div>
+                      <FieldRow
+                        key={row.name}
+                        variant="settings"
+                        rawLabel
+                        label={
+                          <div className="relative flex items-center justify-between gap-1">
+                            <label htmlFor={`afdelingsoplysning-${row.name}`} className="text-sm font-medium text-brand-700">
+                              {row.label}:
+                            </label>
+                            <FieldInfoButton
+                              open={openInfoName === row.name}
+                              onToggle={() => setOpenInfoName((prev) => (prev === row.name ? null : row.name))}
+                              message={row.info}
+                            />
+                          </div>
+                        }
+                      >
                         <input
                           id={`afdelingsoplysning-${row.name}`}
                           type="checkbox"
                           checked={row.checked}
                           onChange={(e) => row.onToggle(e.target.checked)}
-                          className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500"
+                          className={CHECKBOX_CLASSNAME}
                         />
-                      </div>
+                      </FieldRow>
                     ))}
                   </>
                 )}
@@ -363,9 +345,7 @@ export function SettingsAdminPage() {
                 rettighederRef.current?.revert();
               }}
             />
-          </section>
-        </motion.main>
-      </div>
-    </div>
+          </PageSection>
+    </PageShell>
   );
 }

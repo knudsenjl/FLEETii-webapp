@@ -56,6 +56,10 @@
 import { forwardRef, useEffect, useImperativeHandle, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { Modal } from "./Modal";
+import { Button } from "./Button";
+import { ButtonRow } from "./ButtonRow";
+import { FieldRow } from "./FieldRow";
+import { TableMessageRow } from "./TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { ANDET_VALUE, sortAnvendelserWithAndetLast } from "../lib/settings";
 
@@ -321,8 +325,12 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
           the list box is usually taller than one line of label text —
           the div-row equivalent of the old table row's align-top on both
           cells. */}
-      <div className="grid grid-cols-[14rem_1fr] items-start gap-2 px-2 py-0.5">
-        <div className="relative font-medium text-brand-700">
+      <FieldRow
+        variant="settings"
+        rawLabel
+        align="start"
+        label={
+          <div className="relative font-medium text-brand-700">
           {/* "+" (Tilføj anvendelse) — absolutely positioned so it sits
               immediately to the LEFT of labelCell's own "?" info button
               (which stays flush against this box's right edge, unchanged)
@@ -349,25 +357,21 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
             </button>
           )}
           {labelCell}
-        </div>
+          </div>
+        }
+      >
         <div className="select-none">
           <div className="select-none max-h-64 overflow-auto rounded-none border border-brand-100">
             <table className="w-full border-collapse text-sm">
               <tbody className="divide-y divide-brand-100 bg-white">
                 {loading && (
-                  <tr>
-                    <td className="px-2 py-3 text-center text-brand-500">Indlæser anvendelser…</td>
-                  </tr>
+                  <TableMessageRow>Indlæser anvendelser…</TableMessageRow>
                 )}
                 {!loading && loadError && (
-                  <tr>
-                    <td className="px-2 py-3 text-center text-red-600">{loadError}</td>
-                  </tr>
+                  <TableMessageRow variant="error">{loadError}</TableMessageRow>
                 )}
                 {!loading && !loadError && displayList.length === 0 && (
-                  <tr>
-                    <td className="px-2 py-3 text-center text-brand-500">Ingen anvendelser fundet.</td>
-                  </tr>
+                  <TableMessageRow>Ingen anvendelser fundet.</TableMessageRow>
                 )}
                 {!loading &&
                   !loadError &&
@@ -490,7 +494,7 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
             </table>
           </div>
         </div>
-      </div>
+      </FieldRow>
 
       {/* mode==="add"/pendingAction below still get a plain wrapping <div>
           (not just rendering <Modal>/<ConfirmDialog> bare as a sibling) —
@@ -525,8 +529,9 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
               className="mt-3 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
             />
             {submitError && <p className="mt-2 text-sm text-red-600">{submitError}</p>}
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
+            <ButtonRow className="mt-4">
+              <Button
+                variant="secondary"
                 type="button"
                 onClick={() => {
                   setFieldValue("");
@@ -534,19 +539,13 @@ export const AnvendelseSettings = forwardRef<AnvendelseSettingsHandle, Anvendels
                   setMode("view");
                 }}
                 disabled={isSubmitting}
-                className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 Fortryd
-              </button>
-              <button
-                type="button"
-                onClick={() => void handleCreate()}
-                disabled={!canSubmitField || isSubmitting}
-                className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="secondary" type="button" onClick={() => void handleCreate()} disabled={!canSubmitField || isSubmitting}>
                 {isSubmitting ? "Gemmer…" : "Gem"}
-              </button>
-            </div>
+              </Button>
+            </ButtonRow>
           </Modal>
         </div>
       )}

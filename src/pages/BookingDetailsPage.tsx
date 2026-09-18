@@ -1,7 +1,17 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { Button } from "../components/Button";
+import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
+import { PageLoading } from "../components/PageLoading";
+import { PageShell } from "../components/PageShell";
+import { PageSectionBody } from "../components/PageSectionBody";
+import { VehicleMapCard } from "../components/VehicleMapCard";
+import { VehicleLockControlsRow } from "../components/VehicleLockControlsRow";
+import { BlockedBadge } from "../components/BlockedBadge";
+import { PageSection } from "../components/PageSection";
+import { SectionHeading } from "../components/SectionHeading";
 import { isAnyAdmin } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } from "../contexts/VehicleContext";
 import {
@@ -21,11 +31,6 @@ import {
 } from "../lib/bookings";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { HeadlightIcon } from "../components/HeadlightIcon";
-import { HornIcon } from "../components/HornIcon";
-import { InlinePopup } from "../components/InlinePopup";
-import { LeafletMap } from "../components/LeafletMap";
-import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingLifecycle";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
@@ -263,44 +268,28 @@ export function BookingDetailsPage() {
 
   if (!booking) {
     return bookingLoading ? (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser reservation…</div>
+      <PageLoading label="Indlæser reservation…" />
     ) : null;
   }
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="shrink-0 text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
+          <PageSection>
+            <PageSectionBody>
+              <SectionHeading className="shrink-0">Reservationsdetaljer</SectionHeading>
 
-              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Periode:</label>
+              <FieldList>
+                  <FieldRow label="Periode:">
                     <span className="text-sm text-brand-800">{formatBookingPeriod(booking, true)}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Kunde/afdeling:</label>
+                  </FieldRow>
+                  <FieldRow label="Kunde/afdeling:">
                     <span className="text-sm text-brand-800">{departmentLabel}</span>
-                  </div>
+                  </FieldRow>
                   {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Bruger:</label>
+                    <FieldRow label="Bruger:">
                       {booking.userId ? (
                         <button
                           type="button"
@@ -312,14 +301,12 @@ export function BookingDetailsPage() {
                       ) : (
                         <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
                       )}
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Anvendelse:</label>
+                  <FieldRow label="Anvendelse:">
                     <span className="text-sm text-brand-800">{booking.use}</span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
+                  </FieldRow>
+                  <FieldRow label="Køretøj:">
                     <span>
                       {twoHireVehicle ? (
                         <button
@@ -333,154 +320,110 @@ export function BookingDetailsPage() {
                         <span className="text-sm text-brand-800">{vehicleLabel}</span>
                       )}
                       {vehicleIdentInfo?.blocked && (
-                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                          Blokeret
-                        </span>
+                        <BlockedBadge className="ml-2" />
                       )}
                     </span>
-                  </div>
+                  </FieldRow>
                   {/* Kilometerstand is only shown to admin/sysadm — a regular user's own reservation doesn't need this level of vehicle-condition detail. */}
                   {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <FieldRow label="Kilometerstand:">
                       <span className="text-sm text-brand-800">
                         {twoHireVehicle?.distanceCovered ? formatKilometerstand(twoHireVehicle.distanceCovered) : "—"}
                         {twoHireVehicle?.distanceCoveredUpdatedAt
                           ? ` (${shortSignalTimestamp(twoHireVehicle.distanceCoveredUpdatedAt)})`
                           : ""}
                       </span>
-                    </div>
+                    </FieldRow>
                   )}
                   {/* Drivmiddelniveau (fuel/battery %) is appended onto this same row rather than shown as its own — the two are closely related enough not to need a separate label. */}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                  <FieldRow label="Drivmiddel:">
                     <span className="text-sm text-brand-800">
                       {vehicleIdentInfo?.drivmiddel ?? "—"}
                       {twoHireVehicle?.autonomyPercentage
                         ? ` ${twoHireVehicle.autonomyPercentage}${isAdmin && twoHireVehicle.autonomyPercentageUpdatedAt ? ` (${shortSignalTimestamp(twoHireVehicle.autonomyPercentageUpdatedAt)})` : ""}`
                         : ""}
                     </span>
-                  </div>
-                </div>
-              </div>
+                  </FieldRow>
+              </FieldList>
 
               {mapVisible && (
-                // Deliberately no min-h-0 here — see VehicleDetailsPage.tsx's
-                // identical wrapper for why: without it, overflow-y-auto on
-                // the scrolling ancestor above lets this wrapper's own box
-                // collapse below its map child's explicit min-h-[12rem]
-                // floor, and the map then visually spills past its shrunk
-                // wrapper and overlaps the Lås/Blink/Horn row directly below.
-                <div className="flex flex-1 flex-col gap-1">
-                  <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                    <LeafletMap
-                      lat={savedMapView?.lat ?? stableCenter.lat}
-                      lng={savedMapView?.lng ?? stableCenter.lng}
-                      zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
-                      markerLat={position?.lat ?? DENMARK_CENTER.lat}
-                      markerLng={position?.lng ?? DENMARK_CENTER.lng}
-                      onViewChange={handleMapViewChange}
-                      showMarker={Boolean(position)}
-                      markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
-                      onMarkerClick={goToVehicleDetails}
-                      className="absolute inset-0"
-                      liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
-                      followMarker
-                    />
-                    {!position && (
-                      <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                        <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                          Der er ingen GPS position tilgængelig for dette køretøj
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reverse-geocoded address of the map position above — see VehicleDetailsPage.tsx's identical row for why this styling/placement, including why it goes blank (not "Ingen adresse fundet") while Live is on. Only rendered with a real GPS fix. */}
-                  {position && (
-                    <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
-                      {addressLoading ? "Henter adresse…" : liveEnabled ? "" : (address ?? "Ingen adresse fundet")}
-                    </div>
-                  )}
-                </div>
+                <VehicleMapCard
+                  lat={savedMapView?.lat ?? stableCenter.lat}
+                  lng={savedMapView?.lng ?? stableCenter.lng}
+                  zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
+                  markerLat={position?.lat ?? DENMARK_CENTER.lat}
+                  markerLng={position?.lng ?? DENMARK_CENTER.lng}
+                  hasPosition={Boolean(position)}
+                  onViewChange={handleMapViewChange}
+                  markerTooltip={twoHireVehicle?.plate ?? booking.vehicle}
+                  onMarkerClick={goToVehicleDetails}
+                  liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
+                  addressLoading={addressLoading}
+                  liveEnabled={liveEnabled}
+                  address={address}
+                />
               )}
 
-              {/* shrink-0: see VehicleDetailsPage.tsx's identical row for why — without it, this row's box can collapse under overflow-y-auto pressure while its buttons keep their natural size, rendering them overlapping the map above. */}
-              <div className="flex shrink-0 gap-3">
-                <VehicleLockToggle
-                  className="flex-1"
-                  locked={vehicleLocked}
-                  lockEnabled={lockEnabled}
-                  unlockEnabled={unlockEnabled}
-                  loading={lockStateLoading}
-                  onToggle={async (nextLocked) => {
+              <VehicleLockControlsRow
+                lock={{
+                  locked: vehicleLocked,
+                  lockEnabled,
+                  unlockEnabled,
+                  loading: lockStateLoading,
+                  onToggle: async (nextLocked) => {
                     const success = await setLock(nextLocked);
                     if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
                     return success;
-                  }}
-                  cannotUnlockMessage="Du kan først låse op, når din reservation er startet"
-                  cannotLockMessage="Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en anden"
-                  confirmationMessage={
+                  },
+                  confirmationMessage:
                     lockConfirmationKey === "unlocked"
                       ? "Køretøjet er nu låst op. God tur"
                       : lockConfirmationKey === "locked"
                         ? "Køretøjet er nu låst"
-                        : null
-                  }
-                />
-                <div className="group relative flex-1">
-                  <button
-                    type="button"
-                    onClick={() => void handleLocate()}
-                    disabled={isLocating}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <HeadlightIcon />
-                    {isLocating ? "Blinker…" : "Blink"}
-                  </button>
-                  <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
-                </div>
-                <div className="group relative flex-1">
-                  <button
-                    type="button"
-                    onClick={handleHonk}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    <HornIcon />
-                    Horn
-                  </button>
-                  <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
-                </div>
-              </div>
+                        : null,
+                }}
+                locate={{
+                  isLocating,
+                  confirmationVisible: lockConfirmationKey === "located",
+                  onLocate: () => void handleLocate(),
+                }}
+                honk={{
+                  confirmationVisible: lockConfirmationKey === "horn",
+                  onHonk: handleHonk,
+                }}
+              />
 
               {/* Afslut/Rediger/Slet, all on one row (labels shortened from "... reservation" since the section they're in already makes that context clear). shrink-0 for the same reason as the Lås/Blink/Horn row above. */}
               <div className="flex shrink-0 gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => setShowFinishConfirm(true)}
                   disabled={!canFinishBooking || isFinishing}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   Afslut
-                </button>
+                </Button>
                 {canShowEditButton && (
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={goToEditBooking}
-                    className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+                    className="flex-1"
                   >
                     Rediger
-                  </button>
+                  </Button>
                 )}
                 {canShowDeleteButton && (
-                  <button
+                  <Button
+                    variant="danger"
                     type="button"
                     onClick={() => setShowCancelConfirm(true)}
                     disabled={isCancelling}
-                    className="flex-1 rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="flex-1"
                   >
                     {isCancelling ? "Aflyser…" : "Slet"}
-                  </button>
+                  </Button>
                 )}
               </div>
 
@@ -488,10 +431,9 @@ export function BookingDetailsPage() {
               {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
 
               {error && <p className="shrink-0 text-sm text-red-600">{error}</p>}
-            </div>
-          </section>
-        </motion.main>
-      </div>
+            </PageSectionBody>
+          </PageSection>
+      </PageShell>
 
       {showCancelConfirm && (
         <ConfirmDialog
@@ -512,6 +454,6 @@ export function BookingDetailsPage() {
           confirmPendingLabel="Afslutter…"
         />
       )}
-    </div>
+    </>
   );
 }

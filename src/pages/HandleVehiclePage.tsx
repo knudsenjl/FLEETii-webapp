@@ -1,9 +1,15 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
+import { PageShell } from "../components/PageShell";
+import { STICKY_THEAD_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
 import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
+import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
+import { SectionHeading } from "../components/SectionHeading";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
@@ -488,24 +494,12 @@ export function HandleVehiclePage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
+    <PageShell>
+      <PageHeader />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
-
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">Køretøj detaljer</h2>
+          <PageSection>
+            <PageSectionBody>
+              <SectionHeading>Køretøj detaljer</SectionHeading>
 
               {loading && <p className="text-sm text-brand-500">Indlæser…</p>}
               {!loading && loadError && <p className="text-sm text-red-600">{loadError}</p>}
@@ -521,7 +515,7 @@ export function HandleVehiclePage() {
                           value={vehicleIdent}
                           onChange={(e) => setVehicleIdent(e.target.value)}
                           placeholder="valgfri — bruger Nummerplade hvis tom"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       </div>
                     )}
@@ -531,7 +525,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={plate}
                         onChange={(e) => setPlate(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
@@ -540,7 +534,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={make}
                         onChange={(e) => setMake(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
@@ -549,7 +543,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={model}
                         onChange={(e) => setModel(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     <div className="grid grid-cols-[0.4fr_1fr] items-center px-1 py-0.5 text-sm text-brand-700">
@@ -558,7 +552,7 @@ export function HandleVehiclePage() {
                         type="text"
                         value={year}
                         onChange={(e) => setYear(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       />
                     </div>
                     {readOnlyRows.map(([label, value]) => (
@@ -574,7 +568,7 @@ export function HandleVehiclePage() {
                         <select
                           value={drivmiddel}
                           onChange={(e) => setDrivmiddel(e.target.value)}
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         >
                           {DRIVMIDDEL_OPTIONS.map((option) => (
                             <option key={option} value={option}>
@@ -608,7 +602,7 @@ export function HandleVehiclePage() {
                               {!departmentsLoading && !departmentsError && (
                                 <div className="max-h-32 overflow-auto rounded-none border border-brand-100">
                                   <table className="w-full border-collapse text-sm">
-                                    <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                                    <thead className={STICKY_THEAD_CLASSNAME}>
                                       <tr>
                                         <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">
                                           Afdeling
@@ -636,7 +630,7 @@ export function HandleVehiclePage() {
                                               type="checkbox"
                                               checked={selectedDepartmentIds.has(department.department_id)}
                                               onChange={(e) => toggleDepartment(department, e.target.checked)}
-                                              className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                              className={CHECKBOX_CLASSNAME}
                                             />
                                           </td>
                                         </tr>
@@ -662,7 +656,7 @@ export function HandleVehiclePage() {
                             <select
                               value={homeDepartmentId ?? ""}
                               onChange={(e) => setHomeDepartmentId(e.target.value || null)}
-                              className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                              className={TEXT_INPUT_CLASSNAME}
                             >
                               <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
                               {departmentOptions
@@ -791,27 +785,21 @@ export function HandleVehiclePage() {
               {saveError && <p className="text-sm text-red-600">{saveError}</p>}
 
               <div className="flex flex-row gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   onClick={() => void handleSave()}
                   disabled={!canSave || isSaving}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex-1"
                 >
                   {isSaving ? "Gemmer…" : "Gem ændringer"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate(-1)}
-                  disabled={isSaving}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
+                </Button>
+                <Button variant="secondary" type="button" onClick={() => navigate(-1)} disabled={isSaving} className="flex-1">
                   Fortryd
-                </button>
+                </Button>
               </div>
-            </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+            </PageSectionBody>
+          </PageSection>
+    </PageShell>
   );
 }

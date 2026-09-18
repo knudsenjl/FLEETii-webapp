@@ -1,19 +1,24 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking, useVehiclesLoading } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
+import { PageShell } from "../components/PageShell";
+import { VehicleMapCard } from "../components/VehicleMapCard";
+import { VehicleLockControlsRow } from "../components/VehicleLockControlsRow";
+import { BlockedBadge } from "../components/BlockedBadge";
 import { CarGlyph } from "../components/CarGlyph";
+import { FieldRow } from "../components/FieldRow";
+import { FieldList } from "../components/FieldList";
+import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { ConfirmDialog } from "../components/ConfirmDialog";
-import { HeadlightIcon } from "../components/HeadlightIcon";
-import { HornIcon } from "../components/HornIcon";
-import { InlinePopup } from "../components/InlinePopup";
-import { LeafletMap } from "../components/LeafletMap";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
-import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { EyeGlyph } from "../components/EyeGlyph";
+import { SectionHeading } from "../components/SectionHeading";
 import { useVehicleLockState, type VehicleLockBookingContext } from "../hooks/useVehicleLockState";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useMapViewSnapshot } from "../hooks/useMapViewSnapshot";
@@ -393,7 +398,7 @@ export function VehicleDetailsPage() {
 
   if (!vehicle) {
     return vehiclesLoading ? (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser køretøj…</div>
+      <PageLoading label="Indlæser køretøj…" />
     ) : null;
   }
 
@@ -540,25 +545,14 @@ export function VehicleDetailsPage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <PageSection>
+            <PageSectionBody>
               <div className="flex shrink-0 items-center justify-between">
-                <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
+                <SectionHeading>Køretøjsdetaljer</SectionHeading>
                 {/* Driving-vehicle icon (only while 2hire's trip_detected is currently true) + red "!" health button — both admin/sysadm-only, right-aligned next to this heading. Replaces the old standalone Status row (removed 2026-09-11) as the header-level admin health summary for this vehicle — see lib/vehicleHealth.ts, shared with VehiclesPage.tsx's fleet table. */}
                 {isAdmin && (
                   <span className="flex items-center gap-1.5">
@@ -568,19 +562,16 @@ export function VehicleDetailsPage() {
                 )}
               </div>
 
-              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    {/* Single merged row (was two: "Køretøj-ID:" + "Nummerplade:") —
-                        "{vehicle_ident} - {number_plate}" when this vehicle's
-                        department shows vehicle_ident AND it's actually set,
-                        else just number_plate. This row always renders
-                        regardless of useVehicleIdent (unlike the old,
-                        separately-gated "Køretøj-ID:" row), so the "er låst"
-                        indicator has one guaranteed-visible row to attach to
-                        either way. */}
-                    <label className="flex items-center text-sm font-medium text-brand-700">Køretøj:</label>
+              <FieldList>
+                  {/* Single merged row (was two: "Køretøj-ID:" + "Nummerplade:") —
+                      "{vehicle_ident} - {number_plate}" when this vehicle's
+                      department shows vehicle_ident AND it's actually set,
+                      else just number_plate. This row always renders
+                      regardless of useVehicleIdent (unlike the old,
+                      separately-gated "Køretøj-ID:" row), so the "er låst"
+                      indicator has one guaranteed-visible row to attach to
+                      either way. */}
+                  <FieldRow label="Køretøj:">
                     <span className="text-sm text-brand-800">
                       {numberPlateLoading ? (
                         <span className="text-brand-500">Indlæser…</span>
@@ -589,22 +580,18 @@ export function VehicleDetailsPage() {
                       )}
                       {/* Same "Blokeret" badge convention as CostumerAdministrationPage.tsx's blocked-costumer row — mirrors blockedAt (vehicle_profiles.blocked_at) everywhere this vehicle is shown. */}
                       {blockedAt && (
-                        <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                          Blokeret
-                        </span>
+                        <BlockedBadge className="ml-2" />
                       )}
                     </span>
-                  </div>
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Mærke:</label>
+                  </FieldRow>
+                  <FieldRow label="Mærke:">
                     <span className="text-sm text-brand-800">
                       {vehicle.version ? `${vehicle.vehicle} - årgang: ${vehicle.version}` : vehicle.vehicle}
                     </span>
-                  </div>
+                  </FieldRow>
                   {/* Kilometerstand is only shown to admin/sysadm — same gating as BookingDetailsPage.tsx's identical row. */}
                   {isAdmin && (
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kilometerstand:</label>
+                    <FieldRow label="Kilometerstand:">
                       <span className="text-sm text-brand-800">
                         {vehicle.distanceCovered ? (
                           `${formatKilometerstand(vehicle.distanceCovered)}${vehicle.distanceCoveredUpdatedAt ? ` (${shortSignalTimestamp(vehicle.distanceCoveredUpdatedAt)})` : ""}`
@@ -612,11 +599,10 @@ export function VehicleDetailsPage() {
                           <span className="italic">Ingen information</span>
                         )}
                       </span>
-                    </div>
+                    </FieldRow>
                   )}
                   {/* Drivmiddelniveau (fuel/battery %) is appended onto this same row rather than shown as its own — the two are closely related enough not to need a separate label. */}
-                  <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">Drivmiddel:</label>
+                  <FieldRow label="Drivmiddel:">
                     <span className="text-sm text-brand-800">
                       {numberPlateLoading ? (
                         <span className="text-brand-500">Indlæser…</span>
@@ -629,7 +615,7 @@ export function VehicleDetailsPage() {
                         </>
                       )}
                     </span>
-                  </div>
+                  </FieldRow>
                   {isAdmin && (
                     <>
                       {/* Only shown once loaded, and only when this vehicle genuinely belongs to more than one department (or the fetch errored, so that error still surfaces) — a single department is already covered by "Hjemmeafdeling:" below, so listing it again here would just be redundant. */}
@@ -653,8 +639,7 @@ export function VehicleDetailsPage() {
                           </div>
                         </div>
                       )}
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">Hjemmeafdeling:</label>
+                      <FieldRow label="Hjemmeafdeling:">
                         <span className="text-sm text-brand-800">
                           {departmentsLoading ? (
                             <span className="text-brand-500">Indlæser…</span>
@@ -662,20 +647,18 @@ export function VehicleDetailsPage() {
                             (homeDepartmentName ?? "—")
                           )}
                         </span>
-                      </div>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">P-plads:</label>
+                      </FieldRow>
+                      <FieldRow label="P-plads:">
                         <span className="text-sm text-brand-800">
                           {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (parking ?? "—")}
                         </span>
-                      </div>
+                      </FieldRow>
                     </>
                   )}
                   {/* sysadm-only — 2hire-board device internals, not fleet-management info a regular admin has any reason to see. See vehicle_profiles_add_twohire_profile.sql / 2hire-register-vehicle.mts for where these two are set. "2hire-device:" summarizes both as one Konfigureret/Ikke konfigureret badge, with the raw QR-kode/2hire-profil rows collapsed behind the eye button so they aren't shown by default. */}
                   {isSysadm && (
                     <>
-                      <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                        <label className="flex items-center text-sm font-medium text-brand-700">2hire-device:</label>
+                      <FieldRow label="2hire-device:">
                         <span className="flex items-center justify-between text-sm text-brand-800">
                           {numberPlateLoading ? (
                             <span className="text-brand-500">Indlæser…</span>
@@ -693,173 +676,103 @@ export function VehicleDetailsPage() {
                             <EyeGlyph className="h-4 w-4" />
                           </button>
                         </span>
-                      </div>
+                      </FieldRow>
                       {showTwoHireDetails && (
                         <>
-                          <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                            <label className="flex items-center text-sm font-medium text-brand-700">QR-kode:</label>
+                          <FieldRow label="QR-kode:">
                             <span className="text-sm text-brand-800">
                               {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (iotId ?? "—")}
                             </span>
-                          </div>
-                          <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                            <label className="flex items-center text-sm font-medium text-brand-700">2hire-profil:</label>
+                          </FieldRow>
+                          <FieldRow label="2hire-profil:">
                             <span className="text-sm text-brand-800">
                               {numberPlateLoading ? <span className="text-brand-500">Indlæser…</span> : (twohireProfile ?? "—")}
                             </span>
-                          </div>
+                          </FieldRow>
                         </>
                       )}
                     </>
                   )}
-                </div>
-              </div>
+              </FieldList>
 
               {isAdmin && (
-                // Deliberately no min-h-0 here (unlike the scrolling ancestor
-                // above, which needs it): this wrapper's own automatic
-                // minimum height must stay content-based, so it can never be
-                // flex-shrunk below what its map child's explicit
-                // min-h-[12rem] requires. With min-h-0, overflow-y-auto on
-                // the ancestor let this wrapper collapse toward 0 while the
-                // map (overflow-hidden, so bounded to its own box) still
-                // rendered its full 192px — but since a shrunk PARENT box
-                // doesn't clip a child sized by its own min-height, the map
-                // visually spilled downward past where the flex layout
-                // thought this wrapper ended, painting over the Lås/Blink/
-                // Horn button row directly below it. Keeping this wrapper's
-                // height honest fixes that without needing overflow-hidden
-                // here (which would just clip the map's bottom edge instead).
-                <div className="flex flex-1 flex-col gap-1">
-                  <div className="relative isolate min-h-[12rem] flex-1 overflow-hidden rounded-2xl border border-brand-100">
-                    <LeafletMap
-                      lat={savedMapView?.lat ?? stableCenter.lat}
-                      lng={savedMapView?.lng ?? stableCenter.lng}
-                      zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
-                      markerLat={position?.lat ?? DENMARK_CENTER.lat}
-                      markerLng={position?.lng ?? DENMARK_CENTER.lng}
-                      onViewChange={handleMapViewChange}
-                      showMarker={Boolean(position)}
-                      markerTooltip={vehicle.plate}
-                      className="absolute inset-0"
-                      liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
-                      followMarker
-                    />
-                    {!position && (
-                      <div className="pointer-events-none absolute inset-0 z-[1000] flex items-center justify-center p-4">
-                        <div className="rounded-lg border border-red-500 bg-gray-500/50 px-4 py-2 text-center text-sm font-medium text-brand-900 shadow-lg">
-                          Der er ingen GPS position tilgængelig for dette køretøj
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Reverse-geocoded address of the map position above (Nominatim) — full width, smaller text than the detail rows since it's supplementary context, not a primary field. Kept in the same flex-col as the map (gap-1) rather than a sibling of it, so it sits closer to the map than the parent's own gap-4 would otherwise allow. Only rendered with a real GPS fix. Blank (not "Ingen adresse fundet") while Live is on — the lookup itself is suppressed then (see useReverseGeocode's own `enabled` argument above), so showing the "not found" message would be actively misleading; the row just goes quiet until Live stops and a fresh lookup fires. */}
-                  {position && (
-                    <div className="w-full shrink-0 rounded-2xl border border-brand-100 bg-white px-3 py-1.5 text-center text-xs text-brand-600">
-                      {addressLoading ? "Henter adresse…" : liveEnabled ? "" : (address ?? "Ingen adresse fundet")}
-                    </div>
-                  )}
-                </div>
+                <VehicleMapCard
+                  lat={savedMapView?.lat ?? stableCenter.lat}
+                  lng={savedMapView?.lng ?? stableCenter.lng}
+                  zoom={savedMapView?.zoom ?? (position ? 17 : 7)}
+                  markerLat={position?.lat ?? DENMARK_CENTER.lat}
+                  markerLng={position?.lng ?? DENMARK_CENTER.lng}
+                  hasPosition={Boolean(position)}
+                  onViewChange={handleMapViewChange}
+                  markerTooltip={vehicle.plate}
+                  liveToggle={isAdmin ? { active: liveEnabled, onToggle: () => setLiveEnabled((prev) => !prev) } : undefined}
+                  addressLoading={addressLoading}
+                  liveEnabled={liveEnabled}
+                  address={address}
+                />
               )}
 
-              {/* shrink-0: without this, overflow-y-auto on the scrolling ancestor above lets this row's automatic minimum size collapse below its own content height under vertical space pressure (a short window) — the row's box shrinks toward zero while its buttons keep their natural size, so the buttons render overlapping the map above instead of pushing it up and being scrolled to. Same fix applied to the Rediger/Bloker/Slet row below, which showed the same collapse (hidden entirely under the map). */}
-              <div className="flex shrink-0 gap-3">
-                <VehicleLockToggle
-                  className="flex-1"
-                  locked={vehicleLocked}
-                  lockEnabled={lockEnabled}
-                  unlockEnabled={unlockEnabled}
-                  loading={lockStateLoading}
-                  onToggle={async (nextLocked) => {
+              <VehicleLockControlsRow
+                lock={{
+                  locked: vehicleLocked,
+                  lockEnabled,
+                  unlockEnabled,
+                  loading: lockStateLoading,
+                  onToggle: async (nextLocked) => {
                     const success = await setLock(nextLocked);
                     if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
                     return success;
-                  }}
-                  cannotUnlockMessage="Du kan først låse op, når din reservation er startet"
-                  cannotLockMessage="Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en anden"
-                  confirmationMessage={
+                  },
+                  confirmationMessage:
                     lockConfirmationKey === "unlocked"
                       ? "Køretøjet er nu låst op. God tur"
                       : lockConfirmationKey === "locked"
                         ? "Køretøjet er nu låst"
-                        : null
-                  }
-                />
-                <div className="group relative flex-1">
-                  <button
-                    type="button"
-                    onClick={() => void handleLocate()}
-                    disabled={isLocating}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    <HeadlightIcon />
-                    {isLocating ? "Blinker…" : "Blink"}
-                  </button>
-                  <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
-                </div>
-                <div className="group relative flex-1">
-                  <button
-                    type="button"
-                    onClick={handleHonk}
-                    className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
-                    <HornIcon />
-                    Horn
-                  </button>
-                  <InlinePopup visible={lockConfirmationKey === "horn"} message="Endnu ikke implementeret" />
-                </div>
-              </div>
+                        : null,
+                }}
+                locate={{
+                  isLocating,
+                  confirmationVisible: lockConfirmationKey === "located",
+                  onLocate: () => void handleLocate(),
+                }}
+                honk={{
+                  confirmationVisible: lockConfirmationKey === "horn",
+                  onHonk: handleHonk,
+                }}
+              />
 
               {lockError && <p className="shrink-0 text-sm text-red-600">{lockError}</p>}
               {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
 
               {isAdmin && (
                 <div className="grid shrink-0 grid-cols-3 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  <Button variant="secondary" type="button" onClick={() => navigate("/edit-vehicle", { state: { vehicle } })}>
                     Rediger
-                  </button>
+                  </Button>
                   {/* Toggles to "Frigiv" once blocked (handleUnblockVehicle) — same showBlockConfirm dialog, branched by blockedAt below. */}
                   {blockedAt ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowBlockConfirm(true)}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                    >
+                    <Button variant="danger" type="button" onClick={() => setShowBlockConfirm(true)}>
                       Frigiv
-                    </button>
+                    </Button>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowBlockConfirm(true)}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                    >
+                    <Button variant="danger" type="button" onClick={() => setShowBlockConfirm(true)}>
                       Bloker
-                    </button>
+                    </Button>
                   )}
                   {deleteRequestSent ? (
                     <span className="flex items-center justify-center rounded-lg bg-accent-50 px-2 py-1.5 text-center text-sm font-semibold text-accent-700">
                       Anmodning om sletning er sendt
                     </span>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => setShowDeleteConfirm(true)}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
-                    >
+                    <Button variant="danger" type="button" onClick={() => setShowDeleteConfirm(true)}>
                       Slet
-                    </button>
+                    </Button>
                   )}
                 </div>
               )}
-            </div>
-          </section>
-        </motion.main>
-      </div>
+            </PageSectionBody>
+          </PageSection>
+      </PageShell>
 
       {showDeleteConfirm && (
         <ConfirmDialog
@@ -886,6 +799,6 @@ export function VehicleDetailsPage() {
           confirmPendingLabel={blockedAt ? "Frigiver…" : "Blokerer…"}
         />
       )}
-    </div>
+    </>
   );
 }

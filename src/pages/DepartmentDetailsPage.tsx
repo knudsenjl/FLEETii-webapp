@@ -1,13 +1,20 @@
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
+import { DashboardTile } from "../components/DashboardTile";
+import { Button } from "../components/Button";
+import { ButtonRow } from "../components/ButtonRow";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
+import { FieldList } from "../components/FieldList";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { CountBadge } from "../components/CountBadge";
 import { InlinePopup } from "../components/InlinePopup";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { useScopeSwitchGroup } from "../hooks/useScopeSwitchGroup";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useCostumerQuickJumpOptions } from "../hooks/useCostumerQuickJumpOptions";
@@ -371,19 +378,8 @@ export function DepartmentDetailsPage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader
             hideAfdelingAlle
             koretoejNavigate={{ label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }}
@@ -393,8 +389,8 @@ export function DepartmentDetailsPage() {
             }}
           />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Afdelinger hos {costumerName ?? "—"}</h2>
+          <PageSection className="gap-4 overflow-y-auto">
+            <SectionHeading>Afdelinger hos {costumerName ?? "—"}</SectionHeading>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
               <table className="w-full border-collapse text-sm">
@@ -406,25 +402,13 @@ export function DepartmentDetailsPage() {
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {departmentsLoading && (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                        Indlæser…
-                      </td>
-                    </tr>
+                    <TableMessageRow colSpan={2}>Indlæser…</TableMessageRow>
                   )}
                   {!departmentsLoading && departmentsError && (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-3 text-center text-red-600">
-                        {departmentsError}
-                      </td>
-                    </tr>
+                    <TableMessageRow colSpan={2} variant="error">{departmentsError}</TableMessageRow>
                   )}
                   {!departmentsLoading && !departmentsError && departments.length === 0 && (
-                    <tr>
-                      <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                        Ingen afdelinger fundet.
-                      </td>
-                    </tr>
+                    <TableMessageRow colSpan={2}>Ingen afdelinger fundet.</TableMessageRow>
                   )}
                   {!departmentsLoading &&
                     !departmentsError &&
@@ -461,58 +445,56 @@ export function DepartmentDetailsPage() {
             {isSysadm && (
               <>
                 {isAddingDepartment && (
-                  <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                    <div className="divide-y divide-brand-100 bg-white">
-                      <RequiredFieldRow label="Opret afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
-                    </div>
-                  </div>
+                  <FieldList>
+                    <RequiredFieldRow label="Opret afdeling:" value={newDepartmentName} onChange={setNewDepartmentName} />
+                  </FieldList>
                 )}
 
                 {departmentError && <p className="text-sm text-red-600">{departmentError}</p>}
 
                 {isAddingDepartment ? (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
+                  <ButtonRow>
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => setPendingAction("create-department")}
                       disabled={!canSubmitDepartment}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Opret afdeling
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => {
                         setNewDepartmentName("");
                         setIsAddingDepartment(false);
                       }}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Annuller
-                    </button>
-                  </div>
+                    </Button>
+                  </ButtonRow>
                 ) : (
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
+                  <ButtonRow>
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => {
                         setNewDepartmentName("");
                         setDepartmentError(null);
                         setIsAddingDepartment(true);
                       }}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Opret afdeling
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="danger"
                       type="button"
                       onClick={() => setPendingAction("delete-department")}
                       disabled={!selectedDepartmentId}
-                      className="rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       Slet afdeling
-                    </button>
-                  </div>
+                    </Button>
+                  </ButtonRow>
                 )}
               </>
             )}
@@ -523,14 +505,15 @@ export function DepartmentDetailsPage() {
                 {isSysadm && <hr className="border-brand-200" />}
 
                 <div className="relative">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     disabled={scopeSwitch.isSwitching}
                     onClick={() => void scopeSwitch.switchAndNavigate("fleet", selectedDepartmentId, costumerId, "/fleet-map")}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
-                  </button>
+                  </Button>
                   <InlinePopup
                     visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
                     message={scopeSwitch.error ?? ""}
@@ -545,48 +528,41 @@ export function DepartmentDetailsPage() {
                   <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
                     {selectedDepartment ? (selectedDepartment.name ?? "—") : "Ingen afdeling valgt"}
                   </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("koretojer", selectedDepartmentId, costumerId, "/fleet-table")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
-                    </button>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("koretojer", selectedDepartmentId, costumerId, "/fleet-table")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "koretojer" && scopeSwitch.isSwitching ? "Vent…" : "KØRETØJER"}
+                  >
                     <CountBadge count={vehiclesCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "koretojer" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
-                  <div className="relative aspect-square w-28">
-                    <button
-                      type="button"
-                      disabled={scopeSwitch.isSwitching}
-                      onClick={() => void scopeSwitch.switchAndNavigate("brugere", selectedDepartmentId, costumerId, "/department")}
-                      className="flex h-full w-full items-center justify-center rounded-lg border border-brand-200 bg-brand-50 px-8 text-center text-sm font-bold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
-                    </button>
+                  </DashboardTile>
+                  <DashboardTile
+                    onClick={() => void scopeSwitch.switchAndNavigate("brugere", selectedDepartmentId, costumerId, "/department")}
+                    disabled={scopeSwitch.isSwitching}
+                    label={scopeSwitch.activeKey === "brugere" && scopeSwitch.isSwitching ? "Vent…" : "BRUGERE"}
+                  >
                     <CountBadge count={usersCount} />
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "brugere" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
                       align="right"
                     />
-                  </div>
+                  </DashboardTile>
                   {/* Indstillinger — a col-span-2 row in this SAME grid (both roles now: 2026-09-14, opened to sysadm too, alongside App.tsx's /department-settings route relaxing to requireAdmin — see this page's own top doc comment), rather than its own full-width block below a divider like Flådestyring above — sized to match KØRETØJER+BRUGERE's own combined width instead of the section's full width, and grouped with them as one visual cluster with no divider, since all three ("department-specific actions") belong together once a department is selected, whereas Flådestyring above stays full-width/undivided as the one department-independent action. Same switch-then-navigate pattern as Flådestyring/KØRETØJER/BRUGERE. */}
                   <div className="relative col-span-2">
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       disabled={scopeSwitch.isSwitching}
                       onClick={() => void scopeSwitch.switchAndNavigate("indstillinger", selectedDepartmentId, costumerId, "/department-settings")}
-                      className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      className="w-full"
                     >
                       {scopeSwitch.activeKey === "indstillinger" && scopeSwitch.isSwitching ? "Vent…" : "Indstillinger"}
-                    </button>
+                    </Button>
                     <InlinePopup
                       visible={scopeSwitch.activeKey === "indstillinger" && Boolean(scopeSwitch.error)}
                       message={scopeSwitch.error ?? ""}
@@ -596,9 +572,8 @@ export function DepartmentDetailsPage() {
                 </div>
               </>
             )}
-          </section>
-        </motion.main>
-      </div>
+          </PageSection>
+      </PageShell>
 
       {pendingAction && (
         <ConfirmDialog
@@ -614,6 +589,6 @@ export function DepartmentDetailsPage() {
           confirmPendingLabel={pendingAction === "delete-department" ? "Sletter…" : "Vent…"}
         />
       )}
-    </div>
+    </>
   );
 }

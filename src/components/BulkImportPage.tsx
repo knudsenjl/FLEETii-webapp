@@ -6,11 +6,16 @@
 // thin wrapper (own doc comment, own copy) and pass everything through
 // props; this only owns the shared layout/fetch/file-picker mechanics.
 import { useEffect, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "./PageHeader";
+import { PageShell } from "./PageShell";
+import { Button } from "./Button";
+import { FieldRow } from "./FieldRow";
+import { RequiredMark } from "./RequiredMark";
+import { SectionHeading } from "./SectionHeading";
+import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -131,23 +136,11 @@ export function BulkImportPage({
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
+    <PageShell>
+      <PageHeader />
 
           <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">{pageTitle}</h2>
+            <SectionHeading>{pageTitle}</SectionHeading>
             <p className="text-sm text-brand-800">
               Her kan du oprette en række {nounPlural.toLowerCase()} på én gang ved at give oplysninger om de nye{" "}
               {nounPlural.toLowerCase()} i en fil, enten i{" "}
@@ -185,16 +178,13 @@ export function BulkImportPage({
               // sysadm-only Kunde picker — the two import buttons
               // below stay disabled until one's chosen: there's no
               // meaningful default costumer for a platform-wide role.
-              <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                <label className="flex items-center text-sm font-medium text-brand-700">
-                  Kunde: <span className="ml-0.5 text-red-600">*</span>
-                </label>
+              <FieldRow label={<>Kunde: <RequiredMark /></>}>
                 <select
                   required
                   aria-required="true"
                   value={filterCostumerId}
                   onChange={(e) => setFilterCostumerId(e.target.value)}
-                  className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                  className={TEXT_INPUT_CLASSNAME}
                 >
                   <option value="" className="bg-brand-100">Vælg kunde:</option>
                   {costumerOptions.map((costumer) => (
@@ -203,26 +193,28 @@ export function BulkImportPage({
                     </option>
                   ))}
                 </select>
-              </div>
+              </FieldRow>
             )}
 
             <div className="flex gap-3">
-              <button
+              <Button
+                variant="secondary"
                 type="button"
                 disabled={importing || !targetCostumerId}
                 onClick={() => jsonInputRef.current?.click()}
-                className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex-1"
               >
                 {nounPlural} i JSON format
-              </button>
-              <button
+              </Button>
+              <Button
+                variant="secondary"
                 type="button"
                 disabled={importing || !targetCostumerId}
                 onClick={() => csvInputRef.current?.click()}
-                className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                className="flex-1"
               >
                 {nounPlural} i CSV format
-              </button>
+              </Button>
             </div>
 
             {/* Hidden native file pickers — the buttons above just forward
@@ -275,8 +267,6 @@ export function BulkImportPage({
               </div>
             )}
           </section>
-        </motion.main>
-      </div>
-    </div>
+    </PageShell>
   );
 }

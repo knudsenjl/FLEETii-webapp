@@ -1,10 +1,15 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm } from "../lib/roles";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
+import { SectionHeading } from "../components/SectionHeading";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
 import { supabase } from "../lib/supabase";
@@ -156,25 +161,13 @@ export function AvailablePage() {
   const selectedVehicle = availableVehicles.find((vehicle) => vehicle.id === selectedVehicleId) ?? null;
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
+    <PageShell minWidth0>
+      <PageHeader />
 
-      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-w-0 min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
-
-          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-3">
-                <h2 className="text-xl font-semibold text-brand-800">Ledige køretøjer</h2>
+                <SectionHeading>Ledige køretøjer</SectionHeading>
                 {reservationStart && reservationEnd && (
                   <span className="text-[0.7rem] text-brand-600">
                     Periode: {formatDanishDateTimeShort(reservationStart)} -{" "}
@@ -186,8 +179,8 @@ export function AvailablePage() {
               </div>
 
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
-                <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <table className={TABLE_CLASSNAME}>
+                  <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
@@ -196,19 +189,13 @@ export function AvailablePage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {loadingBookings && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Henter ledige køretøjer…</td>
-                      </tr>
+                      <TableMessageRow colSpan={3}>Henter ledige køretøjer…</TableMessageRow>
                     )}
                     {!loadingBookings && bookingsError && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-red-600">{bookingsError}</td>
-                      </tr>
+                      <TableMessageRow colSpan={3} variant="error">{bookingsError}</TableMessageRow>
                     )}
                     {!loadingBookings && !bookingsError && availableVehicles.length === 0 && (
-                      <tr>
-                        <td colSpan={3} className="px-2 py-3 text-center text-brand-500">Ingen ledige køretøjer.</td>
-                      </tr>
+                      <TableMessageRow colSpan={3}>Ingen ledige køretøjer.</TableMessageRow>
                     )}
                     {!loadingBookings &&
                       !bookingsError &&
@@ -256,15 +243,17 @@ export function AvailablePage() {
 
               <div className={editingBookingId ? "grid grid-cols-2 gap-3 pt-2" : "flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end"}>
                 {editingBookingId && (
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => navigate(`/booking-details/${editingBookingId}`)}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     Fortryd
-                  </button>
+                  </Button>
                 )}
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   disabled={!selectedVehicle}
                   onClick={() => {
@@ -289,15 +278,13 @@ export function AvailablePage() {
                       },
                     });
                   }}
-                  className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="w-full"
                 >
                   {editingBookingId ? "Opdater" : "Reserver"}
-                </button>
+                </Button>
               </div>
             </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+          </PageSection>
+    </PageShell>
   );
 }

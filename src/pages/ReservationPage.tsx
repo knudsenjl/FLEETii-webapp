@@ -1,11 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { Button } from "../components/Button";
+import { FieldList } from "../components/FieldList";
+import { RequiredMark } from "../components/RequiredMark";
+import { FieldRow } from "../components/FieldRow";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
+import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
+import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import type { EditingBooking } from "../lib/bookings";
 import {
@@ -582,39 +589,22 @@ export function ReservationPage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
+    <PageShell>
+      <PageHeader />
 
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader />
-
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
-              <h2 className="text-xl font-semibold text-brand-800">
+          <PageSection>
+            <PageSectionBody>
+              <SectionHeading>
                 {editing ? "Rediger reservation" : "Opret reservation"}
-              </h2>
+              </SectionHeading>
 
-              {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-              <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                <div className="divide-y divide-brand-100 bg-white">
+              <FieldList>
                   {isSysadm && (
                     // sysadm-only — a sysadm has no department
                     // of their own, so this booking's target department must
                     // be picked explicitly before AvailablePage can even show
                     // a scoped vehicle list.
-                    <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Kunde/afdeling <span className="ml-0.5 text-red-600">*</span>
-                      </label>
+                    <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Kunde/afdeling <RequiredMark /></>}>
                       <select
                         value={selectedDepartmentId}
                         onChange={(e) => {
@@ -636,12 +626,9 @@ export function ReservationPage() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </FieldRow>
                   )}
-                  <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Bruger {isAdmin && <span className="ml-0.5 text-red-600">*</span>}
-                    </label>
+                  <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Bruger {isAdmin && <RequiredMark />}</>}>
                     {isAdmin ? (
                       <select
                         value={bruger}
@@ -665,7 +652,7 @@ export function ReservationPage() {
                         className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"
                       />
                     )}
-                  </div>
+                  </FieldRow>
                   {/* Anvendelse + (conditionally) Angiv årsag are wrapped
                       together in one div so they count as a SINGLE child of
                       the parent's divide-y — that border only ever lands
@@ -674,10 +661,7 @@ export function ReservationPage() {
                       rather than relying on a border-t-0 override to beat it
                       on specificity. */}
                   <div>
-                    <div className="grid grid-cols-2 gap-3 p-3 sm:p-4">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        Anvendelse <span className="ml-0.5 text-red-600">*</span>
-                      </label>
+                    <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Anvendelse <RequiredMark /></>}>
                       {/* text-[16px], not text-sm — every role (incl. plain "user" on a phone) reaches this field, so it needs the same iOS-zoom-on-focus protection as LoginPage.tsx's own inputs (see its comment) — unlike the sysadm-only Kunde/afdeling and admin-only Bruger <select>s above, which stay text-sm since a Bruger never focuses those. */}
                       <select
                         required
@@ -693,12 +677,13 @@ export function ReservationPage() {
                           </option>
                         ))}
                       </select>
-                    </div>
+                    </FieldRow>
                     {anvendelseOption === ANDET_VALUE && (
-                      <div className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 sm:pb-4">
-                        <label className="flex items-center justify-end text-sm font-medium text-brand-700">
-                          Angiv årsag <span className="ml-0.5 text-red-600">*</span>
-                        </label>
+                      <FieldRow
+                        className="grid grid-cols-2 gap-3 px-3 pb-3 sm:px-4 sm:pb-4"
+                        labelClassName="flex items-center justify-end text-sm font-medium text-brand-700"
+                        label={<>Angiv årsag <RequiredMark /></>}
+                      >
                         {/* text-[16px] — same iOS-zoom reasoning as the Anvendelse <select> above. */}
                         <input
                           type="text"
@@ -708,7 +693,7 @@ export function ReservationPage() {
                           onChange={(e) => setAnvendelseCustom(e.target.value)}
                           className="rounded-lg border border-brand-200 bg-brand-50/60 px-3 py-2 text-[16px] text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                         />
-                      </div>
+                      </FieldRow>
                     )}
                   </div>
                   <div className="relative grid grid-cols-[4rem_3.5rem_1fr_1fr] items-center gap-0.5 p-3 sm:p-4">
@@ -793,8 +778,7 @@ export function ReservationPage() {
                       variant="warning"
                     />
                   </div>
-                </div>
-              </div>
+              </FieldList>
 
               <p className="text-right text-xs text-brand-500">
                 <span className="text-red-600">*</span> Feltet skal udfyldes
@@ -804,38 +788,34 @@ export function ReservationPage() {
 
               {editing ? (
                 <div className="grid grid-cols-2 gap-3 pt-2">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     Bekræft/skift køretøj
-                  </button>
-                  <button
-                    type="button"
-                    onClick={handleCancelEdit}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={handleCancelEdit} className="w-full">
                     Fortryd
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-                  <button
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
                     disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
-                    className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="w-full"
                   >
                     Find ledigt køretøj
-                  </button>
+                  </Button>
                 </div>
               )}
-            </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+            </PageSectionBody>
+          </PageSection>
+    </PageShell>
   );
 }

@@ -14,6 +14,7 @@ import { fetchCostumerDeactivatedAt, useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { TypingHeader } from "../components/TypingHeader";
 import { InlinePopup } from "../components/InlinePopup";
+import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
 
 /** Placeholder for a possible future multi-step login flow; today there's only one step. */
@@ -371,7 +372,7 @@ export function LoginPage() {
             © {new Date().getFullYear()} FLEETii. Alle rettigheder forbeholdes.
           </button>
           {showCopyrightNotice && (
-            <div className="fixed inset-0 z-10" onClick={() => setShowCopyrightNotice(false)} />
+            <ClickOutsideOverlay onClick={() => setShowCopyrightNotice(false)} />
           )}
           <InlinePopup visible={showCopyrightNotice} position="top" message={ANTI_CLONING_NOTICE} />
         </div>

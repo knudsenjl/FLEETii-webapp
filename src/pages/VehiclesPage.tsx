@@ -1,12 +1,18 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { use2hireGPS, use2hireVehicle } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { PageSection } from "../components/PageSection";
+import { BlockedBadge } from "../components/BlockedBadge";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
 import { CarGlyph } from "../components/CarGlyph";
 import { VehicleHealthIndicator } from "../components/VehicleHealthIndicator";
+import { SectionHeading } from "../components/SectionHeading";
+import { TableMessageRow } from "../components/TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
@@ -155,20 +161,8 @@ export function VehiclesPage() {
   }, [vehicles]);
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-w-0 min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-w-0 min-h-0 flex-1 flex-col"
-        >
-          <PageHeader
+    <PageShell minWidth0>
+      <PageHeader
             koretoejFilter={{
               label: "Køretøj",
               value: filterPlate,
@@ -177,18 +171,18 @@ export function VehiclesPage() {
             }}
           />
 
-          <section className="flex min-w-0 min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <PageSection>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
-                <h2 className="text-xl font-semibold text-brand-800">
+                <SectionHeading>
                   Køretøjer{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                   {targetDepartmentName ? ` — ${targetDepartmentName}` : ""}
-                </h2>
+                </SectionHeading>
               </div>
 
               <div className="flex min-w-0 min-h-0 flex-col overflow-auto rounded-none border border-brand-100">
-                <table className="w-full border-collapse text-[0.7rem]">
-                  <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+                <table className={TABLE_CLASSNAME}>
+                  <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Model</th>
@@ -196,15 +190,13 @@ export function VehiclesPage() {
                   </thead>
                   <tbody className="divide-y divide-brand-100 bg-white">
                     {filteredVehicles.length === 0 && (
-                      <tr>
-                        <td colSpan={2} className="px-2 py-3 text-center text-brand-500">
-                          {!targetCostumerId && !isSysadm
-                            ? "Ingen kunde valgt."
-                            : filterPlate
-                              ? "Ingen køretøjer matcher filteret."
-                              : "Ingen køretøjer fundet."}
-                        </td>
-                      </tr>
+                      <TableMessageRow colSpan={2}>
+                        {!targetCostumerId && !isSysadm
+                          ? "Ingen kunde valgt."
+                          : filterPlate
+                            ? "Ingen køretøjer matcher filteret."
+                            : "Ingen køretøjer fundet."}
+                      </TableMessageRow>
                     )}
                     {filteredVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;
@@ -233,9 +225,7 @@ export function VehiclesPage() {
                           <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
                             {vehicle.plate}
                             {blockedByVehicleId[vehicle.vehicleId] && (
-                              <span className="ml-2 rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                Blokeret
-                              </span>
+                              <BlockedBadge className="ml-2" />
                             )}
                           </td>
                           <td className="whitespace-nowrap px-2 py-0.5">
@@ -261,27 +251,22 @@ export function VehiclesPage() {
               </div>
 
               <div className="flex gap-3">
-                <button
+                <Button
+                  variant="secondary"
                   type="button"
                   disabled={!targetCostumerId}
                   title={!targetCostumerId ? "Vælg en kunde for at oprette et køretøj" : undefined}
                   onClick={() => navigate("/new-vehicle")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-brand-50"
+                  className="flex-1 disabled:hover:bg-brand-50"
                 >
                   Opret køretøj
-                </button>
-                <button
-                  type="button"
-                  onClick={() => navigate("/import-vehicles")}
-                  className="flex-1 rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                </Button>
+                <Button variant="secondary" type="button" onClick={() => navigate("/import-vehicles")} className="flex-1">
                   Opret køretøjer fra fil
-                </button>
+                </Button>
               </div>
             </div>
-          </section>
-        </motion.main>
-      </div>
-    </div>
+          </PageSection>
+    </PageShell>
   );
 }

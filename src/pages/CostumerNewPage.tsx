@@ -1,10 +1,18 @@
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
+import { PageSection } from "../components/PageSection";
+import { PageShell } from "../components/PageShell";
+import { Button } from "../components/Button";
+import { FieldRow } from "../components/FieldRow";
+import { RequiredMark } from "../components/RequiredMark";
+import { ButtonRow } from "../components/ButtonRow";
+import { FieldList } from "../components/FieldList";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
+import { SectionHeading } from "../components/SectionHeading";
+import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing, stripNumberSpacing } from "../lib/textNormalization";
@@ -269,55 +277,36 @@ export function CostumerNewPage() {
   };
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">
+          <PageSection className="gap-4 overflow-y-auto">
+            <SectionHeading>
               {step === "success" ? "Kunde registreret" : step === "register" ? "Registrer kunde i 2hire" : "Opret kunde"}
-            </h2>
+            </SectionHeading>
 
             {step === "success" ? (
               <>
                 <p className="text-sm text-brand-800">Den nye kunde er nu registreret i 2hire, og klar til brug.</p>
-                <button
-                  type="button"
-                  onClick={() => navigate("/costumers")}
-                  className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                >
+                <Button variant="secondary" type="button" onClick={() => navigate("/costumers")}>
                   Til kundeliste
-                </button>
+                </Button>
               </>
             ) : step === "register" ? (
               <>
-                {/* shrink-0: a flex item with overflow-hidden gets an automatic min-height of 0 (CSS spec behavior) — without this, vertical space pressure in the flex column can squeeze this whole box to zero height, silently clipping every row even though the DOM/data is correct. */}
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
+                <FieldList>
                     {/* Matches the 2hire inputs' own border/padding (just transparent) below so this static text lines up with theirs instead of sitting flush left. */}
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">CVR.</label>
+                    <FieldRow label="CVR.">
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {costumer?.cvr ?? "—"}
                       </span>
-                    </div>
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Navn:</label>
+                    </FieldRow>
+                    <FieldRow label="Navn:">
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {costumer?.name ?? "—"}
                       </span>
-                    </div>
+                    </FieldRow>
                     <RequiredFieldRow label="2hire client ID:" value={twoHireClientId} onChange={setTwoHireClientId} />
                     <RequiredFieldRow
                       label="2hire client secret:"
@@ -325,8 +314,7 @@ export function CostumerNewPage() {
                       onChange={setTwoHireClientSecret}
                       type="password"
                     />
-                  </div>
-                </div>
+                </FieldList>
 
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
@@ -334,32 +322,24 @@ export function CostumerNewPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
+                <ButtonRow>
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => setPendingAction("register")}
                     disabled={!canSubmitRegister}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Registrer i 2hire
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("discardDraft")}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("discardDraft")}>
                     Fortryd
-                  </button>
-                </div>
+                  </Button>
+                </ButtonRow>
               </>
             ) : (
               <>
-                <div className="shrink-0 overflow-hidden rounded-2xl border border-brand-100">
-                  <div className="divide-y divide-brand-100 bg-white">
-                    <div className="grid grid-cols-2 items-center gap-2 p-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">
-                        CVR: <span className="ml-0.5 text-red-600">*</span>
-                      </label>
+                <FieldList>
+                    <FieldRow label={<>CVR: <RequiredMark /></>}>
                       <div className="flex items-center gap-1.5">
                         <input
                           type="text"
@@ -367,7 +347,7 @@ export function CostumerNewPage() {
                           aria-required="true"
                           value={cvr}
                           onChange={(e) => setCvr(e.target.value)}
-                          className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={`min-w-0 flex-1 ${TEXT_INPUT_CLASSNAME}`}
                         />
                         <button
                           type="button"
@@ -388,7 +368,7 @@ export function CostumerNewPage() {
                           )}
                         </button>
                       </div>
-                    </div>
+                    </FieldRow>
                     {cvrLookupError && <p className="px-0.5 pb-1 text-xs text-red-600">{cvrLookupError}</p>}
                     <RequiredFieldRow label="Navn:" value={name} onChange={setName} />
                     <RequiredFieldRow label="Vej og husnr.:" value={street} onChange={setStreet} />
@@ -397,8 +377,7 @@ export function CostumerNewPage() {
                     <RequiredFieldRow label="Kontaktperson:" value={contactPerson} onChange={setContactPerson} />
                     <RequiredFieldRow label="Tlf:" value={phone} onChange={setPhone} type="tel" />
                     <RequiredFieldRow label="E-mail:" value={email} onChange={setEmail} type="email" />
-                  </div>
-                </div>
+                </FieldList>
 
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
@@ -406,28 +385,23 @@ export function CostumerNewPage() {
 
                 {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
+                <ButtonRow>
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => setPendingAction("create")}
                     disabled={!canSubmitCreate}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret kunde
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("closeCreate")}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("closeCreate")}>
                     Fortryd
-                  </button>
-                </div>
+                  </Button>
+                </ButtonRow>
               </>
             )}
-          </section>
-        </motion.main>
-      </div>
+          </PageSection>
+      </PageShell>
 
       {pendingAction && (
         <ConfirmDialog
@@ -449,6 +423,6 @@ export function CostumerNewPage() {
           }
         />
       )}
-    </div>
+    </>
   );
 }

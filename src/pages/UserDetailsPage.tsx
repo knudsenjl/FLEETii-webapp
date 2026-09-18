@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { motion } from "framer-motion";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { formatRoleLabel, useAuth } from "../contexts/AuthContext";
+import { CHECKBOX_CLASSNAME, TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { isAnyAdmin, isDepartmentAdmin, isSysadm as isSysadmRole } from "../lib/roles";
 import { PageHeader } from "../components/PageHeader";
+import { Button } from "../components/Button";
+import { PageLoading } from "../components/PageLoading";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
+import { RequiredMark } from "../components/RequiredMark";
+import { ButtonRow } from "../components/ButtonRow";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
+import { FieldInfoButton } from "../components/FieldInfoButton";
+import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
+import { PageShell } from "../components/PageShell";
+import { FieldRow, SETTINGS_ROW_CLASSNAME } from "../components/FieldRow";
+import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
 import { ForbiddenNotice } from "../components/ProtectedRoute";
 import { RettighederSettings, type RettighederSettingsHandle } from "../components/RettighederSettings";
 import { StandardSettings, STANDARDER, type StandardSetting } from "../components/StandardSettings";
@@ -479,9 +489,7 @@ export function UserDetailsPage() {
           // 2026-09-14: confirmed via a real screenshot next to this page's
           // own "Bruger oplysninger"/"Tilladelser" headers, which use this
           // same div convention and looked correctly grey).
-          <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
-            Indstillinger
-          </div>
+          <SettingsSectionHeading>Indstillinger</SettingsSectionHeading>
         ),
       },
       ...STANDARDER,
@@ -793,28 +801,17 @@ export function UserDetailsPage() {
   // and `user` becomes non-null.
   if (userId && !user && userLoading) {
     return (
-      <div className="flex h-svh items-center justify-center bg-brand-50 text-brand-600">Indlæser bruger…</div>
+      <PageLoading label="Indlæser bruger…" />
     );
   }
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
+    <>
+      <PageShell>
           <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <PageSection>
+            <PageSectionBody>
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
                     with no overflow-hidden at all) so the Afdeling(er)/
@@ -826,29 +823,27 @@ export function UserDetailsPage() {
                       (same bar styling as the "Indstillinger"/"Tilladelser"
                       subsubheaders below) rather than a separate <h2> sitting
                       above the table. */}
-                  <div className="rounded-t-2xl bg-brand-50/60 px-2 py-1 text-xs font-semibold uppercase tracking-wide text-brand-600">
+                  <SettingsSectionHeading>
                     {isSelf
                       ? "Dine bruger oplysninger"
                       : user
                         ? `Bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
                         : "Opret bruger"}
-                  </div>
+                  </SettingsSectionHeading>
                   {!user && isSysadm && (
                     // sysadm-only "Ny bruger" Kunde row — read-only
                     // display, not a picker: targetCostumerId already
                     // follows the global header's own costumerId ("Data
                     // Filter", PageHeader.tsx), so there's nothing left to
                     // choose here, just to confirm.
-                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                      <label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>
+                    <FieldRow variant="settings" rawLabel label={<label className="flex items-center text-sm font-medium text-brand-700">Kunde:</label>}>
                       <span className="rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">
                         {targetCostumerName ?? "—"}
                       </span>
-                    </div>
+                    </FieldRow>
                   )}
                   {useUserIdent && (
-                    <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                      <label className="text-sm font-medium text-brand-700">Bruger-ID:</label>
+                    <FieldRow variant="settings" rawLabel label={<label className="text-sm font-medium text-brand-700">Bruger-ID:</label>}>
                       {isSelf ? (
                         <input
                           type="text"
@@ -863,26 +858,20 @@ export function UserDetailsPage() {
                           value={userIdent}
                           onChange={(e) => setUserIdent(e.target.value)}
                           placeholder="valgfri — bruger E-mail hvis tom"
-                          className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                          className={TEXT_INPUT_CLASSNAME}
                         />
                       )}
-                    </div>
+                    </FieldRow>
                   )}
                   {/* className override on all three: matches this table's own header bar's px-2 (RequiredFieldRow's own default is p-0.5, no horizontal padding) so every row's label text starts flush with the header text above it. */}
-                  <RequiredFieldRow
-                    label="Navn:"
-                    value={fullName}
-                    onChange={setFullName}
-                    readOnly={isSelf}
-                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
-                  />
+                  <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} readOnly={isSelf} className={SETTINGS_ROW_CLASSNAME} />
                   <RequiredFieldRow
                     label="E-mail:"
                     value={email}
                     onChange={setEmail}
                     type="email"
                     readOnly={isSelf}
-                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                    className={SETTINGS_ROW_CLASSNAME}
                   />
                   <RequiredFieldRow
                     label="Telefon:"
@@ -890,12 +879,17 @@ export function UserDetailsPage() {
                     onChange={setPhone}
                     type="tel"
                     readOnly={isSelf}
-                    className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5"
+                    className={SETTINGS_ROW_CLASSNAME}
                   />
-                  <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                    <label className="flex items-center text-sm font-medium text-brand-700">
-                      Rolle: {!isSelf && <span className="ml-0.5 text-red-600">*</span>}
-                    </label>
+                  <FieldRow
+                    variant="settings"
+                    rawLabel
+                    label={
+                      <label className="flex items-center text-sm font-medium text-brand-700">
+                        Rolle: {!isSelf && <RequiredMark />}
+                      </label>
+                    }
+                  >
                     {isSelf ? (
                       <input
                         type="text"
@@ -910,14 +904,14 @@ export function UserDetailsPage() {
                         aria-required="true"
                         value={role}
                         onChange={(e) => setRole(e.target.value)}
-                        className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                        className={TEXT_INPUT_CLASSNAME}
                       >
                         <option value="" className="bg-brand-100">Vælg rolle:</option>
                         <option value="user">Bruger</option>
                         <option value="admin">Administrator</option>
                       </select>
                     )}
-                  </div>
+                  </FieldRow>
                 </div>
               </div>
 
@@ -947,19 +941,9 @@ export function UserDetailsPage() {
                         (see the departmentOptions.map right underneath). */}
                     {(isSelf || isAnyAdmin(profile?.role)) && departmentOptions.length !== 1 && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
-                          aria-label="Mere information"
-                          className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                        >
-                          ?
-                        </button>
-                        {openInfoPopover === "afdelinger" && (
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                        )}
-                        <InlinePopup
-                          visible={openInfoPopover === "afdelinger"}
+                        <FieldInfoButton
+                          open={openInfoPopover === "afdelinger"}
+                          onToggle={() => setOpenInfoPopover((key) => (key === "afdelinger" ? null : "afdelinger"))}
                           message="Vælg hvilke afdelinger, brugeren er tilknyttet. Derefter kan du nedenfor angive brugerens hjemmeafdeling blandt de tilknyttede afdelinger"
                           align="right"
                         />
@@ -985,15 +969,19 @@ export function UserDetailsPage() {
                           departmentOptions.map((option) => {
                             const isHome = option.department_id === homeDepartmentId;
                             return (
-                              <div key={option.department_id} className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                                <label className="text-sm font-medium text-brand-700">{option.name}:</label>
+                              <FieldRow
+                                key={option.department_id}
+                                variant="settings"
+                                rawLabel
+                                label={<label className="text-sm font-medium text-brand-700">{option.name}:</label>}
+                              >
                                 <span className="inline-flex items-center gap-1.5">
                                   <input
                                     type="checkbox"
                                     checked={isHome || userDepartmentIds.has(option.department_id)}
                                     disabled={isSelf || isHome}
                                     onChange={isSelf ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
-                                    className="h-4 w-4 rounded border-brand-300 text-brand-600 focus:ring-accent-500 disabled:cursor-not-allowed"
+                                    className={CHECKBOX_CLASSNAME}
                                   />
                                   {/* Always-visible, not a hover tooltip — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
                                   {isHome && (
@@ -1005,40 +993,35 @@ export function UserDetailsPage() {
                                     </span>
                                   )}
                                 </span>
-                              </div>
+                              </FieldRow>
                             );
                           })}
                       </>
                     )}
-                      <div className="grid grid-cols-[14rem_1fr] items-center gap-2 px-2 py-0.5">
-                        <div className="relative flex items-center justify-between gap-2">
-                          <label className="text-sm font-medium text-brand-700">
-                            Hjemmeafdeling:{" "}
-                            {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
-                              <span className="ml-0.5 text-red-600">*</span>
-                            )}
-                          </label>
-                          <button
-                            type="button"
-                            onClick={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
-                            aria-label="Mere information"
-                            className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-300 text-[0.65rem] font-bold leading-none text-brand-600 transition hover:bg-brand-50"
-                          >
-                            ?
-                          </button>
-                          {openInfoPopover === "hjemmeafdeling" && (
-                            <div className="fixed inset-0 z-10" onClick={() => setOpenInfoPopover(null)} />
-                          )}
-                          <InlinePopup
-                            visible={openInfoPopover === "hjemmeafdeling"}
-                            message={
-                              isSelf || departmentOptions.length === 1 || soleCheckedDepartment
-                                ? "Du er tilknyttet denne afdeling"
-                                : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
-                            }
-                            align="right"
-                          />
-                        </div>
+                      <FieldRow
+                        variant="settings"
+                        rawLabel
+                        label={
+                          <div className="relative flex items-center justify-between gap-2">
+                            <label className="text-sm font-medium text-brand-700">
+                              Hjemmeafdeling:{" "}
+                              {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
+                                <RequiredMark />
+                              )}
+                            </label>
+                            <FieldInfoButton
+                              open={openInfoPopover === "hjemmeafdeling"}
+                              onToggle={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
+                              message={
+                                isSelf || departmentOptions.length === 1 || soleCheckedDepartment
+                                  ? "Du er tilknyttet denne afdeling"
+                                  : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
+                              }
+                              align="right"
+                            />
+                          </div>
+                        }
+                      >
                         {isSelf || departmentOptions.length === 1 || soleCheckedDepartment ? (
                           <input
                             type="text"
@@ -1059,7 +1042,7 @@ export function UserDetailsPage() {
                             aria-required="true"
                             value={department}
                             onChange={(e) => setDepartment(e.target.value)}
-                            className="rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                            className={TEXT_INPUT_CLASSNAME}
                           >
                             <option value="" className="bg-brand-100">Vælg hjemmeafdeling:</option>
                             {departmentOptions
@@ -1071,7 +1054,7 @@ export function UserDetailsPage() {
                               ))}
                           </select>
                         )}
-                      </div>
+                      </FieldRow>
                     </div>
                   </div>
 
@@ -1179,32 +1162,33 @@ export function UserDetailsPage() {
               {submitError && <p className="text-sm text-red-600">{submitError}</p>}
 
               {user && !isSelf ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
+                <ButtonRow>
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => {
                       setSubmitError(null);
                       setPendingAction("update");
                     }}
                     disabled={!canSubmit}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opdater bruger
-                  </button>
+                  </Button>
                   {user.deleted_at ? (
-                    <button
+                    <Button
+                      variant="secondary"
                       type="button"
                       onClick={() => {
                         setSubmitError(null);
                         setPendingAction("reactivate");
                       }}
-                      className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
                       Genetabler brugers adgang
-                    </button>
+                    </Button>
                   ) : (
                     <div className="relative">
-                      <button
+                      <Button
+                        variant="danger"
                         type="button"
                         onClick={() => {
                           if (isLastAdmin) {
@@ -1214,10 +1198,10 @@ export function UserDetailsPage() {
                           setSubmitError(null);
                           setPendingAction("delete");
                         }}
-                        className="w-full rounded-lg border-2 border-red-600 bg-white px-2 py-1.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+                        className="w-full"
                       >
                         Bloker brugers adgang
-                      </button>
+                      </Button>
                       <InlinePopup
                         visible={warningKey === "last-admin"}
                         message="Kan ikke arkivere den sidste administrator i afdelingen."
@@ -1225,33 +1209,28 @@ export function UserDetailsPage() {
                       />
                     </div>
                   )}
-                </div>
+                </ButtonRow>
               ) : !user ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
+                <ButtonRow>
+                  <Button
+                    variant="secondary"
                     type="button"
                     onClick={() => {
                       setSubmitError(null);
                       setPendingAction("create");
                     }}
                     disabled={!canSubmit}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     Opret bruger
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setPendingAction("close")}
-                    className="rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
-                  >
+                  </Button>
+                  <Button variant="secondary" type="button" onClick={() => setPendingAction("close")}>
                     Fortryd
-                  </button>
-                </div>
+                  </Button>
+                </ButtonRow>
               ) : null}
-            </div>
-          </section>
-        </motion.main>
-      </div>
+            </PageSectionBody>
+          </PageSection>
+      </PageShell>
 
       {pendingAction && (
         <ConfirmDialog
@@ -1288,6 +1267,6 @@ export function UserDetailsPage() {
           }
         />
       )}
-    </div>
+    </>
   );
 }

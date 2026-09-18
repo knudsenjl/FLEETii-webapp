@@ -7,10 +7,15 @@
 // opens CostumerDetailsPage. The sibling "administration af installationer"
 // half lives on its own page — see InstallationAdministrationPage.tsx.
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { PageHeader } from "../components/PageHeader";
+import { PageShell } from "../components/PageShell";
+import { BlockedBadge } from "../components/BlockedBadge";
+import { STICKY_THEAD_CLASSNAME, TABLE_CLASSNAME } from "../lib/tableStyles";
+import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
+import { TableMessageRow } from "../components/TableMessageRow";
+import { SectionHeading } from "../components/SectionHeading";
 import { useAuth } from "../contexts/AuthContext";
 import { useScopeSwitch } from "../hooks/useScopeSwitch";
 import { supabase } from "../lib/supabase";
@@ -93,20 +98,8 @@ export function CostumerAdministrationPage() {
   }, []);
 
   return (
-    <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 px-4 py-6 text-brand-900 sm:px-6 lg:px-8">
-      <div
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_20%_0%,theme(colors.brand.100),transparent_45%)]"
-        aria-hidden="true"
-      />
-
-      <div className="mx-auto flex min-h-0 w-full max-w-7xl flex-1 flex-col gap-6">
-        <motion.main
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-          className="flex min-h-0 flex-1 flex-col"
-        >
-          <PageHeader
+    <PageShell>
+      <PageHeader
             kundeNavigate={{ onSelect: (id) => navigate(`/costumer-details/${id}`) }}
             afdelingNavigate={{
               onSelect: (department) =>
@@ -117,31 +110,25 @@ export function CostumerAdministrationPage() {
           />
 
           <section className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
-            <h2 className="text-xl font-semibold text-brand-800">Administration af kunder</h2>
+            <SectionHeading>Administration af kunder</SectionHeading>
             <InlinePopup visible={Boolean(resetScopeError)} message={resetScopeError ?? ""} align="right" />
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-              <table className="w-full border-collapse text-[0.7rem]">
-                <thead className="sticky top-0 z-10 bg-brand-50 text-[0.68rem] font-semibold uppercase tracking-wide text-brand-700">
+              <table className={TABLE_CLASSNAME}>
+                <thead className={STICKY_THEAD_CLASSNAME}>
                   <tr>
                     <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Navn</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-brand-100 bg-white">
                   {loading && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-brand-500">Indlæser kunder…</td>
-                    </tr>
+                    <TableMessageRow>Indlæser kunder…</TableMessageRow>
                   )}
                   {!loading && error && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-red-600">{error}</td>
-                    </tr>
+                    <TableMessageRow variant="error">{error}</TableMessageRow>
                   )}
                   {!loading && !error && costumers.length === 0 && (
-                    <tr>
-                      <td className="px-2 py-3 text-center text-brand-500">Ingen kunder fundet.</td>
-                    </tr>
+                    <TableMessageRow>Ingen kunder fundet.</TableMessageRow>
                   )}
                   {!loading &&
                     !error &&
@@ -172,9 +159,7 @@ export function CostumerAdministrationPage() {
                               <span>{costumer.name ?? "—"}</span>
                               <div className="flex shrink-0 items-center gap-2">
                                 {costumer.deactivated_at && (
-                                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-red-700">
-                                    Adgang blokeret
-                                  </span>
+                                  <BlockedBadge>Adgang blokeret</BlockedBadge>
                                 )}
                                 {!costumer.has_twohire_credentials && (
                                   <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
@@ -191,16 +176,15 @@ export function CostumerAdministrationPage() {
               </table>
             </div>
 
-            <button
+            <Button
+              variant="secondary"
               type="button"
               onClick={() => navigate("/costumer-new")}
-              className="w-full rounded-lg border border-brand-200 bg-brand-50 px-2 py-1.5 text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
+              className="w-full"
             >
               Opret kunde
-            </button>
+            </Button>
           </section>
-        </motion.main>
-      </div>
-    </div>
+    </PageShell>
   );
 }
