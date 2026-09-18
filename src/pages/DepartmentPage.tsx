@@ -271,7 +271,7 @@ export function DepartmentPage() {
             }}
           />
 
-          <PageSection minWidth0>
+          <PageSection>
             <div className="flex min-w-0 min-h-0 flex-1 flex-col gap-4">
               <div className="flex items-center justify-between gap-2">
                 <SectionHeading>

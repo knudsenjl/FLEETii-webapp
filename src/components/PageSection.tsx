@@ -1,11 +1,8 @@
 import type { ReactNode } from "react";
+import { usePageShellMinWidth0 } from "./PageShell";
 
 interface PageSectionProps {
   children: ReactNode;
-  /** Matches PageShell's own minWidth0 — needed by the same pages that pass
-   * it there (a wide scrollable table would otherwise force this wider than
-   * the viewport). */
-  minWidth0?: boolean;
   /** Extra classes for the handful of pages that put their scrollable
    * content's own gap/overflow-y-auto directly on this section instead of a
    * separate inner div (both are legitimate — content-specific, not part of
@@ -14,8 +11,12 @@ interface PageSectionProps {
 }
 
 /** The white bordered "card" section every page renders directly under its
- * PageHeader — previously hand-copied across 21 files. */
-export function PageSection({ children, minWidth0 = false, className = "" }: PageSectionProps) {
+ * PageHeader — previously hand-copied across 21 files. Reads minWidth0 from
+ * the enclosing PageShell via context rather than taking its own prop: the
+ * two were always passed the identical boolean at every call site, so a
+ * second explicit prop here was pure duplication. */
+export function PageSection({ children, className = "" }: PageSectionProps) {
+  const minWidth0 = usePageShellMinWidth0();
   const minW0 = minWidth0 ? "min-w-0 " : "";
   return (
     <section

@@ -5,17 +5,23 @@ import { HornIcon } from "./HornIcon";
 import { InlinePopup } from "./InlinePopup";
 
 interface VehicleLockControlsRowProps {
-  locked: boolean | null;
-  lockEnabled: boolean;
-  unlockEnabled: boolean;
-  lockLoading: boolean;
-  onToggleLock: (nextLocked: boolean) => Promise<boolean>;
-  lockConfirmationMessage: string | null;
-  isLocating: boolean;
-  locateConfirmationVisible: boolean;
-  onLocate: () => void;
-  honkConfirmationVisible: boolean;
-  onHonk: () => void;
+  lock: {
+    locked: boolean | null;
+    lockEnabled: boolean;
+    unlockEnabled: boolean;
+    loading: boolean;
+    onToggle: (nextLocked: boolean) => Promise<boolean>;
+    confirmationMessage: string | null;
+  };
+  locate: {
+    isLocating: boolean;
+    confirmationVisible: boolean;
+    onLocate: () => void;
+  };
+  honk: {
+    confirmationVisible: boolean;
+    onHonk: () => void;
+  };
 }
 
 /** The Lås/Blink/Horn control row shown on both BookingDetailsPage and
@@ -25,52 +31,42 @@ interface VehicleLockControlsRowProps {
  * it, this row's own automatic minimum size can collapse under
  * overflow-y-auto pressure from the scrolling ancestor while its buttons
  * keep their natural size, rendering them overlapping the map above
- * instead of pushing it up and being scrolled to. */
-export function VehicleLockControlsRow({
-  locked,
-  lockEnabled,
-  unlockEnabled,
-  lockLoading,
-  onToggleLock,
-  lockConfirmationMessage,
-  isLocating,
-  locateConfirmationVisible,
-  onLocate,
-  honkConfirmationVisible,
-  onHonk,
-}: VehicleLockControlsRowProps) {
+ * instead of pushing it up and being scrolled to. Props are grouped by
+ * control (lock/locate/honk) rather than flattened, since a flat 11-prop
+ * list obscured which fields belonged together. */
+export function VehicleLockControlsRow({ lock, locate, honk }: VehicleLockControlsRowProps) {
   return (
     <div className="flex shrink-0 gap-3">
       <VehicleLockToggle
         className="flex-1"
-        locked={locked}
-        lockEnabled={lockEnabled}
-        unlockEnabled={unlockEnabled}
-        loading={lockLoading}
-        onToggle={onToggleLock}
+        locked={lock.locked}
+        lockEnabled={lock.lockEnabled}
+        unlockEnabled={lock.unlockEnabled}
+        loading={lock.loading}
+        onToggle={lock.onToggle}
         cannotUnlockMessage="Du kan først låse op, når din reservation er startet"
         cannotLockMessage="Du kan kun låse køretøjer, efter reservationen er startet, og indtil køretøjet er i brug af en anden"
-        confirmationMessage={lockConfirmationMessage}
+        confirmationMessage={lock.confirmationMessage}
       />
       <div className="group relative flex-1">
         <Button
           variant="secondary"
           type="button"
-          onClick={onLocate}
-          disabled={isLocating}
+          onClick={locate.onLocate}
+          disabled={locate.isLocating}
           className="flex w-full items-center justify-center gap-2"
         >
           <HeadlightIcon />
-          {isLocating ? "Blinker…" : "Blink"}
+          {locate.isLocating ? "Blinker…" : "Blink"}
         </Button>
-        <InlinePopup visible={locateConfirmationVisible} message="Lygterne blinker" />
+        <InlinePopup visible={locate.confirmationVisible} message="Lygterne blinker" />
       </div>
       <div className="group relative flex-1">
-        <Button variant="secondary" type="button" onClick={onHonk} className="flex w-full items-center justify-center gap-2">
+        <Button variant="secondary" type="button" onClick={honk.onHonk} className="flex w-full items-center justify-center gap-2">
           <HornIcon />
           Horn
         </Button>
-        <InlinePopup visible={honkConfirmationVisible} message="Endnu ikke implementeret" />
+        <InlinePopup visible={honk.confirmationVisible} message="Endnu ikke implementeret" />
       </div>
     </div>
   );

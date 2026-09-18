@@ -713,27 +713,32 @@ export function VehicleDetailsPage() {
               )}
 
               <VehicleLockControlsRow
-                locked={vehicleLocked}
-                lockEnabled={lockEnabled}
-                unlockEnabled={unlockEnabled}
-                lockLoading={lockStateLoading}
-                onToggleLock={async (nextLocked) => {
-                  const success = await setLock(nextLocked);
-                  if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
-                  return success;
+                lock={{
+                  locked: vehicleLocked,
+                  lockEnabled,
+                  unlockEnabled,
+                  loading: lockStateLoading,
+                  onToggle: async (nextLocked) => {
+                    const success = await setLock(nextLocked);
+                    if (success) triggerLockConfirmation(nextLocked ? "locked" : "unlocked");
+                    return success;
+                  },
+                  confirmationMessage:
+                    lockConfirmationKey === "unlocked"
+                      ? "Køretøjet er nu låst op. God tur"
+                      : lockConfirmationKey === "locked"
+                        ? "Køretøjet er nu låst"
+                        : null,
                 }}
-                lockConfirmationMessage={
-                  lockConfirmationKey === "unlocked"
-                    ? "Køretøjet er nu låst op. God tur"
-                    : lockConfirmationKey === "locked"
-                      ? "Køretøjet er nu låst"
-                      : null
-                }
-                isLocating={isLocating}
-                locateConfirmationVisible={lockConfirmationKey === "located"}
-                onLocate={() => void handleLocate()}
-                honkConfirmationVisible={lockConfirmationKey === "horn"}
-                onHonk={handleHonk}
+                locate={{
+                  isLocating,
+                  confirmationVisible: lockConfirmationKey === "located",
+                  onLocate: () => void handleLocate(),
+                }}
+                honk={{
+                  confirmationVisible: lockConfirmationKey === "horn",
+                  onHonk: handleHonk,
+                }}
               />
 
               {lockError && <p className="shrink-0 text-sm text-red-600">{lockError}</p>}
