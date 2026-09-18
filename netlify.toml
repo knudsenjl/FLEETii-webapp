@@ -41,3 +41,22 @@
   for = "/templates/bulk-import/*.csv"
   [headers.values]
     Content-Type = "text/plain; charset=utf-8"
+
+# Vite content-hashes every filename under /assets/* (e.g.
+# index-Dfll3UuY.js) — any change to a file's content produces a new URL,
+# so it's safe for a repeat visitor's browser to cache these forever
+# instead of re-fetching them on every deploy.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# sw.js (vite-plugin-pwa's generated service worker) controls how the
+# whole precached app shell gets updated — unlike /assets/*, its filename
+# never changes, so caching it long-term would delay every future app
+# update reaching already-installed users. must-revalidate makes the
+# browser check for a fresh copy on every load instead.
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
