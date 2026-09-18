@@ -12,6 +12,7 @@ import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { DashboardTile } from "../components/DashboardTile";
 import { useAuth } from "../contexts/AuthContext";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
@@ -263,7 +264,7 @@ export function AdminFrontpage() {
           />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <div className="flex flex-col gap-3">
                 <Button
                   variant="secondary"
@@ -445,7 +446,7 @@ export function AdminFrontpage() {
                   </Button>
                 </div>
               )}
-            </div>
+            </PageSectionBody>
           </PageSection>
     </PageShell>
   );

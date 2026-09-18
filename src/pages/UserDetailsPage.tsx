@@ -11,6 +11,7 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 import { InlinePopup } from "../components/InlinePopup";
 import { FieldInfoButton } from "../components/FieldInfoButton";
 import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { PageShell } from "../components/PageShell";
 import { SettingsRow } from "../components/SettingsRow";
 import { SettingsSectionHeading } from "../components/SettingsSectionHeading";
@@ -808,7 +809,7 @@ export function UserDetailsPage() {
           <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <div className="rounded-2xl border border-brand-100">
                 {/* rounded-2xl lives here too (not just on the outer border,
                     with no overflow-hidden at all) so the Afdeling(er)/
@@ -1219,7 +1220,7 @@ export function UserDetailsPage() {
                   </Button>
                 </div>
               ) : null}
-            </div>
+            </PageSectionBody>
           </PageSection>
       </PageShell>
 

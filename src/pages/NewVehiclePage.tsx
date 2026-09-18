@@ -9,6 +9,7 @@ import { FieldInfoButton } from "../components/FieldInfoButton";
 import { FieldRow } from "../components/FieldRow";
 import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
 import { InlinePopup } from "../components/InlinePopup";
 import { Modal } from "../components/Modal";
@@ -293,7 +294,7 @@ export function NewVehiclePage() {
           <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <h2 className="text-xl font-semibold text-brand-800">Opret køretøj</h2>
 
               <div className="rounded-2xl border border-brand-100">
@@ -564,7 +565,7 @@ export function NewVehiclePage() {
                   </div>
                 </div>
               </div>
-            </div>
+            </PageSectionBody>
           </PageSection>
       </PageShell>
 

@@ -8,6 +8,7 @@ import { Button } from "../components/Button";
 import { QrScanButton } from "../components/QrScanButton";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
@@ -496,7 +497,7 @@ export function HandleVehiclePage() {
       <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <h2 className="text-xl font-semibold text-brand-800">Køretøj detaljer</h2>
 
               {loading && <p className="text-sm text-brand-500">Indlæser…</p>}
@@ -796,7 +797,7 @@ export function HandleVehiclePage() {
                   Fortryd
                 </Button>
               </div>
-            </div>
+            </PageSectionBody>
           </PageSection>
     </PageShell>
   );

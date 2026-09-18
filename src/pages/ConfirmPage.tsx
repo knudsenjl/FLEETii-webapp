@@ -6,6 +6,7 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { Button } from "../components/Button";
 import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { supabase } from "../lib/supabase";
 import {
   BOOKING_ID_COLUMN,
@@ -225,7 +226,7 @@ export function ConfirmPage() {
       <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <h2 className="text-xl font-semibold text-brand-800">
                 {editingBookingId ? "Rediger reservation" : "Opret reservation"}
               </h2>
@@ -263,7 +264,7 @@ export function ConfirmPage() {
                   {isSubmitting ? "Bekræfter…" : editingBookingId ? "Bekræft ændring" : "Bekræft reservation"}
                 </Button>
               </div>
-            </div>
+            </PageSectionBody>
           </PageSection>
     </PageShell>
   );

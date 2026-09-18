@@ -9,6 +9,7 @@ import { FieldList } from "../components/FieldList";
 import { TimeSelect } from "../components/TimeSelect";
 import { InlinePopup } from "../components/InlinePopup";
 import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { supabase } from "../lib/supabase";
 import type { EditingBooking } from "../lib/bookings";
 import {
@@ -589,7 +590,7 @@ export function ReservationPage() {
       <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <h2 className="text-xl font-semibold text-brand-800">
                 {editing ? "Rediger reservation" : "Opret reservation"}
               </h2>
@@ -818,7 +819,7 @@ export function ReservationPage() {
                   </Button>
                 </div>
               )}
-            </div>
+            </PageSectionBody>
           </PageSection>
     </PageShell>
   );

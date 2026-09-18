@@ -6,6 +6,7 @@ import { FieldRow } from "../components/FieldRow";
 import { FieldList } from "../components/FieldList";
 import { PageLoading } from "../components/PageLoading";
 import { PageShell } from "../components/PageShell";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { BlockedBadge } from "../components/BlockedBadge";
 import { PageSection } from "../components/PageSection";
@@ -280,7 +281,7 @@ export function BookingDetailsPage() {
           <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <h2 className="shrink-0 text-xl font-semibold text-brand-800">Reservationsdetaljer</h2>
 
               <FieldList>
@@ -473,7 +474,7 @@ export function BookingDetailsPage() {
               {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
 
               {error && <p className="shrink-0 text-sm text-red-600">{error}</p>}
-            </div>
+            </PageSectionBody>
           </PageSection>
       </PageShell>
 

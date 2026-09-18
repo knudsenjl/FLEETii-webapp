@@ -13,6 +13,7 @@ import { CarGlyph } from "../components/CarGlyph";
 import { FieldRow } from "../components/FieldRow";
 import { FieldList } from "../components/FieldList";
 import { PageSection } from "../components/PageSection";
+import { PageSectionBody } from "../components/PageSectionBody";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { HeadlightIcon } from "../components/HeadlightIcon";
 import { HornIcon } from "../components/HornIcon";
@@ -552,7 +553,7 @@ export function VehicleDetailsPage() {
           <PageHeader />
 
           <PageSection>
-            <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSectionBody>
               <div className="flex shrink-0 items-center justify-between">
                 <h2 className="text-xl font-semibold text-brand-800">Køretøjsdetaljer</h2>
                 {/* Driving-vehicle icon (only while 2hire's trip_detected is currently true) + red "!" health button — both admin/sysadm-only, right-aligned next to this heading. Replaces the old standalone Status row (removed 2026-09-11) as the header-level admin health summary for this vehicle — see lib/vehicleHealth.ts, shared with VehiclesPage.tsx's fleet table. */}
@@ -815,7 +816,7 @@ export function VehicleDetailsPage() {
                   )}
                 </div>
               )}
-            </div>
+            </PageSectionBody>
           </PageSection>
       </PageShell>
 
