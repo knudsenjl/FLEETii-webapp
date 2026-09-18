@@ -3,42 +3,78 @@
 // unauthenticated users to "/" and shows a "forbidden" notice to non-admins
 // on admin-only routes. "/about" is the one deliberately public route (it
 // must be reachable from LoginPage before a user has signed in).
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { VehicleProvider } from "./contexts/VehicleContext";
 import { isAnyAdmin } from "./lib/roles";
+import { AppLoadingScreen } from "./components/AppLoadingScreen";
 import { ProtectedRoute } from "./components/ProtectedRoute";
+// LoginPage is the one page loaded eagerly — it's what nearly every visit
+// renders first (via RootRoute below), so it ships in the initial bundle
+// instead of costing a round-trip through <Suspense> before anyone sees
+// anything. Every other route is lazy — most visits only ever touch a
+// handful of these, so there's no reason to make everyone download the
+// admin/fleet-management/import pages (and their dependencies, e.g. Leaflet)
+// up front.
 import { LoginPage } from "./pages/LoginPage";
-import { ReservationPage } from "./pages/ReservationPage";
-import { AvailablePage } from "./pages/AvailablePage";
-import { ConfirmPage } from "./pages/ConfirmPage";
-import { BookingsPage } from "./pages/BookingsPage";
-import { AllBookingsPage } from "./pages/AllBookingsPage";
-import { BookingDetailsPage } from "./pages/BookingDetailsPage";
-import { BookingPage } from "./pages/BookingPage";
-import { AdminFrontpage } from "./pages/AdminFrontpage";
-import { CostumerAdministrationPage } from "./pages/CostumerAdministrationPage";
-import { InstallationAdministrationPage } from "./pages/InstallationAdministrationPage";
-import { CostumerDetailsPage } from "./pages/CostumerDetailsPage";
-import { CostumerNewPage } from "./pages/CostumerNewPage";
-import { DepartmentDetailsPage } from "./pages/DepartmentDetailsPage";
-import { DepartmentPage } from "./pages/DepartmentPage";
-import { FleetManagementPage } from "./pages/FleetManagementPage";
-import { HandleVehiclePage } from "./pages/HandleVehiclePage";
-import { UserDetailsPage } from "./pages/UserDetailsPage";
-import { ImportUsersPage } from "./pages/ImportUsersPage";
-import { ImportVehiclesPage } from "./pages/ImportVehiclesPage";
-import { VehiclesPage } from "./pages/VehiclesPage";
-import { VehicleDetailsPage } from "./pages/VehicleDetailsPage";
-import { NewVehiclePage } from "./pages/NewVehiclePage";
-import { VehicleCreatePage } from "./pages/VehicleCreatePage";
-import { VehicleDeletePage } from "./pages/VehicleDeletePage";
-import { AboutPage } from "./pages/AboutPage";
-import { SettingsSuperadminPage } from "./pages/SettingsSuperadminPage";
-import { SettingsAdminPage } from "./pages/SettingsAdminPage";
-import { SetPasswordPage } from "./pages/SetPasswordPage";
-import { TwoHireCommandPage } from "./pages/TwoHireCommandPage";
+const ReservationPage = lazy(() => import("./pages/ReservationPage").then((m) => ({ default: m.ReservationPage })));
+const AvailablePage = lazy(() => import("./pages/AvailablePage").then((m) => ({ default: m.AvailablePage })));
+const ConfirmPage = lazy(() => import("./pages/ConfirmPage").then((m) => ({ default: m.ConfirmPage })));
+const BookingsPage = lazy(() => import("./pages/BookingsPage").then((m) => ({ default: m.BookingsPage })));
+const AllBookingsPage = lazy(() => import("./pages/AllBookingsPage").then((m) => ({ default: m.AllBookingsPage })));
+const BookingDetailsPage = lazy(() =>
+  import("./pages/BookingDetailsPage").then((m) => ({ default: m.BookingDetailsPage })),
+);
+const BookingPage = lazy(() => import("./pages/BookingPage").then((m) => ({ default: m.BookingPage })));
+const AdminFrontpage = lazy(() => import("./pages/AdminFrontpage").then((m) => ({ default: m.AdminFrontpage })));
+const CostumerAdministrationPage = lazy(() =>
+  import("./pages/CostumerAdministrationPage").then((m) => ({ default: m.CostumerAdministrationPage })),
+);
+const InstallationAdministrationPage = lazy(() =>
+  import("./pages/InstallationAdministrationPage").then((m) => ({ default: m.InstallationAdministrationPage })),
+);
+const CostumerDetailsPage = lazy(() =>
+  import("./pages/CostumerDetailsPage").then((m) => ({ default: m.CostumerDetailsPage })),
+);
+const CostumerNewPage = lazy(() => import("./pages/CostumerNewPage").then((m) => ({ default: m.CostumerNewPage })));
+const DepartmentDetailsPage = lazy(() =>
+  import("./pages/DepartmentDetailsPage").then((m) => ({ default: m.DepartmentDetailsPage })),
+);
+const DepartmentPage = lazy(() => import("./pages/DepartmentPage").then((m) => ({ default: m.DepartmentPage })));
+const FleetManagementPage = lazy(() =>
+  import("./pages/FleetManagementPage").then((m) => ({ default: m.FleetManagementPage })),
+);
+const HandleVehiclePage = lazy(() =>
+  import("./pages/HandleVehiclePage").then((m) => ({ default: m.HandleVehiclePage })),
+);
+const UserDetailsPage = lazy(() => import("./pages/UserDetailsPage").then((m) => ({ default: m.UserDetailsPage })));
+const ImportUsersPage = lazy(() => import("./pages/ImportUsersPage").then((m) => ({ default: m.ImportUsersPage })));
+const ImportVehiclesPage = lazy(() =>
+  import("./pages/ImportVehiclesPage").then((m) => ({ default: m.ImportVehiclesPage })),
+);
+const VehiclesPage = lazy(() => import("./pages/VehiclesPage").then((m) => ({ default: m.VehiclesPage })));
+const VehicleDetailsPage = lazy(() =>
+  import("./pages/VehicleDetailsPage").then((m) => ({ default: m.VehicleDetailsPage })),
+);
+const NewVehiclePage = lazy(() => import("./pages/NewVehiclePage").then((m) => ({ default: m.NewVehiclePage })));
+const VehicleCreatePage = lazy(() =>
+  import("./pages/VehicleCreatePage").then((m) => ({ default: m.VehicleCreatePage })),
+);
+const VehicleDeletePage = lazy(() =>
+  import("./pages/VehicleDeletePage").then((m) => ({ default: m.VehicleDeletePage })),
+);
+const AboutPage = lazy(() => import("./pages/AboutPage").then((m) => ({ default: m.AboutPage })));
+const SettingsSuperadminPage = lazy(() =>
+  import("./pages/SettingsSuperadminPage").then((m) => ({ default: m.SettingsSuperadminPage })),
+);
+const SettingsAdminPage = lazy(() =>
+  import("./pages/SettingsAdminPage").then((m) => ({ default: m.SettingsAdminPage })),
+);
+const SetPasswordPage = lazy(() => import("./pages/SetPasswordPage").then((m) => ({ default: m.SetPasswordPage })));
+const TwoHireCommandPage = lazy(() =>
+  import("./pages/TwoHireCommandPage").then((m) => ({ default: m.TwoHireCommandPage })),
+);
 
 /**
  * The "/" route. Once the initial auth check finishes, sends a signed-in
@@ -112,267 +148,269 @@ function App() {
     <AuthProvider>
       <VehicleProvider>
         <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<RootRoute />} />
-          <Route
-            path="/reservation"
-            element={
-              <ProtectedRoute>
-                <ReservationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/available"
-            element={
-              <ProtectedRoute>
-                <AvailablePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/confirm"
-            element={
-              <ProtectedRoute>
-                <ConfirmPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/bookings"
-            element={
-              <ProtectedRoute requireRole="user">
-                <BookingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/allbookings"
-            element={
-              <ProtectedRoute requireAdmin>
-                <AllBookingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/booking-details/:bookingId"
-            element={
-              <ProtectedRoute>
-                <BookingDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/booking"
-            element={
-              <ProtectedRoute requireRole="user">
-                <BookingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requireAdmin>
-                <AdminFrontpage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/costumers"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <CostumerAdministrationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/sysadm-installations"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <InstallationAdministrationPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/2hire-command"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <TwoHireCommandPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/costumer-new"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <CostumerNewPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/costumer-details/:costumerId"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <CostumerDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/department-details"
-            element={
-              <ProtectedRoute requireAdmin>
-                <DepartmentDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicle-create"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <VehicleCreatePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicle-create/:orderId"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <VehicleCreatePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicle-delete"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <VehicleDeletePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicle-delete/:orderId"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <VehicleDeletePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/department"
-            element={
-              <ProtectedRoute requireAdmin>
-                <DepartmentPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fleet-map"
-            element={
-              <ProtectedRoute requireAdmin>
-                <FleetManagementPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/edit-vehicle"
-            element={
-              <ProtectedRoute requireAdmin>
-                <HandleVehiclePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/user-details"
-            element={
-              <ProtectedRoute requireAdmin>
-                <UserDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/user-details/:userId"
-            element={
-              <ProtectedRoute>
-                <UserDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/import-users"
-            element={
-              <ProtectedRoute requireAdmin>
-                <ImportUsersPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/fleet-table"
-            element={
-              <ProtectedRoute requireAdmin>
-                <VehiclesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vehicle-details/:vehicleId"
-            element={
-              <ProtectedRoute>
-                <VehicleDetailsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/new-vehicle"
-            element={
-              <ProtectedRoute requireAdmin>
-                <NewVehiclePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/import-vehicles"
-            element={
-              <ProtectedRoute requireAdmin>
-                <ImportVehiclesPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/set-password"
-            element={
-              <ProtectedRoute>
-                <SetPasswordPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings-superadmin"
-            element={
-              <ProtectedRoute requireRole="sysadm">
-                <SettingsSuperadminPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/department-settings"
-            element={
-              <ProtectedRoute requireAdmin>
-                <SettingsAdminPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings-user"
-            element={
-              <ProtectedRoute>
-                <SettingsUserRedirect />
-              </ProtectedRoute>
-            }
-          />
-          <Route path="/about" element={<AboutPage />} />
-          <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        <Suspense fallback={<AppLoadingScreen />}>
+          <Routes>
+            <Route path="/" element={<RootRoute />} />
+            <Route
+              path="/reservation"
+              element={
+                <ProtectedRoute>
+                  <ReservationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/available"
+              element={
+                <ProtectedRoute>
+                  <AvailablePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/confirm"
+              element={
+                <ProtectedRoute>
+                  <ConfirmPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/bookings"
+              element={
+                <ProtectedRoute requireRole="user">
+                  <BookingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/allbookings"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AllBookingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/booking-details/:bookingId"
+              element={
+                <ProtectedRoute>
+                  <BookingDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/booking"
+              element={
+                <ProtectedRoute requireRole="user">
+                  <BookingPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <AdminFrontpage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/costumers"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <CostumerAdministrationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sysadm-installations"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <InstallationAdministrationPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/2hire-command"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <TwoHireCommandPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/costumer-new"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <CostumerNewPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/costumer-details/:costumerId"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <CostumerDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/department-details"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <DepartmentDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicle-create"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <VehicleCreatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicle-create/:orderId"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <VehicleCreatePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicle-delete"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <VehicleDeletePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicle-delete/:orderId"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <VehicleDeletePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/department"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <DepartmentPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/fleet-map"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <FleetManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/edit-vehicle"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <HandleVehiclePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-details"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <UserDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/user-details/:userId"
+              element={
+                <ProtectedRoute>
+                  <UserDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/import-users"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ImportUsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/fleet-table"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <VehiclesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/vehicle-details/:vehicleId"
+              element={
+                <ProtectedRoute>
+                  <VehicleDetailsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/new-vehicle"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <NewVehiclePage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/import-vehicles"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <ImportVehiclesPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/set-password"
+              element={
+                <ProtectedRoute>
+                  <SetPasswordPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings-superadmin"
+              element={
+                <ProtectedRoute requireRole="sysadm">
+                  <SettingsSuperadminPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/department-settings"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <SettingsAdminPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings-user"
+              element={
+                <ProtectedRoute>
+                  <SettingsUserRedirect />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/about" element={<AboutPage />} />
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Routes>
+        </Suspense>
       </VehicleProvider>
     </AuthProvider>
   );
