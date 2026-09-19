@@ -20,7 +20,7 @@ export function PageSection({ children, className = "" }: PageSectionProps) {
   const minW0 = minWidth0 ? "min-w-0 " : "";
   return (
     <section
-      className={`flex ${minW0}min-h-0 flex-1 flex-col rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6 ${className}`.trim()}
+      className={`flex ${minW0}min-h-0 flex-1 flex-col rounded-2xl border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6 ${className}`.trim()}
     >
       {children}
     </section>

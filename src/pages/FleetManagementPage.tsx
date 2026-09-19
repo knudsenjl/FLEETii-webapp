@@ -282,7 +282,7 @@ export function FleetManagementPage() {
               }}
             />
 
-            <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+            <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-2 space-y-4">
                 <SectionHeading>
                   Flådestyring{targetCostumerName ? ` hos ${targetCostumerName}` : ""}

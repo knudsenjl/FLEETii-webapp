@@ -139,7 +139,7 @@ export function BulkImportPage({
     <PageShell>
       <PageHeader />
 
-          <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <section className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto rounded-2xl border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <SectionHeading>{pageTitle}</SectionHeading>
             <p className="text-sm text-brand-800">
               Her kan du oprette en række {nounPlural.toLowerCase()} på én gang ved at give oplysninger om de nye{" "}

@@ -117,7 +117,7 @@ function settingsMenuItemsForRole(role: string | null | undefined, ownUserId: st
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
-/** Standard page header: logo, sign-out button (only when logged in), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "Data Filter" button (only when logged in — funnel icon, same as every page's own former "Filtrer" button; opens a popup with a Kunde+Afdeling <select> pair, or a 3s "no departments" InlinePopup in the edge case a non-sysadm has none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the popup's Afdeling <select> lists every department under the currently-picked Kunde (or every department platform-wide once the Kunde <select> is "Alle" — see AuthContext's loadAvailableDepartments), and picking "Alle" in the Afdeling <select> alone (Kunde left as-is) persists that Kunde's own "every department" scope rather than fully unscoping — see handleSwitch's own doc comment. A regular admin never sees the Kunde <select> at all — only Afdeling, listing their own grant list, always scoped to their own single costumer. Deliberately styled as labeled <select> fields (same classes as every page's own "Filtrer" funnel popup, e.g. VehiclesPage.tsx) rather than a custom menu — this is the single, persisted source of truth for the app-wide Kunde/Afdeling scope those per-page popups themselves read (see the filter-redesign work), so sharing their visual language keeps the two families of popup legible as the same kind of control. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
+/** Standard page header: logo, sign-out button (only when logged in), a back button (only when logged in — plain browser-history navigate(-1), sits between sign-out and reload), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "Data Filter" button (only when logged in — funnel icon, same as every page's own former "Filtrer" button; opens a popup with a Kunde+Afdeling <select> pair, or a 3s "no departments" InlinePopup in the edge case a non-sysadm has none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the popup's Afdeling <select> lists every department under the currently-picked Kunde (or every department platform-wide once the Kunde <select> is "Alle" — see AuthContext's loadAvailableDepartments), and picking "Alle" in the Afdeling <select> alone (Kunde left as-is) persists that Kunde's own "every department" scope rather than fully unscoping — see handleSwitch's own doc comment. A regular admin never sees the Kunde <select> at all — only Afdeling, listing their own grant list, always scoped to their own single costumer. Deliberately styled as labeled <select> fields (same classes as every page's own "Filtrer" funnel popup, e.g. VehiclesPage.tsx) rather than a custom menu — this is the single, persisted source of truth for the app-wide Kunde/Afdeling scope those per-page popups themselves read (see the filter-redesign work), so sharing their visual language keeps the two families of popup legible as the same kind of control. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
  * every other page stays the full header): shrinks the logo and drops the
@@ -367,6 +367,20 @@ export function PageHeader({
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <path d="M16 17l5-5-5-5" />
                 <path d="M21 12H9" />
+              </svg>
+            </button>
+          )}
+          {isFullyAuthenticated && (
+            <button
+              type="button"
+              onClick={() => navigate(-1)}
+              aria-label="Tilbage"
+              title="Tilbage"
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-brand-50 text-brand-700 transition hover:bg-brand-100"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
+                <path d="M19 12H5" />
+                <path d="M12 19l-7-7 7-7" />
               </svg>
             </button>
           )}
