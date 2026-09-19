@@ -131,12 +131,14 @@ export function AboutPage() {
 
               <div className="mt-auto flex flex-col gap-3 rounded-2xl border border-brand-100 bg-brand-50/60 p-4">
                 <h3 className="text-sm font-semibold text-brand-800">Kontaktoplysninger</h3>
-                <div className="flex flex-col gap-0.5 text-sm text-brand-700">
+                {/* 2-column grid, 6 cells in row-major DOM order (name/CVR,
+                    address-line-1/phone, address-line-2/email) — grid rows
+                    size to the tallest cell in that row, so the icon rows in
+                    the right column can never drift out of line with the
+                    plain-text rows in the left column the way two
+                    independent flex-col stacks could. */}
+                <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm text-brand-700">
                   <p className="font-medium text-brand-800">FLEETii</p>
-                  <p>Stokagervej 8D</p>
-                  <p>8240 Risskov</p>
-                </div>
-                <div className="flex flex-col gap-1.5 text-sm text-brand-700">
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-brand-500">
@@ -149,14 +151,16 @@ export function AboutPage() {
                     </span>
                     <span>CVR: 31 98 30 37</span>
                   </div>
+                  <p>Stokagervej 8D</p>
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-brand-500">
                         <path d="M6.6 10.8c1.4 2.8 3.8 5.2 6.6 6.6l2.2-2.2c.3-.3.7-.4 1.1-.3 1.2.4 2.5.6 3.8.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.6.6 3.8.1.4 0 .8-.3 1.1L6.6 10.8Z" />
                       </svg>
                     </span>
-                    <a href="tel:+4570608689" className="hover:underline">70 60 86 89</a>
+                    <a href="tel:+4570608689" className="hover:underline">+45 70 60 86 89</a>
                   </div>
+                  <p>8240 Risskov</p>
                   <div className="flex items-center gap-2">
                     <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 text-brand-500">
