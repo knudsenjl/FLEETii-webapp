@@ -5,4 +5,4 @@
 // copies drifting apart over time. See the repo's own LICENSE file for the
 // full ownership terms this clause is a short-form summary of.
 export const ANTI_CLONING_NOTICE =
-  "Det er ikke tilladt at kopiere, dekompilere, foretage reverse engineering af, eller på anden måde forsøge at udtrække hele eller dele af kildekode, brugerflade-design eller forretningslogik fra FLEETii-platformen, herunder (men ikke udtømmende) med henblik på at udvikle et konkurrerende produkt. Enhver sådan handling udgør en væsentlig misligholdelse af disse vilkår.";
+  "Det er ikke tilladt at kopiere, dekompilere, foretage reverse engineering af, eller på anden måde forsøge at udtrække hele eller dele af kildekode, brugerflade-design eller forretningslogik fra FLEETii-platformen, herunder (men ikke udtømmende) med henblik på at udvikle et konkurrerende produkt. Enhver sådan handling udgør en væsentlig misligholdelse.";
