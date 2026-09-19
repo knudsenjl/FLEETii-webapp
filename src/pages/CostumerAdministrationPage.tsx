@@ -109,7 +109,7 @@ export function CostumerAdministrationPage() {
             }}
           />
 
-          <section className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-none border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
+          <section className="relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto rounded-2xl border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
             <SectionHeading>Administration af kunder</SectionHeading>
             <InlinePopup visible={Boolean(resetScopeError)} message={resetScopeError ?? ""} align="right" />
 
