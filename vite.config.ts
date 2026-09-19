@@ -30,6 +30,20 @@ export default defineConfig({
         // (still cached by the browser's normal HTTP cache) on demand.
         globPatterns: ['**/*.{js,css,html,svg,png,ico}'],
         globIgnores: ['manualer/**', 'templates/**'],
+        // vite-plugin-pwa's default navigateFallback catches EVERY
+        // navigation request (no extension-based exclusion, unlike plain
+        // workbox-build) and serves index.html for it — including a
+        // target="_blank" open of a manual under public/manualer/, which is
+        // a top-level navigation like any other. That silently replaced the
+        // real static manual with a fresh, unauthenticated boot of the SPA
+        // (looking like a forced logout) — most reliably reproducible on an
+        // iOS home-screen install, where target="_blank" navigates the same
+        // single, service-worker-controlled window instead of opening a
+        // real new tab. Denylisting these two static-file directories (the
+        // same ones globIgnores already keeps out of precaching, for the
+        // same reason — see its own comment) makes the SW pass their
+        // navigations straight through to the network instead.
+        navigateFallbackDenylist: [/^\/manualer\//, /^\/templates\//],
       },
     }),
   ],
