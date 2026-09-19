@@ -17,7 +17,7 @@ import { isPasswordRecoveryCallback, supabase } from "../lib/supabase";
 import { fetchSettingText } from "../lib/settings";
 import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 
-/** localStorage key for the idle-timeout tracker below — deliberately plain localStorage regardless of "remember me" (lib/supabase.ts's rememberAwareStorage), since it needs to survive a full browser/VS Code restart to catch "closed overnight" — a non-sensitive timestamp, not the session itself. */
+/** localStorage key for the idle-timeout tracker below — deliberately plain localStorage regardless of "remember me" (lib/supabase.ts's rememberAwareStorage), since it needs to survive a full browser/VS Code restart to catch "closed overnight" — a non-sensitive timestamp, not the session itself. Also written to (same key, same throttle, same event list, hand-copied since a static file can't import this constant) by each public/manualer/*.html's own inline script — without that, reading a manual (a real full-page navigation away from the React app, so nothing here runs while it's open) let this go stale and walked the user straight into an immediate forced idle-logout the moment they clicked "Tilbage til FLEETii" and this effect re-ran. */
 const LAST_ACTIVITY_KEY = "fleetii_last_activity";
 /** Used when neither user_settings nor department_settings has a "Session_timeout" row yet (see StandardSettings.tsx, which is where an admin/user actually sets this) — keep in sync with that component's own defaultValue. */
 const DEFAULT_IDLE_TIMEOUT_MINUTES = 30;

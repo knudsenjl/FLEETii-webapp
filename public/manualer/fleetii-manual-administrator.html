@@ -800,6 +800,32 @@
 
 <script>
   (function () {
+    // Mirrors AuthContext.tsx's own LAST_ACTIVITY_KEY/idle-timeout tracking
+    // (same key name, throttle and event list — keep in sync if those ever
+    // change there, since this static page can't import the constants).
+    // This manual is a separate static page with no React app running, so
+    // without this, time spent actually reading it doesn't advance the
+    // shared activity timestamp: it goes stale while you're here, and
+    // clicking "Tilbage til FLEETii" walks straight into an immediate
+    // forced idle-logout the instant the app reloads and checks it —
+    // reported as the header suddenly missing "Log ud" and every other
+    // logged-in-only button.
+    var KEY = 'fleetii_last_activity';
+    var THROTTLE_MS = 30000;
+    var last = 0;
+    function recordActivity() {
+      var now = Date.now();
+      if (now - last < THROTTLE_MS) return;
+      last = now;
+      try { localStorage.setItem(KEY, String(now)); } catch (e) { /* ignore storage errors */ }
+    }
+    recordActivity();
+    ['mousedown', 'keydown', 'scroll', 'touchstart'].forEach(function (evt) {
+      document.addEventListener(evt, recordActivity, { passive: true });
+    });
+  })();
+
+  (function () {
     var btn = document.getElementById('tocMenuBtn');
     var menu = document.getElementById('tocMenu');
     if (!btn || !menu) return;
