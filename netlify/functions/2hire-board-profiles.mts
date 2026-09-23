@@ -9,12 +9,12 @@
 // profile catalog this lists depends on a credential, resolved the same way
 // as every other function this plan touches — requires the caller to send
 // ?costumerId=... (VehicleCreatePage.tsx already has order.costumer_id in
-// scope where this is called) even though this route stays sysadm-only
-// (always resolves to the global credential in practice — see
-// delete-vehicle.mts's identical reasoning for resolving fresh rather than
-// hardcoding).
+// scope where this is called). The route is sysadm-only, but the credential
+// is resolved as the TARGET COSTUMER's — NOT the global
+// one — so the profile catalog matches the account registerVehicle will
+// register into (see 2hire-register-vehicle.mts).
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
+import { requireSysadm } from "./_shared/serverAuth.js";
 import { getTwoHireBoardProfiles } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -40,15 +40,7 @@ export default async (req: Request) => {
   const { admin } = adminClientResult;
 
   try {
-    const { data: caller, error: callerError } = await admin
-      .from("user_profiles")
-      .select("role")
-      .eq("user_id", authResult.userId)
-      .maybeSingle<{ role: string }>();
-    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
-
-    const isSysadm = isSysadmRole(caller?.role);
-    const credentials = await resolveTwoHireCredentials(admin, { isSysadm, costumerId });
+    const credentials = await resolveTwoHireCredentials(admin, { costumerId });
 
     const profiles = await getTwoHireBoardProfiles(credentials);
     return new Response(JSON.stringify({ profiles }), {

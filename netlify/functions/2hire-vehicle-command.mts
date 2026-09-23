@@ -23,8 +23,7 @@
 //
 // Per the "per-costumer 2hire credentials" plan: which 2hire credential
 // authenticates this command depends on the TARGET vehicle's costumer (not
-// the caller's own costumer_id, which a sysadm doesn't have) and
-// whether the caller is a sysadm — resolved fresh via a service-role
+// the caller's own costumer_id, which a sysadm doesn't have) — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
 import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
 import { getAdminClient } from "./_shared/adminClient.js";
@@ -127,7 +126,6 @@ export default async (req: Request) => {
     }
 
     const credentials = await resolveTwoHireCredentials(admin, {
-      isSysadm,
       costumerId: vehicle?.costumer_id ?? null,
     });
 

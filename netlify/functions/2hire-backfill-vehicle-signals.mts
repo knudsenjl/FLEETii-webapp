@@ -14,10 +14,10 @@
 // SPECIFIC_SIGNALS_TO_SEED by hand, since there's no shared constant between
 // the two yet and this file is expected to be short-lived).
 //
-// Always authenticates as the global/sysadm 2hire credential — same
-// reasoning as 2hire-raw-command.mts: this is a diagnostic/maintenance tool,
-// not a user-facing feature, so there's no per-costumer credential scoping
-// to resolve.
+// Each vehicle is fetched with its OWN costumer's sub-account credential
+// (resolveTwoHireCredentials, cached per costumer for the run) — vehicles
+// live in their costumer's 2hire sub-account, so the global credential
+// can't be assumed to reach them.
 //
 // dryRun: true previews (fetches from 2hire, reports what WOULD be written,
 // writes nothing) — always try this first. dryRun: false (or omitted)
@@ -28,9 +28,9 @@ import { requireSysadm } from "./_shared/serverAuth.js";
 import {
   fetchGenericVehicleSignal,
   fetchSpecificVehicleSignal,
-  getGlobalCredentials,
   type TwoHireCredentials,
 } from "./_shared/twoHireClient.js";
+import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
 const GENERIC_SIGNALS = ["distance_covered", "autonomy_percentage", "autonomy_meters", "position", "online"] as const;
 const SPECIFIC_SIGNALS = ["trip_detected"] as const;
@@ -97,8 +97,8 @@ export default async (req: Request) => {
 
   const { data: vehicles, error: vehiclesError } = await admin
     .from("vehicle_profiles")
-    .select("vehicle_id, number_plate")
-    .returns<{ vehicle_id: string; number_plate: string | null }[]>();
+    .select("vehicle_id, number_plate, costumer_id")
+    .returns<{ vehicle_id: string; number_plate: string | null; costumer_id: string | null }[]>();
   if (vehiclesError) {
     return new Response(JSON.stringify({ error: `vehicle_profiles: ${vehiclesError.message}` }), { status: 500 });
   }
@@ -115,7 +115,19 @@ export default async (req: Request) => {
 
   const existingPairs = new Set((existingSignals ?? []).map((row) => `${row.vehicle_id} ${row.signal_type}`));
 
-  const credentials = getGlobalCredentials();
+  // One credential lookup per costumer, memoized as a promise so concurrent
+  // workers for the same costumer share it. A costumer whose credential can't
+  // be resolved rejects here, and is reported per-pair as a failure below.
+  const credentialsByCostumer = new Map<string, Promise<TwoHireCredentials>>();
+  const credentialsFor = (costumerId: string | null) => {
+    const key = costumerId ?? "";
+    let cached = credentialsByCostumer.get(key);
+    if (!cached) {
+      cached = resolveTwoHireCredentials(admin, { costumerId });
+      credentialsByCostumer.set(key, cached);
+    }
+    return cached;
+  };
 
   const missingPairs = (vehicles ?? []).flatMap((vehicle) =>
     ALL_SIGNALS.filter((target) => !existingPairs.has(`${vehicle.vehicle_id} ${target.signal}`)).map((target) => ({
@@ -130,6 +142,7 @@ export default async (req: Request) => {
 
   await runWithConcurrency(missingPairs, CONCURRENT_REQUESTS, async ({ vehicle, target }) => {
     try {
+      const credentials = await credentialsFor(vehicle.costumer_id);
       const reading = await fetchOne(target, vehicle.vehicle_id, credentials);
       if (!reading) {
         noData += 1;
