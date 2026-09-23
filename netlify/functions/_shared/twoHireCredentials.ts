@@ -6,12 +6,15 @@
 // while twoHireClient.ts itself stays a plain HTTP client with no DB
 // dependency at all.
 //
+// There is deliberately NO "caller is a sysadm -> global credential" shortcut:
+// vehicles live in their costumer's own 2hire sub-account, so even a
+// sysadm-initiated operation must authenticate as the TARGET costumer (the
+// global credential would register into / address the wrong account).
+// The global credential is used only by explicitly cross-costumer sysadm
+// tooling that calls getGlobalCredentials() directly.
+//
 // The rule, in order:
-//   1. A sysadm-initiated operation — always the global credential,
-//      in EVERY environment, regardless of which costumer's vehicle is
-//      being touched (2hire's own "best practice" pattern: one master
-//      account whose credential can reach every sub-account too).
-//   2. The TARGET costumer's own sub-account credential — used whenever
+//   1. The TARGET costumer's own sub-account credential — used whenever
 //      it's actually configured (both costumers.twohire_client_id AND
 //      twohire_client_secret set), in EVERY environment, not just
 //      production. This is deliberate: pointing a staging costumer's own
@@ -20,17 +23,14 @@
 //      previously test mode short-circuited to the global credential
 //      unconditionally and never even queried these columns, so there was
 //      no way to exercise this branch outside production.
-//   3. Not configured — in production, a hard error (a real costumer must
+//   2. Not configured — a hard error in EVERY environment (a costumer must
 //      never silently borrow the master/global credential just because
-//      nobody's set theirs up yet). In every other environment, falls back
-//      to the global credential instead, same as every costumer nobody has
-//      bothered to configure test credentials for has always behaved.
+//      nobody's set theirs up yet). Staging used to fall back to the global
+//      credential here, which masked missing-credential problems until they
+//      hit production; a staging costumer that needs to work now needs its
+//      own twohire_client_id/secret columns pointed at the test credential.
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { getGlobalCredentials, type TwoHireCredentials } from "./twoHireClient.js";
-
-function isProductionMode(): boolean {
-  return process.env.VITE_DATA_SOURCE === "2hire-production-adaptor";
-}
+import type { TwoHireCredentials } from "./twoHireClient.js";
 
 /**
  * Resolves the 2hire credential set for one operation. `costumerId` is the
@@ -48,12 +48,8 @@ function isProductionMode(): boolean {
  */
 export async function resolveTwoHireCredentials(
   admin: SupabaseClient,
-  opts: { isSysadm: boolean; costumerId: string | null },
+  opts: { costumerId: string | null },
 ): Promise<TwoHireCredentials> {
-  if (opts.isSysadm) {
-    return getGlobalCredentials();
-  }
-
   if (opts.costumerId) {
     const { data, error } = await admin
       .from("costumers")
@@ -67,14 +63,8 @@ export async function resolveTwoHireCredentials(
     if (data?.twohire_client_id && data?.twohire_client_secret) {
       return { clientId: data.twohire_client_id, clientSecret: data.twohire_client_secret };
     }
-    if (isProductionMode()) {
-      throw new Error(
-        `${data?.name ?? "Denne kunde"} har ikke fået konfigureret 2hire-adgang endnu — kontakt FLEETii.`,
-      );
-    }
-  } else if (isProductionMode()) {
-    throw new Error("Kunne ikke bestemme hvilken kunde denne handling gælder for.");
+    throw new Error(`${data?.name ?? "Denne kunde"} har ikke fået konfigureret 2hire-adgang endnu — kontakt FLEETii.`);
   }
 
-  return getGlobalCredentials();
+  throw new Error("Kunne ikke bestemme hvilken kunde denne handling gælder for.");
 }

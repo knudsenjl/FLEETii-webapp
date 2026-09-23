@@ -17,12 +17,10 @@
 // Per the "per-costumer 2hire credentials" plan: deregisterVehicle needs the
 // TARGET vehicle's own credential (its costumer's sub-account, not
 // necessarily the global one) even though this route is itself
-// sysadm-gated — resolveTwoHireCredentials always resolves the
-// caller's role fresh rather than assuming "sysadm route therefore
-// always global", so the logic stays correct if this route's access ever
-// widens.
+// sysadm-gated — resolveTwoHireCredentials never substitutes the global
+// credential for a sysadm caller.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
+import { requireSysadm } from "./_shared/serverAuth.js";
 import { deregisterVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
@@ -104,24 +102,14 @@ export default async (req: Request) => {
 
   let deregisterWarning: string | null = null;
   try {
-    const [{ data: vehicle, error: vehicleError }, { data: caller, error: callerError }] = await Promise.all([
-      admin
-        .from("vehicle_profiles")
-        .select("costumer_id")
-        .eq("vehicle_id", vehicleId)
-        .maybeSingle<{ costumer_id: string | null }>(),
-      admin
-        .from("user_profiles")
-        .select("role")
-        .eq("user_id", authResult.userId)
-        .maybeSingle<{ role: string }>(),
-    ]);
+    const { data: vehicle, error: vehicleError } = await admin
+      .from("vehicle_profiles")
+      .select("costumer_id")
+      .eq("vehicle_id", vehicleId)
+      .maybeSingle<{ costumer_id: string | null }>();
     if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
-    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
 
-    const isSysadm = isSysadmRole(caller?.role);
     const credentials = await resolveTwoHireCredentials(admin, {
-      isSysadm,
       costumerId: vehicle?.costumer_id ?? null,
     });
 

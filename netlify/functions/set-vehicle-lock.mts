@@ -34,9 +34,8 @@
 //
 // Per the "per-costumer 2hire credentials" plan: the credential used to
 // authenticate the real 2hire command is resolved from the TARGET vehicle's
-// costumer_id (not the caller's own — a sysadm has none) plus whether
-// the caller is a sysadm, same as every other function this plan
-// touches.
+// costumer_id (not the caller's own — a sysadm has none), same as every
+// other function this plan touches.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
 import { getAdminClient } from "./_shared/adminClient.js";
@@ -177,7 +176,6 @@ export default async (req: Request) => {
   // Lås/Lås op needs to know the vehicle didn't actually respond.
   try {
     const credentials = await resolveTwoHireCredentials(admin, {
-      isSysadm,
       costumerId: vehicle.costumer_id,
     });
 

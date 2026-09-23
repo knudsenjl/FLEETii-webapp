@@ -44,13 +44,18 @@
 //
 // Per the "per-costumer 2hire credentials" plan: registerVehicle authenticates
 // with the order's own costumer_id's sub-account credential (resolved fresh
-// via resolveTwoHireCredentials, not hardcoded to global) even though this
-// route is itself sysadm-gated — see delete-vehicle.mts's identical
-// reasoning.
+// via resolveTwoHireCredentials) even though this route is itself
+// sysadm-gated — the global credential would register the vehicle in the
+// wrong 2hire account.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { persistVehicleSignal } from "./_shared/persistVehicleSignal.js";
-import { isSysadmRole, requireSysadm } from "./_shared/serverAuth.js";
-import { fetchGenericVehicleSignal, fetchSpecificVehicleSignal, registerVehicle } from "./_shared/twoHireClient.js";
+import { requireSysadm } from "./_shared/serverAuth.js";
+import {
+  fetchGenericVehicleSignal,
+  fetchSpecificVehicleSignal,
+  registerVehicle,
+  type TwoHireCredentials,
+} from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
 
 /** The GENERIC signals read back right after a successful registration — see the post-registration signal-seeding step at the bottom of this function. "locked" replaced with "online" (2026-09-08: "locked" doesn't actually resolve against 2hire's real API, confirmed via the /2hire-command console). */
@@ -138,19 +143,16 @@ export default async (req: Request) => {
   // Resolved once here (not just inside the registerVehicle branch below) so
   // it's also available for the post-registration signal fetch at the end of
   // this function, on BOTH the first-time-registration path and the
-  // reuse-existing-vehicleId retry path.
-  const { data: caller, error: callerError } = await admin
-    .from("user_profiles")
-    .select("role")
-    .eq("user_id", authResult.userId)
-    .maybeSingle<{ role: string }>();
-  if (callerError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), {
-      status: 500,
-    });
+  // reuse-existing-vehicleId retry path. The resolver never
+  // substitutes the global credential for a sysadm caller, so this registers
+  // into the order's costumer sub-account.
+  let credentials: TwoHireCredentials;
+  try {
+    credentials = await resolveTwoHireCredentials(admin, { costumerId: order.costumer_id });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Ukendt fejl.";
+    return new Response(JSON.stringify({ error: message }), { status: 502 });
   }
-  const isSysadm = isSysadmRole(caller?.role);
-  const credentials = await resolveTwoHireCredentials(admin, { isSysadm, costumerId: order.costumer_id });
 
   let vehicleId: string;
   if (order.vehicle_id) {
