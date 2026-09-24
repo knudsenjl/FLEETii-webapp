@@ -215,18 +215,42 @@ export function formatBookingPeriod(period: BookingPeriod, short = false): strin
     : `${startDate} ${period.start} - ${endDate} ${period.end}`;
 }
 
+/** The timezone every reservation's wall-clock start/end is typed in (see nowIsoString). */
+const BOOKING_TIME_ZONE = "Europe/Copenhagen";
+
+/** Reused across nowIsoString calls — constructing an Intl.DateTimeFormat is comparatively expensive. hourCycle "h23" avoids some engines' "24:00" midnight. */
+const bookingWallClockFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: BOOKING_TIME_ZONE,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hourCycle: "h23",
+});
+
 /**
  * The current moment as a naive "YYYY-MM-DDTHH:mm:ss" string (no timezone
- * suffix) built from LOCAL date/time components — matching the convention
- * reservations are created under (see isoPrefix's doc comment below). Postgres
- * stores those naive values under its session timezone, so a query needs
- * "now" expressed the same naive way for a `>=`/`<=` comparison to land on
- * the intended moment instead of drifting by the local UTC offset.
+ * suffix) in DANISH wall-clock time — matching the convention reservations
+ * are created under (ReservationPage writes the Danish time the user typed,
+ * with no offset; see isoPrefix's doc comment below). Postgres stores those
+ * naive values under its session timezone, so a query needs "now" expressed
+ * the same naive way for a `>=`/`<=` comparison to land on the intended
+ * moment instead of drifting by the UTC offset.
+ *
+ * Deliberately pinned to Europe/Copenhagen rather than the machine's own
+ * local time: this also runs server-side (set-vehicle-lock.mts,
+ * 2hire-vehicle-command.mts), where Netlify Functions run in UTC — using
+ * local time there put "now" 1-2 hours behind every booking, so a regular
+ * user's Lås/Lås op was refused for the first 1-2 hours of their booking
+ * and still allowed for 1-2 hours after it ended.
  */
-export function nowIsoString(): string {
-  const d = new Date();
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+export function nowIsoString(now: Date = new Date()): string {
+  const parts = Object.fromEntries(
+    bookingWallClockFormat.formatToParts(now).map((part) => [part.type, part.value]),
+  ) as Record<Intl.DateTimeFormatPartTypes, string>;
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
 }
 
 /**

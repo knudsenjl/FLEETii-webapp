@@ -4,8 +4,42 @@
 // file) — extracted here so the two stay identical rather than drifting:
 // same allowed roles, same retry behaviour against Supabase's Auth API,
 // same welcome email.
+import { randomInt } from "node:crypto";
 import { isAuthRetryableFetchError, type SupabaseClient } from "@supabase/supabase-js";
 import { escapeHtml } from "./mailer.js";
+
+// Character sets for generateTemporaryPassword — look-alike characters
+// (0/O/o, 1/l/I) left out, since the password is read off an email and typed
+// by hand.
+const TEMP_PASSWORD_LOWER = "abcdefghijkmnpqrstuvwxyz";
+const TEMP_PASSWORD_UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+const TEMP_PASSWORD_DIGITS = "23456789";
+const TEMP_PASSWORD_ALL = TEMP_PASSWORD_LOWER + TEMP_PASSWORD_UPPER + TEMP_PASSWORD_DIGITS;
+const TEMP_PASSWORD_LENGTH = 12;
+
+/**
+ * A fresh, random, single-use temporary password for one new account —
+ * replaces the old shared DEFAULT_USER_PASSWORD env var, which gave every
+ * new account the SAME password (printed in every welcome email), so anyone
+ * who had ever received one could log in as any other not-yet-activated
+ * user. Cryptographically random (node:crypto's randomInt), 12 characters,
+ * always containing at least one lowercase letter, uppercase letter and
+ * digit so it satisfies any character-class rule Supabase Auth's password
+ * policy may be configured with.
+ */
+export function generateTemporaryPassword(): string {
+  const pick = (chars: string) => chars[randomInt(chars.length)];
+  const chars = [pick(TEMP_PASSWORD_LOWER), pick(TEMP_PASSWORD_UPPER), pick(TEMP_PASSWORD_DIGITS)];
+  while (chars.length < TEMP_PASSWORD_LENGTH) {
+    chars.push(pick(TEMP_PASSWORD_ALL));
+  }
+  // Fisher-Yates shuffle, so the guaranteed classes aren't always the first three characters.
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
 
 export const ALLOWED_ROLES = ["user", "admin"] as const;
 export type Role = (typeof ALLOWED_ROLES)[number];
@@ -26,7 +60,7 @@ export function roleLabel(role: Role): string {
 }
 
 /**
- * Creates one auth.users row with the shared default password
+ * Creates one auth.users row with the given temporary password (see generateTemporaryPassword)
  * (email_confirm: true since there's no confirmation-link email to click —
  * an admin creating the account IS the verification) and marks it as
  * needing a real password on first login. Retries up to 3 times on

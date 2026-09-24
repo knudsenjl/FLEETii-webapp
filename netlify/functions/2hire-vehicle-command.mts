@@ -85,11 +85,13 @@ export default async (req: Request) => {
     const isAdmin = isAnyAdminRole(caller?.role);
 
     if (!isSysadm) {
-      if (isAdmin) {
-        if (!caller?.costumer_id || caller.costumer_id !== vehicle?.costumer_id) {
-          return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
-        }
-      } else {
+      // Every non-sysadm caller — admin or regular user — is scoped to their
+      // own costumer's vehicles; for a regular user this is checked before
+      // trusting any booking row (see set-vehicle-lock.mts's identical check).
+      if (!caller?.costumer_id || caller.costumer_id !== vehicle?.costumer_id) {
+        return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+      }
+      if (!isAdmin) {
         // Only "locate" reaches here as a regular user — "start"/"stop" already
         // required requireAdmin() above. Same audience as Lås/Lås op: allowed
         // only if one of the caller's own bookings on this vehicle currently

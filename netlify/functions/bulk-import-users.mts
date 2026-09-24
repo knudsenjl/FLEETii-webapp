@@ -1,7 +1,7 @@
 // Netlify Function: bulk-creates Brugere from a customer-supplied CSV or
 // JSON file — the file-based sibling of create-user.mts, reusing the exact
-// same account-creation mechanics (_shared/userAccount.ts: shared
-// DEFAULT_USER_PASSWORD, must_change_password, retried auth-user creation,
+// same account-creation mechanics (_shared/userAccount.ts: a random
+// per-user temporary password, must_change_password, retried auth-user creation,
 // welcome email) but processing many rows in one request instead of one
 // form submission. Unlike create-user.mts, this ALSO inserts into
 // user_departments itself (see UserDetailsPage.tsx's own comment on that
@@ -25,7 +25,7 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
-import { buildWelcomeEmailHtml, createAuthUserWithRetry, type Role } from "./_shared/userAccount.js";
+import { buildWelcomeEmailHtml, createAuthUserWithRetry, generateTemporaryPassword, type Role } from "./_shared/userAccount.js";
 
 type BulkImportUsersBody = {
   format?: "csv" | "json";
@@ -70,11 +70,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
   const { admin } = adminClientResult;
-
-  const defaultPassword = process.env.DEFAULT_USER_PASSWORD;
-  if (!defaultPassword) {
-    return new Response(JSON.stringify({ error: "Serveren mangler DEFAULT_USER_PASSWORD." }), { status: 500 });
-  }
 
   let body: BulkImportUsersBody;
   try {
@@ -144,7 +139,7 @@ export default async (req: Request) => {
 
   const results: RowResult[] = [];
   for (let i = 0; i < rows.length; i++) {
-    const outcome = await importUserRow(admin, rows[i], { costumerId, defaultPassword, departmentCache, loginUrl, manualUrl });
+    const outcome = await importUserRow(admin, rows[i], { costumerId, departmentCache, loginUrl, manualUrl });
     results.push({ row: i + 1, ...outcome });
   }
 
@@ -158,7 +153,7 @@ export default async (req: Request) => {
 async function importUserRow(
   admin: SupabaseClient,
   row: ImportRow,
-  ctx: { costumerId: string; defaultPassword: string; departmentCache: Map<string, string>; loginUrl: string | null; manualUrl: string | null },
+  ctx: { costumerId: string; departmentCache: Map<string, string>; loginUrl: string | null; manualUrl: string | null },
 ): Promise<Omit<RowResult, "row">> {
   const email = asTrimmedString(row.Email);
   if (!email) {
@@ -186,9 +181,12 @@ async function importUserRow(
     }
   }
 
+  // Per-row random password — never shared between accounts (see
+  // generateTemporaryPassword's doc comment).
+  const temporaryPassword = generateTemporaryPassword();
   const { data: created, error: createError } = await createAuthUserWithRetry(
     admin,
-    { email, password: ctx.defaultPassword },
+    { email, password: temporaryPassword },
     "bulk-import-users",
   );
   if (createError || !created?.user) {
@@ -215,30 +213,29 @@ async function importUserRow(
     return { success: false, error: profileError.message };
   }
 
+  // Not fatal to the row — the account and profile are already good;
+  // surfaced below so the caller knows this one grant needs a manual
+  // follow-up, rather than silently losing it. Deliberately does NOT return
+  // early: the welcome email below still has to go out, since it's the only
+  // place this account's random temporary password is ever communicated.
+  let grantWarning: string | undefined;
   if (departmentId) {
     const { error: grantError } = await admin
       .from("user_departments")
       .insert({ user_id: created.user.id, department_id: departmentId });
     if (grantError) {
-      // Not fatal to the row — the account and profile are already good;
-      // surface it so the caller knows this one grant needs a manual
-      // follow-up, rather than silently losing it.
-      return {
-        success: true,
-        userId: created.user.id,
-        error: `Bruger oprettet, men tildeling af afdeling fejlede: ${grantError.message}`,
-      };
+      grantWarning = `Bruger oprettet, men tildeling af afdeling fejlede: ${grantError.message}`;
     }
   }
 
   const emailResult = await sendMail({
     to: email,
     subject: "Din FLEETii-konto er oprettet",
-    html: buildWelcomeEmailHtml({ role, email, password: ctx.defaultPassword, loginUrl: ctx.loginUrl, manualUrl: ctx.manualUrl }),
+    html: buildWelcomeEmailHtml({ role, email, password: temporaryPassword, loginUrl: ctx.loginUrl, manualUrl: ctx.manualUrl }),
   });
   if (!emailResult.ok) {
     console.error(`[bulk-import-users] welcome email failed for ${email} (account was still created):`, emailResult.error);
   }
 
-  return { success: true, userId: created.user.id };
+  return grantWarning ? { success: true, userId: created.user.id, error: grantWarning } : { success: true, userId: created.user.id };
 }

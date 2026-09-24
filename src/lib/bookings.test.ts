@@ -69,17 +69,39 @@ describe("splitIsoDateTime", () => {
 });
 
 describe("nowIsoString", () => {
-  it("formats the current moment as a naive local-time string with no timezone suffix", () => {
-    const before = new Date();
-    const result = nowIsoString();
-    const after = new Date();
+  it("formats the current moment as a naive string with no timezone suffix", () => {
+    expect(nowIsoString()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+  });
 
-    expect(result).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
+  it("uses Danish summer time (UTC+2), not the machine's own timezone", () => {
+    expect(nowIsoString(new Date("2026-07-01T10:00:05Z"))).toBe("2026-07-01T12:00:05");
+  });
 
-    const pad = (n: number) => String(n).padStart(2, "0");
-    const expectedFromBefore = `${before.getFullYear()}-${pad(before.getMonth() + 1)}-${pad(before.getDate())}T${pad(before.getHours())}:${pad(before.getMinutes())}:${pad(before.getSeconds())}`;
-    const expectedFromAfter = `${after.getFullYear()}-${pad(after.getMonth() + 1)}-${pad(after.getDate())}T${pad(after.getHours())}:${pad(after.getMinutes())}:${pad(after.getSeconds())}`;
-    expect([expectedFromBefore, expectedFromAfter]).toContain(result);
+  it("uses Danish winter time (UTC+1)", () => {
+    expect(nowIsoString(new Date("2026-01-15T10:00:00Z"))).toBe("2026-01-15T11:00:00");
+  });
+
+  it("rolls over to the next Danish day before UTC does, with 00 (not 24) as the hour", () => {
+    expect(nowIsoString(new Date("2026-07-01T22:30:00Z"))).toBe("2026-07-02T00:30:00");
+  });
+
+  it("gives the same result when the process itself runs in UTC, as Netlify Functions do", () => {
+    const originalTz = process.env.TZ;
+    process.env.TZ = "UTC";
+    try {
+      expect(nowIsoString(new Date("2026-07-01T10:00:00Z"))).toBe("2026-07-01T12:00:00");
+    } finally {
+      if (originalTz === undefined) delete process.env.TZ;
+      else process.env.TZ = originalTz;
+    }
+  });
+
+  it("lets a server running in UTC see a just-started Danish booking as started (Lås/Lås op enabled)", () => {
+    // A booking typed as 12:00-14:00 Danish time, checked at 12:01 Danish (10:01 UTC).
+    const now = nowIsoString(new Date("2026-07-01T10:01:00Z"));
+    expect(
+      computeLockButtonState(now, { start: "2026-07-01T12:00:00+00:00", end: "2026-07-01T14:00:00+00:00" }, null, null, true),
+    ).toEqual({ lockEnabled: true, unlockEnabled: true });
   });
 });
 

@@ -1,6 +1,7 @@
 // Netlify Function: creates a new FLEETii user. Creates the Supabase Auth
-// account directly with a known default password (DEFAULT_USER_PASSWORD)
-// and marks it as needing a real password (app_metadata.must_change_password),
+// account directly with a random, per-user temporary password
+// (_shared/userAccount.ts's generateTemporaryPassword — never a shared one;
+// see its doc comment) and marks it as needing a real password (app_metadata.must_change_password),
 // rather than using Supabase's own invite/confirmation email — that proved
 // unreliable in practice (rate limits on the default mailer, persistent
 // unexplained failures with a custom SMTP relay), and account creation
@@ -26,6 +27,7 @@ import { sendMail } from "./_shared/mailer.js";
 import {
   buildWelcomeEmailHtml,
   createAuthUserWithRetry,
+  generateTemporaryPassword,
   isAllowedRole,
   isUsableErrorMessage,
 } from "./_shared/userAccount.js";
@@ -44,8 +46,8 @@ type CreateUserBody = {
  * POST { email, full_name?, phone?, department?, role? } as an
  * authenticated admin. Validates the caller (requireAdmin), the email, the
  * role (must be "user"/"admin", default "user"), and that the requested
- * department matches the caller's own, creates the auth user with the
- * shared default password, upserts their profile, and rolls back the
+ * department matches the caller's own, creates the auth user with a
+ * random temporary password, upserts their profile, and rolls back the
  * created account if the profile write fails so the email doesn't end up
  * permanently "stuck".
  */
@@ -64,11 +66,6 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
   }
   const { admin } = adminClientResult;
-
-  const defaultPassword = process.env.DEFAULT_USER_PASSWORD;
-  if (!defaultPassword) {
-    return new Response(JSON.stringify({ error: "Serveren mangler DEFAULT_USER_PASSWORD." }), { status: 500 });
-  }
 
   let body: CreateUserBody;
   try {
@@ -134,9 +131,10 @@ export default async (req: Request) => {
   // AuthRetryableFetchError-aware retry (dropped/incomplete HTTP response
   // talking to the Auth API, not a real rejection like "already
   // registered") — see createAuthUserWithRetry's own doc comment.
+  const temporaryPassword = generateTemporaryPassword();
   const { data: created, error: createError } = await createAuthUserWithRetry(
     admin,
-    { email, password: defaultPassword },
+    { email, password: temporaryPassword },
     "create-user",
   );
 
@@ -191,7 +189,7 @@ export default async (req: Request) => {
   const emailResult = await sendMail({
     to: email,
     subject: "Din FLEETii-konto er oprettet",
-    html: buildWelcomeEmailHtml({ role, email, password: defaultPassword, loginUrl, manualUrl }),
+    html: buildWelcomeEmailHtml({ role, email, password: temporaryPassword, loginUrl, manualUrl }),
   });
   if (!emailResult.ok) {
     console.error("[create-user] welcome email failed to send (account was still created):", emailResult.error);

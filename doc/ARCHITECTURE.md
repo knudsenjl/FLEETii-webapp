@@ -93,7 +93,7 @@ nothing about who's calling.
 | `create-user.mts`, `update-user.mts`, `delete-user.mts`, `unblock-user.mts` | User lifecycle (Supabase Auth user + `user_profiles` row + welcome email) |
 | `bulk-import-users.mts`, `bulk-import-vehicles.mts` | CSV import flows |
 | `switch-department.mts` | "Skift afdeling" — changes which department's data an admin is currently scoped to |
-| `complete-password-change.mts` | First-login / recovery password change |
+| `complete-password-change.mts` | First-login / recovery password change (sets the password and clears `must_change_password` in one step) |
 | `2hire-register-vehicle.mts`, `2hire-vehicle-command.mts`, `2hire-vehicle-state.mts`, `2hire-board-profiles.mts`, `2hire-subscribe.mts`, `2hire-webhook.mts` | 2hire integration — see below |
 | `set-vehicle-lock.mts` | Sends the real 2hire lock/unlock command *and* persists the resulting state |
 | `delete-vehicle.mts`, `delete-costumer.mts`, `send-vehicle-deletion-request.mts`, `send-vehicle-request.mts` | Vehicle/costumer lifecycle + the email-based request flow to FLEETii staff |

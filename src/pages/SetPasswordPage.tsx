@@ -1,8 +1,8 @@
 // Forced "set a real password" page ("/set-password"). Reached two ways —
 // ProtectedRoute/RootRoute (see App.tsx) send a session here before
 // anywhere else in the app, admin routes included, if EITHER is true:
-// (1) it's still on the shared default password from create-user.mts
-// (app_metadata.must_change_password), or (2) it's a "reset password" email
+// (1) it's still on the random temporary password from create-user.mts's
+// welcome email (app_metadata.must_change_password), or (2) it's a "reset password" email
 // link's session (AuthContext.tsx's isPasswordRecovery) — Supabase signs
 // the user in the moment that link's tokens land in the URL, WITHOUT
 // changing the password, so without this gate a recovery-email click would
@@ -11,17 +11,15 @@ import { useState, type FormEvent } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
-import { supabase } from "../lib/supabase";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 
 const MIN_PASSWORD_LENGTH = 8;
 
 /**
- * Lets the current user set a real password, then clears
- * app_metadata.must_change_password via complete-password-change.mts (a
- * server-only field the client can't clear itself — harmless to call even
- * when it was already false, e.g. for a password-recovery session) and
- * refreshes the session so ProtectedRoute/RootRoute see the change
+ * Lets the current user set a real password via complete-password-change.mts,
+ * which sets it AND clears app_metadata.must_change_password (a server-only
+ * field the client can't clear itself — harmless when it was already false,
+ * e.g. for a password-recovery session) in one step, then refreshes the session so ProtectedRoute/RootRoute see the change
  * immediately — no manual log-out/in required. Also clears
  * isPasswordRecovery so a recovery session doesn't get bounced right back
  * here after navigating away.
@@ -49,19 +47,18 @@ export function SetPasswordPage() {
 
     setIsSubmitting(true);
 
-    const { error: updateError } = await supabase.auth.updateUser({ password });
-    if (updateError) {
-      setError(updateError.message);
-      setIsSubmitting(false);
-      return;
-    }
-
+    // The server sets the password AND clears must_change_password in one
+    // step (see complete-password-change.mts for why it's no longer a
+    // client-side supabase.auth.updateUser() call followed by a flag-only
+    // request).
     try {
       const response = await fetch("/.netlify/functions/complete-password-change", {
         method: "POST",
         headers: {
+          "Content-Type": "application/json",
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
+        body: JSON.stringify({ password }),
       });
       if (!response.ok) {
         const result = (await response.json()) as { error?: string };
