@@ -16,6 +16,7 @@ import { TypingHeader } from "../components/TypingHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
+import { isSysadm } from "../lib/roles";
 
 /** Placeholder for a possible future multi-step login flow; today there's only one step. */
 type Step = { name: "credentials" };
@@ -28,6 +29,40 @@ const stepVariants = {
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -24 },
 };
+
+/**
+ * A sysadm's Data Filter choice ("Alle" / one Kunde / one Afdeling) is persisted on their own user_profiles row (department_id/costumer_id,
+ * via switch-department.mts), so without this a new login silently resumed whatever scope was last picked — possibly by someone else sharing
+ * the account — making data look missing. Clears it back to "Alle" (both null) on an explicit login only: this runs from the login button,
+ * never on a page reload or token refresh, so switching scope and reloading still keeps the chosen scope. Returns true if a reset happened
+ * (the caller then reloads the profile). Best effort: any failure is logged and the login simply continues with the stored scope.
+ */
+async function resetSysadmScope(userId: string, accessToken: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("role, department_id, costumer_id")
+    .eq("user_id", userId)
+    .maybeSingle<{ role: string; department_id: string | null; costumer_id: string | null }>();
+  if (error || !data || !isSysadm(data.role) || (!data.department_id && !data.costumer_id)) {
+    if (error) console.error("[login] could not read profile for sysadm scope reset:", error);
+    return false;
+  }
+  try {
+    const response = await fetch("/.netlify/functions/switch-department", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ departmentId: null }),
+    });
+    if (!response.ok) {
+      console.error("[login] sysadm scope reset failed:", response.status);
+      return false;
+    }
+    return true;
+  } catch (resetError) {
+    console.error("[login] sysadm scope reset failed:", resetError);
+    return false;
+  }
+}
 
 /** The login form. Renders unauthenticated at "/" (see RootRoute) and also reachable, unauthenticated, via LoginPage's own "i" about-button linking to /about. */
 export function LoginPage() {
@@ -48,7 +83,7 @@ export function LoginPage() {
   // / after an idle-timeout sometimes wrongly fails, retry immediately
   // succeeds" investigation). Disabling submit until loading is false closes
   // that race outright instead of working around its symptom.
-  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage, loading } = useAuth();
+  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage, loading, refreshProfile } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState(formSnapshot?.username ?? "");
   const [password, setPassword] = useState(formSnapshot?.password ?? "");
@@ -164,6 +199,11 @@ export function LoginPage() {
         setError("Din virksomheds adgang er blokeret. Kontakt FLEETii for detaljer.");
         setSubmitting(false);
         return;
+      }
+
+      // A sysadm always starts a fresh login on "Alle" — see resetSysadmScope.
+      if (await resetSysadmScope(signInData.user.id, signInData.session.access_token)) {
+        await refreshProfile();
       }
 
       // AuthProvider's onAuthStateChange listener picks up the new session,
