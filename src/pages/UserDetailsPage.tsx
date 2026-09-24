@@ -137,8 +137,16 @@ export function UserDetailsPage() {
             full_name: profile.full_name,
             phone: profile.phone,
             user_ident: profile.user_ident,
-            department_name: afdeling,
-            department_id: afdelingId,
+            // The HOME department (profile.department_id), not the one
+            // currently active in the Data Filter (afdelingId) — see
+            // AuthContext.tsx's Profile.department_id/active_department_id.
+            // availableDepartments always contains it (the home department
+            // is self-healed into the user's own grants); falls back to
+            // afdeling only while that list is still loading.
+            department_name:
+              availableDepartments.find((d) => d.department_id === profile.department_id)?.name ??
+              (afdelingId === profile.department_id ? afdeling : null),
+            department_id: profile.department_id,
             costumer_id: profile.costumer_id,
             role: profile.role,
             deleted_at: null,
@@ -153,6 +161,8 @@ export function UserDetailsPage() {
       profile?.user_ident,
       profile?.costumer_id,
       profile?.role,
+      profile?.department_id,
+      availableDepartments,
       afdeling,
       afdelingId,
     ],
@@ -445,14 +455,15 @@ export function UserDetailsPage() {
     // this stays as a defensive belt-and-braces check.
     (user || !isSysadm || Boolean(targetCostumerId));
 
-  // isSelf reads straight off afdelingId (AuthContext's own live value,
-  // available synchronously on the very first render) rather than
+  // isSelf reads straight off profile.department_id (the HOME department —
+  // never afdelingId, which is the Data Filter's ACTIVE department; available
+  // synchronously on the very first render) rather than
   // departmentOptions/department — departmentOptions itself only resolves
   // once its own fetch effect completes, which would otherwise leave
   // homeDepartmentId (and everything downstream of it, e.g. the new Standard
   // settings section below) undefined for a render or two even though the
   // real answer was already known.
-  const homeDepartmentId = isSelf ? afdelingId : departmentOptions.find((d) => d.name === department)?.department_id;
+  const homeDepartmentId = isSelf ? (profile?.department_id ?? null) : departmentOptions.find((d) => d.name === department)?.department_id;
   /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a sysadm editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
   const { useUserIdent } = useIdentSettings(homeDepartmentId ?? null);
   /** The one department checked "Tilhører" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */

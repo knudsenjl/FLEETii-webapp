@@ -32,3 +32,9 @@ Routine commits/pushes to `main` need no mention of `production` at all — most
 - **Deciding which calendar day something is on:** `danishDayKey`.
 
 Never use `Date`'s local getters (`getHours`, `getDate`, …), `toLocaleString` without a `timeZone`, or build an ISO string from typed parts by hand. All of these silently depend on the runtime's timezone, and Netlify Functions run in UTC. Until 2026-09-24, bookings stored the typed Danish wall-clock time labelled as UTC; every row has since been converted (see `supabase/applied/bookings_*legacy_wallclock*.sql` for how).
+
+**Home department vs. active department (since 2026-09-24):**
+- `user_profiles.department_id` is the user's fixed **Hjemmeafdeling**. Only create-user/update-user/bulk import change it.
+- `user_profiles.active_department_id` is the department currently selected in the Data Filter (admins/users; null = the home department). It is reset on every explicit login.
+- RLS always goes through `current_department_id()` (active if set and still granted, else home). In the client use `afdelingId`; in Netlify Functions use `findActiveDepartmentId`. Never compare against `department_id` when you mean "the department the user is working in right now".
+- A sysadm has no home department. Their `department_id`/`costumer_id` are a pure Data Filter scope pointer (switch-department.mts), reset to "Alle" on login.

@@ -91,3 +91,27 @@ export async function findRequestedDepartment(
   }
   return { department: data?.length === 1 ? data[0] : null };
 }
+
+/**
+ * A user's ACTIVE department, by the same rule as the DB's
+ * current_department_id() (see user_profiles_add_active_department_id.sql):
+ * active_department_id when set AND still one of their user_departments
+ * grants, otherwise their home department_id. For Netlify Functions, which
+ * use the service-role client and so can't call current_department_id()
+ * (it reads auth.uid()) on the caller's behalf.
+ */
+export async function findActiveDepartmentId(
+  admin: SupabaseClient,
+  { userId, departmentId, activeDepartmentId }: { userId: string; departmentId: string | null; activeDepartmentId: string | null },
+): Promise<string | null> {
+  if (activeDepartmentId) {
+    const { data } = await admin
+      .from("user_departments")
+      .select("department_id")
+      .eq("user_id", userId)
+      .eq("department_id", activeDepartmentId)
+      .maybeSingle<{ department_id: string }>();
+    if (data) return activeDepartmentId;
+  }
+  return departmentId;
+}

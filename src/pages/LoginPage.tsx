@@ -16,6 +16,7 @@ import { TypingHeader } from "../components/TypingHeader";
 import { InlinePopup } from "../components/InlinePopup";
 import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
+import { isSysadm } from "../lib/roles";
 
 /** Placeholder for a possible future multi-step login flow; today there's only one step. */
 type Step = { name: "credentials" };
@@ -28,6 +29,54 @@ const stepVariants = {
   animate: { opacity: 1, x: 0 },
   exit: { opacity: 0, x: -24 },
 };
+
+/**
+ * Every explicit login starts in the user's default Data Filter scope, instead of silently resuming whatever was last selected (possibly by
+ * someone else sharing the account), which made data look missing or put an admin in charge of a department they didn't expect:
+ *   - a sysadm starts on "Alle": their scope pointer (department_id/costumer_id) is cleared via switch-department.mts;
+ *   - an admin/user starts in their Hjemmeafdeling: active_department_id is cleared (see user_profiles_add_active_department_id.sql).
+ * Runs from the login button only — never on a page reload or token refresh — so switching scope and reloading still keeps the chosen scope.
+ * Returns true if anything was reset (the caller then reloads the profile). Best effort: any failure is logged and the login simply continues
+ * with the stored scope.
+ */
+async function resetScopeOnLogin(userId: string, accessToken: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from("user_profiles")
+    .select("role, department_id, active_department_id, costumer_id")
+    .eq("user_id", userId)
+    .maybeSingle<{ role: string; department_id: string | null; active_department_id: string | null; costumer_id: string | null }>();
+  if (error || !data) {
+    if (error) console.error("[login] could not read profile for scope reset:", error);
+    return false;
+  }
+
+  if (!isSysadm(data.role)) {
+    if (!data.active_department_id) return false;
+    const { error: resetError } = await supabase.from("user_profiles").update({ active_department_id: null }).eq("user_id", userId);
+    if (resetError) {
+      console.error("[login] active department reset failed:", resetError);
+      return false;
+    }
+    return true;
+  }
+
+  if (!data.department_id && !data.costumer_id) return false;
+  try {
+    const response = await fetch("/.netlify/functions/switch-department", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({ departmentId: null }),
+    });
+    if (!response.ok) {
+      console.error("[login] sysadm scope reset failed:", response.status);
+      return false;
+    }
+    return true;
+  } catch (resetError) {
+    console.error("[login] sysadm scope reset failed:", resetError);
+    return false;
+  }
+}
 
 /** The login form. Renders unauthenticated at "/" (see RootRoute) and also reachable, unauthenticated, via LoginPage's own "i" about-button linking to /about. */
 export function LoginPage() {
@@ -48,7 +97,7 @@ export function LoginPage() {
   // / after an idle-timeout sometimes wrongly fails, retry immediately
   // succeeds" investigation). Disabling submit until loading is false closes
   // that race outright instead of working around its symptom.
-  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage, loading } = useAuth();
+  const { deactivationMessage, clearDeactivationMessage, idleTimeoutMessage, clearIdleTimeoutMessage, loading, refreshProfile } = useAuth();
   const [step] = useState<Step>({ name: "credentials" });
   const [username, setUsername] = useState(formSnapshot?.username ?? "");
   const [password, setPassword] = useState(formSnapshot?.password ?? "");
@@ -164,6 +213,11 @@ export function LoginPage() {
         setError("Din virksomheds adgang er blokeret. Kontakt FLEETii for detaljer.");
         setSubmitting(false);
         return;
+      }
+
+      // Start in the default scope: "Alle" for a sysadm, the Hjemmeafdeling for everyone else — see resetScopeOnLogin.
+      if (await resetScopeOnLogin(signInData.user.id, signInData.session.access_token)) {
+        await refreshProfile();
       }
 
       // AuthProvider's onAuthStateChange listener picks up the new session,
