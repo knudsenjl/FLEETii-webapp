@@ -28,6 +28,7 @@
 // one able to manage that department's users at all, since only an admin
 // can create another admin.
 import { getAdminClient } from "./_shared/adminClient.js";
+import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type DeleteUserBody = { userId?: string };
@@ -64,9 +65,9 @@ export default async (req: Request) => {
   const [{ data: caller }, { data: target }] = await Promise.all([
     admin
       .from("user_profiles")
-      .select("department_id, role")
+      .select("department_id, active_department_id, role")
       .eq("user_id", authResult.userId)
-      .maybeSingle<{ department_id: string | null; role: string }>(),
+      .maybeSingle<{ department_id: string | null; active_department_id: string | null; role: string }>(),
     admin
       .from("user_profiles")
       .select("department_id, role, deleted_at")
@@ -93,7 +94,17 @@ export default async (req: Request) => {
   // A sysadm isn't scoped to one department — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
-  if (!caller || (!callerIsSysadm && caller.department_id !== target.department_id)) {
+  // The caller's ACTIVE department (Data Filter) against the target's HOME
+  // department — same rule as the user_profiles/user_settings RLS policies
+  // (current_department_id(), see user_profiles_add_active_department_id.sql).
+  const callerActiveDepartmentId = caller
+    ? await findActiveDepartmentId(admin, {
+        userId: authResult.userId,
+        departmentId: caller.department_id,
+        activeDepartmentId: caller.active_department_id,
+      })
+    : null;
+  if (!caller || (!callerIsSysadm && callerActiveDepartmentId !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
   }
   if (target.deleted_at) {

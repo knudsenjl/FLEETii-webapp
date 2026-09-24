@@ -18,6 +18,7 @@
 // create-user.mts's welcome email. MAIL_RECIEVER is this function's own
 // recipient (FLEETii staff) — unrelated to who create-user.mts emails.
 import { getAdminClient } from "./_shared/adminClient.js";
+import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
@@ -191,9 +192,9 @@ export default async (req: Request) => {
 
   const { data: caller } = await admin
     .from("user_profiles")
-    .select("role, costumer_id, department_id")
+    .select("role, costumer_id, department_id, active_department_id")
     .eq("user_id", authResult.userId)
-    .maybeSingle<{ role: string; costumer_id: string | null; department_id: string | null }>();
+    .maybeSingle<{ role: string; costumer_id: string | null; department_id: string | null; active_department_id: string | null }>();
 
   // A sysadm isn't scoped to one costumer (platform-wide role — same
   // exception as create-user.mts's own isSysadm branch), so their own
@@ -224,7 +225,16 @@ export default async (req: Request) => {
     afdeling = requestedDepartment.name;
   } else {
     costumerId = caller?.costumer_id ?? null;
-    departmentId = caller?.department_id ?? null;
+    // The department the admin currently has selected in the Data Filter
+    // (not necessarily their home department) — the same one the rest of
+    // the app treats as "their" department right now.
+    departmentId = caller
+      ? await findActiveDepartmentId(admin, {
+          userId: authResult.userId,
+          departmentId: caller.department_id,
+          activeDepartmentId: caller.active_department_id,
+        })
+      : null;
   }
 
   if (!costumerId) {

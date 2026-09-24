@@ -31,22 +31,36 @@ const stepVariants = {
 };
 
 /**
- * A sysadm's Data Filter choice ("Alle" / one Kunde / one Afdeling) is persisted on their own user_profiles row (department_id/costumer_id,
- * via switch-department.mts), so without this a new login silently resumed whatever scope was last picked — possibly by someone else sharing
- * the account — making data look missing. Clears it back to "Alle" (both null) on an explicit login only: this runs from the login button,
- * never on a page reload or token refresh, so switching scope and reloading still keeps the chosen scope. Returns true if a reset happened
- * (the caller then reloads the profile). Best effort: any failure is logged and the login simply continues with the stored scope.
+ * Every explicit login starts in the user's default Data Filter scope, instead of silently resuming whatever was last selected (possibly by
+ * someone else sharing the account), which made data look missing or put an admin in charge of a department they didn't expect:
+ *   - a sysadm starts on "Alle": their scope pointer (department_id/costumer_id) is cleared via switch-department.mts;
+ *   - an admin/user starts in their Hjemmeafdeling: active_department_id is cleared (see user_profiles_add_active_department_id.sql).
+ * Runs from the login button only — never on a page reload or token refresh — so switching scope and reloading still keeps the chosen scope.
+ * Returns true if anything was reset (the caller then reloads the profile). Best effort: any failure is logged and the login simply continues
+ * with the stored scope.
  */
-async function resetSysadmScope(userId: string, accessToken: string): Promise<boolean> {
+async function resetScopeOnLogin(userId: string, accessToken: string): Promise<boolean> {
   const { data, error } = await supabase
     .from("user_profiles")
-    .select("role, department_id, costumer_id")
+    .select("role, department_id, active_department_id, costumer_id")
     .eq("user_id", userId)
-    .maybeSingle<{ role: string; department_id: string | null; costumer_id: string | null }>();
-  if (error || !data || !isSysadm(data.role) || (!data.department_id && !data.costumer_id)) {
-    if (error) console.error("[login] could not read profile for sysadm scope reset:", error);
+    .maybeSingle<{ role: string; department_id: string | null; active_department_id: string | null; costumer_id: string | null }>();
+  if (error || !data) {
+    if (error) console.error("[login] could not read profile for scope reset:", error);
     return false;
   }
+
+  if (!isSysadm(data.role)) {
+    if (!data.active_department_id) return false;
+    const { error: resetError } = await supabase.from("user_profiles").update({ active_department_id: null }).eq("user_id", userId);
+    if (resetError) {
+      console.error("[login] active department reset failed:", resetError);
+      return false;
+    }
+    return true;
+  }
+
+  if (!data.department_id && !data.costumer_id) return false;
   try {
     const response = await fetch("/.netlify/functions/switch-department", {
       method: "POST",
@@ -201,8 +215,8 @@ export function LoginPage() {
         return;
       }
 
-      // A sysadm always starts a fresh login on "Alle" — see resetSysadmScope.
-      if (await resetSysadmScope(signInData.user.id, signInData.session.access_token)) {
+      // Start in the default scope: "Alle" for a sysadm, the Hjemmeafdeling for everyone else — see resetScopeOnLogin.
+      if (await resetScopeOnLogin(signInData.user.id, signInData.session.access_token)) {
         await refreshProfile();
       }
 

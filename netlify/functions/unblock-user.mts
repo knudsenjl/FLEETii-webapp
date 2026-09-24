@@ -14,6 +14,7 @@
 // costumers_add_deactivated_at.sql) — a costumer's deactivated_at is just a
 // row flag, nothing in auth.users to touch.
 import { getAdminClient } from "./_shared/adminClient.js";
+import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type UnblockUserBody = { userId?: string };
@@ -50,9 +51,9 @@ export default async (req: Request) => {
   const [{ data: caller }, { data: target }] = await Promise.all([
     admin
       .from("user_profiles")
-      .select("department_id, role")
+      .select("department_id, active_department_id, role")
       .eq("user_id", authResult.userId)
-      .maybeSingle<{ department_id: string | null; role: string }>(),
+      .maybeSingle<{ department_id: string | null; active_department_id: string | null; role: string }>(),
     admin
       .from("user_profiles")
       .select("department_id, role, deleted_at")
@@ -75,7 +76,17 @@ export default async (req: Request) => {
   }
   // A sysadm isn't scoped to one department — same platform-wide
   // exception as delete-user.mts.
-  if (!caller || (!callerIsSysadm && caller.department_id !== target.department_id)) {
+  // The caller's ACTIVE department (Data Filter) against the target's HOME
+  // department — same rule as the user_profiles/user_settings RLS policies
+  // (current_department_id(), see user_profiles_add_active_department_id.sql).
+  const callerActiveDepartmentId = caller
+    ? await findActiveDepartmentId(admin, {
+        userId: authResult.userId,
+        departmentId: caller.department_id,
+        activeDepartmentId: caller.active_department_id,
+      })
+    : null;
+  if (!caller || (!callerIsSysadm && callerActiveDepartmentId !== target.department_id)) {
     return new Response(JSON.stringify({ error: "Du kan kun genetablere brugere i din egen afdeling." }), {
       status: 403,
     });

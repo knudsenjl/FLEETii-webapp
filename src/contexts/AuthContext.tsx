@@ -34,8 +34,10 @@ export interface Profile {
   user_ident: string | null;
   full_name: string | null;
   phone: string | null;
-  /** References departments.department_id (uuid) — NOT a department name (see supabase/applied/user_profiles_department_to_department_id.sql). Use afdeling (context value, below) for the display name. */
+  /** The user's HOME department (Hjemmeafdeling) — references departments.department_id (uuid), NOT a name. Only changed via create-user/update-user/bulk import, never by the Data Filter (see active_department_id). For a sysadm (no home department) this is instead their Data Filter scope pointer, set via switch-department.mts. Compare against afdelingId (the ACTIVE department) for everything scoping-related, not this. */
   department_id: string | null;
+  /** Admins/users only: the department currently selected in the Data Filter, or null = the home department (see supabase/applied/user_profiles_add_active_department_id.sql). Reset to null on every explicit login. Use afdelingId rather than reading this directly. */
+  active_department_id: string | null;
   /** References costumers.costumer_id (uuid, see supabase/applied/user_profiles_add_costumer_id.sql). Use costumerName (context value, below) for the display name. */
   costumer_id: string | null;
   role: string;
@@ -49,9 +51,12 @@ type ProfileRow = {
   full_name: string | null;
   phone: string | null;
   department_id: string | null;
+  active_department_id: string | null;
   costumer_id: string | null;
   role: string;
   departments: { name: string; costumers: { name: string; deactivated_at: string | null } | null } | null;
+  /** The ACTIVE department's name (user_profiles_active_department_id_fkey) — null when active_department_id is null, i.e. the home department is active. */
+  active_department: { name: string } | null;
   /** Direct costumer_id embed (user_profiles_costumer_id_fkey), independent of the departments embed above — needed to resolve costumerName when department_id is null but costumer_id is set (the "Kunde only" scope, see switchDepartment/switch-department.mts): the departments embed alone resolves to null in that case since it joins through department_id. */
   costumers: { name: string } | null;
 };
@@ -85,7 +90,7 @@ interface AuthContextValue {
   profile: Profile | null;
   /** The logged-in user's department NAME (Afdeling), resolved via the departments join — for display. Use afdelingId for permission/filtering comparisons instead (afdeling is a name, not comparable to other tables' department_id columns). */
   afdeling: string | null;
-  /** The logged-in user's department_id (uuid). Alias for profile?.department_id — compare this against other tables' department_id columns (bookings, settings), not afdeling. */
+  /** The logged-in user's ACTIVE department_id (uuid): profile.active_department_id when a department is selected in the Data Filter, otherwise the home department (profile.department_id) — the same rule as the DB's current_department_id(), which every RLS policy uses. Compare this against other tables' department_id columns (bookings, settings), not afdeling. For the user's own Hjemmeafdeling use profile.department_id. */
   afdelingId: string | null;
   /** The NAME of the costumer associated with the logged-in user's department (departments.costumer_id -> costumers.name), resolved via a nested join alongside afdeling. Null if the department has no costumer_id set. Display-only, like afdeling. */
   costumerName: string | null;
@@ -93,7 +98,7 @@ interface AuthContextValue {
   costumerId: string | null;
   /** The departments this user is allowed to switch into (see user_departments_table.sql) — offered by the "Data Filter" control (PageHeader.tsx). Includes the currently active one. Empty until loaded/if the user has no grants. */
   availableDepartments: DepartmentOption[];
-  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct user_profiles update (RLS restricts this to the department_id column and to a value the user holds a grant for — see user_profiles_update_own_department.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A sysadm may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (a non-sysadm's own "Alle" is the client-only afdelingScopedToAllGrants below instead — this function is never called for it, since department_id itself never actually changes). A sysadm may additionally pass a second argument, costumerId, together with a null departmentId — "just this Kunde, every department under it" — which switch-department.mts persists as department_id=null/costumer_id=<given>, distinct from plain "Alle" (both null). Ignored (never sent to the function) unless departmentId is null and the caller is a sysadm. */
+  /** Switches the user's active department (afdelingId) to one of availableDepartments, via a direct update of user_profiles.active_department_id (never the home department_id; RLS restricts it to a department the user holds a grant for — see user_profiles_add_active_department_id.sql). Refreshes profile/afdeling/costumerName on success. Returns an error message on failure (e.g. the grant was revoked between load and click), null on success. A sysadm may also pass null, meaning "Alle" — clears department_id/costumer_id back to unscoped (their default state) via switch-department.mts; null is not a valid argument for any other role (a non-sysadm's own "Alle" is the client-only afdelingScopedToAllGrants below instead — this function is never called for it, since department_id itself never actually changes). A sysadm may additionally pass a second argument, costumerId, together with a null departmentId — "just this Kunde, every department under it" — which switch-department.mts persists as department_id=null/costumer_id=<given>, distinct from plain "Alle" (both null). Ignored (never sent to the function) unless departmentId is null and the caller is a sysadm. */
   switchDepartment: (departmentId: string | null, costumerId?: string | null) => Promise<string | null>;
   /** Non-sysadm ONLY: true when "Alle" is locally selected in the Afdeling <select> (see this state's own doc comment above, next to its useState). Admin list pages (DepartmentPage.tsx/VehiclesPage.tsx/FleetManagementPage.tsx/AllBookingsPage.tsx) check this ALONGSIDE afdelingId when computing their own "effective" department scope — true means "show every department I hold a grant for", ignoring afdelingId's own (always-real, for this role) value. Always false for a sysadm. */
   afdelingScopedToAllGrants: boolean;
@@ -197,7 +202,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // user_departments, so a bare "departments(...)" is now ambiguous
         // (PGRST201) and fails outright — this pins it to the direct FK.
         .select(
-          "user_id, email, user_ident, full_name, phone, department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at)), costumers!user_profiles_costumer_id_fkey(name)",
+          "user_id, email, user_ident, full_name, phone, department_id, active_department_id, costumer_id, role, departments!user_profiles_department_id_fkey(name, costumers(name, deactivated_at)), active_department:departments!user_profiles_active_department_id_fkey(name), costumers!user_profiles_costumer_id_fkey(name)",
         )
         .eq("user_id", userId)
         .maybeSingle<ProfileRow>();
@@ -215,10 +220,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!data) {
       return { profile: null, afdeling: null, costumerName: null, costumerDeactivatedAt: null };
     }
-    const { departments, costumers, ...profileFields } = data;
+    const { departments, active_department, costumers, ...profileFields } = data;
     return {
       profile: profileFields,
-      afdeling: departments?.name ?? null,
+      // The ACTIVE department's name when one is selected, otherwise the
+      // home department's (same rule as afdelingId below).
+      afdeling: active_department?.name ?? departments?.name ?? null,
       // The departments embed resolves costumerName via department_id, which
       // is null in the "Kunde only" scope (see costumers's own doc comment
       // on ProfileRow) — fall back to the direct costumer_id embed so the
@@ -566,13 +573,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * empty — see the "let sysadm operate unscoped" work). A FLEETii
    * admin may also pass departmentId as null — "Alle" (PageHeader.tsx's own
    * pseudo-entry) — which the function treats as "clear back to unscoped"
-   * rather than a specific department; every other role keeps updating
-   * user_profiles.department_id directly (RLS restricts this to the
-   * department_id column and to a value present in the user's own
-   * user_departments grants — see user_profiles_update_own_department.sql
-   * — so an already-revoked or foreign department_id is rejected
-   * server-side, not just skipped client-side; null is never passed on this
-   * path since PageHeader never offers "Alle" to a non-sysadm).
+   * rather than a specific department; every other role updates only
+   * its own user_profiles.active_department_id directly — never the home
+   * department_id (RLS restricts it to a department present in the user's
+   * own user_departments grants — see
+   * user_profiles_add_active_department_id.sql — so an already-revoked or
+   * foreign department is rejected server-side, not just skipped
+   * client-side; null is never passed on this path since PageHeader never
+   * offers "Alle" to a non-sysadm).
    * A sysadm may pass costumerId alongside a null departmentId, for "just
    * this Kunde" (see the switchDepartment doc comment on AuthContextValue);
    * it's only ever included in the request body on that branch, so it's a
@@ -600,9 +608,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } else {
       if (!departmentId) return "Ugyldig afdeling.";
+      // Only the ACTIVE department changes — the home department
+      // (department_id) is never touched by the Data Filter. Picking the
+      // home department again stores null ("home"), the same state a fresh
+      // login starts in.
       const { error: updateError } = await supabase
         .from("user_profiles")
-        .update({ department_id: departmentId })
+        .update({ active_department_id: departmentId === profile?.department_id ? null : departmentId })
         .eq("user_id", session.user.id);
       if (updateError) return updateError.message;
     }
@@ -620,7 +632,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         afdeling,
-        afdelingId: profile?.department_id ?? null,
+        afdelingId: profile?.active_department_id ?? profile?.department_id ?? null,
         costumerName,
         costumerId: profile?.costumer_id ?? null,
         availableDepartments,
