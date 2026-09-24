@@ -147,6 +147,16 @@ export default async (req: Request) => {
     // with a physically opposite `command` (see this file's header comment).
     command = locked ? "stop" : "start";
 
+    // Same costumer scoping as the admin branch above, checked before
+    // trusting any booking: bookings' own RLS now also requires the booked
+    // vehicle to belong to the booking's department (see
+    // bookings_restore_tillad_flags_and_vehicle_department_check.sql), but a
+    // booking row alone must never be enough to unlock another costumer's
+    // vehicle — e.g. one inserted before that policy existed.
+    if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
+      return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+    }
+
     const currentLocked = signal?.locked ?? true;
     const ownBookings = (bookings ?? []).filter((b) => b.user_id === authResult.userId);
     const requiredFlag = locked ? "lockEnabled" : "unlockEnabled";
