@@ -12,10 +12,10 @@ import {
   formatVehicleLabel,
   isMapVisible,
   mapBookingRow,
-  nowIsoString,
   resolveVehicleGpsPosition,
   type BookingRow,
 } from "../lib/bookings";
+import { nowUtcIso } from "../lib/time";
 import { PageHeader } from "../components/PageHeader";
 import { fadeInUp } from "../lib/motionVariants";
 import { Button } from "../components/Button";
@@ -132,7 +132,7 @@ export function BookingPage() {
     [booking?.vehicle, Boolean(position)],
   );
   /** Time-gated to the 15-minutes-before-start through 15-minutes-after-end window (see isMapVisible) — this page is role "user" only (requireRole in App.tsx), so there's no admin-always-visible override to make here, unlike BookingDetailsPage.tsx's own use of the same map. */
-  const mapVisible = booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false;
+  const mapVisible = booking ? isMapVisible(nowUtcIso(), { start: booking.startIso, end: booking.endIso }) : false;
   /** Reverse-geocoded address of the map position below, shown in the row underneath it — see lib/geocode.ts's useReverseGeocode. */
   const { address, addressLoading } = useReverseGeocode(booking?.vehicle, position, mapVisible);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
@@ -205,7 +205,7 @@ export function BookingPage() {
       // "end >= now" OR "end is null" — a plain .gte() would silently drop
       // every open-ended booking, since NULL >= x is NULL/falsy in Postgres
       // (same reasoning as BookingsPage.tsx's identical query).
-      .or(`end.gte.${nowIsoString()},end.is.null`)
+      .or(`end.gte.${nowUtcIso()},end.is.null`)
       // Scope to the viewer's OWN bookings only, same as BookingsPage.tsx's
       // identical query — without this, RLS alone decides which rows are
       // visible (department-wide, not just this user's), so the "earliest

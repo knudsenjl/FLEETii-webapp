@@ -16,6 +16,15 @@ import { SectionHeading } from "../components/SectionHeading";
 import { supabase } from "../lib/supabase";
 import type { EditingBooking } from "../lib/bookings";
 import {
+  addDaysToDate,
+  ceilToDanishInterval,
+  danishLocalToUtcIso,
+  danishPartsToUtcMs,
+  utcMsToDanishParts,
+  utcToDanishParts,
+  type DanishParts,
+} from "../lib/time";
+import {
   ANDET_VALUE,
   fetchSettingText,
   fetchSettingUnion,
@@ -53,7 +62,7 @@ type ReservationFormSnapshot = {
 const DEFAULT_DURATION_MINUTES = 3 * 60;
 const DEFAULT_INTERVAL_MINUTES = 15;
 
-/** Every `stepMinutes` of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns — step comes from "Standard interval" (falling back to DEFAULT_INTERVAL_MINUTES). "00" is a valid "Standard interval" value in its own right (see ceilToInterval) but isn't a meaningful STEP size — falls back to 1-minute granularity (every minute of the day, fully browsable) rather than dividing by zero. */
+/** Every `stepMinutes` of the day as "HH:mm" strings, for the Start/Slut TimeSelect dropdowns — step comes from "Standard interval" (falling back to DEFAULT_INTERVAL_MINUTES). "00" is a valid "Standard interval" value in its own right (see lib/time.ts's ceilToDanishInterval) but isn't a meaningful STEP size — falls back to 1-minute granularity (every minute of the day, fully browsable) rather than dividing by zero. */
 function buildTimeOptions(stepMinutes: number): string[] {
   const step = stepMinutes > 0 ? stepMinutes : 1;
   const count = Math.floor((24 * 60) / step);
@@ -76,33 +85,12 @@ function parseHHMMToMinutes(value: string): number | null {
 }
 
 /**
- * Rounds a Date up to the next "Standard interval" boundary — 00 (see
- * StandardSettings.tsx's Standard_interval options) means "no rounding at
- * all", returned unchanged (a new reservation starts at the exact current
- * moment); 15/30/45/60 rounds up to the next hh:15/hh:30/hh:45/hh+1:00,
- * already sitting exactly on a boundary is left unchanged (matches the old
- * ceilToQuarterHour's Math.ceil semantics: "the next boundary at or after
- * this moment"). Deliberately computed from the Date's own LOCAL
- * hours/minutes (getHours/getMinutes), not epoch milliseconds — an
- * epoch-ms-based ceiling (the old ceilToQuarterHour's approach) only lines
- * up with LOCAL wall-clock boundaries when the local UTC offset is itself a
- * multiple of intervalMinutes, which breaks for 45 under Denmark's own
- * +60/+120 minute offsets (60/120 aren't multiples of 45) — see
- * CLAUDE.md's "naive wall-clock timestamps" convention for why this
- * codebase avoids exactly this kind of instant-based arithmetic on times
- * that are meant to read the same on-screen regardless of timezone.
+ * The Danish wall-clock date/time `minutes` of real elapsed time after
+ * `parts` — e.g. Start + "Standard varighed" — computed on the UTC instant,
+ * so it stays correct across a DST switch.
  */
-function ceilToInterval(date: Date, intervalMinutes: number): Date {
-  if (intervalMinutes <= 0) return date;
-
-  const result = new Date(date);
-  result.setSeconds(0, 0);
-  const totalMinutes = result.getHours() * 60 + result.getMinutes();
-  const remainder = totalMinutes % intervalMinutes;
-  if (remainder !== 0) {
-    result.setMinutes(result.getMinutes() + (intervalMinutes - remainder));
-  }
-  return result;
+function danishPartsPlusMinutes(parts: DanishParts, minutes: number): DanishParts {
+  return utcMsToDanishParts(danishPartsToUtcMs(parts) + minutes * 60_000);
 }
 
 /**
@@ -256,7 +244,7 @@ export function ReservationPage() {
     void fetchSettingText("Standard_interval", profile?.user_id, afdelingId).then((raw) => {
       const parsed = raw ? Number.parseInt(raw, 10) : NaN;
       // >= 0, not > 0 — "00" (parsed to 0) is a real, meaningful override
-      // (see ceilToInterval: 0 means "no rounding, start right now"), not
+      // (see ceilToDanishInterval: 0 means "no rounding, start right now"), not
       // the same as "no override configured" (raw itself null/missing).
       setStandardIntervalMinutes(Number.isFinite(parsed) && parsed >= 0 ? parsed : null);
     });
@@ -298,24 +286,21 @@ export function ReservationPage() {
     ? users.filter((u) => u.department_id === selectedDepartmentId)
     : users.filter((u) => u.department_id === afdelingId || u.user_id === session?.user.id);
 
-  const now = ceilToInterval(new Date(), effectiveIntervalMinutes);
-  const end = new Date(now.getTime() + effectiveDurationMinutes * 60 * 1000);
-  const toIsoDate = (date: Date) =>
-    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
-  const formatTime = (date: Date) =>
-    `${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
-  /** "date"/"time" parts of an ISO datetime string, for pre-filling Start/Slut from an existing booking being edited. Deliberately string-sliced rather than `new Date(iso).getHours()` — editing.startIso/endIso are raw Supabase timestamptz values with a real UTC offset (e.g. "...T14:00:00+00:00"), and `new Date()` would apply an actual timezone conversion here, silently shifting the pre-filled time by the browser's UTC offset. Every other place in this codebase (lib/bookings.ts's isoPrefix/addMinutesToIso) avoids exactly this by treating these strings as naive wall-clock digits — same convention applied here. */
-  const splitIso = (iso: string) => ({ date: iso.slice(0, 10), time: iso.slice(11, 16) });
+  // The form's Start/Slut state is the DANISH date/time the user sees and
+  // types (see lib/time.ts) — converted to UTC only in currentPeriod() below,
+  // on the way out.
+  const now = ceilToDanishInterval(Date.now(), effectiveIntervalMinutes);
+  const end = danishPartsPlusMinutes(now, effectiveDurationMinutes);
   const initialStart = formSnapshot
     ? { date: formSnapshot.startDate, time: formSnapshot.startTime }
     : editing
-      ? splitIso(editing.startIso)
-      : { date: toIsoDate(now), time: formatTime(now) };
+      ? utcToDanishParts(editing.startIso)
+      : now;
   const initialEnd = formSnapshot
     ? { date: formSnapshot.endDate, time: formSnapshot.endTime }
     : editing?.endIso
-      ? splitIso(editing.endIso)
-      : { date: toIsoDate(end), time: formatTime(end) };
+      ? utcToDanishParts(editing.endIso)
+      : end;
   /** Adds minutes to a "HH:mm" time, reporting how many calendar days the result rolled over (can be negative). */
   const addMinutes = (time: string, minutes: number): { time: string; daysAdded: number } => {
     const [hours, mins] = time.split(":").map(Number);
@@ -326,13 +311,6 @@ export function ReservationPage() {
       time: `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`,
       daysAdded,
     };
-  };
-
-  const addDaysToIsoDate = (dateStr: string, days: number): string => {
-    const [year, month, day] = dateStr.split("-").map(Number);
-    const date = new Date(year, month - 1, day);
-    date.setDate(date.getDate() + days);
-    return toIsoDate(date);
   };
 
   const [startDate, setStartDate] = useState(initialStart.date);
@@ -363,10 +341,9 @@ export function ReservationPage() {
   useEffect(() => {
     if (editing || standardDurationMinutes === null || durationAppliedRef.current) return;
     durationAppliedRef.current = true;
-    const start = new Date(`${startDate}T${startTime}:00`);
-    const newEnd = new Date(start.getTime() + standardDurationMinutes * 60 * 1000);
-    setEndDate(toIsoDate(newEnd));
-    setEndTime(formatTime(newEnd));
+    const newEnd = danishPartsPlusMinutes({ date: startDate, time: startTime }, standardDurationMinutes);
+    setEndDate(newEnd.date);
+    setEndTime(newEnd.time);
   }, [editing, standardDurationMinutes]);
 
   /**
@@ -374,7 +351,7 @@ export function ReservationPage() {
    * interval" and Start rather than "Standard varighed" and End — the
    * initial `now`/initialStart computed above already used
    * effectiveIntervalMinutes, but again only as a useState *initializer*.
-   * Recomputes both Start (ceilToInterval against a fresh "now") AND End
+   * Recomputes both Start (ceilToDanishInterval against a fresh "now") AND End
    * (Start + whatever duration is currently known — effectiveDurationMinutes
    * already falls back to the default while that's still loading, and gets
    * corrected by durationAppliedRef above once it resolves, regardless of
@@ -385,12 +362,12 @@ export function ReservationPage() {
   useEffect(() => {
     if (editing || standardIntervalMinutes === null || intervalAppliedRef.current) return;
     intervalAppliedRef.current = true;
-    const start = ceilToInterval(new Date(), standardIntervalMinutes);
-    const newEnd = new Date(start.getTime() + effectiveDurationMinutes * 60 * 1000);
-    setStartDate(toIsoDate(start));
-    setStartTime(formatTime(start));
-    setEndDate(toIsoDate(newEnd));
-    setEndTime(formatTime(newEnd));
+    const start = ceilToDanishInterval(Date.now(), standardIntervalMinutes);
+    const newEnd = danishPartsPlusMinutes(start, effectiveDurationMinutes);
+    setStartDate(start.date);
+    setStartTime(start.time);
+    setEndDate(newEnd.date);
+    setEndTime(newEnd.time);
   }, [editing, standardIntervalMinutes]);
 
   /**
@@ -406,10 +383,10 @@ export function ReservationPage() {
     let date = candidateDate;
     let time = candidateTime;
 
-    if (new Date(`${date}T${time}:00`).getTime() < Date.now()) {
-      const current = ceilToInterval(new Date(), effectiveIntervalMinutes);
-      date = toIsoDate(current);
-      time = formatTime(current);
+    if (danishPartsToUtcMs({ date, time }) < Date.now()) {
+      const current = ceilToDanishInterval(Date.now(), effectiveIntervalMinutes);
+      date = current.date;
+      time = current.time;
       triggerWarning("start");
     }
 
@@ -424,7 +401,7 @@ export function ReservationPage() {
       const bumped = addMinutes(time, 30);
       setEndTime(bumped.time);
       if (bumped.daysAdded > 0) {
-        setEndDate(addDaysToIsoDate(date, bumped.daysAdded));
+        setEndDate(addDaysToDate(date, bumped.daysAdded));
       }
     }
   };
@@ -434,9 +411,9 @@ export function ReservationPage() {
     let date = candidateDate;
     let time = candidateTime;
 
-    if (new Date(`${date}T${time}:00`).getTime() <= new Date(`${startDate}T${startTime}:00`).getTime()) {
+    if (danishPartsToUtcMs({ date, time }) <= danishPartsToUtcMs({ date: startDate, time: startTime })) {
       const bumped = addMinutes(startTime, 30);
-      date = bumped.daysAdded > 0 ? addDaysToIsoDate(startDate, bumped.daysAdded) : startDate;
+      date = bumped.daysAdded > 0 ? addDaysToDate(startDate, bumped.daysAdded) : startDate;
       time = bumped.time;
       triggerWarning("end");
     }
@@ -450,7 +427,7 @@ export function ReservationPage() {
    * button is pressed on, or just re-enables editing (leaving the last value
    * in place) when pressed off. Doesn't go through applyStartDateTime: that
    * function rejects "past" candidates and rounds up to the next quarter
-   * hour, but a value computed as `new Date()` right now would almost always
+   * hour, but a value computed from the current moment would almost always
    * be judged already in the past by the time the comparison runs a moment
    * later — rounding it up instead of keeping the exact current moment "Nu"
    * is supposed to mean.
@@ -459,17 +436,17 @@ export function ReservationPage() {
     setStartIsNow(nowActive);
     if (!nowActive) return;
 
-    const current = new Date();
-    const endMoment = new Date(current.getTime() + effectiveDurationMinutes * 60 * 1000);
+    const current = utcMsToDanishParts(Date.now());
+    const endMoment = danishPartsPlusMinutes(current, effectiveDurationMinutes);
 
-    setStartDate(toIsoDate(current));
-    setStartTime(formatTime(current));
+    setStartDate(current.date);
+    setStartTime(current.time);
     // Matches the page's own initial default (now -> now+3h) — un-ignores
     // End if it was ignored, since "Nu" is establishing a fresh, concrete
     // booking window.
     setEndIgnored(false);
-    setEndDate(toIsoDate(endMoment));
-    setEndTime(formatTime(endMoment));
+    setEndDate(endMoment.date);
+    setEndTime(endMoment.time);
   };
 
   /**
@@ -517,11 +494,14 @@ export function ReservationPage() {
    * the booking is for.
    */
   const currentPeriod = () => {
-    const current = new Date();
+    // The only place the form's Danish date/time leaves this page — converted
+    // to real UTC instants here (lib/time.ts), which is what AvailablePage/
+    // ConfirmPage compare against and ConfirmPage writes to the DB.
+    const current = utcMsToDanishParts(Date.now());
     const start = startIsNow
-      ? `${toIsoDate(current)}T${formatTime(current)}:00`
-      : `${startDate}T${startTime}:00`;
-    const end = endIgnored ? null : `${endDate}T${endTime}:00`;
+      ? danishLocalToUtcIso(current.date, current.time)
+      : danishLocalToUtcIso(startDate, startTime);
+    const end = endIgnored ? null : danishLocalToUtcIso(endDate, endTime);
     const selectedUser = departmentUsers.find((u) => u.user_id === bruger);
     const brugerLabel =
       isAdmin

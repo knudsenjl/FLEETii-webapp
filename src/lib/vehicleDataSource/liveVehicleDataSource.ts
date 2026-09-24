@@ -1,5 +1,6 @@
 import { supabase } from "../supabase";
 import type { Vehicle2Hire, VehicleDataSource, VehicleGPS2Hire } from "./types";
+import { utcToDanishParts } from "../time";
 
 // getVehicles() reads vehicle_profiles (+ vehicle_signals for the live
 // fields, + vehicle_departments for department scoping — see
@@ -48,12 +49,12 @@ type VehicleSignalRow = {
   trip_detected_updated_at: string | null;
 };
 
-/** Formats a timestamptz value as "DD/MM/YYYY HH.MM" (2hire's wire format), or "" if null. */
+/** Formats a timestamptz value as Danish-time "DD/MM/YYYY HH.MM" (2hire's wire format), or "" if null — Danish explicitly, not the browser's own timezone (see lib/time.ts). */
 function formatSignalTimestamp(iso: string | null): string {
   if (!iso) return "";
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}.${pad(d.getMinutes())}`;
+  const { date, time } = utcToDanishParts(iso);
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year} ${time.replace(":", ".")}`;
 }
 
 /** Formats a raw meter count as "N,NNN km" (2hire's wire format), or "" if null. */

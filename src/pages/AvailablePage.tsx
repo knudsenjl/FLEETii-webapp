@@ -20,9 +20,10 @@ import {
   formatFreePeriod,
   formatVehicleIdentLabel,
   isVehicleAvailable,
-  nowIsoString,
   type BookingWindow,
 } from "../lib/bookings";
+import { danishDayKey, nowUtcIso, utcToDanishParts } from "../lib/time";
+
 
 /** A vehicle available for the requested period, plus a human-readable description of its free window (short "dd/mm" dates). */
 type AvailableVehicle = {
@@ -32,21 +33,16 @@ type AvailableVehicle = {
   ledigPeriode: string;
 };
 
-function formatDanishTime(date: Date): string {
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-  return `${hours}:${minutes}`;
+/** A UTC ISO timestamp as Danish "HH:mm". */
+function formatDanishTime(iso: string): string {
+  return utcToDanishParts(iso).time;
 }
 
-function formatDanishDateTimeShort(date: Date): string {
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  return `${day}/${month} ${formatDanishTime(date)}`;
-}
-
-/** True if two Dates fall on the same calendar day (used to decide whether to repeat the date in the period display). */
-function isSameDate(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+/** A UTC ISO timestamp as Danish "dd/mm HH:mm". */
+function formatDanishDateTimeShort(iso: string): string {
+  const { date, time } = utcToDanishParts(iso);
+  const [, month, day] = date.split("-");
+  return `${day}/${month} ${time}`;
 }
 
 /**
@@ -90,8 +86,9 @@ export function AvailablePage() {
   const brugerLabel = state?.userLabel ?? "";
   const anvendelse = state?.use ?? "";
   const editingBookingId = state?.editingBookingId;
-  const reservationStart = state?.start ? new Date(state.start) : null;
-  const reservationEnd = state?.end ? new Date(state.end) : null;
+  /** UTC ISO timestamps from ReservationPage (see lib/time.ts) — only converted to Danish time for display below. */
+  const reservationStart = state?.start ?? null;
+  const reservationEnd = state?.end ?? null;
   /** For a sysadm, state.departmentId (ReservationPage's own "Kunde/afdeling" pick) is authoritative — they have no afdelingId of their own. Every other role keeps using afdelingId directly, unchanged. */
   const targetDepartmentId = isSysadm(profile?.role) ? (state?.departmentId ?? null) : afdelingId;
 
@@ -119,8 +116,8 @@ export function AvailablePage() {
       });
   }, [editingBookingId]);
 
-  const referenceStart = state?.start ?? nowIsoString();
-  const referenceEnd = state?.end ?? nowIsoString();
+  const referenceStart = state?.start ?? nowUtcIso();
+  const referenceEnd = state?.end ?? nowUtcIso();
 
   const twoHireVehicles = use2hireVehicle();
   const availableVehicles: AvailableVehicle[] = twoHireVehicles
@@ -171,7 +168,7 @@ export function AvailablePage() {
                 {reservationStart && reservationEnd && (
                   <span className="text-[0.7rem] text-brand-600">
                     Periode: {formatDanishDateTimeShort(reservationStart)} -{" "}
-                    {isSameDate(reservationStart, reservationEnd)
+                    {danishDayKey(reservationStart) === danishDayKey(reservationEnd)
                       ? formatDanishTime(reservationEnd)
                       : formatDanishDateTimeShort(reservationEnd)}
                   </span>

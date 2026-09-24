@@ -25,3 +25,10 @@ Routine commits/pushes to `main` need no mention of `production` at all — most
 **Mechanics of the promotion PR itself** (confirmed against #44/#45, both merged): `gh pr create --base production --head main --title "Promote main to production"` — that exact title is the established convention, reused verbatim each time rather than describing the contents. Merge with `gh pr merge <number> --merge` (a real merge commit, not squash/rebase — confirmed by checking a prior promotion merge commit's parent count: 2 parents). No need to re-derive this from `gh pr list --base production` each time.
 
 ## Working conventions
+
+**Time handling: all times are UTC; Danish time only at the edges.** Every timestamp inside the app and in the database is a real UTC instant: an ISO string with `Z`/an offset, or epoch ms. Compare times as instants (`toUtcMs`/`Date.now()`), never as text. Danish time (Europe/Copenhagen) is used in exactly three places, always through `src/lib/time.ts`:
+- **Showing a time to the user:** `utcToDanishParts`, `formatDanishDateTime`, `splitIsoDateTime`.
+- **Reading a time the user typed:** `danishLocalToUtcIso`/`danishPartsToUtcMs`. Typed times are always Danish, even if the browser is set to another timezone.
+- **Deciding which calendar day something is on:** `danishDayKey`.
+
+Never use `Date`'s local getters (`getHours`, `getDate`, …), `toLocaleString` without a `timeZone`, or build an ISO string from typed parts by hand. All of these silently depend on the runtime's timezone, and Netlify Functions run in UTC. Until 2026-09-24, bookings stored the typed Danish wall-clock time labelled as UTC; the `bookings.legacy_wallclock` column tracks rows not yet converted (see `supabase/applied/bookings_*legacy_wallclock*.sql`).

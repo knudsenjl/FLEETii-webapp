@@ -23,12 +23,12 @@ import {
   formatVehicleLabel,
   isMapVisible,
   mapBookingRow,
-  nowIsoString,
   resolveVehicleGpsPosition,
   shortSignalTimestamp,
   userAnsatId,
   type BookingRow,
 } from "../lib/bookings";
+import { nowUtcIso } from "../lib/time";
 import { PageHeader } from "../components/PageHeader";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { useBookingLifecycle, type LifecycleBooking } from "../hooks/useBookingLifecycle";
@@ -126,7 +126,7 @@ export function BookingDetailsPage() {
   );
   const isAdmin = isAnyAdmin(profile?.role);
   /** admin/sysadm always see the map, regardless of the booking's own start/end window — only a regular user's own map is time-gated (see isMapVisible below) to the 15-minutes-before-start through 15-minutes-after-end window. */
-  const mapVisible = isAdmin || (booking ? isMapVisible(nowIsoString(), { start: booking.startIso, end: booking.endIso }) : false);
+  const mapVisible = isAdmin || (booking ? isMapVisible(nowUtcIso(), { start: booking.startIso, end: booking.endIso }) : false);
   /** Restores the map's pan/zoom across a browser refresh — see this hook's own doc comment for why that otherwise silently resets. Scoped to this booking's vehicle so refreshing on a different booking's page never shows a stale, unrelated vehicle's last-saved view. */
   const { savedView: savedMapView, onViewChange: handleMapViewChange } = useMapViewSnapshot(`booking-details-map:${booking?.vehicle ?? ""}`);
   /** Admin-only "Live" toggle on the map (see LeafletMap's liveToggle prop) — same push-based Realtime mechanism as FleetManagementPage.tsx's own Live toggle (see VehicleContext.tsx's useSetLiveTracking), just for this one vehicle: `position` above already re-derives live from gpsPositions on every render, so turning the shared broadcast listener on is all this page needs to do. Persisted across a genuine refresh via useReloadPersistedBoolean, same as FleetManagementPage's own liveEnabled — scoped to this booking's vehicle so refreshing on a different booking's page never inherits a stale on/off state. Defaults to ON when the vehicle is already mid-trip (2hire's live trip_detected signal, read from `liveVehicle` above rather than waiting on the `twoHireVehicle` destructured below since this hook call needs the value at mount, before that exists) — same reasoning as VehicleDetailsPage.tsx's identical default. Only evaluated once per mount (useState initializer), same caveat as there. */

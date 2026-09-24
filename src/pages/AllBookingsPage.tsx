@@ -23,10 +23,10 @@ import {
   formatVehicleIdentLabel,
   formatVehicleLabel,
   mapBookingRow,
-  nowIsoString,
   userAnsatId,
   type BookingRow,
 } from "../lib/bookings";
+import { nowUtcIso } from "../lib/time";
 
 /** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). */
 type Booking = {
@@ -187,7 +187,7 @@ export function AllBookingsPage() {
       .select(BOOKINGS_SELECT_COLUMNS)
       // "end >= now" OR "end is null" — a plain .gte() would silently drop
       // every open-ended booking, since NULL >= x is NULL/falsy in Postgres.
-      .or(`end.gte.${nowIsoString()},end.is.null`)
+      .or(`end.gte.${nowUtcIso()},end.is.null`)
       .order("start", { ascending: true })
       .returns<BookingRow[]>();
 

@@ -12,6 +12,7 @@
 // import; types.ts is a dependency-free leaf file, so importing it directly
 // avoids that requirement cascading into vehicleDataSource/index.ts too.
 import type { Vehicle2Hire } from "./vehicleDataSource/types.js";
+import { danishDayKey, formatDanishDate, toUtcMs, utcToDanishParts } from "./time.js";
 
 // The "bookings" table's columns are named differently from the local field
 // names pages use (see MappedBooking) — these constants are the single
@@ -106,12 +107,19 @@ export type EditingBooking = {
   departmentId: string | null;
 };
 
-/** Splits an ISO datetime into a Danish "dd.mm.yyyy" date and an "HH:mm" time. Tolerates a bare date (no "T") or an empty string by falling back to an empty time instead of throwing. */
+/**
+ * Splits a UTC ISO timestamp into the DANISH "dd.mm.yyyy" date and "HH:mm"
+ * time it corresponds to — the display edge of the "all times are UTC" rule
+ * (see time.ts). Tolerates a bare date (no "T") or an empty string by
+ * falling back to an empty time instead of throwing; a bare date has no
+ * time of day to convert, so it's only reformatted.
+ */
 export function splitIsoDateTime(iso: string): { date: string; time: string } {
-  const [datePart, timePart] = iso.split("T");
-  const [year, month, day] = datePart.split("-");
-  const date = year && month && day ? `${day}.${month}.${year}` : datePart;
-  return { date, time: timePart ? timePart.slice(0, 5) : "" };
+  if (!iso.includes("T")) {
+    return { date: formatDanishDate(iso), time: "" };
+  }
+  const { date, time } = utcToDanishParts(iso);
+  return { date: formatDanishDate(date), time };
 }
 
 /**
@@ -215,80 +223,10 @@ export function formatBookingPeriod(period: BookingPeriod, short = false): strin
     : `${startDate} ${period.start} - ${endDate} ${period.end}`;
 }
 
-/** The timezone every reservation's wall-clock start/end is typed in (see nowIsoString). */
-const BOOKING_TIME_ZONE = "Europe/Copenhagen";
-
-/** Reused across nowIsoString calls — constructing an Intl.DateTimeFormat is comparatively expensive. hourCycle "h23" avoids some engines' "24:00" midnight. */
-const bookingWallClockFormat = new Intl.DateTimeFormat("en-CA", {
-  timeZone: BOOKING_TIME_ZONE,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hourCycle: "h23",
-});
-
-/**
- * The current moment as a naive "YYYY-MM-DDTHH:mm:ss" string (no timezone
- * suffix) in DANISH wall-clock time — matching the convention reservations
- * are created under (ReservationPage writes the Danish time the user typed,
- * with no offset; see isoPrefix's doc comment below). Postgres stores those
- * naive values under its session timezone, so a query needs "now" expressed
- * the same naive way for a `>=`/`<=` comparison to land on the intended
- * moment instead of drifting by the UTC offset.
- *
- * Deliberately pinned to Europe/Copenhagen rather than the machine's own
- * local time: this also runs server-side (set-vehicle-lock.mts,
- * 2hire-vehicle-command.mts), where Netlify Functions run in UTC — using
- * local time there put "now" 1-2 hours behind every booking, so a regular
- * user's Lås/Lås op was refused for the first 1-2 hours of their booking
- * and still allowed for 1-2 hours after it ended.
- */
-export function nowIsoString(now: Date = new Date()): string {
-  const parts = Object.fromEntries(
-    bookingWallClockFormat.formatToParts(now).map((part) => [part.type, part.value]),
-  ) as Record<Intl.DateTimeFormatPartTypes, string>;
-  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}:${parts.second}`;
-}
-
-/**
- * Adds `minutes` (can be negative) to an ISO datetime string's WALL-CLOCK
- * DIGITS, ignoring any timezone suffix entirely, and returns a naive
- * "YYYY-MM-DDTHH:mm:ss" string comparable via isoPrefix. Deliberately does
- * NOT parse `iso` with `new Date(iso)` — that would apply a real timezone
- * conversion (e.g. a Supabase-round-tripped "11:22:00+00:00" becoming
- * "13:22" local before the shift is even applied), which silently
- * contradicts every other comparison in this file: isoPrefix's whole point
- * is treating these strings as plain wall-clock values, never real instants
- * (see its doc comment). `Date.UTC(...)` is used only as a calendar-math
- * trick (correct day/month/year rollover for free) — the wall-clock digits
- * are fed in and read back via UTC getters, so the browser's local
- * timezone never enters the calculation either.
- */
-export function addMinutesToIso(iso: string, minutes: number): string {
-  const match = iso.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})/);
-  if (!match) return iso;
-  const [year, month, day, hour, minute, second] = match.slice(1).map(Number);
-  const d = new Date(Date.UTC(year, month - 1, day, hour, minute + minutes, second));
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}T${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())}:${pad(d.getUTCSeconds())}`;
-}
-
-/**
- * Compares ISO datetime strings as plain wall-clock values (first 19 chars,
- * "YYYY-MM-DDTHH:mm:ss"). Freshly-typed reservation times have no timezone
- * suffix, while values round-tripped through Supabase (timestamptz columns)
- * come back with one (e.g. "+00:00") — converting both sides to `Date` would
- * parse those inconsistently (one as local time, one as UTC) and silently
- * shift the comparison. String comparison sidesteps that entirely. Exported
- * for computeLockButtonState/findAdjacentBookings, which need the same
- * wall-clock comparison against "now" (see nowIsoString).
- */
-export function isoPrefix(iso: string): string {
-  return iso.slice(0, 19);
-}
+// "Now", time arithmetic and every Danish-time conversion live in ./time.ts
+// (the app-wide "all times are UTC" rule — see that file's header). The old
+// wall-clock helpers (nowIsoString/isoPrefix/addMinutesToIso) are gone:
+// booking start/end are real UTC instants now, compared numerically.
 
 /**
  * A vehicle is available for a requested period if it has no bookings at all,
@@ -321,10 +259,10 @@ export function isVehicleAvailable(
 ): boolean {
   if (!reservationStart) return true;
 
-  const start = isoPrefix(reservationStart);
-  const end = reservationEnd ? isoPrefix(reservationEnd) : null;
+  const start = toUtcMs(reservationStart);
+  const end = reservationEnd ? toUtcMs(reservationEnd) : null;
   const carBookings = bookings.filter((b) => b.vehicle_id === vehicleId);
-  return carBookings.every((b) => (end !== null && isoPrefix(b.start) >= end) || (b.end !== null && isoPrefix(b.end) <= start));
+  return carBookings.every((b) => (end !== null && toUtcMs(b.start) >= end) || (b.end !== null && toUtcMs(b.end) <= start));
 }
 
 /** A vehicle's free window either side of a reference period; a null bound means unbounded (no earlier/later booking constrains it). */
@@ -349,21 +287,21 @@ export function computeFreePeriod(
   const carBookings = bookings.filter((b) => b.vehicle_id === vehicleId);
   if (carBookings.length === 0) return null;
 
-  const refStart = isoPrefix(referenceStart);
-  const refEnd = isoPrefix(referenceEnd);
+  const refStart = toUtcMs(referenceStart);
+  const refEnd = toUtcMs(referenceEnd);
 
   let freeStart: string | null = null;
   let freeEnd: string | null = null;
 
   for (const b of carBookings) {
-    const bStart = isoPrefix(b.start);
-    const bEnd = b.end !== null ? isoPrefix(b.end) : null;
+    const bStart = toUtcMs(b.start);
+    const bEnd = b.end !== null ? toUtcMs(b.end) : null;
 
-    if (bEnd !== null && bEnd <= refStart && (freeStart === null || bEnd > freeStart)) {
-      freeStart = bEnd;
+    if (b.end !== null && bEnd !== null && bEnd <= refStart && (freeStart === null || bEnd > toUtcMs(freeStart))) {
+      freeStart = b.end;
     }
-    if (bStart >= refEnd && (freeEnd === null || bStart < freeEnd)) {
-      freeEnd = bStart;
+    if (bStart >= refEnd && (freeEnd === null || bStart < toUtcMs(freeEnd))) {
+      freeEnd = b.start;
     }
   }
 
@@ -384,7 +322,7 @@ function formatFreePeriodBound(iso: string, short: boolean): string {
  */
 export function formatFreePeriod(period: FreePeriod, short = false): string {
   if (period.start && period.end) {
-    const sameDay = period.start.slice(0, 10) === period.end.slice(0, 10);
+    const sameDay = danishDayKey(period.start) === danishDayKey(period.end);
     const endFormatted = sameDay ? splitIsoDateTime(period.end).time : formatFreePeriodBound(period.end, short);
     return `${formatFreePeriodBound(period.start, short)} - ${endFormatted}`;
   }
@@ -448,14 +386,13 @@ export type BookingNeighbor = { booking_id: string; start: string; end: string |
  * if there is none). Relies on the DB's booking-overlap exclusion constraint
  * to guarantee a vehicle's bookings never overlap, so sorting by start
  * yields a single well-defined sequence — same assumption computeFreePeriod
- * already relies on. Sorts via isoPrefix for the same reason every other
- * comparison in this file does (see isoPrefix's doc comment).
+ * already relies on.
  */
 export function findAdjacentBookings(
   vehicleBookings: BookingNeighbor[],
   currentBookingId: string,
 ): { previous: BookingNeighbor | null; next: BookingNeighbor | null } {
-  const sorted = [...vehicleBookings].sort((a, b) => isoPrefix(a.start).localeCompare(isoPrefix(b.start)));
+  const sorted = [...vehicleBookings].sort((a, b) => toUtcMs(a.start) - toUtcMs(b.start));
   const index = sorted.findIndex((b) => b.booking_id === currentBookingId);
   if (index === -1) return { previous: null, next: null };
   return { previous: sorted[index - 1] ?? null, next: sorted[index + 1] ?? null };
@@ -479,10 +416,8 @@ export type LockButtonState = { lockEnabled: boolean; unlockEnabled: boolean };
  *    unlock's own expiry cutoff, since securing an available vehicle after
  *    your booking ends (before the next renter's window opens) isn't a
  *    security concern the way unlocking one is.
- * `now` should come from nowIsoString() so it compares consistently with
- * `booking`/`previous`/`next` (all raw, Supabase-round-tripped ISO values)
- * via isoPrefix — see that function's doc comment for why plain Date parsing
- * would silently misalign the comparison. An open-ended `booking` (end:
+ * `now` and every booking bound are UTC ISO timestamps (see time.ts's
+ * nowUtcIso), compared as real instants. An open-ended `booking` (end:
  * null) never expires, so rules 2/3 can never disable Unlock/Lock. An
  * open-ended `previous` never expires either, so it permanently blocks
  * Unlock (rule 2) — this shouldn't occur in practice (an open-ended booking
@@ -496,11 +431,11 @@ export function computeLockButtonState(
   next: { start: string } | null,
   vehicleLocked: boolean,
 ): LockButtonState {
-  const nowPrefix = isoPrefix(now);
-  const started = nowPrefix >= isoPrefix(booking.start);
-  const expired = booking.end !== null && nowPrefix >= isoPrefix(booking.end);
-  const previousExpired = !previous || (previous.end !== null && nowPrefix >= isoPrefix(previous.end));
-  const nextBegun = Boolean(next && nowPrefix >= isoPrefix(next.start));
+  const nowMs = toUtcMs(now);
+  const started = nowMs >= toUtcMs(booking.start);
+  const expired = booking.end !== null && nowMs >= toUtcMs(booking.end);
+  const previousExpired = !previous || (previous.end !== null && nowMs >= toUtcMs(previous.end));
+  const nextBegun = Boolean(next && nowMs >= toUtcMs(next.start));
 
   return {
     lockEnabled: started && !(expired && nextBegun),
@@ -508,18 +443,20 @@ export function computeLockButtonState(
   };
 }
 
+/** isMapVisible's margin either side of the booking: 15 minutes. */
+const MAP_VISIBILITY_MARGIN_MS = 15 * 60_000;
+
 /**
  * Whether a booking's map should be shown right now: from 15 minutes before
  * its start to 15 minutes after its end — matches BookingDetailsPage's map
  * visibility window. An open-ended booking (end: null) has no upper bound,
- * so the map stays visible indefinitely once the window opens. `now` should
- * come from nowIsoString() — see isoPrefix's doc comment for why.
+ * so the map stays visible indefinitely once the window opens. `now` and the
+ * booking bounds are UTC ISO timestamps (see time.ts's nowUtcIso).
  */
 export function isMapVisible(now: string, booking: { start: string; end: string | null }): boolean {
-  const nowPrefix = isoPrefix(now);
-  const visibleFrom = isoPrefix(addMinutesToIso(booking.start, -15));
-  if (nowPrefix < visibleFrom) return false;
+  const nowMs = toUtcMs(now);
+  if (nowMs < toUtcMs(booking.start) - MAP_VISIBILITY_MARGIN_MS) return false;
   if (booking.end === null) return true;
-  const visibleUntil = isoPrefix(addMinutesToIso(booking.end, 15));
-  return nowPrefix <= visibleUntil;
+  return nowMs <= toUtcMs(booking.end) + MAP_VISIBILITY_MARGIN_MS;
 }
+

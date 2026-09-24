@@ -37,7 +37,8 @@
 // costumer_id (not the caller's own — a sysadm has none), same as every
 // other function this plan touches.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
-import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
+import { computeLockButtonState, findAdjacentBookings } from "../../src/lib/bookings.js";
+import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
@@ -163,7 +164,7 @@ export default async (req: Request) => {
     const authorized = ownBookings.some((booking) => {
       const { previous, next } = findAdjacentBookings(bookings ?? [], booking.booking_id);
       const state = computeLockButtonState(
-        nowIsoString(),
+        nowUtcIso(),
         { start: booking.start, end: booking.end },
         previous ? { end: previous.end } : null,
         next ? { start: next.start } : null,
