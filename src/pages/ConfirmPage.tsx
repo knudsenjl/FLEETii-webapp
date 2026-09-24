@@ -159,6 +159,11 @@ export function ConfirmPage() {
       usage: anvendelse,
       [USER_ID_COLUMN]: bruger || session?.user.id || null,
       [DEPARTMENT_COLUMN]: state.departmentId,
+      // start/end are real UTC instants (ReservationPage converts the typed
+      // Danish time via lib/time.ts) — marks this row as already converted,
+      // so the one-off bookings_utc_convert migration leaves it alone (see
+      // supabase/applied/bookings_add_legacy_wallclock.sql).
+      legacy_wallclock: false,
     };
 
     let writeError: { code?: string; message: string } | null;

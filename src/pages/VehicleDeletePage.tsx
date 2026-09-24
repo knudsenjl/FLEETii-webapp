@@ -12,6 +12,7 @@ import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel } from "../lib/bookings";
+import { formatDanishDateTime } from "../lib/time";
 
 /** A pending "Nedlæg" (deletion) costumer_orders row — mirrors VehicleCreatePage.tsx's own CostumerOrder shape/reasoning, for the reverse flow (see costumer_orders_merge_deletion_requests.sql: both order types share this one table now, distinguished by order_type). Normally arrives pre-filled via router state (InstallationAdministrationPage's "Administration af installationer" table row click), but also fetchable by id alone so "/vehicle-delete/:orderId" works as a direct link (the email's own link). */
 type VehicleDeletionOrder = {
@@ -262,7 +263,7 @@ export function VehicleDeletePage() {
     ["Anmodet af:", order.contactperson],
     ["Kontakt e-mail:", order.contactemail ?? "—"],
     ["Telefon:", order.contactnumber ?? "—"],
-    ["Anmodet:", new Date(order.created_at).toLocaleString("da-DK")],
+    ["Anmodet:", formatDanishDateTime(order.created_at)],
   ];
 
   return (

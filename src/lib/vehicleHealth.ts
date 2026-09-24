@@ -3,6 +3,7 @@
 // VehicleDetailsPage.tsx gained the same red "!" button (previously
 // VehiclesPage.tsx's fleet table only), so the two pages share one
 // definition of "unhealthy" instead of drifting apart.
+import { utcToDanishParts } from "./time";
 
 /** How long a tracked signal can go without a fresh reading before the "!" health button flags it — see the 2026-09-10 webhook-delivery investigation that prompted this feature. */
 export const SIGNAL_STALE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
@@ -12,9 +13,9 @@ export type HealthIssue = { label: string; lastReceivedIso: string | null };
 
 /** Danish "DD/MM HH:MM" formatting straight from a raw ISO timestamp — same output shape as shortSignalTimestamp (lib/bookings.ts), which instead takes 2hire's own pre-formatted "DD/MM/YYYY HH.MM" string; position has no such pre-formatted string of its own (see vehicleDataSource/types.ts's VehicleGPS2Hire.updatedAtIso doc comment), so this formats directly from ISO instead. */
 export function formatIsoShort(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  const { date, time } = utcToDanishParts(iso);
+  const [, month, day] = date.split("-");
+  return `${day}/${month} ${time}`;
 }
 
 /** The subset of a vehicle's fields getVehicleHealthIssues actually needs — deliberately structural (not DisplayVehicle itself) so both VehiclesPage.tsx's full DisplayVehicle and VehicleDetailsPage.tsx's narrower router-state Vehicle type satisfy it without extra casting. All optional/nullable since a narrower caller's shape may not always carry every one of them. */

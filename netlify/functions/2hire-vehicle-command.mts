@@ -25,7 +25,8 @@
 // authenticates this command depends on the TARGET vehicle's costumer (not
 // the caller's own costumer_id, which a sysadm doesn't have) — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
-import { computeLockButtonState, findAdjacentBookings, nowIsoString } from "../../src/lib/bookings.js";
+import { computeLockButtonState, findAdjacentBookings } from "../../src/lib/bookings.js";
+import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
@@ -113,7 +114,7 @@ export default async (req: Request) => {
         const authorized = ownBookings.some((booking) => {
           const { previous, next } = findAdjacentBookings(bookings ?? [], booking.booking_id);
           const state = computeLockButtonState(
-            nowIsoString(),
+            nowUtcIso(),
             { start: booking.start, end: booking.end },
             previous ? { end: previous.end } : null,
             next ? { start: next.start } : null,

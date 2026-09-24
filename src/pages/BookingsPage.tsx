@@ -18,13 +18,12 @@ import {
   USER_ID_COLUMN,
   formatBookingPeriod,
   formatVehicleIdentLabel,
-  isoPrefix,
   mapBookingRow,
-  nowIsoString,
   type BookingRow,
 } from "../lib/bookings";
+import { nowUtcIso, toUtcMs } from "../lib/time";
 
-/** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). startIso/endIso are kept (unlike the original table-only version of this type) to drive the "Aktiv nu" badge below via real wall-clock comparisons — see isoPrefix's own doc comment for why that's isoPrefix/string comparison, never `new Date(...)`. */
+/** A booking as rendered on this page (see MappedBooking in lib/bookings.ts, which this mirrors). startIso/endIso are kept (unlike the original table-only version of this type) to drive the "Aktiv nu" badge below (UTC instants, compared numerically — see lib/time.ts). */
 type Booking = {
   id: string;
   vehicle: string;
@@ -99,7 +98,7 @@ export function BookingsPage() {
       .select(BOOKINGS_SELECT_COLUMNS)
       // "end >= now" OR "end is null" — a plain .gte() would silently drop
       // every open-ended booking, since NULL >= x is NULL/falsy in Postgres.
-      .or(`end.gte.${nowIsoString()},end.is.null`)
+      .or(`end.gte.${nowUtcIso()},end.is.null`)
       .eq(USER_ID_COLUMN, user)
       .order("start", { ascending: true })
       .returns<BookingRow[]>();
@@ -118,11 +117,11 @@ export function BookingsPage() {
     void loadBookings();
   }, [user]);
 
-  /** Whether `booking` is the viewer's currently-active reservation (start <= now <= end, or end is null) — drives the "Aktiv nu" badge below. Same wall-clock isoPrefix comparison convention as BookingPage.tsx's own bookingStarted/bookingExpired (see isoPrefix's doc comment for why never `new Date(...)`). */
+  /** Whether `booking` is the viewer's currently-active reservation (start <= now <= end, or end is null) — drives the "Aktiv nu" badge below. Compared as UTC instants (see lib/time.ts). */
   const isBookingActive = (booking: Booking) => {
-    const nowPrefix = isoPrefix(nowIsoString());
-    const started = nowPrefix >= isoPrefix(booking.startIso);
-    const expired = booking.endIso !== null && nowPrefix >= isoPrefix(booking.endIso);
+    const nowMs = Date.now();
+    const started = nowMs >= toUtcMs(booking.startIso);
+    const expired = booking.endIso !== null && nowMs >= toUtcMs(booking.endIso);
     return started && !expired;
   };
 

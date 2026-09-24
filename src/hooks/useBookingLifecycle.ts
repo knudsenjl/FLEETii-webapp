@@ -17,7 +17,8 @@ import { useTimedFlag } from "./useTimedFlag";
 import { useLocateVehicle } from "./useLocateVehicle";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
-import { BOOKING_ID_COLUMN, isoPrefix, nowIsoString, toDisplayVehicle, userAnsatId, type EditingBooking } from "../lib/bookings";
+import { BOOKING_ID_COLUMN, toDisplayVehicle, userAnsatId, type EditingBooking } from "../lib/bookings";
+import { nowUtcIso, toUtcMs } from "../lib/time";
 
 /** The fields BookingPage.tsx/BookingDetailsPage.tsx both need for the shared actions below — same shape each page's own fetch (fresh-on-mount for BookingPage, router-state-or-fetch-by-id for BookingDetailsPage) already produces. */
 export type LifecycleBooking = {
@@ -188,7 +189,7 @@ export function useBookingLifecycle(
       return;
     }
 
-    const { error: updateError } = await supabase.from("bookings").update({ end: nowIsoString() }).eq(BOOKING_ID_COLUMN, booking.id);
+    const { error: updateError } = await supabase.from("bookings").update({ end: nowUtcIso() }).eq(BOOKING_ID_COLUMN, booking.id);
 
     if (updateError) {
       setError(updateError.message);
@@ -212,10 +213,10 @@ export function useBookingLifecycle(
     triggerLockConfirmation("horn");
   };
 
-  /** "Afslut reservation" is enabled only within the booking's own period — from its start until its end (or always, for an open-ended booking), same wall-clock comparison as computeLockButtonState. */
-  const nowPrefix = isoPrefix(nowIsoString());
+  /** "Afslut reservation" is enabled only within the booking's own period — from its start until its end (or always, for an open-ended booking), compared as UTC instants, same as computeLockButtonState. */
+  const nowMs = Date.now();
   const canFinishBooking = booking
-    ? nowPrefix >= isoPrefix(booking.startIso) && !(booking.endIso !== null && nowPrefix >= isoPrefix(booking.endIso))
+    ? nowMs >= toUtcMs(booking.startIso) && !(booking.endIso !== null && nowMs >= toUtcMs(booking.endIso))
     : false;
 
   return {

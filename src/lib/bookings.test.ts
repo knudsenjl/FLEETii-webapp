@@ -4,7 +4,6 @@ import {
   BOOKING_ID_COLUMN,
   DEPARTMENT_COLUMN,
   VEHICLE_ID_COLUMN,
-  addMinutesToIso,
   computeFreePeriod,
   computeLockButtonState,
   findAdjacentBookings,
@@ -15,7 +14,6 @@ import {
   isMapVisible,
   isVehicleAvailable,
   mapBookingRow,
-  nowIsoString,
   resolveVehicleGpsPosition,
   shortDanishDate,
   shortSignalTimestamp,
@@ -55,8 +53,12 @@ describe("BOOKINGS_SELECT_COLUMNS", () => {
 });
 
 describe("splitIsoDateTime", () => {
-  it("splits an ISO datetime into Danish date and time parts", () => {
-    expect(splitIsoDateTime("2026-07-09T14:30:00")).toEqual({ date: "09.07.2026", time: "14:30" });
+  it("splits a UTC timestamp into the DANISH date and time it corresponds to", () => {
+    expect(splitIsoDateTime("2026-07-09T12:30:00Z")).toEqual({ date: "09.07.2026", time: "14:30" });
+  });
+
+  it("accepts Supabase's '+00:00' format and rolls over to the next Danish day", () => {
+    expect(splitIsoDateTime("2026-07-09T22:30:00+00:00")).toEqual({ date: "10.07.2026", time: "00:30" });
   });
 
   it("does not throw on a bare date with no time part, and returns an empty time", () => {
@@ -68,49 +70,12 @@ describe("splitIsoDateTime", () => {
   });
 });
 
-describe("nowIsoString", () => {
-  it("formats the current moment as a naive string with no timezone suffix", () => {
-    expect(nowIsoString()).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}$/);
-  });
-
-  it("uses Danish summer time (UTC+2), not the machine's own timezone", () => {
-    expect(nowIsoString(new Date("2026-07-01T10:00:05Z"))).toBe("2026-07-01T12:00:05");
-  });
-
-  it("uses Danish winter time (UTC+1)", () => {
-    expect(nowIsoString(new Date("2026-01-15T10:00:00Z"))).toBe("2026-01-15T11:00:00");
-  });
-
-  it("rolls over to the next Danish day before UTC does, with 00 (not 24) as the hour", () => {
-    expect(nowIsoString(new Date("2026-07-01T22:30:00Z"))).toBe("2026-07-02T00:30:00");
-  });
-
-  it("gives the same result when the process itself runs in UTC, as Netlify Functions do", () => {
-    const originalTz = process.env.TZ;
-    process.env.TZ = "UTC";
-    try {
-      expect(nowIsoString(new Date("2026-07-01T10:00:00Z"))).toBe("2026-07-01T12:00:00");
-    } finally {
-      if (originalTz === undefined) delete process.env.TZ;
-      else process.env.TZ = originalTz;
-    }
-  });
-
-  it("lets a server running in UTC see a just-started Danish booking as started (Lås/Lås op enabled)", () => {
-    // A booking typed as 12:00-14:00 Danish time, checked at 12:01 Danish (10:01 UTC).
-    const now = nowIsoString(new Date("2026-07-01T10:01:00Z"));
-    expect(
-      computeLockButtonState(now, { start: "2026-07-01T12:00:00+00:00", end: "2026-07-01T14:00:00+00:00" }, null, null, true),
-    ).toEqual({ lockEnabled: true, unlockEnabled: true });
-  });
-});
-
 describe("mapBookingRow", () => {
   const row: BookingRow = {
     booking_id: "42",
     vehicle_id: "7c6a05e9-1c49-41ae-bbea-afe6b09ff74f",
-    start: "2026-07-09T09:00:00",
-    end: "2026-07-09T12:00:00",
+    start: "2026-07-09T07:00:00+00:00",
+    end: "2026-07-09T10:00:00+00:00",
     usage: "Kundebesøg",
     user_id: "c2d3e4f5-6789-01bc-defa-2345678901bc",
     user_profiles: { email: "user@example.com", user_ident: null },
@@ -129,8 +94,8 @@ describe("mapBookingRow", () => {
       start: "09:00",
       endDate: "09.07.2026",
       end: "12:00",
-      startIso: "2026-07-09T09:00:00",
-      endIso: "2026-07-09T12:00:00",
+      startIso: "2026-07-09T07:00:00+00:00",
+      endIso: "2026-07-09T10:00:00+00:00",
       use: "Kundebesøg",
       userId: "c2d3e4f5-6789-01bc-defa-2345678901bc",
       userEmail: "user@example.com",
@@ -163,7 +128,7 @@ describe("mapBookingRow", () => {
       start: "09:00",
       endDate: null,
       end: null,
-      startIso: "2026-07-09T09:00:00",
+      startIso: "2026-07-09T07:00:00+00:00",
       endIso: null,
       use: "Kundebesøg",
       userId: "c2d3e4f5-6789-01bc-defa-2345678901bc",
@@ -410,23 +375,29 @@ describe("computeFreePeriod", () => {
 
 describe("formatFreePeriod", () => {
   it("omits the repeated end date when start and end fall on the same day", () => {
-    expect(formatFreePeriod({ start: "2026-07-09T08:00:00", end: "2026-07-09T14:00:00" })).toBe(
+    expect(formatFreePeriod({ start: "2026-07-09T06:00:00Z", end: "2026-07-09T12:00:00Z" })).toBe(
       "09.07.2026 08:00 - 14:00",
     );
   });
 
   it("shows the full end date when start and end fall on different days", () => {
-    expect(formatFreePeriod({ start: "2026-07-09T08:00:00", end: "2026-07-10T14:00:00" })).toBe(
+    expect(formatFreePeriod({ start: "2026-07-09T06:00:00Z", end: "2026-07-10T12:00:00Z" })).toBe(
       "09.07.2026 08:00 - 10.07.2026 14:00",
     );
   });
 
   it("prefixes a bounded start with 'Fra' when the end is unbounded", () => {
-    expect(formatFreePeriod({ start: "2026-07-09T08:00:00", end: null })).toBe("Fra 09.07.2026 08:00");
+    expect(formatFreePeriod({ start: "2026-07-09T06:00:00Z", end: null })).toBe("Fra 09.07.2026 08:00");
   });
 
   it("prefixes a bounded end with 'Til' when the start is unbounded", () => {
-    expect(formatFreePeriod({ start: null, end: "2026-07-09T14:00:00" })).toBe("Til 09.07.2026 14:00");
+    expect(formatFreePeriod({ start: null, end: "2026-07-09T12:00:00Z" })).toBe("Til 09.07.2026 14:00");
+  });
+
+  it("decides 'same day' by the Danish calendar day, not the UTC one", () => {
+    expect(formatFreePeriod({ start: "2026-07-09T22:30:00Z", end: "2026-07-10T08:00:00Z" })).toBe(
+      "10.07.2026 00:30 - 10:00",
+    );
   });
 
   it("falls back to a dash when both bounds are missing", () => {
@@ -434,7 +405,7 @@ describe("formatFreePeriod", () => {
   });
 
   it("uses short 'dd/mm' dates when short is true", () => {
-    expect(formatFreePeriod({ start: "2026-07-09T08:00:00", end: "2026-07-10T14:00:00" }, true)).toBe(
+    expect(formatFreePeriod({ start: "2026-07-09T06:00:00Z", end: "2026-07-10T12:00:00Z" }, true)).toBe(
       "09/07 08:00 - 10/07 14:00",
     );
   });
@@ -638,29 +609,6 @@ describe("computeLockButtonState", () => {
   it("permanently blocks unlock if the previous booking was itself open-ended (defensive — shouldn't occur in practice)", () => {
     const previous = { end: null };
     expect(computeLockButtonState("2027-01-01T00:00:00", booking, previous, null, true).unlockEnabled).toBe(false);
-  });
-});
-
-describe("addMinutesToIso", () => {
-  it("adds positive minutes, rolling over the hour", () => {
-    expect(addMinutesToIso("2026-07-09T09:50:00", 15)).toBe("2026-07-09T10:05:00");
-  });
-
-  it("subtracts minutes when given a negative value, rolling back the hour", () => {
-    expect(addMinutesToIso("2026-07-09T09:05:00", -15)).toBe("2026-07-09T08:50:00");
-  });
-
-  it("rolls over the calendar day when the shift crosses midnight", () => {
-    expect(addMinutesToIso("2026-07-09T23:55:00", 15)).toBe("2026-07-10T00:10:00");
-  });
-
-  it("ignores a timezone suffix entirely rather than converting it — regression test for a real bug where the map on BookingDetailsPage stayed hidden because a Supabase-round-tripped '+00:00' value got shifted by the local UTC offset before the 15-minute window was even applied", () => {
-    expect(addMinutesToIso("2026-07-19T11:22:00+00:00", -15)).toBe("2026-07-19T11:07:00");
-    expect(addMinutesToIso("2026-07-19T14:22:00+00:00", 15)).toBe("2026-07-19T14:37:00");
-  });
-
-  it("returns the input unchanged if it doesn't match the expected ISO shape", () => {
-    expect(addMinutesToIso("not-a-date", 15)).toBe("not-a-date");
   });
 });
 

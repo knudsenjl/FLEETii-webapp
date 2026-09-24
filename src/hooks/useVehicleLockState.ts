@@ -11,10 +11,10 @@ import { supabase } from "../lib/supabase";
 import {
   computeLockButtonState,
   findAdjacentBookings,
-  nowIsoString,
   VEHICLE_ID_COLUMN,
   type BookingNeighbor,
 } from "../lib/bookings";
+import { nowUtcIso } from "../lib/time";
 
 /** The current user's own reservation for this vehicle, if any — the context computeLockButtonState needs. A null endIso means the booking is open-ended (see bookings.ts's BookingRow doc comment), not "no booking" — don't treat it as missing context. */
 export type VehicleLockBookingContext = { bookingId: string; startIso: string; endIso: string | null };
@@ -111,7 +111,7 @@ export function useVehicleLockState(
 
     const { previous, next } = findAdjacentBookings(bookingsResult.data ?? [], bookingId);
     const state = computeLockButtonState(
-      nowIsoString(),
+      nowUtcIso(),
       { start: bookingStartIso, end: bookingEndIso ?? null },
       previous ? { end: previous.end } : null,
       next ? { start: next.start } : null,
