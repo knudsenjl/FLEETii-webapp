@@ -98,7 +98,13 @@ type Costumer = {
  */
 export function CostumerDetailsPage() {
   const navigate = useNavigate();
-  const { session, costumerId: activeCostumerId, costumerName: activeCostumerName, afdelingId: activeAfdelingId } = useAuth();
+  const {
+    session,
+    costumerId: activeCostumerId,
+    costumerName: activeCostumerName,
+    afdelingId: activeAfdelingId,
+    switchDepartment,
+  } = useAuth();
   const location = useLocation();
   const { costumerId } = useParams<{ costumerId: string }>();
   const state = location.state as { costumer?: Costumer } | null;
@@ -563,7 +569,23 @@ export function CostumerDetailsPage() {
     <>
       <PageShell>
           <PageHeader
-            hideKundeAlle
+            kundePage={
+              costumerId
+                ? {
+                    costumerId,
+                    // "Alle" here means "back to every costumer": clear the
+                    // global scope (only if it isn't "Alle" already) and
+                    // return to the sysadm front page — this page itself
+                    // only ever shows one costumer.
+                    onAlle: () => {
+                      void (async () => {
+                        if (activeCostumerId || activeAfdelingId) await switchDepartment(null);
+                        navigate("/admin");
+                      })();
+                    },
+                  }
+                : undefined
+            }
             koretoejNavigate={{ label: "Køretøjer", options: vehicleOptions, onSelect: (id) => navigate(`/vehicle-details/${id}`) }}
             brugerNavigate={{ label: "Brugere", options: userOptions, onSelect: (id) => navigate(`/user-details/${id}`) }}
             onSwitcherOpenChange={(open) => {

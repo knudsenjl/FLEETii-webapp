@@ -163,11 +163,14 @@ const KUNDE_NAVIGATE_ALL = "__alle__";
  * instead of the normal persisted Kunde/Afdeling switch every other sysadm
  * page uses it for.
  *
- * `hideKundeAlle` (optional, page-supplied — CostumerDetailsPage.tsx only):
- * same idea as `hideAfdelingAlle` above, but for the (non-navigate) Kunde
- * <select>'s own "Alle" option — that page manages exactly ONE costumer at
- * a time, so "every costumer at once" is a dead choice there too (see its
- * own "Kunde changing to Alle...does nothing" doc comment).
+ * `kundePage` (optional, page-supplied — CostumerDetailsPage.tsx only): for a
+ * page that shows ONE specific costumer regardless of the global scope.
+ * `costumerId` is that page's costumer, shown as the (non-navigate) Kunde
+ * <select>'s value instead of the global scope — which can still be "Alle"
+ * there (opening a costumer from the front page's jump menu doesn't change the
+ * scope), and previously made the select fall back to displaying its FIRST
+ * option, i.e. an unrelated costumer. `onAlle` is what picking "Alle" does
+ * on that page (there is no "all costumers" view of a single-costumer page).
  *
  * `afdelingNavigate` (optional, page-supplied — CostumerAdministrationPage.tsx
  * only, see PageHeaderAfdelingNavigateField): same repurposing as
@@ -182,7 +185,7 @@ export function PageHeader({
   brugerNavigate,
   hideAfdelingAlle = false,
   hideAfdeling = false,
-  hideKundeAlle = false,
+  kundePage,
   kundeNavigate,
   afdelingNavigate,
   onSwitcherOpenChange,
@@ -196,7 +199,7 @@ export function PageHeader({
   brugerNavigate?: PageHeaderNavigateField;
   hideAfdelingAlle?: boolean;
   hideAfdeling?: boolean;
-  hideKundeAlle?: boolean;
+  kundePage?: { costumerId: string; onAlle: () => void };
   kundeNavigate?: PageHeaderKundeNavigateField;
   afdelingNavigate?: PageHeaderAfdelingNavigateField;
   /** Fires whenever the "Data Filter" popup opens/closes — optional, purely so a page whose koretoejNavigate/brugerNavigate options come from an otherwise-unconditional fetch (see useCostumerQuickJumpOptions) can defer that fetch until the popup is actually opened at least once, instead of firing it on every mount regardless of whether the admin ever opens Data Filter at all. */
@@ -490,13 +493,16 @@ export function PageHeader({
                           </select>
                         ) : (
                           <select
-                            value={costumerId ?? ""}
+                            value={kundePage?.costumerId ?? costumerId ?? ""}
                             disabled={isSwitchingScope}
-                            onChange={(e) => void handleSwitch(null, e.target.value || null)}
+                            onChange={(e) => {
+                              if (!e.target.value && kundePage) kundePage.onAlle();
+                              else void handleSwitch(null, e.target.value || null);
+                            }}
                             className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
                           >
-                            {/* Nothing meaningful to choose between with 0-1 real options. Also hidden outright when hideKundeAlle is set (CostumerDetailsPage.tsx — see its own doc comment), regardless of option count. */}
-                            {kundeOptions.length > 1 && !hideKundeAlle && <option value="">Alle</option>}
+                            {/* Nothing meaningful to choose between with 0-1 real options. On a kundePage, "Alle" runs that page's own onAlle instead of switching scope (see the prop's doc comment). */}
+                            {kundeOptions.length > 1 && <option value="">Alle</option>}
                             {kundeOptions.map(([id, name]) => (
                               <option key={id} value={id}>
                                 {name}
@@ -708,11 +714,25 @@ export function PageHeader({
         <div className="flex min-w-0 items-center justify-between gap-2">
           <p className="min-w-0 truncate text-[0.7rem] font-medium text-brand-600">{formatRoleLabel(profile?.role)}: {profile?.full_name ?? "—"} ({profile?.email ?? "—"})</p>
           <p className="shrink-0 truncate text-[0.7rem] font-medium text-brand-600">
-            Afdeling: {costumerName ? `${costumerName}/` : ""}
-            {/* afdeling is only ever null for a sysadm sitting on "Alle" (fully unscoped) or the newer "Kunde only" state (costumerId set, no specific department — see the Kunde-header row above); every other role always has a real department_id, so "—" (missing data) never actually applies to them. Distinguished by costumerId, since both states share a null afdeling. A non-sysadm's own "Alle" is checked FIRST and separately (afdelingScopedToAllGrants) — afdeling itself stays a real, non-null name for them even while it's active (see that state's own doc comment in AuthContext.tsx), so it would otherwise never show here at all. */}
-            {afdelingScopedToAllGrants && !isSysadm(profile?.role)
-              ? "Alle afdelinger"
-              : (afdeling ?? (isSysadm(profile?.role) ? (costumerId ? "Alle afdelinger" : "Alle") : "—"))}
+            {isSysadm(profile?.role) ? (
+              // Sysadm: always "Kunde/Afdeling", each "Alle" when unscoped —
+              // "Alle/Alle" right after login, "{Kunde}/Alle" once a Kunde is
+              // selected OR while viewing one Kunde's own page (kundePage —
+              // the global scope can still be "Alle" there, see that prop).
+              <>
+                Afdeling:{" "}
+                {kundePage
+                  ? (kundeOptions.find(([id]) => id === kundePage.costumerId)?.[1] ?? costumerName ?? "Alle")
+                  : (costumerName ?? "Alle")}
+                /{afdeling ?? "Alle"}
+              </>
+            ) : (
+              <>
+                Afdeling: {costumerName ? `${costumerName}/` : ""}
+                {/* Admin/user: afdeling is always a real department name (their active department — see AuthContext's afdelingId), so "—" only means missing data. Their own "Alle" is the client-only afdelingScopedToAllGrants, checked first since afdeling itself stays set while it's active. */}
+                {afdelingScopedToAllGrants ? "Alle afdelinger" : (afdeling ?? "—")}
+              </>
+            )}
           </p>
         </div>
       )}
