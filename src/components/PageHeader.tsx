@@ -117,6 +117,9 @@ function settingsMenuItemsForRole(role: string | null | undefined, ownUserId: st
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
 const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
 
+/** Option value for the "Alle" entry in the jump-to-Kunde menu (kundeNavigate) — a sentinel, since "" is that menu's own "Vælg…" placeholder and every other value is a real costumer id. */
+const KUNDE_NAVIGATE_ALL = "__alle__";
+
 /** Standard page header: logo, sign-out button (only when logged in), a back button (only when logged in — plain browser-history navigate(-1), sits between sign-out and reload), a reload button (always shown, logged in or not — a real window.location.reload(), since the app's fixed-position body means iOS's native pull-to-refresh doesn't work here), a "Data Filter" button (only when logged in — funnel icon, same as every page's own former "Filtrer" button; opens a popup with a Kunde+Afdeling <select> pair, or a 3s "no departments" InlinePopup in the edge case a non-sysadm has none at all; see AuthContext's switchDepartment), a settings button (only when logged in — role "user" navigates straight to their personal settings, the only one they have; "admin"/"sysadm" instead open a dropdown offering BOTH their personal settings and their department/FLEETii-wide one, since they have two — see settingsMenuItemsForRole), an "About" link, and the current user's role/department. For a sysadm, the popup's Afdeling <select> lists every department under the currently-picked Kunde (or every department platform-wide once the Kunde <select> is "Alle" — see AuthContext's loadAvailableDepartments), and picking "Alle" in the Afdeling <select> alone (Kunde left as-is) persists that Kunde's own "every department" scope rather than fully unscoping — see handleSwitch's own doc comment. A regular admin never sees the Kunde <select> at all — only Afdeling, listing their own grant list, always scoped to their own single costumer. Deliberately styled as labeled <select> fields (same classes as every page's own "Filtrer" funnel popup, e.g. VehiclesPage.tsx) rather than a custom menu — this is the single, persisted source of truth for the app-wide Kunde/Afdeling scope those per-page popups themselves read (see the filter-redesign work), so sharing their visual language keeps the two families of popup legible as the same kind of control. Used on every page — public pages (like AboutPage) get the logged-out variant automatically since isFullyAuthenticated is false there.
  *
  * `compact` (BookingPage.tsx/BookingsPage.tsx's mobile-first layout only —
@@ -463,12 +466,22 @@ export function PageHeader({
                         {kundeNavigate ? (
                           <select
                             value=""
+                            disabled={isSwitchingScope}
                             onChange={(e) => {
-                              if (e.target.value) kundeNavigate.onSelect(e.target.value);
+                              // "Alle" resets the global scope in place (no
+                              // navigation) — otherwise a sysadm who had
+                              // picked a Kunde (here or on
+                              // CostumerDetailsPage, which hides "Alle")
+                              // had no way back to "Alle" from the pages
+                              // that use this jump-to-Kunde menu.
+                              if (e.target.value === KUNDE_NAVIGATE_ALL) void handleSwitch(null, null);
+                              else if (e.target.value) kundeNavigate.onSelect(e.target.value);
                             }}
-                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500"
+                            className="mt-1 w-full rounded-lg border border-brand-200 bg-brand-50/60 px-2 py-1.5 text-xs text-brand-800 outline-none focus:border-accent-500 disabled:cursor-not-allowed disabled:opacity-60"
                           >
                             <option value="">Vælg…</option>
+                            {/* Only when a Kunde is actually selected — on "Alle" already there's nothing to reset. */}
+                            {costumerId && <option value={KUNDE_NAVIGATE_ALL}>Alle</option>}
                             {kundeOptions.map(([id, name]) => (
                               <option key={id} value={id}>
                                 {name}
