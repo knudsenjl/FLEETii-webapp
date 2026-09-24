@@ -22,6 +22,7 @@
 // from UserDetailsPage.tsx.
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { getAdminClient } from "./_shared/adminClient.js";
+import { findRequestedDepartment } from "./_shared/departmentLookup.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import {
@@ -38,7 +39,10 @@ type CreateUserBody = {
   phone?: string | null;
   /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional. */
   user_ident?: string | null;
+  /** Home department NAME — kept for older clients; departmentId is preferred (names are only unique per costumer). */
   department?: string | null;
+  /** Home department id — preferred over `department` when present. */
+  departmentId?: string | null;
   role?: string;
 };
 
@@ -99,27 +103,30 @@ export default async (req: Request) => {
   // since user_profiles now stores the uuid, not the name (see
   // supabase/applied/user_profiles_department_to_department_id.sql).
   const requestedDepartmentName = asTrimmedString(body.department) || null;
-  const [{ data: caller }, { data: requestedDepartmentRow }] = await Promise.all([
-    admin
-      .from("user_profiles")
-      .select("costumer_id, role")
-      .eq("user_id", authResult.userId)
-      .maybeSingle<{ costumer_id: string | null; role: string }>(),
-    requestedDepartmentName
-      ? admin
-          .from("departments")
-          .select("department_id, costumer_id")
-          .eq("name", requestedDepartmentName)
-          .maybeSingle<{ department_id: string; costumer_id: string | null }>()
-      : Promise.resolve({ data: null }),
-  ]);
-  const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
+  const { data: caller } = await admin
+    .from("user_profiles")
+    .select("costumer_id, role")
+    .eq("user_id", authResult.userId)
+    .maybeSingle<{ costumer_id: string | null; role: string }>();
 
   // A sysadm isn't scoped to one costumer — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql) —
   // they just need the requested department to actually exist.
   const isSysadm = isSysadmRole(caller?.role);
+
+  // By id when the client sends one (UserDetailsPage.tsx does); a bare name
+  // is scoped to the caller's own costumer, since department names are only
+  // unique per costumer — see findRequestedDepartment.
+  const { department: requestedDepartmentRow, error: requestedDepartmentError } = await findRequestedDepartment(admin, {
+    departmentId: asTrimmedString(body.departmentId) || null,
+    departmentName: requestedDepartmentName,
+    costumerId: isSysadm ? null : (caller?.costumer_id ?? null),
+  });
+  if (requestedDepartmentError) {
+    console.error("[create-user] departments lookup failed:", requestedDepartmentError);
+  }
+  const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
   if (isSysadm) {
     if (!requestedDepartmentRow) {
       return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });

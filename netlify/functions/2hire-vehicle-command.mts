@@ -30,7 +30,7 @@ import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
-import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
 
 const VALID_COMMANDS: readonly TwoHireGenericCommand[] = ["start", "stop", "locate"];
 
@@ -75,15 +75,32 @@ export default async (req: Request) => {
         .maybeSingle<{ costumer_id: string | null }>(),
       admin
         .from("user_profiles")
-        .select("role, costumer_id")
+        .select("role, costumer_id, deleted_at")
         .eq("user_id", authResult.userId)
-        .maybeSingle<{ role: string; costumer_id: string | null }>(),
+        .maybeSingle<{ role: string; costumer_id: string | null; deleted_at: string | null }>(),
     ]);
-    if (vehicleError) throw new Error(`Kunne ikke slå køretøjet op: ${vehicleError.message}`);
-    if (callerError) throw new Error(`Kunne ikke slå brugeren op: ${callerError.message}`);
+    if (vehicleError) {
+      return new Response(JSON.stringify({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }), { status: 500 });
+    }
+    if (callerError) {
+      return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), { status: 500 });
+    }
+    // Same 404 as set-vehicle-lock.mts — otherwise a stale/mistyped id from a
+    // sysadm (who skips the costumer check below) surfaced as a misleading
+    // "can't determine costumer" 502 from resolveTwoHireCredentials.
+    if (!vehicle) {
+      return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
+    }
 
-    const isSysadm = isSysadmRole(caller?.role);
-    const isAdmin = isAnyAdminRole(caller?.role);
+    // An archived user (delete-user.mts bans the login AND sets deleted_at)
+    // can still hold a valid access token until it expires (up to ~1 hour) —
+    // requireUser alone only proves the token is valid, so refuse them here.
+    if (!caller || caller.deleted_at) {
+      return new Response(JSON.stringify({ error: "Din bruger er ikke længere aktiv." }), { status: 403 });
+    }
+
+    const isSysadm = isSysadmRole(caller.role);
+    const isAdmin = isAnyAdminRole(caller.role);
 
     if (!isSysadm) {
       // Every non-sysadm caller — admin or regular user — is scoped to their
@@ -129,7 +146,7 @@ export default async (req: Request) => {
     }
 
     const credentials = await resolveTwoHireCredentials(admin, {
-      costumerId: vehicle?.costumer_id ?? null,
+      costumerId: vehicle.costumer_id,
     });
 
     try {
@@ -153,6 +170,6 @@ export default async (req: Request) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: 502 });
+    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
   }
 };

@@ -56,7 +56,7 @@ import {
   registerVehicle,
   type TwoHireCredentials,
 } from "./_shared/twoHireClient.js";
-import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
 
 /** The GENERIC signals read back right after a successful registration — see the post-registration signal-seeding step at the bottom of this function. "locked" replaced with "online" (2026-09-08: "locked" doesn't actually resolve against 2hire's real API, confirmed via the /2hire-command console). */
 const GENERIC_SIGNALS_TO_SEED = ["distance_covered", "autonomy_percentage", "autonomy_meters", "position", "online"] as const;
@@ -151,7 +151,7 @@ export default async (req: Request) => {
     credentials = await resolveTwoHireCredentials(admin, { costumerId: order.costumer_id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: 502 });
+    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
   }
 
   let vehicleId: string;

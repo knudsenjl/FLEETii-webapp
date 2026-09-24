@@ -63,8 +63,27 @@ export async function resolveTwoHireCredentials(
     if (data?.twohire_client_id && data?.twohire_client_secret) {
       return { clientId: data.twohire_client_id, clientSecret: data.twohire_client_secret };
     }
-    throw new Error(`${data?.name ?? "Denne kunde"} har ikke fået konfigureret 2hire-adgang endnu — kontakt FLEETii.`);
+    throw new TwoHireNotConfiguredError(`${data?.name ?? "Denne kunde"} har ikke fået konfigureret 2hire-adgang endnu — kontakt FLEETii.`);
   }
 
-  throw new Error("Kunne ikke bestemme hvilken kunde denne handling gælder for.");
+  throw new TwoHireNotConfiguredError("Kunne ikke bestemme hvilken kunde denne handling gælder for.");
+}
+
+/**
+ * Thrown by resolveTwoHireCredentials when FLEETii's OWN setup is missing
+ * (the costumer has no 2hire credentials, or the vehicle/order has no
+ * costumer at all) — a configuration problem to fix in FLEETii, not a 2hire
+ * outage. Kept distinct so callers can report it as such (see
+ * twoHireErrorStatus) instead of a 502 that looks like 2hire is down.
+ */
+export class TwoHireNotConfiguredError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "TwoHireNotConfiguredError";
+  }
+}
+
+/** HTTP status for an error from resolving credentials or calling 2hire: 409 (Conflict) for missing FLEETii configuration, 502 (Bad Gateway) for everything else — i.e. 2hire itself or the network failing. */
+export function twoHireErrorStatus(error: unknown): 409 | 502 {
+  return error instanceof TwoHireNotConfiguredError ? 409 : 502;
 }

@@ -9,6 +9,7 @@
 // check below is this function's actual authorization boundary.
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { getAdminClient } from "./_shared/adminClient.js";
+import { findRequestedDepartment } from "./_shared/departmentLookup.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 
 type UpdateUserBody = {
@@ -18,7 +19,10 @@ type UpdateUserBody = {
   phone?: string | null;
   /** Company-wide "Bruger-ID" identifier (see supabase/applied/user_profiles_add_user_ident.sql) — optional. */
   user_ident?: string | null;
+  /** Home department NAME — kept for older clients; departmentId is preferred (names are only unique per costumer). */
   department?: string | null;
+  /** Home department id — preferred over `department` when present. */
+  departmentId?: string | null;
   role?: string;
 };
 
@@ -82,29 +86,19 @@ export default async (req: Request) => {
 
 
   const requestedDepartmentName = asTrimmedString(body.department) || null;
-  const [{ data: caller }, { data: target }, { data: requestedDepartmentRow, error: requestedDepartmentError }] =
-    await Promise.all([
-      admin
-        .from("user_profiles")
-        .select("costumer_id, role")
-        .eq("user_id", authResult.userId)
-        .maybeSingle<{ costumer_id: string | null; role: string }>(),
-      admin
-        .from("user_profiles")
-        .select("costumer_id, department_id, role, email")
-        .eq("user_id", targetUserId)
-        .maybeSingle<{ costumer_id: string | null; department_id: string | null; role: string; email: string | null }>(),
-      requestedDepartmentName
-        ? admin
-            .from("departments")
-            .select("department_id, costumer_id")
-            .eq("name", requestedDepartmentName)
-            .maybeSingle<{ department_id: string; costumer_id: string | null }>()
-        : Promise.resolve({ data: null, error: null }),
-    ]);
-  if (requestedDepartmentError) {
-    console.error("[update-user] departments lookup failed:", requestedDepartmentError);
-  }
+  const requestedDepartmentIdParam = asTrimmedString(body.departmentId) || null;
+  const [{ data: caller }, { data: target }] = await Promise.all([
+    admin
+      .from("user_profiles")
+      .select("costumer_id, role")
+      .eq("user_id", authResult.userId)
+      .maybeSingle<{ costumer_id: string | null; role: string }>(),
+    admin
+      .from("user_profiles")
+      .select("costumer_id, department_id, role, email")
+      .eq("user_id", targetUserId)
+      .maybeSingle<{ costumer_id: string | null; department_id: string | null; role: string; email: string | null }>(),
+  ]);
 
   if (!target) {
     return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
@@ -113,6 +107,19 @@ export default async (req: Request) => {
   // exception as department_settings/user_departments' own RLS policies
   // (see supabase/applied/department_settings_allow_fleetii_admin.sql).
   const isSysadm = isSysadmRole(caller?.role);
+
+  // By id when the client sends one (UserDetailsPage.tsx does); a bare name
+  // is scoped to the relevant costumer, since department names are only
+  // unique per costumer — see findRequestedDepartment.
+  const { department: requestedDepartmentRow, error: requestedDepartmentError } = await findRequestedDepartment(admin, {
+    departmentId: requestedDepartmentIdParam,
+    departmentName: requestedDepartmentName,
+    costumerId: isSysadm ? target.costumer_id : (caller?.costumer_id ?? null),
+  });
+  if (requestedDepartmentError) {
+    console.error("[update-user] departments lookup failed:", requestedDepartmentError);
+  }
+  const departmentRequested = Boolean(requestedDepartmentIdParam || requestedDepartmentName);
   // A regular admin must never be able to touch a sysadm's account —
   // in particular never change their login email (see the updateUserById
   // call below) — regardless of whether the costumer-scoping check below
@@ -131,10 +138,10 @@ export default async (req: Request) => {
     if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
       return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });
     }
-    if (requestedDepartmentName && requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
+    if (departmentRequested && requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
       return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
     }
-  } else if (requestedDepartmentName && !requestedDepartmentRow) {
+  } else if (departmentRequested && !requestedDepartmentRow) {
     return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
   }
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;

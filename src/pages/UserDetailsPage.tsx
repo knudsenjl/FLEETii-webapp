@@ -633,6 +633,8 @@ export function UserDetailsPage() {
           phone: phone || null,
           user_ident: userIdent.trim() || null,
           department: department || null,
+          // The id is what the server actually resolves (names are only unique per costumer); the name stays for older server versions.
+          departmentId: departmentOptions.find((d) => d.name === department)?.department_id ?? null,
           role: role || "user",
         }),
       });
@@ -733,6 +735,8 @@ export function UserDetailsPage() {
           phone: phone || null,
           user_ident: userIdent.trim() || null,
           department: department || null,
+          // The id is what the server actually resolves (names are only unique per costumer); the name stays for older server versions.
+          departmentId: departmentOptions.find((d) => d.name === department)?.department_id ?? null,
           role: role || "user",
         }),
       });

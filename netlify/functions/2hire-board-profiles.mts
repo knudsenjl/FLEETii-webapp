@@ -16,7 +16,7 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 import { getTwoHireBoardProfiles } from "./_shared/twoHireClient.js";
-import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
 
 export default async (req: Request) => {
   if (req.method !== "GET") {
@@ -49,6 +49,6 @@ export default async (req: Request) => {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: 502 });
+    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
   }
 };
