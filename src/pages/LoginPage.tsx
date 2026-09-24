@@ -175,7 +175,14 @@ export function LoginPage() {
     }
   }
 
-  /** Sends a Supabase password-reset email to the entered username/email. Requires a non-empty username field (used as the recipient) but no password. */
+  /**
+   * Sends a Supabase password-reset email to the entered username/email. Requires a non-empty username field (used as the recipient) but no password.
+   *
+   * redirectTo is the site the user is actually on (app.fleetii.dk / dev.fleetii.dk / localhost), so the emailed link always leads back to the right
+   * environment. Without it Supabase falls back to the project's own "Site URL" setting, which on production was still the default
+   * http://localhost:3000, so every reset link pointed at the user's own machine (2026-09-24). Supabase only honours redirectTo if it matches the
+   * project's Auth "Redirect URLs" allow-list (e.g. https://app.fleetii.dk/**); otherwise it silently falls back to Site URL again.
+   */
   async function handleForgotPassword() {
     setError(null);
     setResetMessage(null);
@@ -186,7 +193,9 @@ export function LoginPage() {
     }
 
     setResetSubmitting(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(username);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(username, {
+      redirectTo: window.location.origin,
+    });
     setResetSubmitting(false);
 
     if (resetError) {
