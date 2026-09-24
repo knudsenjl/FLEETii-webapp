@@ -1,14 +1,13 @@
 // Netlify Function backing TwoHireCommandPage.tsx ("/2hire-command",
 // sysadm-only): sends an arbitrary, hand-typed request straight to 2hire's
 // Adapter API and returns the raw response, for poking at endpoints this
-// codebase has no dedicated wrapper for yet (unlike 2hire-vehicle-command.mts/
-// 2hire-vehicle-state.mts, which each call one fixed, already-understood
-// _shared/twoHireClient.ts function). Deliberately thin and unscoped beyond
+// codebase has no dedicated wrapper for yet (unlike 2hire-vehicle-command.mts,
+// which calls one fixed, already-understood _shared/twoHireClient.ts
+// function). Deliberately thin and unscoped beyond
 // the sysadm check itself — this is a diagnostic console, not a
 // user-facing feature, so it always authenticates as the global/sysadm
 // 2hire credential (getGlobalCredentials) regardless of which vehicle the
-// command targets, same as getDeviceState()'s own test-tooling-only
-// shortcut in twoHireClient.ts.
+// command targets.
 //
 // The one convenience this adds over a raw curl call: a command string may
 // embed a REAL number plate wrapped in braces (e.g.
@@ -86,9 +85,8 @@ export default async (req: Request) => {
       { status: 400 },
     );
   }
-  // A full URL (e.g. the e2e/simulation host, https://e2e.adapter.2hire.io —
-  // see TWOHIRE_E2E_BASE_URL's own doc comment in twoHireClient.ts for why
-  // that's a SEPARATE host from getTwoHireBaseUrl()'s test/production one)
+  // A full URL (e.g. 2hire's e2e/simulation host, https://e2e.adapter.2hire.io,
+  // which is a SEPARATE host from getTwoHireBaseUrl()'s test/production one)
   // is used as-is; a bare path is resolved against getTwoHireBaseUrl(). Only
   // prepending the base URL for a bare path (not unconditionally) avoids
   // mangling an already-absolute URL into "<base>/<absolute-url>".

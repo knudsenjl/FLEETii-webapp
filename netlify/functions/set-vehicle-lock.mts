@@ -42,7 +42,7 @@ import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand } from "./_shared/twoHireClient.js";
-import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
 
 /** A vehicle's booking, as needed to re-run computeLockButtonState/findAdjacentBookings server-side. */
 type VehicleBooking = { booking_id: string; start: string; end: string | null; user_id: string | null };
@@ -104,9 +104,9 @@ export default async (req: Request) => {
       .maybeSingle<{ costumer_id: string | null }>(),
     admin
       .from("user_profiles")
-      .select("role, costumer_id")
+      .select("role, costumer_id, deleted_at")
       .eq("user_id", authResult.userId)
-      .maybeSingle<{ role: string; costumer_id: string | null }>(),
+      .maybeSingle<{ role: string; costumer_id: string | null; deleted_at: string | null }>(),
     admin.from("vehicle_signals").select("locked").eq("vehicle_id", vehicleId).maybeSingle<{ locked: boolean }>(),
     admin
       .from("bookings")
@@ -130,8 +130,15 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
   }
 
-  const isSysadm = isSysadmRole(caller?.role);
-  const isAdmin = isAnyAdminRole(caller?.role);
+  // An archived user (delete-user.mts bans the login AND sets deleted_at)
+  // can still hold a valid access token until it expires (up to ~1 hour) —
+  // requireUser alone only proves the token is valid, so refuse them here.
+  if (!caller || caller.deleted_at) {
+    return new Response(JSON.stringify({ error: "Din bruger er ikke længere aktiv." }), { status: 403 });
+  }
+
+  const isSysadm = isSysadmRole(caller.role);
+  const isAdmin = isAnyAdminRole(caller.role);
 
   let command = body.command ?? (locked ? "stop" : "start");
 
@@ -194,7 +201,7 @@ export default async (req: Request) => {
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
     console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${command}) failed:`, message);
-    return new Response(JSON.stringify({ error: message }), { status: 502 });
+    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
   }
 
   // Record who drove: a 'lock'/'unlock' history row per fulfilled command,

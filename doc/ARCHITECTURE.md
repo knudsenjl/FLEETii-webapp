@@ -94,7 +94,7 @@ nothing about who's calling.
 | `bulk-import-users.mts`, `bulk-import-vehicles.mts` | CSV import flows |
 | `switch-department.mts` | "Skift afdeling" — changes which department's data an admin is currently scoped to |
 | `complete-password-change.mts` | First-login / recovery password change (sets the password and clears `must_change_password` in one step) |
-| `2hire-register-vehicle.mts`, `2hire-vehicle-command.mts`, `2hire-vehicle-state.mts`, `2hire-board-profiles.mts`, `2hire-subscribe.mts`, `2hire-webhook.mts` | 2hire integration — see below |
+| `2hire-register-vehicle.mts`, `2hire-vehicle-command.mts`, `2hire-board-profiles.mts`, `2hire-subscribe.mts`, `2hire-webhook.mts` | 2hire integration — see below |
 | `set-vehicle-lock.mts` | Sends the real 2hire lock/unlock command *and* persists the resulting state |
 | `delete-vehicle.mts`, `delete-costumer.mts`, `send-vehicle-deletion-request.mts`, `send-vehicle-request.mts` | Vehicle/costumer lifecycle + the email-based request flow to FLEETii staff |
 | `motorapi-vehicle-lookup.mts` | Danish plate/stelnummer lookup via MotorAPI |
@@ -143,17 +143,18 @@ fuel/battery level, trip state. Three separate hosts, picked by
 sub-account (`costumers.twohire_client_id`, readable; `twohire_client_secret`,
 service-role-only). `resolveTwoHireCredentials()` decides which credential
 set an operation uses, always resolved server-side from the actual
-vehicle/order being acted on — never trusted from the client: a
-FLEETii-admin-initiated action always uses the global `TWOHIRE_CLIENT_ID`/
-`SECRET` credential, in every environment ("one master account that can
-reach every sub-account too"); otherwise the *target* costumer's own
-sub-account credential is used whenever it's actually configured, in every
-environment too — this is deliberate, since it's what lets a staging
-costumer's own columns be pointed at the test adapter's credential to
-exercise this path before touching production. Only when nothing's
-configured does it fall back to the global credential — and in production
-specifically, that "nothing configured" case is a hard error instead, so a
-real costumer can never silently borrow the master credential.
+vehicle/order being acted on — never trusted from the client. Every
+operation, including a sysadm-initiated one, authenticates as the *target*
+costumer's own sub-account, in every environment (staging costumers point
+their columns at the test adapter's credential). If the costumer has no
+credential configured, the operation fails with a `TwoHireNotConfiguredError`
+(reported as HTTP 409, a FLEETii configuration problem — not a 502 2hire
+outage); there is no fallback to the global credential. The global
+`TWOHIRE_CLIENT_ID`/`SECRET` credential is used only by explicitly
+cross-costumer sysadm tooling (`2hire-raw-command.mts`, `2hire-subscribe.mts`).
+Vehicles registered with the global credential before 2026-09-23 are
+confirmed reachable with their costumer's sub-account credential (admins
+have successfully locked/unlocked them).
 
 2hire delivers webhook events (`2hire-webhook.mts`), HMAC-signed with
 `TWOHIRE_WEBHOOK_SECRET`. That secret is captured by 2hire at

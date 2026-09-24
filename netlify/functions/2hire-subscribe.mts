@@ -26,9 +26,8 @@
 // credentials, one subscribe call only covers whatever account authenticated
 // it — the full-fan-out mode is a LOOP, one call per costumer that has its
 // own credentials configured, plus one more using the global credential
-// (covers sysadm's own sub-account, and is also what test mode always
-// resolves to regardless of which costumer's row is being iterated — see
-// getGlobalCredentials/resolveTwoHireCredentials). The webhook secret/
+// (covers the master account itself — see getGlobalCredentials). The
+// webhook secret/
 // callback URL stay single and shared across every subscription (see
 // twoHireCredentials.ts's own header comment), so there's no per-costumer
 // disambiguation needed on the receiving end. Both modes keep going on a

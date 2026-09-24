@@ -118,6 +118,9 @@ export default async (req: Request) => {
   // One credential lookup per costumer, memoized as a promise so concurrent
   // workers for the same costumer share it. A costumer whose credential can't
   // be resolved rejects here, and is reported per-pair as a failure below.
+  // A rejected lookup is evicted from the cache (not kept for the rest of the
+  // run), so one transient DB error doesn't fail every remaining pair of that
+  // costumer — the next pair simply tries again.
   const credentialsByCostumer = new Map<string, Promise<TwoHireCredentials>>();
   const credentialsFor = (costumerId: string | null) => {
     const key = costumerId ?? "";
@@ -125,6 +128,9 @@ export default async (req: Request) => {
     if (!cached) {
       cached = resolveTwoHireCredentials(admin, { costumerId });
       credentialsByCostumer.set(key, cached);
+      cached.catch(() => {
+        if (credentialsByCostumer.get(key) === cached) credentialsByCostumer.delete(key);
+      });
     }
     return cached;
   };

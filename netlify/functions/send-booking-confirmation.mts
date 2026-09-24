@@ -19,7 +19,7 @@
 // over — see ConfirmPage.tsx's own fire-and-forget call site.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
-import { requireUser } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 import { splitIsoDateTime } from "../../src/lib/bookings.js";
 
@@ -118,9 +118,9 @@ export default async (req: Request) => {
       .maybeSingle<BookingQueryRow>(),
     admin
       .from("user_profiles")
-      .select("full_name, email")
+      .select("full_name, email, role, costumer_id")
       .eq("user_id", authResult.userId)
-      .maybeSingle<{ full_name: string | null; email: string | null }>(),
+      .maybeSingle<{ full_name: string | null; email: string | null; role: string; costumer_id: string | null }>(),
   ]);
 
   if (bookingError || !booking) {
@@ -128,16 +128,36 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Reservationen blev ikke fundet." }), { status: 404 });
   }
 
+  const { data: vehicle } = await admin
+    .from("vehicle_profiles")
+    .select("number_plate, vehicle_ident, brand, model, costumer_id")
+    .eq("vehicle_id", booking.vehicle_id)
+    .maybeSingle<{
+      number_plate: string | null;
+      vehicle_ident: string | null;
+      brand: string | null;
+      model: string | null;
+      costumer_id: string | null;
+    }>();
+
+  // Only someone who could actually have created this booking may trigger
+  // its email: the booked user themselves, an admin of the vehicle's own
+  // costumer (booking on someone's behalf), or a sysadm. Otherwise any
+  // logged-in user could make FLEETii email any booking's owner by id.
+  const mayNotify =
+    authResult.userId === booking.user_id ||
+    isSysadmRole(callerProfile?.role) ||
+    (isAnyAdminRole(callerProfile?.role) &&
+      Boolean(callerProfile?.costumer_id) &&
+      callerProfile?.costumer_id === vehicle?.costumer_id);
+  if (!mayNotify) {
+    return new Response(JSON.stringify({ error: "Du har ikke adgang til denne reservation." }), { status: 403 });
+  }
+
   const recipientEmail = booking.user_profiles?.email;
   if (!recipientEmail) {
     return new Response(JSON.stringify({ error: "Ingen e-mailadresse fundet for brugeren." }), { status: 400 });
   }
-
-  const { data: vehicle } = await admin
-    .from("vehicle_profiles")
-    .select("number_plate, vehicle_ident, brand, model")
-    .eq("vehicle_id", booking.vehicle_id)
-    .maybeSingle<{ number_plate: string | null; vehicle_ident: string | null; brand: string | null; model: string | null }>();
 
   // Same vehicle_ident-over-number_plate fallback as every other vehicle
   // label app-wide (see liveVehicleDataSource.ts's toVehicle2Hire).

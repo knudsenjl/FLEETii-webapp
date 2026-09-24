@@ -217,8 +217,6 @@ export default async (req: Request) => {
           usage: pick(usageOptions),
           start: start.toISOString(),
           end: end ? end.toISOString() : null,
-          // Real UTC instants (toISOString) — see ConfirmPage.tsx's identical flag.
-          legacy_wallclock: false,
         });
 
         if (!error) {

@@ -14,10 +14,8 @@
 // authenticates now takes a TwoHireCredentials parameter instead of reading
 // process.env directly — WHICH credential to pass is decided one layer up,
 // by _shared/twoHireCredentials.ts's resolveTwoHireCredentials() (costumer
-// sub-account vs. the global/sysadm credential vs. test mode).
-// getDeviceState() at the bottom of this file is the one exception — it has
-// no per-costumer concept at all (test tooling only) and always uses
-// getGlobalCredentials() itself.
+// sub-account). Only explicitly cross-costumer sysadm tooling
+// (2hire-raw-command.mts, 2hire-subscribe.mts) uses getGlobalCredentials().
 
 /** Picks the 2hire host based on VITE_DATA_SOURCE: "2hire-production-adaptor" -> the real fleet; anything else (e.g. "2hire-test-adaptor") -> the test/simulated environment, the safe default. */
 export function getTwoHireBaseUrl(): string {
@@ -29,7 +27,7 @@ export function getTwoHireBaseUrl(): string {
 /** One 2hire sub-account's (or the global FLEETii account's) client_id/client_secret — see resolveTwoHireCredentials() in _shared/twoHireCredentials.ts for how the right one gets picked for a given operation. */
 export type TwoHireCredentials = { clientId: string; clientSecret: string };
 
-/** The single global/sysadm credential, read from TWOHIRE_CLIENT_ID/SECRET — used directly in test mode (everyone shares it) and, in production, only for a sysadm-initiated operation (see resolveTwoHireCredentials). This is the ONLY remaining place in the codebase that reads these two env vars. */
+/** The single global/sysadm credential, read from TWOHIRE_CLIENT_ID/SECRET — used only by explicitly cross-costumer sysadm tooling (2hire-raw-command.mts, 2hire-subscribe.mts); every vehicle/order operation authenticates as its costumer instead (see resolveTwoHireCredentials). This is the ONLY place in the codebase that reads these two env vars. */
 export function getGlobalCredentials(): TwoHireCredentials {
   const clientId = process.env.TWOHIRE_CLIENT_ID;
   const clientSecret = process.env.TWOHIRE_CLIENT_SECRET;
@@ -328,15 +326,6 @@ export async function fetchSpecificVehicleSignal(
   return fetchVehicleSignal(vehicleId, "specific", signal, credentials);
 }
 
-/**
- * The e2e/simulation-only host used by createvehicle (POST /devices) and
- * getDeviceState — distinct from getTwoHireBaseUrl()'s test/production
- * switch, since simulating a device is never something a real, physical
- * vehicle needs (see starttrip's/createvehicle's own "Full Path" docs, both
- * fixed to this host regardless of VITE_DATA_SOURCE).
- */
-const TWOHIRE_E2E_BASE_URL = "https://e2e.adapter.2hire.io";
-
 /** The three generic commands every 2hire-compatible vehicle supports — see sendGenericCommand. */
 export type TwoHireGenericCommand = "start" | "stop" | "locate";
 
@@ -380,43 +369,4 @@ export async function sendGenericCommand(
     const cause = result?.details?.cause ?? result?.code ?? response.status;
     throw new Error(`2hire "${command}"-kommando fejlede (${cause}).`);
   }
-}
-
-/**
- * A device's current state as reported by 2hire — see getDeviceState().
- * `status` is the field that matters for lock display: observed values are
- * "LOCKED", "UNLOCKED", and "MOVING". The other fields are included since
- * they're already in 2hire's response and may be useful later (e.g. for
- * distance_covered/autonomy_percentage, which don't reach our webhook) —
- * nothing here reads them today.
- */
-export type TwoHireDeviceState = {
-  status: string;
-  position?: { timestamp: number; data: { latitude: number; longitude: number } };
-  online?: { timestamp: number; data: { online: boolean } };
-  autonomy_percentage?: { timestamp: number; data: { percentage: number } };
-  distance_covered?: { timestamp: number; data: { meters: number } };
-};
-
-/**
- * Reads a simulated 2hire-board device's current state — GET
- * /devices/{identifier}/state, e2e host: this is a simulation-only
- * endpoint, no equivalent for a real, in-service vehicle. Used to read back
- * the real `status` ("LOCKED"/"UNLOCKED") after a
- * sendGenericCommand("start"/"stop") call, rather than assuming the command
- * did what it asked.
- *
- * Docs: https://developer.2hire.io/reference/getdevicestate
- */
-export async function getDeviceState(identifier: string): Promise<TwoHireDeviceState> {
-  const token = await getTwoHireAccessToken(getGlobalCredentials());
-  const response = await fetch(`${TWOHIRE_E2E_BASE_URL}/devices/${encodeURIComponent(identifier)}/state`, {
-    headers: { Authorization: `${token.tokenType} ${token.value}` },
-  });
-
-  if (!response.ok) {
-    throw new Error(`Kunne ikke hente køretøjets 2hire-status (${response.status}): ${await response.text()}`);
-  }
-
-  return (await response.json()) as TwoHireDeviceState;
 }
