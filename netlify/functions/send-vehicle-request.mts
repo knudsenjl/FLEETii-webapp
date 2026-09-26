@@ -22,6 +22,7 @@ import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
+import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
@@ -165,6 +166,14 @@ export default async (req: Request) => {
   const fuelLevel = asTrimmedString(body.fuelLevel);
   const mileage = asTrimmedString(body.mileage);
   const drivmiddel = asTrimmedString(body.drivmiddel) || "Benzin";
+  // Checked here against the same list as the DB's CHECK constraint — an
+  // invalid value used to reach the insert and come back as a generic
+  // "Kunne ikke oprette bestillingen" (code review 2026-09-26).
+  if (!(DRIVMIDDEL_OPTIONS as readonly string[]).includes(drivmiddel)) {
+    return new Response(JSON.stringify({ error: `Drivmiddel skal være en af: ${DRIVMIDDEL_OPTIONS.join(", ")}.` }), {
+      status: 400,
+    });
+  }
   const kontaktperson = asTrimmedString(body.kontaktperson);
   const kontaktemail = asTrimmedString(body.kontaktemail);
   const kontaktnummer = asNormalizedNumberString(body.kontaktnummer);
@@ -187,6 +196,8 @@ export default async (req: Request) => {
   }
   const fleetiiDevice = needsFleetiiDevice ? "Nyt device skal installeres" : `Eksisterende device (id: ${fleetiiDeviceId})`;
 
+  // Only a last-resort fallback: both branches below replace it with the
+  // department's real name from the database whenever there is one.
   let afdeling = asTrimmedString(body.afdeling) || "—";
 
 
@@ -235,6 +246,17 @@ export default async (req: Request) => {
           activeDepartmentId: caller.active_department_id,
         })
       : null;
+    // The e-mail shows this department's real name, not the afdeling text
+    // the browser sent (which could disagree with departmentId — code review
+    // 2026-09-26).
+    if (departmentId) {
+      const { data: department } = await admin
+        .from("departments")
+        .select("name")
+        .eq("department_id", departmentId)
+        .maybeSingle<{ name: string }>();
+      if (department?.name) afdeling = department.name;
+    }
   }
 
   if (!costumerId) {
