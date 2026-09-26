@@ -5,9 +5,11 @@
 // _shared/vehicleLock.ts's lockStateForBooking). POST rather than GET so the
 // token travels in the body, never in a URL/access log.
 //
-// Never returns the guest's personal data (name/email/…) — the token is a
-// bearer credential, and whoever holds a forwarded link shouldn't learn who
-// it was issued to. Rate-limited and logged via _shared/guestAccess.ts.
+// Of the guest's personal data it returns only their name, for the page's
+// "Kunde/Afdeling/Navn" line (user decision 2026-09-26) — never email/phone/
+// address/licence. While access is active it also returns the vehicle's last
+// GPS position for the page's map (same 15-min-margin window regular users
+// get, see isMapVisible). Rate-limited and logged via _shared/guestAccess.ts.
 import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { guestAccessWindow, guestVehicleLabel, logGuestAccess, resolveGuestRequest } from "./_shared/guestAccess.js";
@@ -41,12 +43,23 @@ export default async (req: Request) => {
   // buttons at all, so there's no reason to load the vehicle's bookings.
   let lock: { lockEnabled: boolean; unlockEnabled: boolean } | null = null;
   let locked: boolean | null = null;
+  let position: { lat: number; lng: number; updatedAt: string | null } | null = null;
   if (access === "active") {
     try {
-      const context = await loadLockContext(admin, booking.vehicle_id);
+      const [context, { data: signal }] = await Promise.all([
+        loadLockContext(admin, booking.vehicle_id),
+        admin
+          .from("vehicle_signals")
+          .select("lat, lng, position_updated_at")
+          .eq("vehicle_id", booking.vehicle_id)
+          .maybeSingle<{ lat: number | null; lng: number | null; position_updated_at: string | null }>(),
+      ]);
       const own = context.bookings.find((b) => b.booking_id === booking.booking_id);
       lock = own ? lockStateForBooking(context, own) : { lockEnabled: false, unlockEnabled: false };
       locked = context.currentLocked;
+      if (signal?.lat != null && signal.lng != null) {
+        position = { lat: signal.lat, lng: signal.lng, updatedAt: signal.position_updated_at };
+      }
     } catch (error) {
       console.error("[guest-booking-status]", error);
       return json({ error: "Der opstod en fejl. Prøv igen om lidt." }, 500);
@@ -59,6 +72,10 @@ export default async (req: Request) => {
   return json(
     {
       access,
+      guestName: booking.guest_name,
+      costumerName: booking.costumer_name,
+      departmentName: booking.department_name,
+      position,
       vehicleLabel: guestVehicleLabel(booking.vehicle, "Køretøj"),
       brand: booking.vehicle?.brand ?? null,
       model: booking.vehicle?.model ?? null,

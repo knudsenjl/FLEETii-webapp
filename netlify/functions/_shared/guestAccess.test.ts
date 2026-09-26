@@ -79,12 +79,15 @@ describe("buildGuestEmailHtml", () => {
       start: "01.10.2026 12:00",
       end: "01.10.2026 14:00",
       linkUrl: "https://dev.fleetii.dk/gaest#abc",
+      logoUrl: "https://dev.fleetii.dk/fleetii-logo.png",
     });
     expect(html).not.toContain("<script>");
     expect(html).toContain("&lt;script&gt;");
     expect(html).toContain("A&amp;B");
     expect(html).toContain('href="https://dev.fleetii.dk/gaest#abc"');
     expect(html).toContain("Åbn køretøjet");
+    expect(html).toContain('src="https://dev.fleetii.dk/fleetii-logo.png"');
+    expect(html).toContain("v:roundrect"); // Outlook's oval button
   });
 });
 

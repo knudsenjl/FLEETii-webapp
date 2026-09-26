@@ -114,6 +114,24 @@ export function formatDanishDate(isoDate: string): string {
   return year && month && day ? `${day}.${month}.${year}` : isoDate;
 }
 
+const DANISH_WEEKDAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+const DANISH_MONTHS = ["januar", "februar", "marts", "april", "maj", "juni", "juli", "august", "september", "oktober", "november", "december"];
+
+/**
+ * A UTC ISO timestamp written out the Danish way — "lørdag 26. september
+ * 2026 kl. 14:45" — for text a person reads rather than scans in a table
+ * (e.g. the drop-in guest's email). Weekday/month names are spelled out here
+ * instead of relying on Intl's "da-DK" locale data, so the result is the same
+ * on every runtime; only the timezone conversion goes through
+ * utcToDanishParts.
+ */
+export function formatDanishLongDateTime(iso: string): string {
+  const { date, time } = utcToDanishParts(iso);
+  const [year, month, day] = date.split("-").map(Number);
+  const weekday = DANISH_WEEKDAYS[new Date(Date.UTC(year, month - 1, day)).getUTCDay()];
+  return `${weekday} ${day}. ${DANISH_MONTHS[month - 1]} ${year} kl. ${time}`;
+}
+
 /** A UTC ISO timestamp shown as Danish "dd.mm.yyyy HH:mm". */
 export function formatDanishDateTime(iso: string): string {
   const { date, time } = utcToDanishParts(iso);

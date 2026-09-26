@@ -1,10 +1,13 @@
 // The drop-in guest's page ("/gaest#‹token›", PUBLIC — no login): what the
 // "Åbn køretøjet" button in the guest's email opens (see
 // netlify/functions/_shared/guestAccess.ts's buildGuestEmailHtml). Looks like
-// the regular user's front-page hero card (BookingPage.tsx) — vehicle,
-// the big circular Lås/Lås op control, Periode/Anvendelse chips — minus
-// everything that needs an account (Data Filter, Blink/Horn, map, Afslut/
-// Rediger/Slet).
+// the regular user's front-page hero card (BookingPage.tsx) — a
+// "Kunde/Afdeling/Navn" line, vehicle, the big circular Lås/Lås op control,
+// Periode/Anvendelse chips and (while the link is active) the vehicle's map —
+// minus everything that needs an account (Data Filter, Blink/Horn, Afslut/
+// Rediger/Slet). Before the reservation starts the lock control is shown but
+// disabled, and it switches on by itself at the start time (see the
+// refresh-at-boundary effect below).
 //
 // The token lives in the URL fragment, which browsers never send to a
 // server; this page reads it and POSTs it to guest-booking-status.mts /
@@ -13,18 +16,26 @@
 // button state here is only a mirror of what the server just said. Kept in
 // the address bar on purpose so the guest can reload or bookmark the page
 // for the whole reservation.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { FleetiiLogo } from "../components/FleetiiLogo";
 import { InfoCard } from "../components/InfoCard";
+import { LeafletMap } from "../components/LeafletMap";
+import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { VehicleLockToggle } from "../components/VehicleLockToggle";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { formatBookingPeriod, splitIsoDateTime } from "../lib/bookings";
 import { fadeInUp } from "../lib/motionVariants";
+import { toUtcMs } from "../lib/time";
 
 /** guest-booking-status.mts's response — see that function for each field. */
 type GuestStatus = {
   access: "active" | "not_yet" | "expired" | "revoked";
+  guestName: string | null;
+  costumerName: string | null;
+  departmentName: string | null;
+  /** The vehicle's last GPS fix — only while access is active, null without one. */
+  position: { lat: number; lng: number; updatedAt: string | null } | null;
   vehicleLabel: string;
   brand: string | null;
   model: string | null;
@@ -38,6 +49,12 @@ type GuestStatus = {
   lock: { lockEnabled: boolean; unlockEnabled: boolean } | null;
   locked: boolean | null;
 };
+
+/** How far ahead the refresh-at-boundary effect schedules an exact refresh; see that effect. */
+const BOUNDARY_REFRESH_HORIZON_MS = 60 * 60_000;
+
+/** Fallback map center when the vehicle has no GPS fix — same as BookingPage.tsx. */
+const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 
 /** How often the page re-asks the server while open: keeps the button state current as the booking starts/ends. Well inside guestAccess.ts's rate limit (60 uses / 10 min). */
 const REFRESH_MS = 30_000;
@@ -103,6 +120,31 @@ export function GuestDrivePage() {
     };
   }, [refresh]);
 
+  // Refresh exactly when something changes on its own clock — the link
+  // opening (start -15 min) and the reservation starting (the lock control
+  // switching on) — instead of waiting up to REFRESH_MS for the next poll.
+  // Measured against the server's clock (serverNow), not the phone's.
+  useEffect(() => {
+    if (!status) return;
+    const skewMs = toUtcMs(status.serverNow) - Date.now();
+    const serverNowMs = Date.now() + skewMs;
+    const delays = [status.accessFrom, status.start]
+      .filter((iso): iso is string => Boolean(iso))
+      .map((iso) => toUtcMs(iso) - serverNowMs)
+      // Only boundaries within the next hour: the 30 s poll covers anything
+      // later anyway, and a delay beyond setTimeout's ~24.8-day maximum
+      // overflows and fires IMMEDIATELY — which re-renders, re-runs this
+      // effect and loops straight into the server's rate limit.
+      .filter((delay) => delay > 0 && delay <= BOUNDARY_REFRESH_HORIZON_MS);
+    if (delays.length === 0) return;
+    const timer = window.setTimeout(() => void refresh(), Math.min(...delays) + 1000);
+    return () => window.clearTimeout(timer);
+  }, [status, refresh]);
+
+  /** The map's initial center — the first position seen, kept stable so later GPS updates only move the marker (followMarker) instead of rebuilding the map. */
+  const mapCenter = useRef<{ lat: number; lng: number } | null>(null);
+  if (status?.position && !mapCenter.current) mapCenter.current = { lat: status.position.lat, lng: status.position.lng };
+
   const handleToggle = async (nextLocked: boolean): Promise<boolean> => {
     setIsSending(true);
     setActionError(null);
@@ -121,6 +163,10 @@ export function GuestDrivePage() {
   };
 
   const vehicleTitle = status ? [status.brand, status.model].filter(Boolean).join(" ") || status.vehicleLabel : "";
+  /** "Kunde/Afdeling/Navn", same slash style as PageHeader's "Afdeling: Kunde/Afdeling" line. */
+  const scopeLine = status ? [status.costumerName, status.departmentName, status.guestName].filter(Boolean).join("/") : "";
+  /** The lock control is shown before start too (disabled), so the guest sees what they'll use; only a revoked/expired link hides it. */
+  const showLockControl = status?.access === "active" || status?.access === "not_yet";
 
   return (
     <div className="relative flex h-svh flex-col overflow-hidden bg-brand-50 text-brand-900">
@@ -132,7 +178,7 @@ export function GuestDrivePage() {
         <div className="flex shrink-0 items-center pb-3">
           <FleetiiLogo className="h-6 w-auto shrink-0" />
         </div>
-        <h1 className="shrink-0 pb-1 text-sm font-semibold uppercase tracking-wide text-brand-500">Din reservation</h1>
+        <h1 className="shrink-0 truncate pb-1 text-sm font-semibold text-brand-600">{scopeLine || "Din reservation"}</h1>
 
         <div className="flex min-h-0 flex-1 flex-col gap-3.5 overflow-y-auto pb-4">
           {!status && !loadError && <InfoCard>Henter reservationen…</InfoCard>}
@@ -147,10 +193,10 @@ export function GuestDrivePage() {
                   {status.plate && <span className="truncate text-xs text-brand-500">{status.plate}</span>}
                 </div>
 
-                {status.access === "active" ? (
+                {showLockControl ? (
                   <VehicleLockToggle
                     variant="circle"
-                    locked={status.locked}
+                    locked={status.locked ?? true}
                     lockEnabled={status.lock?.lockEnabled ?? false}
                     unlockEnabled={status.lock?.unlockEnabled ?? false}
                     loading={isSending}
@@ -167,11 +213,14 @@ export function GuestDrivePage() {
                   />
                 ) : (
                   <p className="py-6 text-center text-sm text-brand-700">
-                    {status.access === "not_yet"
-                      ? `Reservationen starter ${fullDateTime(status.start)}. Du kan låse køretøjet op her, når den er startet.`
-                      : status.access === "revoked"
+                    {status.access === "revoked"
                         ? "Adgangen til køretøjet er lukket. Kontakt receptionen, hvis du har brug for hjælp."
                         : "Reservationen er slut, og linket virker ikke længere."}
+                  </p>
+                )}
+                {status.access === "not_yet" && (
+                  <p className="text-center text-sm text-brand-700">
+                    Reservationen starter {fullDateTime(status.start)}. Du kan låse køretøjet op her, når den er startet.
                   </p>
                 )}
               </div>
@@ -188,7 +237,36 @@ export function GuestDrivePage() {
               </div>
 
               {status.access === "active" && (
-                <InfoCard>Husk at låse køretøjet, når du forlader det og når du afleverer det.</InfoCard>
+                <div className="relative isolate h-52 overflow-hidden rounded-2xl border border-brand-100">
+                  <LeafletMap
+                    lat={mapCenter.current?.lat ?? DENMARK_CENTER.lat}
+                    lng={mapCenter.current?.lng ?? DENMARK_CENTER.lng}
+                    zoom={mapCenter.current ? 16 : 7}
+                    markerLat={status.position?.lat ?? DENMARK_CENTER.lat}
+                    markerLng={status.position?.lng ?? DENMARK_CENTER.lng}
+                    showMarker={Boolean(status.position)}
+                    markerTooltip={status.plate ?? vehicleTitle}
+                    className="absolute inset-0"
+                    followMarker
+                  />
+                  {!status.position && (
+                    <MapOverlayMessage>Der er ingen GPS position tilgængelig for dette køretøj</MapOverlayMessage>
+                  )}
+                </div>
+              )}
+
+              {showLockControl && (
+                <div
+                  role="note"
+                  className="flex items-start gap-3 rounded-2xl border-2 border-amber-400 bg-amber-50 p-4 text-sm font-semibold text-amber-900 shadow-sm"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden="true">
+                    <path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+                    <line x1="12" y1="9" x2="12" y2="13" />
+                    <line x1="12" y1="17" x2="12.01" y2="17" />
+                  </svg>
+                  <span>Husk at låse køretøjet, når du forlader det og når du afleverer det.</span>
+                </div>
               )}
 
               {actionError && <p className="text-center text-sm text-red-600">{actionError}</p>}
