@@ -11,6 +11,7 @@
 // two pages' handlers drifting apart the way their layouts already have.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { useVehicleLockState } from "./useVehicleLockState";
 import { useTimedFlag } from "./useTimedFlag";
@@ -18,7 +19,7 @@ import { useLocateVehicle } from "./useLocateVehicle";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import { BOOKING_ID_COLUMN, bookingUserLabel, toDisplayVehicle, type EditingBooking } from "../lib/bookings";
-import { nowUtcIso, toUtcMs } from "../lib/time";
+import { toUtcMs } from "../lib/time";
 
 /** The fields BookingPage.tsx/BookingDetailsPage.tsx both need for the shared actions below — same shape each page's own fetch (fresh-on-mount for BookingPage, router-state-or-fetch-by-id for BookingDetailsPage) already produces. */
 export type LifecycleBooking = {
@@ -69,6 +70,7 @@ export function useBookingLifecycle(
   },
 ) {
   const navigate = useNavigate();
+  const { session } = useAuth();
   const vehicles = use2hireVehicle();
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
 
@@ -162,16 +164,20 @@ export function useBookingLifecycle(
     navigate("/reservation", { state: { editing } });
   };
 
-  /** Deletes this booking and returns to the bookings list. */
+  /** Deletes this booking and returns to the bookings list. `.select()` returns the deleted rows: RLS silently filters a delete the viewer isn't allowed to make down to 0 rows with no error, so an empty result is reported as a failure instead of navigating away as if it worked. */
   const handleCancelBooking = async () => {
     if (!booking) return;
     setIsCancelling(true);
     setError(null);
 
-    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
+    const { data: deleted, error: deleteError } = await supabase
+      .from("bookings")
+      .delete()
+      .eq(BOOKING_ID_COLUMN, booking.id)
+      .select(BOOKING_ID_COLUMN);
 
-    if (deleteError) {
-      setError(deleteError.message);
+    if (deleteError || !deleted?.length) {
+      setError(deleteError?.message ?? "Reservationen kunne ikke slettes — du har muligvis ikke tilladelse til det.");
       setIsCancelling(false);
       setShowCancelConfirm(false);
       return;
@@ -180,7 +186,7 @@ export function useBookingLifecycle(
     navigate("/bookings", { replace: true });
   };
 
-  /** Ends this booking early: locks the vehicle, then sets its "end" to now — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. If locking fails, the booking is left untouched (see useVehicleLockState's own error) rather than shortening a booking whose vehicle didn't actually get secured. */
+  /** Ends this booking early: locks the vehicle, then sets its "end" to now via finish-booking.mts — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. Goes through that Function rather than a client UPDATE because bookings' UPDATE RLS requires Tillad_rediger_reservation, which "Afslut" must not depend on (see that Function's header). If locking fails, the booking is left untouched (see useVehicleLockState's own error) rather than shortening a booking whose vehicle didn't actually get secured. */
   const handleFinishBooking = async () => {
     if (!booking) return;
     setIsFinishing(true);
@@ -193,10 +199,26 @@ export function useBookingLifecycle(
       return;
     }
 
-    const { error: updateError } = await supabase.from("bookings").update({ end: nowUtcIso() }).eq(BOOKING_ID_COLUMN, booking.id);
+    let finishError: string | null = null;
+    try {
+      const response = await fetch("/.netlify/functions/finish-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ bookingId: booking.id }),
+      });
+      if (!response.ok) {
+        const result = (await response.json().catch(() => ({}))) as { error?: string };
+        finishError = result.error ?? "Kunne ikke afslutte reservationen.";
+      }
+    } catch {
+      finishError = "Kunne ikke kontakte serveren. Prøv igen.";
+    }
 
-    if (updateError) {
-      setError(updateError.message);
+    if (finishError) {
+      setError(finishError);
       setIsFinishing(false);
       setShowFinishConfirm(false);
       return;

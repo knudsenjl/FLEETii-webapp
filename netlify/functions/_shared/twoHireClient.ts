@@ -17,6 +17,7 @@
 // sub-account). Only explicitly cross-costumer sysadm tooling
 // (2hire-raw-command.mts, 2hire-subscribe.mts) uses getGlobalCredentials().
 
+import { fetchWithTimeout } from "./fetchWithTimeout.js";
 /** Picks the 2hire host based on VITE_DATA_SOURCE: "2hire-production-adaptor" -> the real fleet; anything else (e.g. "2hire-test-adaptor") -> the test/simulated environment, the safe default. */
 export function getTwoHireBaseUrl(): string {
   return process.env.VITE_DATA_SOURCE === "2hire-production-adaptor"
@@ -52,7 +53,8 @@ function isExpired(token: CachedToken): boolean {
 }
 
 async function requestNewToken(credentials: TwoHireCredentials): Promise<CachedToken> {
-  const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/auth`, {
+  const response = await fetchWithTimeout(`${getTwoHireBaseUrl()}/api/v1/auth`, {
+    label: "2hire",
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ clientId: credentials.clientId, clientSecret: credentials.clientSecret }),
@@ -112,7 +114,8 @@ async function setWebhookSubscription(
   }
 
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/webhook`, {
+  const response = await fetchWithTimeout(`${getTwoHireBaseUrl()}/api/v1/webhook`, {
+    label: "2hire",
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -182,7 +185,8 @@ export type TwoHireBoardProfile = Record<string, unknown>;
 /** Lists the 2hire-board vehicle-configuration profiles available to pick a `profileId` from for registerVehicle(). The confirmed real response shape wraps the array as {profiles: [...]} (see TwoHireBoardProfile's own doc comment) — a bare array is also accepted defensively, though not known to actually occur. */
 export async function getTwoHireBoardProfiles(credentials: TwoHireCredentials): Promise<TwoHireBoardProfile[]> {
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/connectivity-provider/2hire-board/profile`, {
+  const response = await fetchWithTimeout(`${getTwoHireBaseUrl()}/api/v1/connectivity-provider/2hire-board/profile`, {
+    label: "2hire",
     headers: { Authorization: `${token.tokenType} ${token.value}` },
   });
 
@@ -224,7 +228,8 @@ export async function registerVehicle(
   credentials: TwoHireCredentials,
 ): Promise<{ vehicleId: string }> {
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/vehicle/register`, {
+  const response = await fetchWithTimeout(`${getTwoHireBaseUrl()}/api/v1/vehicle/register`, {
+    label: "2hire",
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -256,7 +261,8 @@ export async function registerVehicle(
  */
 export async function deregisterVehicle(vehicleId: string, credentials: TwoHireCredentials): Promise<void> {
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetch(`${getTwoHireBaseUrl()}/api/v1/vehicle/deregister`, {
+  const response = await fetchWithTimeout(`${getTwoHireBaseUrl()}/api/v1/vehicle/deregister`, {
+    label: "2hire",
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
@@ -291,9 +297,9 @@ async function fetchVehicleSignal(
   credentials: TwoHireCredentials,
 ): Promise<TwoHireSignalReading | null> {
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${getTwoHireBaseUrl()}/api/v1/vehicle/${encodeURIComponent(vehicleId)}/signal/${kind}/${encodeURIComponent(signal)}`,
-    { headers: { Authorization: `${token.tokenType} ${token.value}` } },
+    { label: "2hire", headers: { Authorization: `${token.tokenType} ${token.value}` } },
   );
 
   if (response.status === 404) return null;
@@ -349,9 +355,10 @@ export async function sendGenericCommand(
   credentials: TwoHireCredentials,
 ): Promise<void> {
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetch(
+  const response = await fetchWithTimeout(
     `${getTwoHireBaseUrl()}/api/v1/vehicle/${encodeURIComponent(vehicleId)}/command/generic/${command}`,
     {
+      label: "2hire",
       method: "POST",
       headers: {
         "Content-Type": "application/json",

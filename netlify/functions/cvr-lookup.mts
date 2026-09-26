@@ -6,6 +6,7 @@
 // sysadm gated, same access level as the rest of CostumerNewPage.tsx
 // (see App.tsx's requireRole="sysadm" on /costumer-new).
 import { requireSysadm } from "./_shared/serverAuth.js";
+import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
 
 const CVRAPI_BASE_URL = "https://cvrapi.dk/api";
@@ -72,7 +73,8 @@ export default async (req: Request) => {
 
   let response: Response;
   try {
-    response = await fetch(`${CVRAPI_BASE_URL}?search=${encodeURIComponent(cvr)}&country=dk`, {
+    response = await fetchWithTimeout(`${CVRAPI_BASE_URL}?search=${encodeURIComponent(cvr)}&country=dk`, {
+      label: "cvrapi.dk",
       headers: { "User-Agent": CVRAPI_USER_AGENT },
     });
   } catch {

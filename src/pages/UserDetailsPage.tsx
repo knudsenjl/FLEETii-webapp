@@ -924,6 +924,12 @@ export function UserDetailsPage() {
                         <option value="" className="bg-brand-100">Vælg rolle:</option>
                         <option value="user">Bruger</option>
                         <option value="admin">Administrator</option>
+                        {/* Shown only so a sysadm's own role displays (and is sent back unchanged — update-user.mts accepts an unchanged "sysadm"); it can't be picked for anyone else. */}
+                        {role === "sysadm" && (
+                          <option value="sysadm" disabled>
+                            Sysadm
+                          </option>
+                        )}
                       </select>
                     )}
                   </FieldRow>

@@ -78,7 +78,14 @@ export default async (req: Request) => {
   const [departmentsResult, vehiclesResult, usersResult] = await Promise.all([
     admin.from("departments").select("department_id", { count: "exact", head: true }).eq("costumer_id", targetCostumerId),
     admin.from("vehicle_profiles").select("vehicle_id", { count: "exact", head: true }).eq("costumer_id", targetCostumerId),
-    admin.from("user_profiles").select("user_id", { count: "exact", head: true }).eq("costumer_id", targetCostumerId),
+    // Sysadms don't count: their costumer_id is only a Data Filter scope
+    // pointer (see switch-department.mts), not a membership — they're moved
+    // back to "Alle" just before the delete below.
+    admin
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("costumer_id", targetCostumerId)
+      .neq("role", "sysadm"),
   ]);
   for (const result of [departmentsResult, vehiclesResult, usersResult]) {
     if (result.error) {
@@ -95,6 +102,18 @@ export default async (req: Request) => {
       }),
       { status: 409 },
     );
+  }
+
+  // A draft has no departments, so a sysadm can only point at it via
+  // costumer_id — reset that first, or the delete would fail on the foreign
+  // key (or leave the sysadm scoped to a costumer that no longer exists).
+  const { error: pointerError } = await admin
+    .from("user_profiles")
+    .update({ costumer_id: null, department_id: null, active_department_id: null })
+    .eq("costumer_id", targetCostumerId)
+    .eq("role", "sysadm");
+  if (pointerError) {
+    return new Response(JSON.stringify({ error: pointerError.message }), { status: 500 });
   }
 
   const { error: deleteError } = await admin.from("costumers").delete().eq("costumer_id", targetCostumerId);

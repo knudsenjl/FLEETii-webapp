@@ -19,6 +19,8 @@ import {
   splitIsoDateTime,
   type BookingWindow,
 } from "../lib/bookings";
+import { fetchVehicleConflictWindows } from "../lib/bookingWindows";
+import { nowUtcIso } from "../lib/time";
 import type { DropInGuest } from "../lib/dropIn";
 
 /** The selected vehicle, as passed in via router state from AvailablePage. */
@@ -128,12 +130,14 @@ export function ConfirmPage() {
     setIsSubmitting(true);
     setError(null);
 
-    const { data: existingBookings, error: fetchError } = await supabase
-      .from("bookings")
-      .select(`${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end`);
-
-    if (fetchError) {
-      setError(fetchError.message);
+    // Only this vehicle's bookings that could overlap, read in full (see
+    // lib/bookingWindows.ts — the old unfiltered select of every booking
+    // was silently capped at 1000 rows).
+    let existingBookings: BookingWindow[];
+    try {
+      existingBookings = await fetchVehicleConflictWindows(vehicle.id, reservationStart ?? nowUtcIso());
+    } catch (fetchError) {
+      setError(fetchError instanceof Error ? fetchError.message : "Kunne ikke kontrollere ledigheden.");
       setIsSubmitting(false);
       return;
     }
@@ -141,7 +145,7 @@ export function ConfirmPage() {
     // Excludes the booking being edited (if any) from its own
     // availability check — otherwise re-confirming the same vehicle/time
     // it already occupies would always look unavailable.
-    const otherBookings = ((existingBookings ?? []) as BookingWindow[]).filter(
+    const otherBookings = existingBookings.filter(
       (b) => b.booking_id !== editingBookingId,
     );
 
@@ -181,7 +185,16 @@ export function ConfirmPage() {
     let writeError: { code?: string; message: string } | null;
     let newBookingId: string | null = null;
     if (editingBookingId) {
-      ({ error: writeError } = await supabase.from("bookings").update(bookingFields).eq(BOOKING_ID_COLUMN, editingBookingId));
+      // .select() returns the updated rows: RLS silently narrows an update
+      // the viewer may not make to 0 rows with no error, so an empty result
+      // is reported instead of looking like a successful save.
+      const { data: updatedRows, error } = await supabase
+        .from("bookings")
+        .update(bookingFields)
+        .eq(BOOKING_ID_COLUMN, editingBookingId)
+        .select(BOOKING_ID_COLUMN);
+      writeError =
+        error ?? (updatedRows?.length ? null : { message: "Reservationen kunne ikke opdateres — du har muligvis ikke tilladelse til det." });
     } else {
       const { data: insertedBooking, error } = await supabase
         .from("bookings")

@@ -17,6 +17,11 @@
 //     truly irreversible action in the whole app, unlike archiving a user
 //     (data survives) or deactivating a costumer (reversible).
 //
+// Sysadms are never purged: their costumer_id is only a Data Filter scope
+// pointer, not a membership. purge_costumer resets any sysadm pointing at
+// this costumer to "Alle" instead (see purge_costumer_spare_sysadm.sql), and
+// they're left out of the logged e-mail list below for the same reason.
+//
 // Ordering: costumer_purge_log is written FIRST (a recovery trail — the
 // affected emails/user_ids are recoverable from it even if the auth-account
 // deletion loop below fails partway through), then purge_costumer runs
@@ -86,6 +91,7 @@ export default async (req: Request) => {
     .from("user_profiles")
     .select("user_id, email")
     .eq("costumer_id", targetCostumerId)
+    .neq("role", "sysadm")
     .returns<{ user_id: string; email: string | null }[]>();
   if (usersError) {
     return new Response(JSON.stringify({ error: usersError.message }), { status: 500 });
