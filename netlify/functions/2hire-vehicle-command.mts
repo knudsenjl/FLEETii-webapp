@@ -1,37 +1,35 @@
-// Netlify Function: sends one of 2hire's three generic vehicle commands
-// (start/stop/locate) to a real, registered 2hire vehicle — see
+// Netlify Function: sends 2hire's generic "locate" command (blink the
+// headlights) to a real, registered 2hire vehicle — see
 // _shared/twoHireClient.ts's sendGenericCommand. Reached from
-// TwoHireTestPage.tsx's own Lås/Lås op + "Blink lygterne" buttons (against
-// the dedicated WB20499 test vehicle) AND, since command isn't hardcoded
-// here, from BookingDetailsPage.tsx/VehicleDetailsPage.tsx's "Blink lygterne"
-// (useLocateVehicle) against a real booking's real vehicle.
+// BookingPage.tsx/BookingDetailsPage.tsx/VehicleDetailsPage.tsx's "Blink"
+// (useLocateVehicle).
 //
-// Auth is split per command rather than one blanket check: "locate" (blink
-// headlights, harmless) is available to the same audience as Lås/Lås op —
-// any logged-in user, not just admins, but ONLY for a vehicle they actually
-// have a relevant booking on (same three-rule "in the Lås/Lås op window"
-// check as set-vehicle-lock.mts's own regular-user authorization — reused,
-// not reimplemented, via _shared/vehicleLock.ts's anyOwnBookingAllows, so the
-// two can't drift apart). "start"/"stop" (raw lock/unlock, bypassing those
-// enablement rules entirely) stay admin-only — TwoHireTestPage.tsx's direct
-// testing flow is the only caller of those today. A regular ("admin", not
-// "sysadm") caller is additionally scoped to their OWN costumer's
-// vehicles for every command — same scoping VehiclesPage.tsx already applies
-// to what an admin can even see — since requireAdmin()/requireUser() on
-// their own only prove SOME caller is authenticated, not that they
-// administer or have a booking on the TARGET vehicle.
+// Only "locate" is accepted. It used to also take "start"/"stop" (raw
+// unlock/lock) for admins — left over from the long-gone TwoHireTestPage —
+// which physically unlocked a vehicle WITHOUT recording lock history or the
+// persisted `locked` state that set-vehicle-lock.mts maintains. Every real
+// Lås/Lås op goes through set-vehicle-lock.mts (code review 2026-09-26).
+//
+// Audience: the same as Lås/Lås op — any logged-in user, but a regular user
+// ONLY for a vehicle they have a booking on that is currently inside its
+// Lås/Lås op window (the same three-rule check as set-vehicle-lock.mts's
+// regular-user authorization, reused via _shared/vehicleLock.ts's
+// anyOwnBookingAllows, so the two can't drift apart). A regular ("admin",
+// not "sysadm") caller is scoped to their OWN costumer's vehicles — same
+// scoping VehiclesPage.tsx applies to what an admin can even see — since
+// requireUser() alone only proves SOME caller is authenticated.
 //
 // Per the "per-costumer 2hire credentials" plan: which 2hire credential
 // authenticates this command depends on the TARGET vehicle's costumer (not
 // the caller's own costumer_id, which a sysadm doesn't have) — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isAnyAdminRole, isSysadmRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
 import { anyOwnBookingAllows, loadLockContext } from "./_shared/vehicleLock.js";
 
-const VALID_COMMANDS: readonly TwoHireGenericCommand[] = ["start", "stop", "locate"];
+const VALID_COMMANDS: readonly TwoHireGenericCommand[] = ["locate"];
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -51,7 +49,7 @@ export default async (req: Request) => {
     );
   }
 
-  const authResult = command === "locate" ? await requireUser(req) : await requireAdmin(req);
+  const authResult = await requireUser(req);
   if (!authResult.ok) {
     return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
   }
@@ -106,8 +104,7 @@ export default async (req: Request) => {
         return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
       }
       if (!isAdmin) {
-        // Only "locate" reaches here as a regular user — "start"/"stop" already
-        // required requireAdmin() above. Same audience as Lås/Lås op: allowed
+        // Same audience as Lås/Lås op: allowed
         // only if one of the caller's own bookings on this vehicle currently
         // has lock or unlock enabled (see set-vehicle-lock.mts's identical
         // check for why the raw rules, not just "has a booking", are reused).
