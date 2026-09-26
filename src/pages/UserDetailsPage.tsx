@@ -760,17 +760,21 @@ export function UserDetailsPage() {
         return;
       }
 
-      // Seeds user_departments for the new user — create-user.mts itself
-      // never touches that table, so without this a brand-new user would
-      // have zero grants (the gap flagged earlier this session). The
-      // self-heal effect above guarantees userDepartmentIds already has at
-      // least the chosen home department; if role is "admin" it may also
-      // include whatever else was checked in the Afdelinger table.
+      // Seeds user_departments for the new user. create-user.mts already
+      // grants the home department itself; this adds everything else
+      // checked in the Afdelinger table (role "admin"). The self-heal effect
+      // above guarantees userDepartmentIds has at least the home
+      // department, which create-user has already inserted — hence
+      // upsert-ignore rather than insert (that duplicate would otherwise
+      // fail on the primary key).
       const newUserId = result.id;
       if (newUserId && userDepartmentIds.size > 0) {
         const { error: insertGrantsError } = await supabase
           .from("user_departments")
-          .insert([...userDepartmentIds].map((department_id) => ({ user_id: newUserId, department_id })));
+          .upsert(
+            [...userDepartmentIds].map((department_id) => ({ user_id: newUserId, department_id })),
+            { onConflict: "user_id,department_id", ignoreDuplicates: true },
+          );
         if (insertGrantsError) {
           setSubmitError(insertGrantsError.message);
           setIsSubmitting(false);

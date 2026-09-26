@@ -7,7 +7,7 @@
 // Error with a readable message.
 
 /** Default deadline for one outside request. Below Netlify's 10 s Function limit so there's time left to answer the browser. */
-export const EXTERNAL_FETCH_TIMEOUT_MS = 8000;
+const EXTERNAL_FETCH_TIMEOUT_MS = 8000;
 
 /**
  * fetch(), aborted after `timeoutMs`. `label` names the service in the

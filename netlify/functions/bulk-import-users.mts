@@ -153,6 +153,9 @@ export default async (req: Request) => {
       .map((row) => asTrimmedString(row.Afdeling))
       .filter((name): name is string => Boolean(name)),
     costumerId,
+    // Only a sysadm (setting up a costumer) may create departments by import;
+    // for an admin an unknown name is a row error, not a new department.
+    { allowCreate: isSysadm },
   );
 
   const results: RowResult[] = await mapWithConcurrency(rows, IMPORT_CONCURRENCY, async (row, i) => ({
@@ -235,7 +238,10 @@ async function importUserRow(
   if (departmentId) {
     const { error: grantError } = await admin
       .from("user_departments")
-      .insert({ user_id: created.user.id, department_id: departmentId });
+      .upsert(
+        { user_id: created.user.id, department_id: departmentId },
+        { onConflict: "user_id,department_id", ignoreDuplicates: true },
+      );
     if (grantError) {
       grantWarning = `Bruger oprettet, men tildeling af afdeling fejlede: ${grantError.message}`;
     }

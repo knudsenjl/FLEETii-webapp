@@ -67,7 +67,7 @@ export interface RettighederSettingsHandle {
 const READONLY_INFO_MESSAGE = "Denne tilladelse er givet af din administrator, og kan kun ændres ved henvendelse til vedkommende.";
 
 /** The permission flags, in the order they're shown — label text is this app's own phrasing, not a literal transform of the setting name. info is the "?" popover text shown right-aligned next to the label (see openInfoName below), for table="department_settings" (SettingsAdminPage). infoUser overrides it for table="user_settings" (both UserDetailsPage instances — about one specific user, so "denne bruger" rather than "brugere i afdelingen"); falls back to info when absent. Neither applies for the self-view instance (readOnly) — see READONLY_INFO_MESSAGE above instead. */
-export const RETTIGHEDER: { name: string; label: string; info: string; infoUser?: string }[] = [
+const RETTIGHEDER: { name: string; label: string; info: string; infoUser?: string }[] = [
   {
     name: "Tillad_ny_reservation",
     label: "Ny reservation",

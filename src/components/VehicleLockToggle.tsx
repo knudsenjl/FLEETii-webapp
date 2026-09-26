@@ -84,8 +84,11 @@ export function VehicleLockToggle({
 
   // Dismiss on a tap/click anywhere outside this control — a document-level
   // listener + ref check rather than a full-screen "fixed inset-0" overlay
-  // (see LockStatusIcon.tsx's identical fix for why: no z-index/stacking
-  // dependency to lose a fight against, unlike an overlay div).
+  // (the pattern used elsewhere, e.g. PageHeader's dropdowns): an overlay
+  // has to win a z-index/stacking fight against whatever surrounds it (a
+  // sticky table header, a map), and when it loses it stops intercepting
+  // clicks and the popup sticks open. A document listener has no stacking
+  // dependency at all.
   useEffect(() => {
     if (!showBlockedReason) return;
     const handlePointerDown = (e: PointerEvent) => {

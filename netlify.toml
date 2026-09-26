@@ -24,11 +24,23 @@
 # Applies to the whole SPA — stops the app being embedded in an <iframe> on
 # someone else's site (a cheap way to "skin"/clone a UI without copying any
 # code), on top of the LICENSE's own ownership notice.
+#
+# Content-Security-Policy-Report-Only: the full policy the app should run
+# under, in REPORT-ONLY mode — the browser blocks nothing, but logs every
+# violation to the console ("[Report Only] Refused to …"). Added by the
+# 2026-09-26 code review without browser testing (UI testing was paused), so
+# it can't break anything yet. Once a click-through on staging shows no
+# violations, move it into the enforced Content-Security-Policy header
+# below (keeping frame-ancestors, which report-only mode ignores). Sources:
+# Supabase (REST + realtime websocket), Google Fonts (index.html),
+# OpenStreetMap tiles (LeafletMap.tsx), the QR scanner's blob: worker
+# (qr-scanner), inline style attributes (React/framer-motion).
 [[headers]]
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
     Content-Security-Policy = "frame-ancestors 'none'"
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob: https://*.tile.openstreetmap.org; connect-src 'self' https://*.supabase.co wss://*.supabase.co; worker-src 'self' blob:; manifest-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
 

@@ -160,6 +160,24 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
   }
 
+  // A valid signature only proves 2hire sent it, not that it has the shape
+  // used below: a missing/non-numeric timestamp made `new Date(...)
+  // .toISOString()` throw and the delivery end as an unhandled 500 (code
+  // review 2026-09-26). Anything malformed is acknowledged (so 2hire
+  // doesn't retry a delivery that can never succeed) and logged.
+  const payload = body?.payload;
+  if (
+    typeof body?.topic !== "string" ||
+    !payload ||
+    typeof payload.timestamp !== "number" ||
+    !Number.isFinite(payload.timestamp) ||
+    typeof payload.data !== "object" ||
+    payload.data === null
+  ) {
+    console.warn(`[2hire-webhook] malformed payload dropped: ${rawBody.slice(0, 500)}`);
+    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+  }
+
   const topicMatch = TOPIC_PATTERN.exec(body.topic);
   if (!topicMatch) {
     // Not a shape we recognize at all — acknowledge so 2hire doesn't retry,

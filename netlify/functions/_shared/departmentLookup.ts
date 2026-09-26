@@ -21,7 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * for the same brand-new department name could both miss the SELECT and
  * both INSERT, creating a duplicate.
  */
-export async function findOrCreateDepartment(
+async function findOrCreateDepartment(
   admin: SupabaseClient,
   { name, costumerId }: { name: string; costumerId: string },
 ): Promise<{ departmentId: string } | { error: string }> {
@@ -120,20 +120,45 @@ export async function findActiveDepartmentId(
 export type DepartmentResolution = { departmentId: string } | { error: string };
 
 /**
- * Finds or creates (findOrCreateDepartment) each distinct department name
- * ONE AT A TIME, up front, for the bulk imports. They then process their rows
- * concurrently (see _shared/concurrency.ts), and two rows naming the same new
- * department must never race to create it twice — so all creation happens
- * here first, sequentially, and the rows just read the map.
+ * Resolves each distinct department name ONE AT A TIME, up front, for the
+ * bulk imports. They then process their rows concurrently (see
+ * _shared/concurrency.ts), and two rows naming the same new department must
+ * never race to create it twice — so all lookups/creation happen here first,
+ * sequentially, and the rows just read the map.
+ *
+ * `allowCreate` decides what an unknown name means: true (sysadm, setting up
+ * a costumer) creates it via findOrCreateDepartment; false (a regular admin)
+ * makes it a per-row error instead. Imports used to create a department for
+ * any name at all, so a typo in the Afdeling column silently produced a new,
+ * stray department (code review 2026-09-26).
  */
 export async function resolveDepartmentNames(
   admin: SupabaseClient,
   names: Iterable<string>,
   costumerId: string,
+  { allowCreate }: { allowCreate: boolean },
 ): Promise<Map<string, DepartmentResolution>> {
   const resolved = new Map<string, DepartmentResolution>();
   for (const name of names) {
-    if (!resolved.has(name)) resolved.set(name, await findOrCreateDepartment(admin, { name, costumerId }));
+    if (resolved.has(name)) continue;
+    if (allowCreate) {
+      resolved.set(name, await findOrCreateDepartment(admin, { name, costumerId }));
+      continue;
+    }
+    const { data, error } = await admin
+      .from("departments")
+      .select("department_id")
+      .eq("name", name)
+      .eq("costumer_id", costumerId)
+      .maybeSingle<{ department_id: string }>();
+    resolved.set(
+      name,
+      error
+        ? { error: error.message }
+        : data
+          ? { departmentId: data.department_id }
+          : { error: "findes ikke hos kunden — opret den først under Afdelinger, eller ret stavningen." },
+    );
   }
   return resolved;
 }
