@@ -3,6 +3,7 @@
 // positioned list rather than a native <select> so it can be styled to match
 // the rest of the app's inputs consistently across browsers.
 import { useEffect, useRef, useState } from "react";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 interface TimeSelectProps {
   /** Currently selected option (shown on the toggle button even if it's not present in `options`). */
@@ -20,18 +21,7 @@ export function TimeSelect({ value, options, onChange, disabled = false }: TimeS
   const containerRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        setOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [open]);
+  useClickOutside(containerRef, open, () => setOpen(false));
 
   useEffect(() => {
     if (!open || !listRef.current) return;

@@ -26,6 +26,7 @@ import {
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
 import { callFunction } from "../lib/callFunction";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 /** The DisplayVehicle shape, as passed in via router state from VehicleDetailsPage's "Rediger køretøj" button. Only vehicleId is actually used here — the editable fields (plate/brand/model/year) are fetched fresh from vehicle_profiles on mount instead of trusted from router state, since VehicleDetailsPage's own Vehicle type only carries an already-combined "brand model" display string, not the separate fields this form edits/saves. */
 type Vehicle = {
@@ -241,18 +242,7 @@ export function HandleVehiclePage() {
   }, [isSysadm, vehicleCostumerId]);
 
   /** Closes the profile-JSON popup on an outside click — same pattern as VehicleCreatePage.tsx's own. */
-  useEffect(() => {
-    if (!showProfileJson) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (profileJsonRef.current && !profileJsonRef.current.contains(event.target as Node)) {
-        setShowProfileJson(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showProfileJson]);
+  useClickOutside(profileJsonRef, showProfileJson, () => setShowProfileJson(false));
 
   // A costumer with only one department has no real choice to make for
   // either Afdeling(er) or Hjemmeafdeling — self-heal that sole department

@@ -5,10 +5,11 @@
 // whose color, icon, and label all swap together based on state, so there's
 // nothing to misread. No sliding animation — the whole button just
 // re-renders in one of two looks.
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { InlinePopup } from "./InlinePopup";
 import { PadlockGlyph } from "./PadlockGlyph";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 interface VehicleLockToggleProps {
   /** null while the current lock state is still loading. */
@@ -82,23 +83,10 @@ export function VehicleLockToggle({
     void onToggle(!locked);
   };
 
-  // Dismiss on a tap/click anywhere outside this control — a document-level
-  // listener + ref check rather than a full-screen "fixed inset-0" overlay
-  // (the pattern used elsewhere, e.g. PageHeader's dropdowns): an overlay
-  // has to win a z-index/stacking fight against whatever surrounds it (a
-  // sticky table header, a map), and when it loses it stops intercepting
-  // clicks and the popup sticks open. A document listener has no stacking
-  // dependency at all.
-  useEffect(() => {
-    if (!showBlockedReason) return;
-    const handlePointerDown = (e: PointerEvent) => {
-      if (!containerRef.current?.contains(e.target as Node)) {
-        setShowBlockedReason(false);
-      }
-    };
-    document.addEventListener("pointerdown", handlePointerDown);
-    return () => document.removeEventListener("pointerdown", handlePointerDown);
-  }, [showBlockedReason]);
+  // Dismiss on a tap/click anywhere outside this control ("pointerdown", so
+  // touch counts too) — see useClickOutside for why a document listener
+  // rather than an overlay.
+  useClickOutside(containerRef, showBlockedReason, () => setShowBlockedReason(false), "pointerdown");
 
   if (variant === "circle") {
     return (

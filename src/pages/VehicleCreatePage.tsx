@@ -27,6 +27,7 @@ import {
 import { callFunction } from "../lib/callFunction";
 import { useMotorApiLookup } from "../hooks/useMotorApiLookup";
 import { MotorApiLookupButton } from "../components/MotorApiLookupButton";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 /** A pending "send-vehicle-request" submission — mirrors InstallationAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
 type CostumerOrder = {
@@ -361,18 +362,7 @@ export function VehicleCreatePage() {
   const profileJsonRef = useRef<HTMLDivElement>(null);
 
   /** Closes the profile-JSON popup on an outside click — same pattern as AllBookingsPage.tsx's own filter popover. */
-  useEffect(() => {
-    if (!showProfileJson) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (profileJsonRef.current && !profileJsonRef.current.contains(event.target as Node)) {
-        setShowProfileJson(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showProfileJson]);
+  useClickOutside(profileJsonRef, showProfileJson, () => setShowProfileJson(false));
 
   /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the "i" button on the merged Køretøj row below (state/fetch/popup in useMotorApiLookup + MotorApiLookupButton) — always keyed on order.number_plate (the real registration number), never vehicle_ident (MotorAPI has no notion of a company-internal identifier) — fetched lazily on first open rather than on mount, since MotorAPI usage counts against a daily quota. Combined { vehicle, environment, equipment } response, each independently either { data } or { error } (a used/older vehicle may simply have no environment/equipment data). */
   const motorApi = useMotorApiLookup();

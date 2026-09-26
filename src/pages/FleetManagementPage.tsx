@@ -17,6 +17,7 @@ import { formatVehicleIdentLabel, toDisplayVehicle, type DisplayVehicle } from "
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
 import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 /** Fallback map center used when the department has no vehicles with a GPS fix yet — same as BookingDetailsPage/VehicleDetailsPage's "no GPS position" fallback, showing all of Denmark rather than one city. */
 const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
@@ -132,18 +133,7 @@ export function FleetManagementPage() {
   const [noGpsOpen, setNoGpsOpen] = useState(false);
   const noGpsRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!noGpsOpen) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (noGpsRef.current && !noGpsRef.current.contains(event.target as Node)) {
-        setNoGpsOpen(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [noGpsOpen]);
+  useClickOutside(noGpsRef, noGpsOpen, () => setNoGpsOpen(false));
 
   /** Loads the target costumer's own departments — both the Afdeling filter's options and (via their department_ids) which vehicles are in scope below. Same "Alle" cross-costumer fallback for a sysadm as VehiclesPage.tsx's own identical effect — see its own doc comment for why that's a real, RLS-permitted query rather than a mistake. */
   useEffect(() => {
