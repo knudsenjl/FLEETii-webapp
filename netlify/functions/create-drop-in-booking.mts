@@ -54,7 +54,8 @@ const isZonedIso = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\
 /**
  * POST { vehicleId, departmentId, start, end, usage, guest: { name, email,
  * phone, address, licenseNo, idChecked } } as an admin/sysadm. All five
- * guest fields and Slut are required (user decisions 2026-09-26). Returns
+ * guest fields, idChecked (the receptionist has checked licence and ID) and
+ * Slut are required (user decisions 2026-09-26). Returns
  * { bookingId, emailSent }.
  */
 export default async (req: Request) => {
@@ -107,7 +108,10 @@ export default async (req: Request) => {
     return json({ error: "Navn, email, telefon, adresse og kørekort-nr. skal udfyldes." }, 400);
   }
   if (!EMAIL_PATTERN.test(guest.email)) return json({ error: "Ugyldig emailadresse." }, 400);
-  const idChecked = guestBody.idChecked === true;
+  if (guestBody.idChecked !== true) {
+    return json({ error: "Kørekort og legitimation skal være kontrolleret." }, 400);
+  }
+  const idChecked = true;
 
   // 1. The booking, under the receptionist's own RLS (see header comment).
   const { data: inserted, error: insertError } = await authResult.client

@@ -23,11 +23,12 @@ export function dropInLabel(name?: string | null): string {
   return name ? `Drop-in: ${name}` : "Drop-in";
 }
 
-/** Whether every required guest field is filled in (all five are required — user decision 2026-09-26) and the email looks like one. Mirrors create-drop-in-booking.mts's own server-side check. */
+/** Whether every required guest field is filled in (all five are required), the email looks like one, and "Kørekort og legitimation kontrolleret" is ticked (user decisions 2026-09-26). Mirrors create-drop-in-booking.mts's own server-side check. */
 export function isDropInGuestComplete(guest: DropInGuest): boolean {
   return (
     Boolean(guest.name.trim() && guest.phone.trim() && guest.address.trim() && guest.licenseNo.trim()) &&
-    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email.trim())
+    /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(guest.email.trim()) &&
+    guest.idChecked
   );
 }
 
