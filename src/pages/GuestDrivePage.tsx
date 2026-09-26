@@ -2,7 +2,7 @@
 // "Åbn køretøjet" button in the guest's email opens (see
 // netlify/functions/_shared/guestAccess.ts's buildGuestEmailHtml). Looks like
 // the regular user's front-page hero card (BookingPage.tsx) — a
-// "Kunde/Afdeling/Navn" line, vehicle, the big circular Lås/Lås op control,
+// "Kunde/Afdeling" line, vehicle + the guest's name, the big circular Lås/Lås op control,
 // Periode/Anvendelse chips and (while the link is active) the vehicle's map —
 // minus everything that needs an account (Data Filter, Blink/Horn, Afslut/
 // Rediger/Slet). Before the reservation starts the lock control is shown but
@@ -163,8 +163,8 @@ export function GuestDrivePage() {
   };
 
   const vehicleTitle = status ? [status.brand, status.model].filter(Boolean).join(" ") || status.vehicleLabel : "";
-  /** "Kunde/Afdeling/Navn", same slash style as PageHeader's "Afdeling: Kunde/Afdeling" line. */
-  const scopeLine = status ? [status.costumerName, status.departmentName, status.guestName].filter(Boolean).join("/") : "";
+  /** "Kunde/Afdeling", same slash style as PageHeader's "Afdeling: Kunde/Afdeling" line. The guest's own name goes under the vehicle instead. */
+  const scopeLine = status ? [status.costumerName, status.departmentName].filter(Boolean).join("/") : "";
   /** The lock control is shown before start too (disabled), so the guest sees what they'll use; only a revoked/expired link hides it. */
   const showLockControl = status?.access === "active" || status?.access === "not_yet";
 
@@ -190,7 +190,7 @@ export function GuestDrivePage() {
               <div className="flex flex-col items-center gap-3.5 rounded-3xl border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5">
                 <div className="flex w-full min-w-0 flex-col gap-0.5">
                   <span className="truncate text-base font-semibold text-brand-800">{vehicleTitle}</span>
-                  {status.plate && <span className="truncate text-xs text-brand-500">{status.plate}</span>}
+                  {status.guestName && <span className="truncate text-xs text-brand-500">{status.guestName}</span>}
                 </div>
 
                 {showLockControl ? (

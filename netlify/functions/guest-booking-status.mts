@@ -5,8 +5,8 @@
 // _shared/vehicleLock.ts's lockStateForBooking). POST rather than GET so the
 // token travels in the body, never in a URL/access log.
 //
-// Of the guest's personal data it returns only their name, for the page's
-// "Kunde/Afdeling/Navn" line (user decision 2026-09-26) — never email/phone/
+// Of the guest's personal data it returns only their name, shown under the
+// vehicle on the page (user decision 2026-09-26) — never email/phone/
 // address/licence. While access is active it also returns the vehicle's last
 // GPS position for the page's map (same 15-min-margin window regular users
 // get, see isMapVisible). Rate-limited and logged via _shared/guestAccess.ts.
