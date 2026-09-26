@@ -18,6 +18,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
+import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { getGlobalCredentials, getTwoHireAccessToken, getTwoHireBaseUrl } from "./_shared/twoHireClient.js";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
@@ -130,7 +131,8 @@ export default async (req: Request) => {
     const token = await getTwoHireAccessToken(getGlobalCredentials());
     const hasBody = method !== "GET" && method !== "DELETE" && requestBody?.body?.trim();
 
-    const response = await fetch(requestUrl, {
+    const response = await fetchWithTimeout(requestUrl, {
+      label: "2hire",
       method,
       headers: {
         Authorization: `${token.tokenType} ${token.value}`,

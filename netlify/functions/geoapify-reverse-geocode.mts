@@ -43,6 +43,7 @@
 // as a bug in an otherwise all-Danish UI.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireUser } from "./_shared/serverAuth.js";
+import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
 
@@ -53,8 +54,9 @@ type SignalRow = { signal_type: string; signal_value: { latitude?: number; longi
 
 /** Calls Geoapify's reverse-geocode endpoint for one lat/lng. Returns the formatted address, or null if Geoapify has nothing for this position. Throws on network/HTTP/parse failure — callers decide how to fall back. */
 async function fetchGeoapifyAddress(lat: number, lng: number, apiKey: string): Promise<string | null> {
-  const response = await fetch(
-    `${GEOAPIFY_BASE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&lang=da&limit=1&format=json&apiKey=${apiKey}`,
+  const response = await fetchWithTimeout(
+    `${GEOAPIFY_BASE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&lang=da&limit=1&format=json&apiKey=${encodeURIComponent(apiKey)}`,
+    { label: "Geoapify" },
   );
   if (!response.ok) {
     throw new Error(`Geoapify svarede ${response.status}.`);

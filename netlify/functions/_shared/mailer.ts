@@ -42,6 +42,13 @@ export async function sendMail(args: { to: string; subject: string; html: string
     // nodemailer needs to be told which one applies for the given port.
     secure: Number(process.env.SMTP_PORT ?? 587) === 465,
     auth: { user: smtpUser, pass: smtpPass },
+    // nodemailer's own defaults wait up to 2 min to connect and 10 min on an
+    // idle socket — far past Netlify's Function limit, so a stuck mail
+    // server used to kill the whole request. Fail fast with a real error
+    // instead (code review 2026-09-26).
+    connectionTimeout: 8000,
+    greetingTimeout: 8000,
+    socketTimeout: 10000,
   });
 
   try {

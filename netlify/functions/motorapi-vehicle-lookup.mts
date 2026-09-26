@@ -12,6 +12,7 @@
 // admins reach this via NewVehiclePage.tsx (requireAdmin, not sysadm
 // only, see App.tsx's /new-vehicle route), not just sysadms.
 import { requireAdmin } from "./_shared/serverAuth.js";
+import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
 
 const MOTORAPI_BASE_URL = "https://v1.motorapi.dk";
@@ -22,7 +23,8 @@ type MotorApiSection = { data: unknown } | { error: string };
 /** Calls one MotorAPI endpoint with the shared X-AUTH-TOKEN header, returning a MotorApiSection rather than throwing — so a single failing section (e.g. a 404 on /equipment for a vehicle MotorAPI has no equipment data for) doesn't take down the other two. */
 async function fetchMotorApiSection(path: string, token: string): Promise<MotorApiSection> {
   try {
-    const response = await fetch(`${MOTORAPI_BASE_URL}${path}`, {
+    const response = await fetchWithTimeout(`${MOTORAPI_BASE_URL}${path}`, {
+      label: "MotorAPI",
       headers: { "X-AUTH-TOKEN": token },
     });
     const bodyText = await response.text();
