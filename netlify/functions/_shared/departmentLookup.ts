@@ -115,3 +115,25 @@ export async function findActiveDepartmentId(
   }
   return departmentId;
 }
+
+/** What resolveDepartmentNames found for one name: the department id, or why it couldn't be found/created. */
+export type DepartmentResolution = { departmentId: string } | { error: string };
+
+/**
+ * Finds or creates (findOrCreateDepartment) each distinct department name
+ * ONE AT A TIME, up front, for the bulk imports. They then process their rows
+ * concurrently (see _shared/concurrency.ts), and two rows naming the same new
+ * department must never race to create it twice — so all creation happens
+ * here first, sequentially, and the rows just read the map.
+ */
+export async function resolveDepartmentNames(
+  admin: SupabaseClient,
+  names: Iterable<string>,
+  costumerId: string,
+): Promise<Map<string, DepartmentResolution>> {
+  const resolved = new Map<string, DepartmentResolution>();
+  for (const name of names) {
+    if (!resolved.has(name)) resolved.set(name, await findOrCreateDepartment(admin, { name, costumerId }));
+  }
+  return resolved;
+}

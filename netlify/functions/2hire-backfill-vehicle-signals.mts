@@ -24,6 +24,7 @@
 // actually writes.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { persistVehicleSignal } from "./_shared/persistVehicleSignal.js";
+import { mapWithConcurrency } from "./_shared/concurrency.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 import {
   fetchGenericVehicleSignal,
@@ -58,22 +59,6 @@ async function fetchOne(target: SignalTarget, vehicleId: string, credentials: Tw
   return target.kind === "generic"
     ? fetchGenericVehicleSignal(vehicleId, target.signal, credentials)
     : fetchSpecificVehicleSignal(vehicleId, target.signal, credentials);
-}
-
-/** Runs `worker` over every item in `items`, at most `concurrency` in flight at once — a plain Promise.all would fire all of them at once, which is exactly what CONCURRENT_REQUESTS exists to avoid. */
-async function runWithConcurrency<T>(
-  items: T[],
-  concurrency: number,
-  worker: (item: T) => Promise<void>,
-): Promise<void> {
-  let nextIndex = 0;
-  async function runNext(): Promise<void> {
-    const index = nextIndex++;
-    if (index >= items.length) return;
-    await worker(items[index]);
-    await runNext();
-  }
-  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, () => runNext()));
 }
 
 export default async (req: Request) => {
@@ -146,7 +131,7 @@ export default async (req: Request) => {
   let noData = 0;
   const failures: BackfillFailure[] = [];
 
-  await runWithConcurrency(missingPairs, CONCURRENT_REQUESTS, async ({ vehicle, target }) => {
+  await mapWithConcurrency(missingPairs, CONCURRENT_REQUESTS, async ({ vehicle, target }) => {
     try {
       const credentials = await credentialsFor(vehicle.costumer_id);
       const reading = await fetchOne(target, vehicle.vehicle_id, credentials);

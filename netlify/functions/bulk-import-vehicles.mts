@@ -31,7 +31,8 @@ import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/request
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
-import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
+import { resolveDepartmentNames, type DepartmentResolution } from "./_shared/departmentLookup.js";
+import { mapWithConcurrency } from "./_shared/concurrency.js";
 
 type BulkImportVehiclesBody = {
   format?: "csv" | "json";
@@ -47,6 +48,14 @@ type BulkImportVehiclesBody = {
 type RowResult = { row: number; success: boolean; orderId?: string; error?: string };
 
 const DRIVMIDDEL_SET = new Set<string>(DRIVMIDDEL_OPTIONS);
+
+/**
+ * Rows imported at the same time. One at a time let a few dozen rows run
+ * past Netlify's Function time limit (each row waits on Supabase Auth and,
+ * for users, an SMTP welcome e-mail); 4 keeps SMTP/Auth comfortable while
+ * cutting the wall-clock time about fourfold (code review 2026-09-26).
+ */
+const IMPORT_CONCURRENCY = 4;
 
 /**
  * POST { format: "csv"|"json", fileContent, costumerId?, contactperson?,
@@ -145,19 +154,23 @@ export default async (req: Request) => {
     );
   }
 
-  const departmentCache = new Map<string, string>();
+  // Each distinct department is looked up (or created) once, up front and
+  // in order — only for rows that would reach that step (a Nummerplade and a
+  // valid Drivmiddel), same as before — so the concurrent rows below never
+  // race to create the same new department.
+  const departments = await resolveDepartmentNames(
+    admin,
+    rows
+      .filter((row) => asNormalizedNumberString(row.Nummerplade) && DRIVMIDDEL_SET.has(asTrimmedString(row.Drivmiddel) || "Benzin"))
+      .map((row) => asTrimmedString(row.Afdeling))
+      .filter((name): name is string => Boolean(name)),
+    costumerId,
+  );
 
-  const results: RowResult[] = [];
-  for (let i = 0; i < rows.length; i++) {
-    const outcome = await importVehicleRow(admin, rows[i], {
-      costumerId,
-      contactperson,
-      contactemail,
-      contactnumber,
-      departmentCache,
-    });
-    results.push({ row: i + 1, ...outcome });
-  }
+  const results: RowResult[] = await mapWithConcurrency(rows, IMPORT_CONCURRENCY, async (row, i) => ({
+    row: i + 1,
+    ...(await importVehicleRow(admin, row, { costumerId, contactperson, contactemail, contactnumber, departments })),
+  }));
 
   const successCount = results.filter((r) => r.success).length;
   return new Response(
@@ -174,7 +187,7 @@ async function importVehicleRow(
     contactperson: string;
     contactemail: string;
     contactnumber: string;
-    departmentCache: Map<string, string>;
+    departments: Map<string, DepartmentResolution>;
   },
 ): Promise<Omit<RowResult, "row">> {
   const numberPlate = asNormalizedNumberString(row.Nummerplade);
@@ -188,20 +201,16 @@ async function importVehicleRow(
     return { success: false, error: `Drivmiddel skal være en af: ${DRIVMIDDEL_OPTIONS.join(", ")}.` };
   }
 
+  // Already found/created up front (resolveDepartmentNames) — never created
+  // here, since rows run concurrently.
   const departmentName = asTrimmedString(row.Afdeling);
   let departmentId: string | null = null;
   if (departmentName) {
-    const cached = ctx.departmentCache.get(departmentName);
-    if (cached) {
-      departmentId = cached;
-    } else {
-      const resolved = await findOrCreateDepartment(admin, { name: departmentName, costumerId: ctx.costumerId });
-      if ("error" in resolved) {
-        return { success: false, error: `Afdeling "${departmentName}": ${resolved.error}` };
-      }
-      departmentId = resolved.departmentId;
-      ctx.departmentCache.set(departmentName, departmentId);
+    const resolved = ctx.departments.get(departmentName);
+    if (!resolved || "error" in resolved) {
+      return { success: false, error: `Afdeling "${departmentName}": ${resolved?.error ?? "kunne ikke slås op."}` };
     }
+    departmentId = resolved.departmentId;
   }
 
   const { data: insertedOrder, error: insertError } = await admin
