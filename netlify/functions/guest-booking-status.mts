@@ -5,11 +5,16 @@
 // _shared/vehicleLock.ts's lockStateForBooking). POST rather than GET so the
 // token travels in the body, never in a URL/access log.
 //
-// Of the guest's personal data it returns only their name, shown under the
-// vehicle on the page (user decision 2026-09-26) — never email/phone/
-// address/licence. While access is active it also returns the vehicle's last
+// Never returns the guest's personal data (name/email/…) — the token is a
+// bearer credential, and whoever holds a forwarded link shouldn't learn who
+// it was issued to. The vehicle is labelled like VehicleDetailsPage.tsx's
+// "Køretøj:" row ("Køretøj-ID / Nummerplade" when the vehicle's home
+// department uses Køretøj-ID, else just the plate) — worked out here, since a
+// guest isn't logged in and can't read department_settings. While access is
+// active it also returns the vehicle's last
 // GPS position for the page's map (same 15-min-margin window regular users
 // get, see isMapVisible). Rate-limited and logged via _shared/guestAccess.ts.
+import { formatVehicleIdentLabel } from "../../src/lib/bookings.js";
 import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { guestAccessWindow, guestVehicleLabel, logGuestAccess, resolveGuestRequest } from "./_shared/guestAccess.js";
@@ -66,13 +71,24 @@ export default async (req: Request) => {
     }
   }
 
+  // Same fail-closed default as useIdentSettings: no setting row = plate only.
+  let useVehicleIdent = false;
+  if (booking.vehicle?.department_id) {
+    const { data: setting } = await admin
+      .from("department_settings")
+      .select("value_bool")
+      .eq("department_id", booking.vehicle.department_id)
+      .eq("name", "use_vehicle_ident")
+      .maybeSingle<{ value_bool: boolean | null }>();
+    useVehicleIdent = setting?.value_bool === true;
+  }
+
   await logGuestAccess(admin, booking.booking_id, access === "active" ? "status" : "denied", ip);
 
   const window = booking.end ? guestAccessWindow({ start: booking.start, end: booking.end }) : null;
   return json(
     {
       access,
-      guestName: booking.guest_name,
       costumerName: booking.costumer_name,
       departmentName: booking.department_name,
       position,
@@ -80,6 +96,7 @@ export default async (req: Request) => {
       brand: booking.vehicle?.brand ?? null,
       model: booking.vehicle?.model ?? null,
       plate: booking.vehicle?.vehicle_ident?.trim() || booking.vehicle?.number_plate || null,
+      vehicleIdentLabel: formatVehicleIdentLabel(booking.vehicle?.vehicle_ident, booking.vehicle?.number_plate, useVehicleIdent),
       usage: booking.usage,
       start: booking.start,
       end: booking.end,
