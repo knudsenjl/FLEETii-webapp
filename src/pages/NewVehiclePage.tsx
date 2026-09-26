@@ -12,7 +12,6 @@ import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
 import { PageSectionBody } from "../components/PageSectionBody";
 import { RequiredFieldRow } from "../components/RequiredFieldRow";
-import { InlinePopup } from "../components/InlinePopup";
 import { Modal } from "../components/Modal";
 import { SectionHeading } from "../components/SectionHeading";
 import { useIdentSettings } from "../hooks/useIdentSettings";
@@ -23,6 +22,8 @@ import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 import { stripNumberSpacing } from "../lib/textNormalization";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 import { callFunction } from "../lib/callFunction";
+import { useMotorApiLookup } from "../hooks/useMotorApiLookup";
+import { MotorApiLookupButton } from "../components/MotorApiLookupButton";
 
 /**
  * Admin "Opret køretøj" page ("/new-vehicle"): rather than creating the
@@ -125,26 +126,8 @@ export function NewVehiclePage() {
     setKontaktnummer(profile.phone ?? "");
   }, [profile]);
 
-  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the Nummerplade row's lookup button — same button/icon and { data } | { error } JSON popup as VehicleCreatePage.tsx's own identical Køretøj-row button. Unlike that page (a fixed, already-saved order's plate), nummerplade here is still being typed, so no "fetch once and cache forever" guard — see handleOpenMotorApiPopup below. */
-  const [motorApiResult, setMotorApiResult] = useState<unknown>(null);
-  const [motorApiLoading, setMotorApiLoading] = useState(false);
-  const [motorApiError, setMotorApiError] = useState<string | null>(null);
-  const [showMotorApiPopup, setShowMotorApiPopup] = useState(false);
-  const motorApiRef = useRef<HTMLDivElement>(null);
-
-  /** Closes the MotorAPI popup on an outside click — same pattern as PageHeader.tsx's "Data Filter" dropdown. */
-  useEffect(() => {
-    if (!showMotorApiPopup) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (motorApiRef.current && !motorApiRef.current.contains(event.target as Node)) {
-        setShowMotorApiPopup(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMotorApiPopup]);
+  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the Nummerplade row's lookup button (state/fetch/popup in useMotorApiLookup + MotorApiLookupButton) — same button/icon and { data } | { error } JSON popup as VehicleCreatePage.tsx's own identical Køretøj-row button. Unlike that page (a fixed, already-saved order's plate), nummerplade here is still being typed, so no "fetch once and cache forever" guard — see handleOpenMotorApiPopup below. */
+  const motorApi = useMotorApiLookup();
 
   /** Fills Brand/Mærke/Årgang/Drivmiddel from a just-loaded MotorAPI result — same field mapping/priority as VehicleCreatePage.tsx's own identical autofillFromMotorApi, just against this page's own plain useState setters (these are simple typed-in fields here, not persisted per-keystroke the way that page's order fields are). Only overwrites a field MotorAPI actually has a value for. */
   const autofillFromMotorApi = (result: unknown) => {
@@ -164,33 +147,10 @@ export function NewVehiclePage() {
 
   /** Opens the MotorAPI popup and fetches fresh data for whatever's currently typed into Nummerplade, autofilling Brand/Mærke/Årgang/Drivmiddel from it. Always fetches fresh on open (no cache, unlike VehicleCreatePage.tsx's ensureMotorApiDataLoaded) — nummerplade can still change here, and a stale cached result for a since-edited plate would silently autofill the wrong vehicle's data. A re-click while already open just closes it. */
   const handleOpenMotorApiPopup = () => {
-    const opening = !showMotorApiPopup;
-    setShowMotorApiPopup(opening);
-    // Stripped of ALL whitespace (not just trimmed) — passed on to MotorAPI,
-    // which expects the plain registration number, not a spaced-out one.
-    const regNo = stripNumberSpacing(nummerplade);
-    if (!opening || !regNo) return;
-
-    setMotorApiLoading(true);
-    setMotorApiError(null);
-    setMotorApiResult(null);
-    void callFunction<Record<string, unknown>>("motorapi-vehicle-lookup", { query: { regNo } })
-      .then((response) => {
-        const result: unknown = response.data;
-        if (!response.ok) {
-          const message = (result as { error?: string } | null)?.error ?? "Kunne ikke hente data fra MotorAPI.";
-          setMotorApiError(message);
-          setMotorApiLoading(false);
-          return;
-        }
-        setMotorApiResult(result);
-        autofillFromMotorApi(result);
-        setMotorApiLoading(false);
-      })
-      .catch(() => {
-        setMotorApiError("Kunne ikke kontakte serveren. Prøv igen senere.");
-        setMotorApiLoading(false);
-      });
+    const opening = !motorApi.open;
+    motorApi.setOpen(opening);
+    if (!opening || !stripNumberSpacing(nummerplade)) return;
+    motorApi.load(nummerplade, autofillFromMotorApi);
   };
 
   const emailFormatInvalid = kontaktemail.trim().length > 0 && !EMAIL_PATTERN.test(kontaktemail.trim());
@@ -375,36 +335,12 @@ export function NewVehiclePage() {
                         className={`min-w-0 flex-1 ${TEXT_INPUT_CLASSNAME}`}
                       />
                       {/* Same lookup-button look/behavior as VehicleCreatePage.tsx's own Køretøj-row button (magnifying glass, spinner while in flight, JSON popup) — see handleOpenMotorApiPopup/autofillFromMotorApi above for why this one always fetches fresh instead of caching. */}
-                      <div className="relative shrink-0" ref={motorApiRef}>
-                        <button
-                          type="button"
-                          onClick={handleOpenMotorApiPopup}
-                          disabled={motorApiLoading || !nummerplade.trim()}
-                          aria-label="Slå nummerplade op i MotorAPI og udfyld Brand/Mærke/Årgang/Drivmiddel"
-                          title="Slå op i MotorAPI"
-                          className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition hover:bg-brand-50 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent"
-                        >
-                          {motorApiLoading ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
-                              <path d="M21 12a9 9 0 1 1-9-9" />
-                            </svg>
-                          ) : (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                              <circle cx="11" cy="11" r="7" />
-                              <path d="m21 21-4.3-4.3" />
-                            </svg>
-                          )}
-                        </button>
-                        <InlinePopup
-                          visible={showMotorApiPopup}
-                          align="right"
-                          message={
-                            <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
-                              {motorApiLoading ? "Henter fra MotorAPI…" : motorApiError ? motorApiError : JSON.stringify(motorApiResult, null, 2)}
-                            </pre>
-                          }
-                        />
-                      </div>
+                      <MotorApiLookupButton
+                        lookup={motorApi}
+                        onClick={handleOpenMotorApiPopup}
+                        disabled={motorApi.loading || !nummerplade.trim()}
+                        ariaLabel="Slå nummerplade op i MotorAPI og udfyld Brand/Mærke/Årgang/Drivmiddel"
+                      />
                     </div>
                   </FieldRow>
                   <FieldRow label="Mærke:">
