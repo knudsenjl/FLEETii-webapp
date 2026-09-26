@@ -83,6 +83,8 @@ export function AvailablePage() {
         selectedVehicleId?: string | null;
         /** Drop-in mode only (see ReservationPage's doc comment) — purely pass-through to ConfirmPage, same as userLabel. */
         dropInGuest?: DropInGuest;
+        /** Editing a drop-in booking — pass-through to ConfirmPage, which must then keep user_id NULL. */
+        editingIsGuest?: boolean;
       }
     | null;
   const bruger = state?.user ?? "";
@@ -276,6 +278,7 @@ export function AvailablePage() {
                         departmentId: targetDepartmentId,
                         departmentLabel: state?.departmentLabel,
                         dropInGuest: state?.dropInGuest,
+                        editingIsGuest: state?.editingIsGuest,
                       },
                     });
                   }}

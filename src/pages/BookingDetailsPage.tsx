@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
+import { DropInGuestPanel } from "../components/DropInGuestPanel";
 import { Button } from "../components/Button";
 import { FieldRow } from "../components/FieldRow";
 import { FieldList } from "../components/FieldList";
@@ -25,7 +26,7 @@ import {
   mapBookingRow,
   resolveVehicleGpsPosition,
   shortSignalTimestamp,
-  userAnsatId,
+  bookingUserLabel,
   type BookingRow,
 } from "../lib/bookings";
 import { nowUtcIso } from "../lib/time";
@@ -296,10 +297,10 @@ export function BookingDetailsPage() {
                           onClick={() => navigate(`/user-details/${booking.userId}`)}
                           className="text-left text-sm text-accent-600 hover:underline"
                         >
-                          {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
+                          {bookingUserLabel(booking, useUserIdent) ?? "—"}
                         </button>
                       ) : (
-                        <span className="text-sm text-brand-800">{(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}</span>
+                        <span className="text-sm text-brand-800">{bookingUserLabel(booking, useUserIdent) ?? "—"}</span>
                       )}
                     </FieldRow>
                   )}
@@ -345,6 +346,15 @@ export function BookingDetailsPage() {
                     </span>
                   </FieldRow>
               </FieldList>
+
+              {/* Drop-in booking: the guest's details + resend/revoke of their link — admins only (booking_guests' RLS wouldn't return the row to anyone else anyway). */}
+              {isAdmin && booking.isGuest && (
+                <DropInGuestPanel
+                  bookingId={booking.id}
+                  endIso={booking.endIso}
+                  emailFailed={(location.state as { dropInEmailFailed?: boolean } | null)?.dropInEmailFailed === true}
+                />
+              )}
 
               {mapVisible && (
                 <VehicleMapCard

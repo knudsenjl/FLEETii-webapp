@@ -76,6 +76,8 @@ export function ConfirmPage() {
         /** Display-ready counterpart to departmentId (ReservationPage's own resolved "Kunde/afdeling" label) — shown as the first summary row below, a final read-only "security check" before the booking is actually written. */
         departmentLabel?: string;
         dropInGuest?: DropInGuest;
+        /** Editing a drop-in booking (see ReservationPage's dropInBrugerLabel): user_id must stay NULL — bookings_guest_has_no_user would reject anything else. */
+        editingIsGuest?: boolean;
       }
     | null;
   const vehicle = state?.vehicle ?? null;
@@ -172,7 +174,7 @@ export function ConfirmPage() {
       start: reservationStart,
       end: reservationEnd,
       usage: anvendelse,
-      [USER_ID_COLUMN]: bruger || session?.user.id || null,
+      [USER_ID_COLUMN]: state.editingIsGuest ? null : bruger || session?.user.id || null,
       [DEPARTMENT_COLUMN]: state.departmentId,
     };
 

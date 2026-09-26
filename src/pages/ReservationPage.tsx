@@ -148,6 +148,12 @@ export function ReservationPage() {
   const formSnapshot = (location.state as { formSnapshot?: ReservationFormSnapshot } | null)?.formSnapshot ?? null;
   /** Set only in drop-in mode — see this component's doc comment. Survives a browser back-navigation from AvailablePage, since handleFindAvailable's snapshot keeps the rest of this entry's state. */
   const dropInGuest = readDropInGuest(location.state);
+  /** "Drop-in: ‹navn›" whenever the booking is for a drop-in guest — a new one (dropInGuest) or one being edited (editing.isGuest). Non-null means: no Bruger to pick, Slut required, and (when editing) ConfirmPage leaves user_id NULL. */
+  const dropInBrugerLabel = dropInGuest
+    ? dropInLabel(dropInGuest.name)
+    : editing?.isGuest
+      ? (editing.userLabel ?? dropInLabel(null))
+      : null;
   const isAdmin = isAnyAdmin(profile?.role);
   /** A sysadm has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
   const isSysadm = isSysadmRole(profile?.role);
@@ -491,7 +497,7 @@ export function ReservationPage() {
       return;
     }
 
-    if (dropInGuest) {
+    if (dropInBrugerLabel !== null) {
       triggerWarning("endRequired");
       return;
     }
@@ -530,8 +536,8 @@ export function ReservationPage() {
       : danishLocalToUtcIso(startDate, startTime);
     const end = endIgnored ? null : danishLocalToUtcIso(endDate, endTime);
     const selectedUser = departmentUsers.find((u) => u.user_id === bruger);
-    const brugerLabel = dropInGuest
-      ? dropInLabel(dropInGuest.name)
+    const brugerLabel = dropInBrugerLabel !== null
+      ? dropInBrugerLabel
       : isAdmin
         ? ((useUserIdent ? selectedUser?.user_ident : undefined) || selectedUser?.email) ?? editing?.userLabel ?? ""
         : ((useUserIdent && profile?.user_ident) || profile?.email || session?.user.email) ?? "";
@@ -587,6 +593,7 @@ export function ReservationPage() {
         departmentId: isSysadm ? selectedDepartmentId || null : afdelingId,
         departmentLabel,
         dropInGuest: dropInGuest ?? undefined,
+        editingIsGuest: editing?.isGuest || undefined,
       },
     });
   };
@@ -638,10 +645,10 @@ export function ReservationPage() {
                     </FieldRow>
                   )}
                   <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Bruger {isAdmin && <RequiredMark />}</>}>
-                    {dropInGuest ? (
+                    {dropInBrugerLabel !== null ? (
                       <input
                         type="text"
-                        value={dropInLabel(dropInGuest.name)}
+                        value={dropInBrugerLabel}
                         disabled
                         readOnly
                         className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"
@@ -814,7 +821,7 @@ export function ReservationPage() {
                     variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
+                    disabled={(!bruger && dropInBrugerLabel === null) || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
                     className="w-full"
                   >
                     Bekræft/skift køretøj
@@ -829,7 +836,7 @@ export function ReservationPage() {
                     variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={(!bruger && !dropInGuest) || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
+                    disabled={(!bruger && dropInBrugerLabel === null) || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
                     className="w-full"
                   >
                     Find ledigt køretøj

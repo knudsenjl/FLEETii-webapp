@@ -17,7 +17,7 @@ import { useTimedFlag } from "./useTimedFlag";
 import { useLocateVehicle } from "./useLocateVehicle";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
-import { BOOKING_ID_COLUMN, toDisplayVehicle, userAnsatId, type EditingBooking } from "../lib/bookings";
+import { BOOKING_ID_COLUMN, bookingUserLabel, toDisplayVehicle, type EditingBooking } from "../lib/bookings";
 import { nowUtcIso, toUtcMs } from "../lib/time";
 
 /** The fields BookingPage.tsx/BookingDetailsPage.tsx both need for the shared actions below — same shape each page's own fetch (fresh-on-mount for BookingPage, router-state-or-fetch-by-id for BookingDetailsPage) already produces. */
@@ -31,6 +31,9 @@ export type LifecycleBooking = {
   userEmail: string | null;
   userIdent: string | null;
   departmentId: string | null;
+  /** Drop-in booking fields (see MappedBooking) — optional, since BookingPage.tsx only ever shows a user's own, never-drop-in booking. */
+  isGuest?: boolean;
+  guestName?: string | null;
 };
 
 /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel and blocked-state) for a booking's vehicle — fetched straight from vehicle_profiles rather than reusing the 2hire vehicle's own plate field, since that's an UNGATED vehicle_ident-or-number_plate fallback and callers need to respect useVehicleIdent themselves. */
@@ -58,7 +61,7 @@ export function useBookingLifecycle(
   opts: {
     /** Passed straight through to useVehicleLockState — true unlocks both Lås/Lås op buttons regardless of the booking's own window (admin/sysadm on BookingDetailsPage); always false on BookingPage (role "user" only, no admin override to make there). */
     isAdminLock: boolean;
-    /** Whether to use userAnsatId(booking) instead of booking.userEmail as goToEditBooking's userLabel prefill — see useIdentSettings' own doc comment. */
+    /** Whether to use the Bruger-ID (see bookingUserLabel) instead of booking.userEmail as goToEditBooking's userLabel prefill — see useIdentSettings' own doc comment. */
     useUserIdent: boolean;
     userId: string | undefined;
     /** The BOOKING's OWN department (booking.departmentId), for the Tillad_slet_reservation/Tillad_rediger_reservation checks below — NOT the viewer's ambient/header-selected afdelingId. For BookingPage.tsx (role "user") the two happen to be identical (a user only ever has bookings in their own department); BookingDetailsPage.tsx (admin/sysadm, who can view any department's booking) must pass the booking's own departmentId explicitly instead. */
@@ -148,12 +151,13 @@ export function useBookingLifecycle(
     const editing: EditingBooking = {
       bookingId: booking.id,
       userId: booking.userId,
-      userLabel: opts.useUserIdent ? userAnsatId(booking) : booking.userEmail,
+      userLabel: bookingUserLabel(booking, opts.useUserIdent),
       anvendelse: booking.use,
       startIso: booking.startIso,
       endIso: booking.endIso,
       vehicleId: booking.vehicle,
       departmentId: booking.departmentId,
+      isGuest: booking.isGuest ?? false,
     };
     navigate("/reservation", { state: { editing } });
   };
