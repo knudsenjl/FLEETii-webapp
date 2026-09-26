@@ -23,6 +23,7 @@ import {
   type BookingWindow,
 } from "../lib/bookings";
 import { danishDayKey, nowUtcIso, utcToDanishParts } from "../lib/time";
+import type { DropInGuest } from "../lib/dropIn";
 
 
 /** A vehicle available for the requested period, plus a human-readable description of its free window (short "dd/mm" dates). */
@@ -80,6 +81,10 @@ export function AvailablePage() {
         departmentLabel?: string;
         /** Present only when this page was reached via a browser back-navigation from ConfirmPage — see the "Reserver"/"Opdater" button's own comment below. Restores the row the admin had picked, which a plain useState initializer would otherwise lose on remount. */
         selectedVehicleId?: string | null;
+        /** Drop-in mode only (see ReservationPage's doc comment) — purely pass-through to ConfirmPage, same as userLabel. */
+        dropInGuest?: DropInGuest;
+        /** Editing a drop-in booking — pass-through to ConfirmPage, which must then keep user_id NULL. */
+        editingIsGuest?: boolean;
       }
     | null;
   const bruger = state?.user ?? "";
@@ -272,6 +277,8 @@ export function AvailablePage() {
                         editingBookingId,
                         departmentId: targetDepartmentId,
                         departmentLabel: state?.departmentLabel,
+                        dropInGuest: state?.dropInGuest,
+                        editingIsGuest: state?.editingIsGuest,
                       },
                     });
                   }}

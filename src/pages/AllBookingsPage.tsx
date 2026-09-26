@@ -23,7 +23,7 @@ import {
   formatVehicleIdentLabel,
   formatVehicleLabel,
   mapBookingRow,
-  userAnsatId,
+  bookingUserLabel,
   type BookingRow,
 } from "../lib/bookings";
 import { nowUtcIso } from "../lib/time";
@@ -40,6 +40,9 @@ type Booking = {
   userId: string | null;
   userEmail: string | null;
   userIdent: string | null;
+  /** Drop-in fields — see MappedBooking/bookingUserLabel. */
+  isGuest: boolean;
+  guestName: string | null;
 };
 
 /**
@@ -307,9 +310,9 @@ export function AllBookingsPage() {
                           >
                             <td
                               className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5"
-                              title={(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? undefined}
+                              title={bookingUserLabel(booking, useUserIdent) ?? undefined}
                             >
-                              {(useUserIdent ? userAnsatId(booking) : booking.userEmail) ?? "—"}
+                              {bookingUserLabel(booking, useUserIdent) ?? "—"}
                             </td>
                             <td className="w-px whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">
                               {formatVehicleIdentLabel(

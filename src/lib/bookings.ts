@@ -13,6 +13,7 @@
 // avoids that requirement cascading into vehicleDataSource/index.ts too.
 import type { Vehicle2Hire } from "./vehicleDataSource/types.js";
 import { danishDayKey, formatDanishDate, toUtcMs, utcToDanishParts } from "./time.js";
+import { dropInLabel } from "./dropIn.js";
 
 // The "bookings" table's columns are named differently from the local field
 // names pages use (see MappedBooking) — these constants are the single
@@ -26,7 +27,12 @@ export const USER_ID_COLUMN = "user_id";
 export const DEPARTMENT_COLUMN = "department_id";
 
 /** Column list for a `.select(...)` that needs every field mapBookingRow() consumes — embeds user_profiles(email, user_ident) via the user_id FK (PostgREST resolves it automatically) so callers get display-ready email/Bruger-ID alongside the raw id in one round-trip, same idea as departments(name) would for department_id. */
-export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email, user_ident), ${DEPARTMENT_COLUMN}`;
+// is_guest + booking_guests(name): a drop-in booking (see
+// supabase/applied/bookings_drop_in_guests.sql). booking_guests' RLS only
+// returns the row to admins of the vehicle's costumer and sysadm, so the
+// embedded name is simply null for a regular user — who then sees just
+// "Drop-in" (bookingUserLabel), never the guest's name.
+export const BOOKINGS_SELECT_COLUMNS = `${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end, usage, ${USER_ID_COLUMN}, user_profiles(email, user_ident), ${DEPARTMENT_COLUMN}, is_guest, booking_guests(name)`;
 
 /** The propellant values vehicle_profiles.drivmiddel (and costumer_orders.drivmiddel) allow, per their shared CHECK constraint — see supabase/applied/vehicle_profiles_add_drivmiddel.sql / costumer_orders_add_drivmiddel.sql (plus vehicle_profiles_costumer_orders_drivmiddel_add_hybrid_variants.sql for the two Hybrid/* additions). Kept as a plain array (not an enum type) so every "Drivmiddel:" <select> (HandleVehiclePage.tsx, VehicleCreatePage.tsx) always matches the DB's own constraint from one shared source. */
 export const DRIVMIDDEL_OPTIONS = ["Benzin", "Diesel", "El", "Hybrid", "Hybrid/Benzin", "Hybrid/Diesel", "Brint"] as const;
@@ -61,6 +67,10 @@ export type BookingRow = {
   user_profiles: { email: string; user_ident: string | null } | null;
   /** References departments.department_id — NOT a department name (see supabase/bookings_department_to_department_id.sql). */
   department_id: string | null;
+  /** A drop-in booking (user_id is then always null) — see BOOKINGS_SELECT_COLUMNS. Optional so callers selecting fewer columns still type-check. */
+  is_guest?: boolean;
+  /** The drop-in guest's name via the one-to-one embed; null when not a drop-in OR not visible to this viewer (RLS). PostgREST may return a one-element array for some embeds, so both shapes are accepted. */
+  booking_guests?: { name: string | null } | { name: string | null }[] | null;
 };
 
 /** A BookingRow reshaped for display: DB column names replaced with the local field names pages use, and start/end pre-split into separate Danish date/time strings. startIso/endIso are the original, unsplit ISO values — kept alongside the display strings for callers that need real timestamp comparisons (e.g. computeLockButtonState) rather than reconstructing a timestamp from "dd.mm.yyyy"/"HH:mm". A null endDate/end/endIso means the booking is open-ended (see BookingRow). */
@@ -82,6 +92,10 @@ export type MappedBooking = {
   userIdent: string | null;
   /** References departments.department_id — NOT a department name. */
   departmentId: string | null;
+  /** A drop-in booking (no FLEETii user — see BookingRow.is_guest). */
+  isGuest: boolean;
+  /** The drop-in guest's name, only for viewers allowed to see it (admins); null otherwise. */
+  guestName: string | null;
 };
 
 /**
@@ -105,6 +119,8 @@ export type EditingBooking = {
   endIso: string | null;
   vehicleId: string;
   departmentId: string | null;
+  /** Editing a drop-in booking: there's no user to (re)pick, and ConfirmPage must leave user_id NULL (bookings_guest_has_no_user). userLabel then carries its "Drop-in: ‹navn›" label. */
+  isGuest?: boolean;
 };
 
 /**
@@ -188,7 +204,23 @@ export function mapBookingRow(row: BookingRow): MappedBooking {
     userEmail: row.user_profiles?.email ?? null,
     userIdent: row.user_profiles?.user_ident ?? null,
     departmentId: row.department_id,
+    isGuest: row.is_guest ?? false,
+    guestName: (Array.isArray(row.booking_guests) ? row.booking_guests[0] : row.booking_guests)?.name ?? null,
   };
+}
+
+/**
+ * Who a booking is for, as displayed in a "Bruger" column/row: "Drop-in:
+ * ‹navn›" (or just "Drop-in" for a viewer who may not see the name) for a
+ * drop-in, otherwise the user's Bruger-ID/email per `useUserIdent` (see
+ * userAnsatId). Null when there's no user at all.
+ */
+export function bookingUserLabel(
+  booking: { isGuest?: boolean; guestName?: string | null; userIdent: string | null; userEmail: string | null },
+  useUserIdent: boolean,
+): string | null {
+  if (booking.isGuest) return dropInLabel(booking.guestName);
+  return useUserIdent ? userAnsatId(booking) : booking.userEmail;
 }
 
 /** "Bruger-ID" display value for a booking's user (or any user_profiles-backed record) — userIdent when set, else userEmail, else null (e.g. userId itself was null). Single source of truth for this fallback so BookingDetailsPage/AllBookingsPage/ReservationPage don't each reimplement it. */
