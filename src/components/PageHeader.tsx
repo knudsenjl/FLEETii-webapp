@@ -11,6 +11,7 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
 import { ClickOutsideOverlay } from "./ClickOutsideOverlay";
+import { callFunction } from "../lib/callFunction";
 
 /** One entry in the settings button's dropdown menu (admin/sysadm only — see settingsMenuItemsForRole). */
 type SettingsMenuItem = { label: string; path: string };
@@ -217,7 +218,6 @@ export function PageHeader({
     afdelingScopedToAllGrants,
     setAfdelingScopedToAllGrants,
     isFullyAuthenticated,
-    session,
   } = useAuth();
   const navigate = useNavigate();
   const { activeKey: notImplementedKey, trigger: triggerNotImplemented } = useTimedFlag();
@@ -290,14 +290,8 @@ export function PageHeader({
   const handleSeedTestBookings = async () => {
     setSeedingBookings(true);
     try {
-      const response = await fetch("/.netlify/functions/seed-test-bookings", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      });
-      const result = (await response.json()) as {
+      const response = await callFunction("seed-test-bookings", { method: "POST" });
+      const result = response.data as {
         error?: string;
         created?: { department: string; count: number }[];
         skipped?: { department: string; reason: string }[];

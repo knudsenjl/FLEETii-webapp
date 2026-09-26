@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
@@ -26,6 +25,7 @@ import {
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
 import { stripNumberSpacing } from "../lib/textNormalization";
+import { callFunction } from "../lib/callFunction";
 
 /** A pending "send-vehicle-request" submission — mirrors InstallationAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
 type CostumerOrder = {
@@ -109,7 +109,6 @@ type CostumerOrderQueryRow = {
  *     with the error surfaced, rather than pretending registration failed.
  */
 export function VehicleCreatePage() {
-  const { session } = useAuth();
   const refreshVehicles = useRefreshVehicles();
   const navigate = useNavigate();
   const location = useLocation();
@@ -429,11 +428,9 @@ export function VehicleCreatePage() {
     setMotorApiError(null);
     // Stripped of ALL whitespace (not just trimmed) — passed on to MotorAPI,
     // which expects the plain registration number, not a spaced-out one.
-    void fetch(`/.netlify/functions/motorapi-vehicle-lookup?regNo=${encodeURIComponent(stripNumberSpacing(order.number_plate))}`, {
-      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-    })
-      .then(async (response) => {
-        const result = (await response.json()) as unknown;
+    void callFunction("motorapi-vehicle-lookup", { query: { regNo: stripNumberSpacing(order.number_plate) } })
+      .then((response) => {
+        const result = response.data as unknown;
         if (!response.ok) {
           const message = (result as { error?: string } | null)?.error ?? "Kunne ikke hente data fra MotorAPI.";
           setMotorApiError(message);
@@ -474,11 +471,9 @@ export function VehicleCreatePage() {
     let cancelled = false;
     setProfilesLoading(true);
     setProfilesError(null);
-    void fetch(`/.netlify/functions/2hire-board-profiles?costumerId=${encodeURIComponent(order.costumer_id)}`, {
-      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-    })
-      .then(async (response) => {
-        const result = (await response.json()) as { profiles?: TwoHireBoardProfile[]; error?: string };
+    void callFunction("2hire-board-profiles", { query: { costumerId: order.costumer_id } })
+      .then((response) => {
+        const result = response.data as { profiles?: TwoHireBoardProfile[]; error?: string };
         if (cancelled) return;
         if (!response.ok) {
           setProfilesError(result.error ?? "Kunne ikke hente 2hire-profiler.");
@@ -497,7 +492,7 @@ export function VehicleCreatePage() {
     return () => {
       cancelled = true;
     };
-  }, [session, order?.vehicle_registered, order?.costumer_id]);
+  }, [order?.vehicle_registered, order?.costumer_id]);
 
   // Only while a SPECIFIC order is being fetched by id (:orderId present, no
   // router state yet) — without this guard, the page would flash-redirect
@@ -525,21 +520,16 @@ export function VehicleCreatePage() {
     const profileLabel = selectedProfile ? boardProfileLabel(selectedProfile) : null;
 
     try {
-      const response = await fetch("/.netlify/functions/2hire-register-vehicle", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const response = await callFunction("2hire-register-vehicle", {
+        body: {
           orderId: order.order_id,
           qrCode: qrCode.trim(),
           profileId: selectedProfileId,
           profileLabel,
-        }),
+        },
       });
 
-      const result = (await response.json()) as { ok?: boolean; vehicleId?: string; error?: string };
+      const result = response.data as { ok?: boolean; vehicleId?: string; error?: string };
 
       if (!response.ok) {
         setRegisterError(result.error ?? "Kunne ikke registrere køretøjet.");
@@ -587,16 +577,9 @@ export function VehicleCreatePage() {
 
     if (vehicleRegistered && registeredVehicleId) {
       try {
-        const response = await fetch("/.netlify/functions/delete-vehicle", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ vehicleId: registeredVehicleId, orderId: order.order_id }),
-        });
+        const response = await callFunction("delete-vehicle", { body: { vehicleId: registeredVehicleId, orderId: order.order_id } });
 
-        const result = (await response.json()) as { ok?: boolean; error?: string };
+        const result = response.data as { ok?: boolean; error?: string };
         if (!response.ok) {
           setDeleteError(result.error ?? "Kunne ikke slette køretøjet.");
           setIsDeleting(false);

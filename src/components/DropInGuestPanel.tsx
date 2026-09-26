@@ -7,7 +7,6 @@
 // the row to admins of the vehicle's costumer and sysadm (token_hash isn't
 // even column-granted, so it can't be selected here).
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import { formatDanishDateTime } from "../lib/time";
 import { Button } from "./Button";
@@ -15,6 +14,7 @@ import { ConfirmDialog } from "./ConfirmDialog";
 import { FieldList } from "./FieldList";
 import { FieldRow } from "./FieldRow";
 import { SectionHeading } from "./SectionHeading";
+import { callFunction } from "../lib/callFunction";
 
 type GuestRow = {
   name: string | null;
@@ -41,7 +41,6 @@ interface DropInGuestPanelProps {
 const LINK_TAIL_MS = 30 * 60_000;
 
 export function DropInGuestPanel({ bookingId, endIso, emailFailed = false }: DropInGuestPanelProps) {
-  const { session } = useAuth();
   const [guest, setGuest] = useState<GuestRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"resend" | "revoke" | null>(null);
@@ -68,15 +67,8 @@ export function DropInGuestPanel({ bookingId, endIso, emailFailed = false }: Dro
     setBusy(action);
     setMessage(null);
     try {
-      const response = await fetch("/.netlify/functions/guest-access-admin", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ bookingId, action }),
-      });
-      const result = (await response.json().catch(() => ({}))) as { error?: string };
+      const response = await callFunction("guest-access-admin", { body: { bookingId, action } });
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setMessage({ text: result.error ?? "Der opstod en fejl.", error: true });
       } else {

@@ -11,7 +11,6 @@
 // two pages' handlers drifting apart the way their layouts already have.
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { use2hireVehicle } from "../contexts/VehicleContext";
 import { useVehicleLockState } from "./useVehicleLockState";
 import { useTimedFlag } from "./useTimedFlag";
@@ -20,6 +19,7 @@ import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
 import { BOOKING_ID_COLUMN, bookingUserLabel, toDisplayVehicle, type EditingBooking } from "../lib/bookings";
 import { toUtcMs } from "../lib/time";
+import { callFunction } from "../lib/callFunction";
 
 /** The fields BookingPage.tsx/BookingDetailsPage.tsx both need for the shared actions below — same shape each page's own fetch (fresh-on-mount for BookingPage, router-state-or-fetch-by-id for BookingDetailsPage) already produces. */
 export type LifecycleBooking = {
@@ -70,7 +70,6 @@ export function useBookingLifecycle(
   },
 ) {
   const navigate = useNavigate();
-  const { session } = useAuth();
   const vehicles = use2hireVehicle();
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
 
@@ -201,16 +200,9 @@ export function useBookingLifecycle(
 
     let finishError: string | null = null;
     try {
-      const response = await fetch("/.netlify/functions/finish-booking", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ bookingId: booking.id }),
-      });
+      const response = await callFunction("finish-booking", { body: { bookingId: booking.id } });
       if (!response.ok) {
-        const result = (await response.json().catch(() => ({}))) as { error?: string };
+        const result = response.data as { error?: string };
         finishError = result.error ?? "Kunne ikke afslutte reservationen.";
       }
     } catch {

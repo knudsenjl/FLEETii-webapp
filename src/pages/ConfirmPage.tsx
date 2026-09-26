@@ -22,6 +22,7 @@ import {
 import { fetchVehicleConflictWindows } from "../lib/bookingWindows";
 import { nowUtcIso } from "../lib/time";
 import type { DropInGuest } from "../lib/dropIn";
+import { callFunction } from "../lib/callFunction";
 
 /** The selected vehicle, as passed in via router state from AvailablePage. */
 type ReservationVehicle = {
@@ -227,14 +228,7 @@ export function ConfirmPage() {
     // brand-new reservation notifies its user, see
     // send-booking-confirmation.mts's own doc comment.
     if (newBookingId) {
-      void fetch("/.netlify/functions/send-booking-confirmation", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ bookingId: newBookingId }),
-      }).catch(() => {
+      void callFunction("send-booking-confirmation", { body: { bookingId: newBookingId } }).catch(() => {
         // Ignored — see this block's own doc comment above.
       });
     }
@@ -250,29 +244,24 @@ export function ConfirmPage() {
    */
   const confirmDropIn = async (departmentId: string) => {
     if (!dropInGuest) return;
-    let response: Response;
+    let response: Awaited<ReturnType<typeof callFunction<{ bookingId?: string; emailSent?: boolean }>>>;
     try {
-      response = await fetch("/.netlify/functions/create-drop-in-booking", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      response = await callFunction<{ bookingId?: string; emailSent?: boolean }>("create-drop-in-booking", {
+        body: {
           vehicleId: vehicle.id,
           departmentId,
           start: reservationStart,
           end: reservationEnd,
           usage: anvendelse,
           guest: dropInGuest,
-        }),
+        },
       });
     } catch {
       setError("Kunne ikke kontakte serveren. Prøv igen.");
       setIsSubmitting(false);
       return;
     }
-    const result = (await response.json().catch(() => ({}))) as { bookingId?: string; emailSent?: boolean; error?: string };
+    const result = response.data;
     if (!response.ok || !result.bookingId) {
       setError(result.error ?? "Kunne ikke oprette drop-in reservationen.");
       setIsSubmitting(false);

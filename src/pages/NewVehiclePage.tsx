@@ -22,6 +22,7 @@ import { motorApiDrivmiddel, motorApiVehicleField } from "../lib/motorApi";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
 import { stripNumberSpacing } from "../lib/textNormalization";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
+import { callFunction } from "../lib/callFunction";
 
 /**
  * Admin "Opret køretøj" page ("/new-vehicle"): rather than creating the
@@ -40,7 +41,7 @@ import { fetchDepartmentOptions, type DepartmentOption } from "../lib/department
  * the costumer this request is for is still a genuine choice.
  */
 export function NewVehiclePage() {
-  const { afdeling, afdelingId, costumerId, costumerName, session, profile } = useAuth();
+  const { afdeling, afdelingId, costumerId, costumerName, profile } = useAuth();
   const navigate = useNavigate();
   /** A sysadm has no costumer/department of their own (platform-wide role) — see this component's own doc comment for why selectedCostumerId comes from the header rather than a picker. */
   const isSysadm = isSysadmRole(profile?.role);
@@ -173,11 +174,9 @@ export function NewVehiclePage() {
     setMotorApiLoading(true);
     setMotorApiError(null);
     setMotorApiResult(null);
-    void fetch(`/.netlify/functions/motorapi-vehicle-lookup?regNo=${encodeURIComponent(regNo)}`, {
-      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-    })
-      .then(async (response) => {
-        const result = (await response.json()) as unknown;
+    void callFunction<Record<string, unknown>>("motorapi-vehicle-lookup", { query: { regNo } })
+      .then((response) => {
+        const result: unknown = response.data;
         if (!response.ok) {
           const message = (result as { error?: string } | null)?.error ?? "Kunne ikke hente data fra MotorAPI.";
           setMotorApiError(message);
@@ -240,13 +239,8 @@ export function NewVehiclePage() {
     }
 
     try {
-      const response = await fetch("/.netlify/functions/send-vehicle-request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const response = await callFunction("send-vehicle-request", {
+        body: {
           afdeling: isSysadm
             ? (departmentOptions.find((d) => d.department_id === selectedDepartmentId)?.name ?? null)
             : afdeling,
@@ -270,10 +264,10 @@ export function NewVehiclePage() {
           kontaktperson,
           kontaktemail,
           kontaktnummer,
-        }),
+        },
       });
 
-      const result = (await response.json()) as { ok?: boolean; error?: string };
+      const result = response.data as { ok?: boolean; error?: string };
 
       if (!response.ok) {
         setSendError(result.error ?? "Kunne ikke sende bestillingen.");

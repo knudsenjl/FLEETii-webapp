@@ -29,6 +29,7 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { formatBookingPeriod, splitIsoDateTime } from "../lib/bookings";
 import { fadeInUp } from "../lib/motionVariants";
 import { toUtcMs } from "../lib/time";
+import { callFunction } from "../lib/callFunction";
 
 /** guest-booking-status.mts's response — see that function for each field. */
 type GuestStatus = {
@@ -62,16 +63,11 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
 /** How often the page re-asks the server while open: keeps the button state current as the booking starts/ends. Well inside guestAccess.ts's rate limit (60 uses / 10 min). */
 const REFRESH_MS = 30_000;
 
-/** POSTs `body` to a guest Function; returns the parsed JSON or throws with the server's Danish error. */
+/** POSTs `body` to a guest Function; returns the parsed JSON or throws with the server's Danish error. (callFunction adds a login token only if the visitor happens to be logged in — the guest endpoints authenticate by the link token and ignore it.) */
 async function postGuest<T>(fn: string, body: unknown): Promise<T> {
-  const response = await fetch(`/.netlify/functions/${fn}`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const json = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new Error(json.error ?? "Der opstod en fejl. Prøv igen om lidt.");
-  return json as T;
+  const response = await callFunction<T>(fn, { body });
+  if (!response.ok) throw new Error(response.data.error ?? "Der opstod en fejl. Prøv igen om lidt.");
+  return response.data as T;
 }
 
 /** "dd/mm HH:mm - HH:mm" etc., via the same formatBookingPeriod the front page uses. */

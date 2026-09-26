@@ -25,6 +25,7 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useScopeSwitchGroup } from "../hooks/useScopeSwitchGroup";
 import { useCostumerQuickJumpOptions } from "../hooks/useCostumerQuickJumpOptions";
+import { callFunction } from "../lib/callFunction";
 
 /** The costumer row, as passed in via router state from CostumerAdministrationPage. The address is three separate lines (street+number, postal code+city, country) rather than one free-text field — see supabase/applied/costumers_split_address_into_three_fields.sql. */
 type Costumer = {
@@ -99,7 +100,6 @@ type Costumer = {
 export function CostumerDetailsPage() {
   const navigate = useNavigate();
   const {
-    session,
     costumerId: activeCostumerId,
     costumerName: activeCostumerName,
     afdelingId: activeAfdelingId,
@@ -412,16 +412,9 @@ export function CostumerDetailsPage() {
 
     if (twoHireFieldsTyped) {
       try {
-        const response = await fetch("/.netlify/functions/2hire-subscribe", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ costumerId: costumer.costumer_id }),
-        });
+        const response = await callFunction("2hire-subscribe", { body: { costumerId: costumer.costumer_id } });
 
-        const result = (await response.json()) as { error?: string };
+        const result = response.data as { error?: string };
         if (!response.ok) {
           setSubmitError(
             result.error ?? "2hire-oplysningerne blev gemt, men registrering hos 2hire mislykkedes. Prøv at gemme igen.",
@@ -462,16 +455,9 @@ export function CostumerDetailsPage() {
     setSubmitError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/delete-costumer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ costumerId: costumer.costumer_id, confirmName: purgeConfirmText }),
-      });
+      const response = await callFunction("delete-costumer", { body: { costumerId: costumer.costumer_id, confirmName: purgeConfirmText } });
 
-      const result = (await response.json()) as { error?: string };
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke slette kunden.");
         setIsSubmitting(false);

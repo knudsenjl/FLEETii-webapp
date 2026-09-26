@@ -29,6 +29,7 @@ import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, to
 import { useReverseGeocode } from "../lib/geocode";
 import { supabase } from "../lib/supabase";
 import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { callFunction } from "../lib/callFunction";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
 type Vehicle = {
@@ -117,7 +118,7 @@ export function VehicleDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   // "admin OR sysadm" — same superset convention as ProtectedRoute's
   // own requireAdmin (App.tsx) and the server-side requireAdmin() helper;
   // this page has no requireAdmin route gate of its own (see doc comment
@@ -423,16 +424,9 @@ export function VehicleDetailsPage() {
     setDeleteError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/send-vehicle-deletion-request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ vehicleId: vehicle.vehicleId }),
-      });
+      const response = await callFunction("send-vehicle-deletion-request", { body: { vehicleId: vehicle.vehicleId } });
 
-      const result = (await response.json()) as { ok?: boolean; error?: string };
+      const result = response.data as { ok?: boolean; error?: string };
 
       if (!response.ok) {
         setDeleteError(result.error ?? "Kunne ikke sende anmodningen.");

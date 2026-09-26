@@ -4,7 +4,7 @@
 // op — see that function's own doc comment), so it isn't duplicated across
 // pages.
 import { useCallback, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { callFunction } from "../lib/callFunction";
 
 export type UseLocateVehicleResult = {
   isLocating: boolean;
@@ -15,7 +15,6 @@ export type UseLocateVehicleResult = {
 
 /** Wraps the "locate" (blink headlights) 2hire command — see 2hire-vehicle-command.mts. */
 export function useLocateVehicle(): UseLocateVehicleResult {
-  const { session } = useAuth();
   const [isLocating, setIsLocating] = useState(false);
   const [locateError, setLocateError] = useState<string | null>(null);
 
@@ -25,16 +24,9 @@ export function useLocateVehicle(): UseLocateVehicleResult {
       setLocateError(null);
 
       try {
-        const response = await fetch("/.netlify/functions/2hire-vehicle-command", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ vehicleId, command: "locate" }),
-        });
+        const response = await callFunction("2hire-vehicle-command", { body: { vehicleId, command: "locate" } });
 
-        const result = (await response.json()) as { error?: string };
+        const result = response.data as { error?: string };
         if (!response.ok) {
           setLocateError(result.error ?? "Kunne ikke lokalisere køretøjet.");
           return false;
@@ -48,7 +40,7 @@ export function useLocateVehicle(): UseLocateVehicleResult {
 
       return true;
     },
-    [session],
+    [],
   );
 
   return { isLocating, locateError, locate };

@@ -2,7 +2,7 @@
 // address, shared by VehicleDetailsPage.tsx, BookingDetailsPage.tsx, and
 // BookingPage.tsx (all show this in a row directly below their map).
 import { useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
+import { callFunction } from "./callFunction";
 
 /**
  * Shape of geoapify-reverse-geocode.mts's own response — a thin proxy
@@ -42,7 +42,6 @@ export function useReverseGeocode(
   position: { lat: number; lng: number } | null | undefined,
   enabled: boolean,
 ): { address: string | null; addressLoading: boolean } {
-  const { session } = useAuth();
   const [address, setAddress] = useState<string | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
 
@@ -55,14 +54,8 @@ export function useReverseGeocode(
     let cancelled = false;
     setAddressLoading(true);
 
-    void fetch(
-      `/.netlify/functions/geoapify-reverse-geocode?vehicleId=${encodeURIComponent(vehicleId)}`,
-      {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-      },
-    )
-      .then((response) => response.json() as Promise<ReverseGeocodeResponse>)
-      .then((data) => {
+    void callFunction<ReverseGeocodeResponse>("geoapify-reverse-geocode", { query: { vehicleId } })
+      .then(({ data }) => {
         if (cancelled) return;
         setAddress(data.address ?? null);
       })
@@ -77,7 +70,7 @@ export function useReverseGeocode(
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, vehicleId, position?.lat, position?.lng, session?.access_token]);
+  }, [enabled, vehicleId, position?.lat, position?.lng]);
 
   return { address, addressLoading };
 }
