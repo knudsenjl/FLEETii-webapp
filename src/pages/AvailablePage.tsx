@@ -19,7 +19,7 @@ import {
   isVehicleAvailable,
   type BookingWindow,
 } from "../lib/bookings";
-import { danishDayKey, nowUtcIso, utcToDanishParts } from "../lib/time";
+import { danishDayKey, formatDanishDateTimeShort, nowUtcIso, utcToDanishParts } from "../lib/time";
 import { fetchAvailabilityWindows } from "../lib/bookingWindows";
 import type { DropInGuest } from "../lib/dropIn";
 
@@ -35,13 +35,6 @@ type AvailableVehicle = {
 /** A UTC ISO timestamp as Danish "HH:mm". */
 function formatDanishTime(iso: string): string {
   return utcToDanishParts(iso).time;
-}
-
-/** A UTC ISO timestamp as Danish "dd/mm HH:mm". */
-function formatDanishDateTimeShort(iso: string): string {
-  const { date, time } = utcToDanishParts(iso);
-  const [, month, day] = date.split("-");
-  return `${day}/${month} ${time}`;
 }
 
 /**

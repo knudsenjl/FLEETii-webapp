@@ -13,11 +13,11 @@
 // later once real usage shows what's actually needed.
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { SectionHeading } from "../components/SectionHeading";
+import { callFunction } from "../lib/callFunction";
 
 /** The shape 2hire-raw-command.mts always resolves to on a 200 — either this or {error} (see handleExecute). */
 type RawCommandResult = { requestUrl: string; status: number; ok: boolean; result: unknown };
@@ -35,7 +35,6 @@ type BackfillResult = {
 };
 
 export function TwoHireCommandPage() {
-  const { session } = useAuth();
   const navigate = useNavigate();
   const [command, setCommand] = useState("POST /api/v1/vehicle/{AB12345}/command/generic/locate");
   const [body, setBody] = useState("");
@@ -53,20 +52,13 @@ export function TwoHireCommandPage() {
     setResult(null);
 
     try {
-      const response = await fetch("/.netlify/functions/2hire-raw-command", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ command, body: body.trim() || undefined }),
-      });
+      const response = await callFunction("2hire-raw-command", { body: { command, body: body.trim() || undefined } });
       if (!response.ok) {
-        const failure = (await response.json().catch(() => null)) as { error?: string } | null;
+        const failure = response.data as { error?: string } | null;
         setError(failure?.error ?? "Kommandoen fejlede.");
         return;
       }
-      setResult((await response.json()) as RawCommandResult);
+      setResult(response.data as RawCommandResult);
     } catch {
       setError("Kunne ikke kontakte serveren. Prøv igen senere.");
     } finally {
@@ -83,20 +75,13 @@ export function TwoHireCommandPage() {
     setBackfillResult(null);
 
     try {
-      const response = await fetch("/.netlify/functions/2hire-backfill-vehicle-signals", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ dryRun }),
-      });
+      const response = await callFunction("2hire-backfill-vehicle-signals", { body: { dryRun } });
       if (!response.ok) {
-        const failure = (await response.json().catch(() => null)) as { error?: string } | null;
+        const failure = response.data as { error?: string } | null;
         setBackfillError(failure?.error ?? "Backfill fejlede.");
         return;
       }
-      setBackfillResult((await response.json()) as BackfillResult);
+      setBackfillResult(response.data as BackfillResult);
     } catch {
       setBackfillError("Kunne ikke kontakte serveren. Prøv igen senere.");
     } finally {

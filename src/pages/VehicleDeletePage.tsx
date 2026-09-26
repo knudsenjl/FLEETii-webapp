@@ -1,6 +1,5 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
@@ -13,6 +12,7 @@ import { useIdentSettings } from "../hooks/useIdentSettings";
 import { supabase } from "../lib/supabase";
 import { formatVehicleIdentLabel } from "../lib/bookings";
 import { formatDanishDateTime } from "../lib/time";
+import { callFunction } from "../lib/callFunction";
 
 /** A pending "Nedlæg" (deletion) costumer_orders row — mirrors VehicleCreatePage.tsx's own CostumerOrder shape/reasoning, for the reverse flow (see costumer_orders_merge_deletion_requests.sql: both order types share this one table now, distinguished by order_type). Normally arrives pre-filled via router state (InstallationAdministrationPage's "Administration af installationer" table row click), but also fetchable by id alone so "/vehicle-delete/:orderId" works as a direct link (the email's own link). */
 type VehicleDeletionOrder = {
@@ -76,7 +76,6 @@ type VehicleDeletionOrderQueryRow = {
  * steps always happened together in practice.
  */
 export function VehicleDeletePage() {
-  const { session } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { orderId } = useParams<{ orderId: string }>();
@@ -220,16 +219,9 @@ export function VehicleDeletePage() {
     }
 
     try {
-      const response = await fetch("/.netlify/functions/delete-vehicle", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ vehicleId: order.vehicle_id, orderId: order.order_id }),
-      });
+      const response = await callFunction("delete-vehicle", { body: { vehicleId: order.vehicle_id, orderId: order.order_id } });
 
-      const result = (await response.json()) as { ok?: boolean; error?: string; deregisterWarning?: string | null };
+      const result = response.data as { ok?: boolean; error?: string; deregisterWarning?: string | null };
 
       if (!response.ok) {
         setDeleteError(result.error ?? "Kunne ikke slette køretøjet.");

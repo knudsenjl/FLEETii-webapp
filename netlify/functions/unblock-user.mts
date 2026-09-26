@@ -16,22 +16,23 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 type UnblockUserBody = { userId?: string };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -39,12 +40,12 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as UnblockUserBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const targetUserId = body.userId;
   if (!targetUserId) {
-    return new Response(JSON.stringify({ error: "userId er påkrævet." }), { status: 400 });
+    return json({ error: "userId er påkrævet." }, 400);
   }
 
 
@@ -62,7 +63,7 @@ export default async (req: Request) => {
   ]);
 
   if (!target) {
-    return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
+    return json({ error: "Brugeren findes ikke." }, 404);
   }
   const callerIsSysadm = isSysadmRole(caller?.role);
   // A regular admin must never be able to act on a sysadm's account
@@ -72,7 +73,7 @@ export default async (req: Request) => {
   // switch-department.mts, which would otherwise let the department-match
   // check below pass. Checked before any mutation.
   if (!callerIsSysadm && isSysadmRole(target.role)) {
-    return new Response(JSON.stringify({ error: "Du kan ikke genetablere en sysadm." }), { status: 403 });
+    return json({ error: "Du kan ikke genetablere en sysadm." }, 403);
   }
   // A sysadm isn't scoped to one department — same platform-wide
   // exception as delete-user.mts.
@@ -87,12 +88,10 @@ export default async (req: Request) => {
       })
     : null;
   if (!caller || (!callerIsSysadm && callerActiveDepartmentId !== target.department_id)) {
-    return new Response(JSON.stringify({ error: "Du kan kun genetablere brugere i din egen afdeling." }), {
-      status: 403,
-    });
+    return json({ error: "Du kan kun genetablere brugere i din egen afdeling." }, 403);
   }
   if (!target.deleted_at) {
-    return new Response(JSON.stringify({ error: "Brugeren er ikke blokeret." }), { status: 409 });
+    return json({ error: "Brugeren er ikke blokeret." }, 409);
   }
 
   // Lifts the ban — "none" is the Auth Admin API's own literal for clearing
@@ -114,11 +113,8 @@ export default async (req: Request) => {
     .eq("user_id", targetUserId);
   if (restoreError) {
     console.error("[unblock-user] restore failed after the auth account was already unbanned:", restoreError);
-    return new Response(JSON.stringify({ error: restoreError.message }), { status: 500 });
+    return json({ error: restoreError.message }, 500);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

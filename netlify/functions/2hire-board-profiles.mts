@@ -17,25 +17,26 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 import { getTwoHireBoardProfiles } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
+import { json } from "./_shared/http.js";
 
 export default async (req: Request) => {
   if (req.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const costumerId = new URL(req.url).searchParams.get("costumerId")?.trim();
   if (!costumerId) {
-    return new Response(JSON.stringify({ error: "costumerId er påkrævet." }), { status: 400 });
+    return json({ error: "costumerId er påkrævet." }, 400);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -43,12 +44,9 @@ export default async (req: Request) => {
     const credentials = await resolveTwoHireCredentials(admin, { costumerId });
 
     const profiles = await getTwoHireBoardProfiles(credentials);
-    return new Response(JSON.stringify({ profiles }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ profiles }, 200);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
+    return json({ error: message }, twoHireErrorStatus(error));
   }
 };

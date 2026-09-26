@@ -132,6 +132,13 @@ export function formatDanishLongDateTime(iso: string): string {
   return `${weekday} ${day}. ${DANISH_MONTHS[month - 1]} ${year} kl. ${time}`;
 }
 
+/** A UTC ISO timestamp shown as short Danish "dd/mm HH:mm" (no year) — for compact summaries (AvailablePage/ConfirmPage), which used to format this themselves. */
+export function formatDanishDateTimeShort(iso: string): string {
+  const { date, time } = utcToDanishParts(iso);
+  const [, month, day] = date.split("-");
+  return `${day}/${month} ${time}`;
+}
+
 /** A UTC ISO timestamp shown as Danish "dd.mm.yyyy HH:mm". */
 export function formatDanishDateTime(iso: string): string {
   const { date, time } = utcToDanishParts(iso);

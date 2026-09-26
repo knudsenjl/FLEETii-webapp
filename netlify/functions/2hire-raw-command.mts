@@ -20,6 +20,7 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { getGlobalCredentials, getTwoHireAccessToken, getTwoHireBaseUrl } from "./_shared/twoHireClient.js";
+import { json } from "./_shared/http.js";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 type HttpMethod = (typeof HTTP_METHODS)[number];
@@ -85,18 +86,18 @@ async function resolvePlatePlaceholders(path: string, admin: SupabaseClient): Pr
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const requestBody = (await req.json().catch(() => null)) as { command?: string; body?: string } | null;
   const command = requestBody?.command?.trim();
   if (!command) {
-    return new Response(JSON.stringify({ error: "command er påkrævet." }), { status: 400 });
+    return json({ error: "command er påkrævet." }, 400);
   }
 
   const [methodToken, ...pathParts] = command.split(/\s+/);
@@ -115,13 +116,13 @@ export default async (req: Request) => {
   // mangling an already-absolute URL into "<base>/<absolute-url>".
   const isAbsoluteUrl = /^https?:\/\//i.test(rawPath);
   if (isAbsoluteUrl && !isTwoHireUrl(rawPath)) {
-    return new Response(JSON.stringify({ error: "Kun https-adresser hos 2hire (*.2hire.io) er tilladt." }), { status: 400 });
+    return json({ error: "Kun https-adresser hos 2hire (*.2hire.io) er tilladt." }, 400);
   }
   const path = isAbsoluteUrl ? rawPath : rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
 
   try {
@@ -155,6 +156,6 @@ export default async (req: Request) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: 502 });
+    return json({ error: message }, 502);
   }
 };

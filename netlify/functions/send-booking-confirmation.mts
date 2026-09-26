@@ -21,7 +21,8 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
-import { splitIsoDateTime } from "../../src/lib/bookings.js";
+import { json } from "./_shared/http.js";
+import { formatDanishDateTime } from "../../src/lib/time.js";
 
 type SendBookingConfirmationBody = {
   bookingId?: string;
@@ -37,12 +38,6 @@ type BookingQueryRow = {
   user_profiles: { email: string | null; full_name: string | null } | null;
   departments: { name: string; costumers: { name: string | null } | null } | null;
 };
-
-/** "dd.mm.yyyy HH:mm" — the full (not shortened) form, since an email is a permanent record rather than space-constrained UI, unlike ConfirmPage.tsx's own `short` display. */
-function formatDanishDateTime(iso: string): string {
-  const { date, time } = splitIsoDateTime(iso);
-  return `${date} ${time}`;
-}
 
 /** Builds the HTML email body: the header line (see this function's own doc comment for the two variants), then the same Kunde/afdeling, Køretøj, Anvendelse, Start, Slut rows ConfirmPage.tsx's own read-only summary shows. */
 function buildHtmlBody(fields: {
@@ -84,29 +79,29 @@ function buildHtmlBody(fields: {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireUser(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   let body: SendBookingConfirmationBody;
   try {
     body = (await req.json()) as SendBookingConfirmationBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const bookingId = asTrimmedString(body.bookingId);
   if (!bookingId) {
-    return new Response(JSON.stringify({ error: "bookingId er påkrævet." }), { status: 400 });
+    return json({ error: "bookingId er påkrævet." }, 400);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -125,7 +120,7 @@ export default async (req: Request) => {
 
   if (bookingError || !booking) {
     console.error("[send-booking-confirmation] booking lookup failed:", bookingError);
-    return new Response(JSON.stringify({ error: "Reservationen blev ikke fundet." }), { status: 404 });
+    return json({ error: "Reservationen blev ikke fundet." }, 404);
   }
 
   const { data: vehicle } = await admin
@@ -151,12 +146,12 @@ export default async (req: Request) => {
       Boolean(callerProfile?.costumer_id) &&
       callerProfile?.costumer_id === vehicle?.costumer_id);
   if (!mayNotify) {
-    return new Response(JSON.stringify({ error: "Du har ikke adgang til denne reservation." }), { status: 403 });
+    return json({ error: "Du har ikke adgang til denne reservation." }, 403);
   }
 
   const recipientEmail = booking.user_profiles?.email;
   if (!recipientEmail) {
-    return new Response(JSON.stringify({ error: "Ingen e-mailadresse fundet for brugeren." }), { status: 400 });
+    return json({ error: "Ingen e-mailadresse fundet for brugeren." }, 400);
   }
 
   // Same vehicle_ident-over-number_plate fallback as every other vehicle
@@ -188,11 +183,8 @@ export default async (req: Request) => {
   });
 
   if (!result.ok) {
-    return new Response(JSON.stringify({ error: `Kunne ikke sende mail: ${result.error}` }), { status: 502 });
+    return json({ error: `Kunne ikke sende mail: ${result.error}` }, 502);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

@@ -19,12 +19,10 @@ import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { guestAccessWindow, guestVehicleLabel, logGuestAccess, resolveGuestRequest } from "./_shared/guestAccess.js";
 import { loadLockContext, lockStateForBooking } from "./_shared/vehicleLock.js";
+import { json as jsonResponse } from "./_shared/http.js";
 
-const json = (body: unknown, status: number) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-  });
+/** Every answer from this public, token-authenticated endpoint is marked no-store — a guest's lock state must never be served from a cache. */
+const json = (body: unknown, status: number) => jsonResponse(body, status, { "Cache-Control": "no-store" });
 
 export default async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);

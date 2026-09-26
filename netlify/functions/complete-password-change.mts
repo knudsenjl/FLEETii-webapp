@@ -19,6 +19,7 @@
 // so one user can never change another's password or flag.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireUser } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 /** Same minimum as SetPasswordPage.tsx's own client-side check — re-checked here since the client check alone is bypassable. */
 const MIN_PASSWORD_LENGTH = 8;
@@ -27,32 +28,30 @@ type CompletePasswordChangeBody = { password?: unknown };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireUser(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   let body: CompletePasswordChangeBody;
   try {
     body = (await req.json()) as CompletePasswordChangeBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   // Not trimmed — leading/trailing spaces are legitimate password characters.
   const password = typeof body.password === "string" ? body.password : "";
   if (password.length < MIN_PASSWORD_LENGTH) {
-    return new Response(JSON.stringify({ error: `Adgangskoden skal være mindst ${MIN_PASSWORD_LENGTH} tegn.` }), {
-      status: 400,
-    });
+    return json({ error: `Adgangskoden skal være mindst ${MIN_PASSWORD_LENGTH} tegn.` }, 400);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -67,11 +66,8 @@ export default async (req: Request) => {
     // written for end users — pass those through; anything else gets a
     // generic message.
     const message = error.status === 422 && error.message ? error.message : "Kunne ikke gemme adgangskoden. Prøv igen.";
-    return new Response(JSON.stringify({ error: message }), { status: error.status === 422 ? 400 : 500 });
+    return json({ error: message }, error.status === 422 ? 400 : 500);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

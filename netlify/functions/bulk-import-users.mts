@@ -27,6 +27,8 @@ import { sendMail } from "./_shared/mailer.js";
 import { resolveDepartmentNames, type DepartmentResolution } from "./_shared/departmentLookup.js";
 import { mapWithConcurrency } from "./_shared/concurrency.js";
 import { buildWelcomeEmailHtml, createAuthUserWithRetry, generateTemporaryPassword, type Role } from "./_shared/userAccount.js";
+import { json } from "./_shared/http.js";
+import { siteUrl } from "./_shared/siteUrl.js";
 
 type BulkImportUsersBody = {
   format?: "csv" | "json";
@@ -66,17 +68,17 @@ function normalizeRole(value: string | undefined): Role | null {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -84,7 +86,7 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as BulkImportUsersBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const format = body.format;
@@ -106,7 +108,7 @@ export default async (req: Request) => {
     );
   }
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: "Filen indeholder ingen rækker." }), { status: 400 });
+    return json({ error: "Filen indeholder ingen rækker." }, 400);
   }
 
 
@@ -121,7 +123,7 @@ export default async (req: Request) => {
   if (isSysadm) {
     const requested = asTrimmedString(body.costumerId);
     if (!requested) {
-      return new Response(JSON.stringify({ error: "costumerId er påkrævet for sysadm." }), { status: 400 });
+      return json({ error: "costumerId er påkrævet for sysadm." }, 400);
     }
     const { data: costumerRow } = await admin
       .from("costumers")
@@ -129,17 +131,17 @@ export default async (req: Request) => {
       .eq("costumer_id", requested)
       .maybeSingle<{ costumer_id: string }>();
     if (!costumerRow) {
-      return new Response(JSON.stringify({ error: "Ukendt costumerId." }), { status: 400 });
+      return json({ error: "Ukendt costumerId." }, 400);
     }
     costumerId = costumerRow.costumer_id;
   } else {
     if (!caller?.costumer_id) {
-      return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
+      return json({ error: "Din bruger er ikke tilknyttet en kunde." }, 403);
     }
     costumerId = caller.costumer_id;
   }
 
-  const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
+  const loginUrl = siteUrl();
   const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
 
   // Each distinct department is looked up (or created) once, up front and

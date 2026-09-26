@@ -25,6 +25,8 @@ import {
   sortBoardProfiles,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
+import { callFunction } from "../lib/callFunction";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 /** The DisplayVehicle shape, as passed in via router state from VehicleDetailsPage's "Rediger køretøj" button. Only vehicleId is actually used here — the editable fields (plate/brand/model/year) are fetched fresh from vehicle_profiles on mount instead of trusted from router state, since VehicleDetailsPage's own Vehicle type only carries an already-combined "brand model" display string, not the separate fields this form edits/saves. */
 type Vehicle = {
@@ -79,7 +81,7 @@ export function HandleVehiclePage() {
   const navigate = useNavigate();
   const location = useLocation();
   const refreshVehicles = useRefreshVehicles();
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   /** Gates the "QR-kode"/"2hire-profil" section below — 2hire-board device internals, not something a regular admin manages. */
   const isSysadm = isSysadmRole(profile?.role);
   const state = location.state as { vehicle?: Vehicle } | null;
@@ -216,11 +218,9 @@ export function HandleVehiclePage() {
     let cancelled = false;
     setProfilesLoading(true);
     setProfilesError(null);
-    void fetch(`/.netlify/functions/2hire-board-profiles?costumerId=${encodeURIComponent(vehicleCostumerId)}`, {
-      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-    })
-      .then(async (response) => {
-        const result = (await response.json()) as { profiles?: TwoHireBoardProfile[]; error?: string };
+    void callFunction("2hire-board-profiles", { query: { costumerId: vehicleCostumerId } })
+      .then((response) => {
+        const result = response.data as { profiles?: TwoHireBoardProfile[]; error?: string };
         if (cancelled) return;
         if (!response.ok) {
           setProfilesError(result.error ?? "Kunne ikke hente 2hire-profiler.");
@@ -239,21 +239,10 @@ export function HandleVehiclePage() {
     return () => {
       cancelled = true;
     };
-  }, [isSysadm, vehicleCostumerId, session]);
+  }, [isSysadm, vehicleCostumerId]);
 
   /** Closes the profile-JSON popup on an outside click — same pattern as VehicleCreatePage.tsx's own. */
-  useEffect(() => {
-    if (!showProfileJson) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (profileJsonRef.current && !profileJsonRef.current.contains(event.target as Node)) {
-        setShowProfileJson(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showProfileJson]);
+  useClickOutside(profileJsonRef, showProfileJson, () => setShowProfileJson(false));
 
   // A costumer with only one department has no real choice to make for
   // either Afdeling(er) or Hjemmeafdeling — self-heal that sole department

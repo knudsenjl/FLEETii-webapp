@@ -22,9 +22,7 @@ import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { nowUtcIso, toUtcMs } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
-
-const json = (body: unknown, status: number) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+import { json } from "./_shared/http.js";
 
 /** POST { bookingId } as any logged-in user. Returns { ok: true, end }. */
 export default async (req: Request) => {

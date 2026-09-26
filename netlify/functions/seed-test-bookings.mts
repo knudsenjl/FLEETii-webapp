@@ -57,6 +57,7 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 /** Netlify's own permanent, runtime-injected site identifier for the real production deployment (app.fleetii.dk) — confirmed via `netlify sites:list`. Hardcoded, not another env var: unlike a config value, process.env.SITE_ID can't be missing or misspelled (Netlify populates it for every Function invocation automatically), so this can never silently fail to trigger. Changing which site counts as "production" requires an explicit code change here. */
 const PRODUCTION_SITE_ID = "ae77d3e5-f334-44f1-aa47-d33cd231681b";
@@ -86,7 +87,7 @@ function randomStart(now: number): Date {
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   if (process.env.ALLOW_TEST_BOOKING_SEED !== "true") {
@@ -105,12 +106,12 @@ export default async (req: Request) => {
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -120,7 +121,7 @@ export default async (req: Request) => {
     .eq("user_id", authResult.userId)
     .maybeSingle<{ role: string; costumer_id: string | null }>();
   if (callerError) {
-    return new Response(JSON.stringify({ error: callerError.message }), { status: 500 });
+    return json({ error: callerError.message }, 500);
   }
 
   const isSysadm = isSysadmRole(caller?.role);
@@ -128,7 +129,7 @@ export default async (req: Request) => {
   // sysadm (no costumer of their own) still seeds every department
   // system-wide, unchanged from before this scoping was added.
   if (!isSysadm && !caller?.costumer_id) {
-    return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
+    return json({ error: "Din bruger er ikke tilknyttet en kunde." }, 403);
   }
 
   // .eq() (a PostgrestFilterBuilder method) has to be applied before
@@ -154,7 +155,7 @@ export default async (req: Request) => {
 
   for (const result of [departmentsResult, vehicleDepartmentsResult, userDepartmentsResult, anvendelseResult]) {
     if (result.error) {
-      return new Response(JSON.stringify({ error: result.error.message }), { status: 500 });
+      return json({ error: result.error.message }, 500);
     }
   }
 
@@ -224,7 +225,7 @@ export default async (req: Request) => {
           break;
         }
         if (error.code !== EXCLUSION_VIOLATION) {
-          return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+          return json({ error: error.message }, 500);
         }
         // Overlapping booking for that vehicle — retry with a fresh random pick.
       }
@@ -232,8 +233,5 @@ export default async (req: Request) => {
     created.push({ department: departmentLabel, count: insertedForDepartment });
   }
 
-  return new Response(JSON.stringify({ ok: true, created, skipped }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true, created, skipped }, 200);
 };

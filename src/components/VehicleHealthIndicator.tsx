@@ -94,9 +94,11 @@ export function VehicleHealthIndicator({ issues, formatLastReceived }: VehicleHe
               setOpen(false);
             }}
             style={{ position: "fixed", top: popupPosition.top, right: popupPosition.right }}
-            className="animate-fade-in z-50 w-max rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-black shadow-lg"
+            className="animate-fade-in z-50 w-max max-w-sm rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-black shadow-lg"
           >
-            <ul className="space-y-1">
+            {/* Intro + closing explanation around the list (user wording, 2026-09-27): the list alone read as "the vehicle is broken", when the usual cause is simply that it hasn't been used. The 3 days match vehicleHealth.ts's SIGNAL_STALE_THRESHOLD_MS. */}
+            <p className="mb-1">Det er mere end 3 dage siden, at FLEETii har modtaget flg. data fra køretøjet:</p>
+            <ul className="mb-1 space-y-1 pl-4">
               {issues.map((issue) => (
                 <li key={issue.label} className="whitespace-nowrap">
                   <span className="font-semibold">{issue.label}:</span>{" "}
@@ -104,6 +106,10 @@ export function VehicleHealthIndicator({ issues, formatLastReceived }: VehicleHe
                 </li>
               ))}
             </ul>
+            <p>
+              hvorfor disse data måske ikke er korrekte. Årsagen kan simpelthen være, at køretøjet ikke har været anvendt de sidste
+              tre dage.
+            </p>
           </div>,
           document.body,
         )}

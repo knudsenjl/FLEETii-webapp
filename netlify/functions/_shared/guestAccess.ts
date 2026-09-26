@@ -15,6 +15,7 @@ import { createHash, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { formatDanishLongDateTime, toUtcMs } from "../../../src/lib/time.js";
 import { escapeHtml, sendMail } from "./mailer.js";
+import { siteBaseUrl } from "./siteUrl.js";
 
 /** The link opens this long before the booking's start (user decision 2026-09-26). */
 const GUEST_LINK_LEAD_MINUTES = 15;
@@ -182,11 +183,6 @@ export function guestVehicleLabel(
 /** The public /gaest link for a token. The token goes in the URL fragment (#), which browsers never send to a server — so it doesn't end up in Netlify's access logs or a Referer header. */
 export function guestLinkUrl(baseUrl: string, token: string): string {
   return `${baseUrl.replace(/\/+$/, "")}/gaest#${token}`;
-}
-
-/** This deploy's own origin, same fallback convention as send-vehicle-request.mts. */
-function siteBaseUrl(): string {
-  return process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp-staging.netlify.app";
 }
 
 /**

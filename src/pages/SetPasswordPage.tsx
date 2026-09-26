@@ -12,6 +12,7 @@ import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { FleetiiLogo } from "../components/FleetiiLogo";
+import { callFunction } from "../lib/callFunction";
 
 const MIN_PASSWORD_LENGTH = 8;
 
@@ -25,7 +26,7 @@ const MIN_PASSWORD_LENGTH = 8;
  * here after navigating away.
  */
 export function SetPasswordPage() {
-  const { session, refreshProfile, clearPasswordRecovery, isPasswordRecovery } = useAuth();
+  const { refreshProfile, clearPasswordRecovery, isPasswordRecovery } = useAuth();
   const navigate = useNavigate();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -52,16 +53,9 @@ export function SetPasswordPage() {
     // client-side supabase.auth.updateUser() call followed by a flag-only
     // request).
     try {
-      const response = await fetch("/.netlify/functions/complete-password-change", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ password }),
-      });
+      const response = await callFunction("complete-password-change", { body: { password } });
       if (!response.ok) {
-        const result = (await response.json()) as { error?: string };
+        const result = response.data as { error?: string };
         setError(result.error ?? "Kunne ikke fuldføre adgangskodeskiftet.");
         setIsSubmitting(false);
         return;

@@ -62,6 +62,10 @@ async function resetScopeOnLogin(userId: string, accessToken: string): Promise<b
 
   if (!data.department_id && !data.costumer_id) return false;
   try {
+    // Deliberately NOT callFunction (lib/callFunction.ts): this runs in the
+    // middle of signing in, with the access token signIn just returned, and
+    // shouldn't depend on the Supabase client's session storage having
+    // settled yet.
     const response = await fetch("/.netlify/functions/switch-department", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
