@@ -21,7 +21,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
  * for the same brand-new department name could both miss the SELECT and
  * both INSERT, creating a duplicate.
  */
-export async function findOrCreateDepartment(
+async function findOrCreateDepartment(
   admin: SupabaseClient,
   { name, costumerId }: { name: string; costumerId: string },
 ): Promise<{ departmentId: string } | { error: string }> {

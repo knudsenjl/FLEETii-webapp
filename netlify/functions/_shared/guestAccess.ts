@@ -17,13 +17,13 @@ import { formatDanishLongDateTime, toUtcMs } from "../../../src/lib/time.js";
 import { escapeHtml, sendMail } from "./mailer.js";
 
 /** The link opens this long before the booking's start (user decision 2026-09-26). */
-export const GUEST_LINK_LEAD_MINUTES = 15;
+const GUEST_LINK_LEAD_MINUTES = 15;
 /** …and stays open this long after its end. */
-export const GUEST_LINK_TAIL_MINUTES = 30;
+const GUEST_LINK_TAIL_MINUTES = 30;
 
 /** Rate limit per booking: at most this many token uses (status + lock/unlock + denied) within GUEST_RATE_WINDOW_MINUTES. Generous enough for a page that refreshes its status every ~30 s plus a handful of taps. */
 export const GUEST_RATE_LIMIT = 60;
-export const GUEST_RATE_WINDOW_MINUTES = 10;
+const GUEST_RATE_WINDOW_MINUTES = 10;
 
 /** A new random access token: 32 bytes (256 bits), base64url — safe to put in a URL fragment as-is. */
 export function generateGuestToken(): string {
@@ -117,7 +117,7 @@ type GuestRow = {
  * booking is somehow not a drop-in any more — the caller answers both with
  * the same neutral error. Throws on a DB error.
  */
-export async function findGuestBookingByToken(admin: SupabaseClient, token: string): Promise<GuestBooking | null> {
+async function findGuestBookingByToken(admin: SupabaseClient, token: string): Promise<GuestBooking | null> {
   const { data, error } = await admin
     .from("booking_guests")
     .select(
@@ -166,7 +166,7 @@ export async function logGuestAccess(
 }
 
 /** The caller's IP as Netlify reports it (x-nf-client-connection-ip), falling back to x-forwarded-for's first hop. For the audit log only — never used for authorization. */
-export function clientIp(req: Request): string | null {
+function clientIp(req: Request): string | null {
   return req.headers.get("x-nf-client-connection-ip") ?? req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 }
 
@@ -185,7 +185,7 @@ export function guestLinkUrl(baseUrl: string, token: string): string {
 }
 
 /** This deploy's own origin, same fallback convention as send-vehicle-request.mts. */
-export function siteBaseUrl(): string {
+function siteBaseUrl(): string {
   return process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp-staging.netlify.app";
 }
 

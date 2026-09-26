@@ -6,7 +6,7 @@
 import { utcToDanishParts } from "./time";
 
 /** How long a tracked signal can go without a fresh reading before the "!" health button flags it — see the 2026-09-10 webhook-delivery investigation that prompted this feature. */
-export const SIGNAL_STALE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
+const SIGNAL_STALE_THRESHOLD_MS = 3 * 24 * 60 * 60 * 1000;
 
 /** One signal the health check found missing or stale for a vehicle — lastReceivedIso is null if that signal has NEVER been received at all (as opposed to merely being older than SIGNAL_STALE_THRESHOLD_MS). */
 export type HealthIssue = { label: string; lastReceivedIso: string | null };

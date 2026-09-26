@@ -1,7 +1,6 @@
-// Flat, filled padlock silhouette shared by LockStatusIcon (a standalone
-// red/green status glyph in tables) and VehicleLockToggle (a white icon on a
-// colored pill button) — one shape, colored via currentColor, so both places
-// stay visually identical. Locked: shackle closes fully into the body.
+// Flat, filled padlock silhouette used by VehicleLockToggle (both its pill and
+// circle variants) — one shape, colored via currentColor. (The table status
+// glyph LockStatusIcon that also used it was removed as unused, 2026-09-26.) Locked: shackle closes fully into the body.
 // Unlocked: the shackle stays hinged on the left post but swings up and to
 // the right, clearly detached from the body — the standard "open padlock"
 // convention, replacing the old inline svgs whose locked/unlocked paths

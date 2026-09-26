@@ -15,7 +15,7 @@
 // (Netlify Functions run in UTC).
 
 /** The timezone every user-facing date/time in FLEETii is shown and typed in. */
-export const APP_TIME_ZONE = "Europe/Copenhagen";
+const APP_TIME_ZONE = "Europe/Copenhagen";
 
 /** A Danish wall-clock date/time as the user sees/types it: date "YYYY-MM-DD", time "HH:mm". */
 export type DanishParts = { date: string; time: string };
