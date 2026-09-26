@@ -26,10 +26,10 @@ const EMPTY_GUEST: DropInGuest = { name: "", email: "", phone: "", address: "", 
  * Step 1 of a drop-in reservation ("/drop-in", admin/sysadm — the
  * receptionist): "Gæstens oplysninger", the walk-in visitor's details.
  * Reached from AdminFrontpage.tsx's "Drop-in reservation" button. All five
- * fields are required and "Fortsæt" stays disabled until they're filled in
- * (user decision 2026-09-26); the checkbox is the receptionist's own record
- * that they looked at the driving licence and ID — FLEETii stores no CPR or
- * ID data. Nothing is written here: "Fortsæt" carries the guest in router
+ * fields AND the "Kørekort og legitimation kontrolleret" checkbox are
+ * required — "Fortsæt" stays disabled until they're all done (user decisions
+ * 2026-09-26). The checkbox is the receptionist's own record that they
+ * looked at the driving licence and ID — FLEETii stores no CPR or ID data. Nothing is written here: "Fortsæt" carries the guest in router
  * state into the normal ReservationPage → AvailablePage → ConfirmPage flow
  * (drop-in mode), and only ConfirmPage's "Bekræft" creates anything, via
  * create-drop-in-booking.mts. Re-entered with the same guest pre-filled on a
@@ -87,7 +87,9 @@ export function DropInGuestPage() {
                 onChange={(e) => update("idChecked", e.target.checked)}
                 className="h-4 w-4 accent-brand-600"
               />
-              Kørekort og legitimation kontrolleret
+              <span>
+                Kørekort og legitimation kontrolleret <RequiredMark />
+              </span>
             </label>
           </FieldList>
 
@@ -95,9 +97,21 @@ export function DropInGuestPage() {
             <span className="text-red-600">*</span> Feltet skal udfyldes
           </p>
 
-          <p className="text-xs text-brand-500">
-            Gæsten får en email med et link, hvor køretøjet kan låses og låses op i reservationens periode.
-          </p>
+          {/* Highlighted, not a footnote: the receptionist should tell the guest to look for this email (same box style as GuestDrivePage.tsx's lock reminder, in brand blue since it's information, not a warning). */}
+          <div
+            role="note"
+            className="flex items-start gap-3 rounded-2xl border-2 border-brand-400 bg-brand-100 p-4 text-sm font-semibold text-brand-800 shadow-sm"
+          >
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden="true">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="16" x2="12" y2="12" />
+              <line x1="12" y1="8" x2="12.01" y2="8" />
+            </svg>
+            <span>
+              Når reservationen er oprettet, vil gæsten få tilsendt en email med et link, hvor køretøjet kan låses og låses op i
+              reservationens periode.
+            </span>
+          </div>
 
           <div className="grid grid-cols-2 gap-3 pt-2">
             <Button variant="secondary" type="button" onClick={() => navigate("/admin")} className="w-full">

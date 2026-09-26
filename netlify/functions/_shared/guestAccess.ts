@@ -72,10 +72,9 @@ export function evaluateGuestAccess(
   return "active";
 }
 
-/** The drop-in booking a token resolves to, with just what the guest endpoints need. Of the guest's personal data only their own name is included — shown on /gaest (user decision 2026-09-26); email/phone/address/licence never leave booking_guests this way. */
+/** The drop-in booking a token resolves to, with just what the guest endpoints need. Never includes the guest's personal data — the token is a bearer credential, and whoever holds a forwarded link shouldn't learn who it was issued to. */
 export type GuestBooking = {
   booking_id: string;
-  guest_name: string | null;
   /** "Kunde/Afdeling" of the booking's department, for /gaest's header line. */
   costumer_name: string | null;
   department_name: string | null;
@@ -91,12 +90,13 @@ export type GuestBooking = {
     brand: string | null;
     model: string | null;
     costumer_id: string | null;
+    /** The vehicle's home department — whose use_vehicle_ident setting decides how the vehicle is labelled (same as VehicleDetailsPage.tsx). */
+    department_id: string | null;
   } | null;
 };
 
 type GuestRow = {
   booking_id: string;
-  name: string | null;
   revoked_at: string | null;
   anonymized_at: string | null;
   bookings: {
@@ -121,7 +121,7 @@ export async function findGuestBookingByToken(admin: SupabaseClient, token: stri
   const { data, error } = await admin
     .from("booking_guests")
     .select(
-      "booking_id, name, revoked_at, anonymized_at, bookings(booking_id, vehicle_id, start, end, usage, is_guest, vehicle_profiles(number_plate, vehicle_ident, brand, model, costumer_id), departments(name, costumers(name)))",
+      "booking_id, revoked_at, anonymized_at, bookings(booking_id, vehicle_id, start, end, usage, is_guest, vehicle_profiles(number_plate, vehicle_ident, brand, model, costumer_id, department_id), departments(name, costumers(name)))",
     )
     .eq("token_hash", hashGuestToken(token))
     .maybeSingle<GuestRow>();
@@ -130,7 +130,6 @@ export async function findGuestBookingByToken(admin: SupabaseClient, token: stri
   const b = data.bookings;
   return {
     booking_id: b.booking_id,
-    guest_name: data.name,
     costumer_name: b.departments?.costumers?.name ?? null,
     department_name: b.departments?.name ?? null,
     vehicle_id: b.vehicle_id,
@@ -172,7 +171,10 @@ export function clientIp(req: Request): string | null {
 }
 
 /** "‹Køretøj-ID or Nummerplade›: ‹brand› ‹model›" — the same vehicle_ident-over-number_plate label used app-wide (see send-booking-confirmation.mts). */
-export function guestVehicleLabel(vehicle: GuestBooking["vehicle"], fallback: string): string {
+export function guestVehicleLabel(
+  vehicle: { vehicle_ident: string | null; number_plate: string | null; brand: string | null; model: string | null } | null,
+  fallback: string,
+): string {
   const plate = vehicle?.vehicle_ident?.trim() || vehicle?.number_plate || fallback;
   return vehicle ? `${plate}: ${vehicle.brand ?? ""} ${vehicle.model ?? ""}`.trim() : plate;
 }
