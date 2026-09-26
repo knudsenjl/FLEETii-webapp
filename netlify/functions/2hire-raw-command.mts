@@ -26,6 +26,24 @@ type HttpMethod = (typeof HTTP_METHODS)[number];
 /** Matches every "{...}" token in a command string — each one's inner text is treated as a number plate to resolve (see resolvePlatePlaceholders). */
 const PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
 
+/** What a plate placeholder may contain: letters, digits and spaces. Plates are interpolated into a PostgREST .or() filter string, where a comma, dot or parenthesis would change the filter itself. */
+const PLATE_PATTERN = /^[\p{L}\p{N} ]+$/u;
+
+/**
+ * Whether an absolute URL may receive the 2hire bearer token: https only, and
+ * only a 2hire host (adapter/test/e2e are all *.2hire.io). Anything else
+ * would hand the global 2hire credential to whatever host was typed or
+ * pasted (code review 2026-09-26).
+ */
+function isTwoHireUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && (hostname === "2hire.io" || hostname.endsWith(".2hire.io"));
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Replaces every "{plate}" token in `path` with that plate's real 2hire
  * vehicle_id, read from vehicle_profiles.number_plate (case/whitespace
@@ -37,6 +55,10 @@ const PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
 async function resolvePlatePlaceholders(path: string, admin: SupabaseClient): Promise<string> {
   const plates = [...new Set([...path.matchAll(PLACEHOLDER_PATTERN)].map((match) => match[1].trim()))];
   if (plates.length === 0) return path;
+  const invalidPlate = plates.find((plate) => !PLATE_PATTERN.test(plate));
+  if (invalidPlate !== undefined) {
+    throw new Error(`Ugyldig nummerplade "${invalidPlate}" — kun bogstaver, tal og mellemrum.`);
+  }
 
   // ilike (not .in()) so a plate typed in any case still matches how it's
   // actually stored — number_plate isn't guaranteed to be all-caps in the DB.
@@ -91,6 +113,9 @@ export default async (req: Request) => {
   // prepending the base URL for a bare path (not unconditionally) avoids
   // mangling an already-absolute URL into "<base>/<absolute-url>".
   const isAbsoluteUrl = /^https?:\/\//i.test(rawPath);
+  if (isAbsoluteUrl && !isTwoHireUrl(rawPath)) {
+    return new Response(JSON.stringify({ error: "Kun https-adresser hos 2hire (*.2hire.io) er tilladt." }), { status: 400 });
+  }
   const path = isAbsoluteUrl ? rawPath : rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
 
   const adminClientResult = getAdminClient();
