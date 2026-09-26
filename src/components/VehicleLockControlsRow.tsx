@@ -35,6 +35,9 @@ interface VehicleLockControlsRowProps {
  * control (lock/locate/honk) rather than flattened, since a flat 11-prop
  * list obscured which fields belonged together. */
 export function VehicleLockControlsRow({ lock, locate, honk }: VehicleLockControlsRowProps) {
+  /** Blink/Horn share Lås/Lås op's audience: enabled only while at least one of those is — the exact rule 2hire-vehicle-command.mts enforces server-side for "locate". Always true for admin/sysadm (useVehicleLockState forces both flags on for them). */
+  const vehicleActionsEnabled = lock.lockEnabled || lock.unlockEnabled;
+
   return (
     <div className="flex shrink-0 gap-3">
       <VehicleLockToggle
@@ -53,7 +56,7 @@ export function VehicleLockControlsRow({ lock, locate, honk }: VehicleLockContro
           variant="secondary"
           type="button"
           onClick={locate.onLocate}
-          disabled={locate.isLocating}
+          disabled={locate.isLocating || !vehicleActionsEnabled}
           className="flex w-full items-center justify-center gap-2"
         >
           <HeadlightIcon />
@@ -62,7 +65,13 @@ export function VehicleLockControlsRow({ lock, locate, honk }: VehicleLockContro
         <InlinePopup visible={locate.confirmationVisible} message="Lygterne blinker" />
       </div>
       <div className="group relative flex-1">
-        <Button variant="secondary" type="button" onClick={honk.onHonk} className="flex w-full items-center justify-center gap-2">
+        <Button
+          variant="secondary"
+          type="button"
+          onClick={honk.onHonk}
+          disabled={!vehicleActionsEnabled}
+          className="flex w-full items-center justify-center gap-2"
+        >
           <HornIcon />
           Horn
         </Button>
