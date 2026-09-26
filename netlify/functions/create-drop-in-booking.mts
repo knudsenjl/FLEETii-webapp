@@ -23,6 +23,7 @@ import { toUtcMs } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, requireUser } from "./_shared/serverAuth.js";
 import { generateGuestToken, hashGuestToken, sendGuestEmail } from "./_shared/guestAccess.js";
+import { json } from "./_shared/http.js";
 
 type DropInGuestBody = {
   name?: unknown;
@@ -41,9 +42,6 @@ type CreateDropInBookingBody = {
   usage?: unknown;
   guest?: DropInGuestBody;
 };
-
-const json = (body: unknown, status: number) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 
 /** A deliberately loose email check (something@something.tld) — the real test is whether the mail arrives. */
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;

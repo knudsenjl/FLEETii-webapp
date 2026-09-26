@@ -8,6 +8,7 @@
 import { requireSysadm } from "./_shared/serverAuth.js";
 import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
+import { json } from "./_shared/http.js";
 
 const CVRAPI_BASE_URL = "https://cvrapi.dk/api";
 
@@ -53,12 +54,12 @@ type CvrLookupResult = {
  */
 export default async (req: Request) => {
   if (req.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   // Stripped of ALL whitespace (not just trimmed) before validating/sending
@@ -68,7 +69,7 @@ export default async (req: Request) => {
   // string.
   const cvr = stripNumberSpacing(new URL(req.url).searchParams.get("cvr") ?? "");
   if (!cvr || !/^\d{8}$/.test(cvr)) {
-    return new Response(JSON.stringify({ error: "CVR-nummeret skal være 8 cifre." }), { status: 400 });
+    return json({ error: "CVR-nummeret skal være 8 cifre." }, 400);
   }
 
   let response: Response;
@@ -78,20 +79,20 @@ export default async (req: Request) => {
       headers: { "User-Agent": CVRAPI_USER_AGENT },
     });
   } catch {
-    return new Response(JSON.stringify({ error: "Kunne ikke kontakte cvrapi.dk." }), { status: 502 });
+    return json({ error: "Kunne ikke kontakte cvrapi.dk." }, 502);
   }
 
   let body: unknown;
   try {
     body = await response.json();
   } catch {
-    return new Response(JSON.stringify({ error: "cvrapi.dk svarede med ugyldig JSON." }), { status: 502 });
+    return json({ error: "cvrapi.dk svarede med ugyldig JSON." }, 502);
   }
 
   const errorCode = (body as { error?: string } | null)?.error;
   if (!response.ok || errorCode) {
     const message = friendlyCvrApiError(errorCode, (body as { message?: string } | null)?.message);
-    return new Response(JSON.stringify({ error: message }), { status: response.ok ? 502 : response.status });
+    return json({ error: message }, response.ok ? 502 : response.status);
   }
 
   const company = body as Partial<CvrLookupResult>;
@@ -104,8 +105,5 @@ export default async (req: Request) => {
     cityname: company.cityname ?? null,
   };
 
-  return new Response(JSON.stringify(result), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json(result, 200);
 };

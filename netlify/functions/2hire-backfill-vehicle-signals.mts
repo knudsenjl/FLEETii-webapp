@@ -32,6 +32,7 @@ import {
   type TwoHireCredentials,
 } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+import { json } from "./_shared/http.js";
 
 const GENERIC_SIGNALS = ["distance_covered", "autonomy_percentage", "autonomy_meters", "position", "online"] as const;
 const SPECIFIC_SIGNALS = ["trip_detected"] as const;
@@ -63,17 +64,17 @@ async function fetchOne(target: SignalTarget, vehicleId: string, credentials: Tw
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -85,7 +86,7 @@ export default async (req: Request) => {
     .select("vehicle_id, number_plate, costumer_id")
     .returns<{ vehicle_id: string; number_plate: string | null; costumer_id: string | null }[]>();
   if (vehiclesError) {
-    return new Response(JSON.stringify({ error: `vehicle_profiles: ${vehiclesError.message}` }), { status: 500 });
+    return json({ error: `vehicle_profiles: ${vehiclesError.message}` }, 500);
   }
 
   const { data: existingSignals, error: signalsError } = await admin
@@ -93,9 +94,7 @@ export default async (req: Request) => {
     .select("vehicle_id, signal_type")
     .returns<{ vehicle_id: string; signal_type: string }[]>();
   if (signalsError) {
-    return new Response(JSON.stringify({ error: `vehicle_signals_latest: ${signalsError.message}` }), {
-      status: 500,
-    });
+    return json({ error: `vehicle_signals_latest: ${signalsError.message}` }, 500);
   }
 
   const existingPairs = new Set((existingSignals ?? []).map((row) => `${row.vehicle_id} ${row.signal_type}`));

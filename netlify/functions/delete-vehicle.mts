@@ -23,6 +23,7 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
 import { deregisterVehicle } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials } from "./_shared/twoHireCredentials.js";
+import { json } from "./_shared/http.js";
 
 type DeleteVehicleBody = { vehicleId?: string; orderId?: string };
 
@@ -40,17 +41,17 @@ type DeleteVehicleBody = { vehicleId?: string; orderId?: string };
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -58,13 +59,13 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as DeleteVehicleBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const vehicleId = body.vehicleId?.trim();
   const orderId = body.orderId?.trim();
   if (!vehicleId || !orderId) {
-    return new Response(JSON.stringify({ error: "vehicleId og orderId er påkrævet." }), { status: 400 });
+    return json({ error: "vehicleId og orderId er påkrævet." }, 400);
   }
 
   // Confirms orderId is actually THE fulfilled deletion request for
@@ -88,16 +89,16 @@ export default async (req: Request) => {
     .eq("order_id", orderId)
     .maybeSingle<{ order_type: string; vehicle_id: string | null; device_removed: boolean }>();
   if (orderError) {
-    return new Response(JSON.stringify({ error: orderError.message }), { status: 500 });
+    return json({ error: orderError.message }, 500);
   }
   if (!order) {
-    return new Response(JSON.stringify({ error: "Ordren findes ikke." }), { status: 404 });
+    return json({ error: "Ordren findes ikke." }, 404);
   }
   if (order.order_type !== "Nedlæg" || order.vehicle_id !== vehicleId) {
-    return new Response(JSON.stringify({ error: "Ordren er ikke en nedlæggelsesordre for dette køretøj." }), { status: 400 });
+    return json({ error: "Ordren er ikke en nedlæggelsesordre for dette køretøj." }, 400);
   }
   if (!order.device_removed) {
-    return new Response(JSON.stringify({ error: "Fjernelse af enheden er endnu ikke bekræftet for denne ordre." }), { status: 409 });
+    return json({ error: "Fjernelse af enheden er endnu ikke bekræftet for denne ordre." }, 409);
   }
 
   let deregisterWarning: string | null = null;
@@ -121,7 +122,7 @@ export default async (req: Request) => {
 
   const { error: deleteError } = await admin.rpc("delete_vehicle", { target_vehicle_id: vehicleId });
   if (deleteError) {
-    return new Response(JSON.stringify({ error: deleteError.message }), { status: 500 });
+    return json({ error: deleteError.message }, 500);
   }
 
   const { error: orderDeleteError } = await admin.from("costumer_orders").delete().eq("order_id", orderId);
@@ -132,8 +133,5 @@ export default async (req: Request) => {
     );
   }
 
-  return new Response(JSON.stringify({ ok: true, deregisterWarning }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true, deregisterWarning }, 200);
 };

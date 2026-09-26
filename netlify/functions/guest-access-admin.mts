@@ -15,9 +15,7 @@ import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { evaluateGuestAccess, generateGuestToken, hashGuestToken, sendGuestEmail } from "./_shared/guestAccess.js";
-
-const json = (body: unknown, status: number) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+import { json } from "./_shared/http.js";
 
 type GuestAdminRow = {
   booking_id: string;

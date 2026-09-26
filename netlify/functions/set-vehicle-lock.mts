@@ -42,6 +42,7 @@ import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { anyOwnBookingAllows, loadLockContext, sendAndRecordLock } from "./_shared/vehicleLock.js";
+import { json } from "./_shared/http.js";
 
 // `command`, if present, overrides which real 2hire generic command is sent
 // (default: `locked ? "stop" : "start"`) while `locked` still controls what
@@ -54,17 +55,17 @@ type SetVehicleLockBody = { vehicleId?: string; locked?: boolean; command?: "sta
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireUser(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -72,18 +73,18 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as SetVehicleLockBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const vehicleId = asTrimmedString(body.vehicleId);
   if (!vehicleId) {
-    return new Response(JSON.stringify({ error: "vehicleId er påkrævet." }), { status: 400 });
+    return json({ error: "vehicleId er påkrævet." }, 400);
   }
   if (typeof body.locked !== "boolean") {
-    return new Response(JSON.stringify({ error: "locked skal være true eller false." }), { status: 400 });
+    return json({ error: "locked skal være true eller false." }, 400);
   }
   if (body.command !== undefined && body.command !== "start" && body.command !== "stop") {
-    return new Response(JSON.stringify({ error: "command skal være start eller stop." }), { status: 400 });
+    return json({ error: "command skal være start eller stop." }, 400);
   }
   const locked = body.locked;
 
@@ -100,20 +101,20 @@ export default async (req: Request) => {
       .maybeSingle<{ role: string; costumer_id: string | null; deleted_at: string | null }>(),
   ]);
   if (vehicleError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }), { status: 500 });
+    return json({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }, 500);
   }
   if (callerError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), { status: 500 });
+    return json({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }, 500);
   }
   if (!vehicle) {
-    return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
+    return json({ error: "Køretøjet blev ikke fundet." }, 404);
   }
 
   // An archived user (delete-user.mts bans the login AND sets deleted_at)
   // can still hold a valid access token until it expires (up to ~1 hour) —
   // requireUser alone only proves the token is valid, so refuse them here.
   if (!caller || caller.deleted_at) {
-    return new Response(JSON.stringify({ error: "Din bruger er ikke længere aktiv." }), { status: 403 });
+    return json({ error: "Din bruger er ikke længere aktiv." }, 403);
   }
 
   const isSysadm = isSysadmRole(caller.role);
@@ -125,7 +126,7 @@ export default async (req: Request) => {
     // full access, any vehicle
   } else if (isAdmin) {
     if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
-      return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+      return json({ error: "Du har ikke adgang til dette køretøj." }, 403);
     }
   } else {
     // Regular user: only the admin-only Bloker/Frigiv flow ever needs a
@@ -141,7 +142,7 @@ export default async (req: Request) => {
     // booking row alone must never be enough to unlock another costumer's
     // vehicle — e.g. one inserted before that policy existed.
     if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
-      return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+      return json({ error: "Du har ikke adgang til dette køretøj." }, 403);
     }
 
     let authorized: boolean;
@@ -155,12 +156,10 @@ export default async (req: Request) => {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : "Ukendt fejl.";
-      return new Response(JSON.stringify({ error: message }), { status: 500 });
+      return json({ error: message }, 500);
     }
     if (!authorized) {
-      return new Response(JSON.stringify({ error: "Du har ikke adgang til at låse/låse op for dette køretøj lige nu." }), {
-        status: 403,
-      });
+      return json({ error: "Du har ikke adgang til at låse/låse op for dette køretøj lige nu." }, 403);
     }
   }
 
@@ -177,11 +176,8 @@ export default async (req: Request) => {
     logTag: "set-vehicle-lock",
   });
   if (!result.ok) {
-    return new Response(JSON.stringify({ error: result.error }), { status: result.status });
+    return json({ error: result.error }, result.status);
   }
 
-  return new Response(JSON.stringify({ ok: true, locked }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true, locked }, 200);
 };

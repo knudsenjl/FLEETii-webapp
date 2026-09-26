@@ -31,6 +31,7 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 type SwitchDepartmentBody = {
   departmentId?: string | null;
@@ -39,17 +40,17 @@ type SwitchDepartmentBody = {
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -57,7 +58,7 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as SwitchDepartmentBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   // A falsy/absent departmentId means "Alle" — clear back to unscoped,
@@ -81,10 +82,10 @@ export default async (req: Request) => {
       .eq("department_id", departmentId)
       .maybeSingle<{ department_id: string; costumer_id: string | null }>();
     if (departmentError) {
-      return new Response(JSON.stringify({ error: departmentError.message }), { status: 500 });
+      return json({ error: departmentError.message }, 500);
     }
     if (!department) {
-      return new Response(JSON.stringify({ error: "Afdelingen findes ikke." }), { status: 404 });
+      return json({ error: "Afdelingen findes ikke." }, 404);
     }
     targetDepartmentId = department.department_id;
     targetCostumerId = department.costumer_id;
@@ -100,10 +101,10 @@ export default async (req: Request) => {
         .eq("costumer_id", costumerId)
         .maybeSingle<{ costumer_id: string }>();
       if (costumerError) {
-        return new Response(JSON.stringify({ error: costumerError.message }), { status: 500 });
+        return json({ error: costumerError.message }, 500);
       }
       if (!costumer) {
-        return new Response(JSON.stringify({ error: "Kunden findes ikke." }), { status: 404 });
+        return json({ error: "Kunden findes ikke." }, 404);
       }
       targetCostumerId = costumer.costumer_id;
     }
@@ -114,11 +115,8 @@ export default async (req: Request) => {
     .update({ department_id: targetDepartmentId, costumer_id: targetCostumerId })
     .eq("user_id", authResult.userId);
   if (updateError) {
-    return new Response(JSON.stringify({ error: updateError.message }), { status: 500 });
+    return json({ error: updateError.message }, 500);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

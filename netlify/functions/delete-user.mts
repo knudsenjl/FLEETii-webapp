@@ -30,22 +30,23 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 type DeleteUserBody = { userId?: string };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -53,12 +54,12 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as DeleteUserBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const targetUserId = body.userId;
   if (!targetUserId) {
-    return new Response(JSON.stringify({ error: "userId er påkrævet." }), { status: 400 });
+    return json({ error: "userId er påkrævet." }, 400);
   }
 
 
@@ -76,7 +77,7 @@ export default async (req: Request) => {
   ]);
 
   if (!target) {
-    return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
+    return json({ error: "Brugeren findes ikke." }, 404);
   }
   const callerIsSysadm = isSysadmRole(caller?.role);
   // A regular admin must never be able to archive a sysadm's
@@ -89,7 +90,7 @@ export default async (req: Request) => {
   // the platform admin's login and archive their profile. Checked before
   // any mutation.
   if (!callerIsSysadm && isSysadmRole(target.role)) {
-    return new Response(JSON.stringify({ error: "Du kan ikke slette en sysadm." }), { status: 403 });
+    return json({ error: "Du kan ikke slette en sysadm." }, 403);
   }
   // A sysadm isn't scoped to one department — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
@@ -105,10 +106,10 @@ export default async (req: Request) => {
       })
     : null;
   if (!caller || (!callerIsSysadm && callerActiveDepartmentId !== target.department_id)) {
-    return new Response(JSON.stringify({ error: "Du kan kun slette brugere i din egen afdeling." }), { status: 403 });
+    return json({ error: "Du kan kun slette brugere i din egen afdeling." }, 403);
   }
   if (target.deleted_at) {
-    return new Response(JSON.stringify({ error: "Brugeren er allerede arkiveret." }), { status: 409 });
+    return json({ error: "Brugeren er allerede arkiveret." }, 409);
   }
 
   // Refuse to archive the last remaining non-archived admin in the
@@ -140,13 +141,13 @@ export default async (req: Request) => {
     const { count: otherAdminCount, error: countError } = await adminCountQuery;
 
     if (countError) {
-      return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
+      return json({ error: countError.message }, 500);
     }
     if (!otherAdminCount) {
       const message = isSysadmRole(target.role)
         ? "Kan ikke slette den sidste sysadm."
         : "Kan ikke slette den sidste administrator i afdelingen.";
-      return new Response(JSON.stringify({ error: message }), { status: 409 });
+      return json({ error: message }, 409);
     }
   }
 
@@ -158,7 +159,7 @@ export default async (req: Request) => {
     ban_duration: "876000h",
   });
   if (banError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke spærre login-kontoen: ${banError.message}` }), { status: 500 });
+    return json({ error: `Kunne ikke spærre login-kontoen: ${banError.message}` }, 500);
   }
 
   // Archives the profile row (UPDATE, not DELETE) — bookings/user_settings/
@@ -170,11 +171,8 @@ export default async (req: Request) => {
     .eq("user_id", targetUserId);
   if (archiveError) {
     console.error("[delete-user] archive failed after the auth account was already banned:", archiveError);
-    return new Response(JSON.stringify({ error: archiveError.message }), { status: 500 });
+    return json({ error: archiveError.message }, 500);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

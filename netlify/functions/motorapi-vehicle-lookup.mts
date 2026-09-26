@@ -14,6 +14,7 @@
 import { requireAdmin } from "./_shared/serverAuth.js";
 import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { stripNumberSpacing } from "../../src/lib/textNormalization.js";
+import { json } from "./_shared/http.js";
 
 const MOTORAPI_BASE_URL = "https://v1.motorapi.dk";
 
@@ -48,17 +49,17 @@ async function fetchMotorApiSection(path: string, token: string): Promise<MotorA
  */
 export default async (req: Request) => {
   if (req.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const token = process.env.MOTORAPI_TOKEN;
   if (!token) {
-    return new Response(JSON.stringify({ error: "Serveren mangler MOTORAPI_TOKEN." }), { status: 500 });
+    return json({ error: "Serveren mangler MOTORAPI_TOKEN." }, 500);
   }
 
   // Stripped of ALL whitespace (not just trimmed) before being sent on to
@@ -67,7 +68,7 @@ export default async (req: Request) => {
   // registration number.
   const regNo = stripNumberSpacing(new URL(req.url).searchParams.get("regNo") ?? "");
   if (!regNo) {
-    return new Response(JSON.stringify({ error: "regNo er påkrævet." }), { status: 400 });
+    return json({ error: "regNo er påkrævet." }, 400);
   }
 
   const encodedRegNo = encodeURIComponent(regNo);
@@ -77,8 +78,5 @@ export default async (req: Request) => {
     fetchMotorApiSection(`/vehicles/${encodedRegNo}/equipment`, token),
   ]);
 
-  return new Response(JSON.stringify({ vehicle, environment, equipment }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ vehicle, environment, equipment }, 200);
 };
