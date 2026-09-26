@@ -203,7 +203,7 @@ export function buildGuestEmailHtml(fields: {
 
   return `
 <div style="background:#f3f5f7;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
-  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #c3cbd4;">
+  <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #c3cbd4;border-radius:20px;overflow:hidden;border-collapse:separate;">
     <tr>
       <td style="background:#18385b;padding:16px 20px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:1px;">FLEETii</td>
     </tr>
@@ -220,7 +220,7 @@ export function buildGuestEmailHtml(fields: {
         <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
           <tr>
             <td align="center">
-              <a href="${escapeHtml(fields.linkUrl)}" style="display:inline-block;background:#18385b;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:14px 32px;">Åbn køretøjet</a>
+              <a href="${escapeHtml(fields.linkUrl)}" style="display:inline-block;background:#18385b;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:14px 36px;border-radius:999px;">Åbn køretøjet</a>
             </td>
           </tr>
         </table>
