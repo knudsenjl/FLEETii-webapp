@@ -33,6 +33,7 @@ import {
   isUsableErrorMessage,
 } from "./_shared/userAccount.js";
 import { json } from "./_shared/http.js";
+import { siteUrl } from "./_shared/siteUrl.js";
 
 type CreateUserBody = {
   email?: string;
@@ -207,7 +208,7 @@ export default async (req: Request) => {
   // point, so a failed welcome email is logged, not surfaced as a request
   // failure — the admin still sees it via emailSent below and can pass the
   // credentials on some other way.
-  const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
+  const loginUrl = siteUrl();
   // VITE_BRUGERMANUAL_URL is a site-relative path (e.g.
   // "/manualer/fleetii-manual-bruger.html"), not an absolute URL —
   // needs loginUrl to become one for the email; omitted if either is unset.

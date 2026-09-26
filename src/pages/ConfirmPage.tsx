@@ -15,12 +15,10 @@ import {
   USER_ID_COLUMN,
   VEHICLE_ID_COLUMN,
   isVehicleAvailable,
-  shortDanishDate,
-  splitIsoDateTime,
   type BookingWindow,
 } from "../lib/bookings";
 import { fetchVehicleConflictWindows } from "../lib/bookingWindows";
-import { nowUtcIso } from "../lib/time";
+import { formatDanishDateTimeShort, nowUtcIso } from "../lib/time";
 import type { DropInGuest } from "../lib/dropIn";
 import { callFunction } from "../lib/callFunction";
 
@@ -108,12 +106,6 @@ export function ConfirmPage() {
   if (!vehicle) {
     return null;
   }
-
-  /** "dd.mm.yyyy HH:mm" (or "dd/mm HH:mm" when `short`) — short pairs with the full version as a hover tooltip. */
-  const formatDanishDateTime = (isoDateTime: string, short = false) => {
-    const { date, time } = splitIsoDateTime(isoDateTime);
-    return `${short ? shortDanishDate(date) : date} ${time}`;
-  };
 
   /**
    * Re-checks availability (the vehicle may have been booked by someone else
@@ -288,8 +280,8 @@ export function ConfirmPage() {
         ] as [string, string][])
       : []),
     ["Anvendelse:", anvendelse],
-    ["Start:", reservationStart ? formatDanishDateTime(reservationStart, true) : ""],
-    ["Slut:", reservationEnd ? formatDanishDateTime(reservationEnd, true) : "Ingen slutdato"],
+    ["Start:", reservationStart ? formatDanishDateTimeShort(reservationStart) : ""],
+    ["Slut:", reservationEnd ? formatDanishDateTimeShort(reservationEnd) : "Ingen slutdato"],
   ];
 
   return (

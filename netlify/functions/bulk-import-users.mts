@@ -28,6 +28,7 @@ import { resolveDepartmentNames, type DepartmentResolution } from "./_shared/dep
 import { mapWithConcurrency } from "./_shared/concurrency.js";
 import { buildWelcomeEmailHtml, createAuthUserWithRetry, generateTemporaryPassword, type Role } from "./_shared/userAccount.js";
 import { json } from "./_shared/http.js";
+import { siteUrl } from "./_shared/siteUrl.js";
 
 type BulkImportUsersBody = {
   format?: "csv" | "json";
@@ -140,7 +141,7 @@ export default async (req: Request) => {
     costumerId = caller.costumer_id;
   }
 
-  const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
+  const loginUrl = siteUrl();
   const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
 
   // Each distinct department is looked up (or created) once, up front and

@@ -21,8 +21,8 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
-import { splitIsoDateTime } from "../../src/lib/bookings.js";
 import { json } from "./_shared/http.js";
+import { formatDanishDateTime } from "../../src/lib/time.js";
 
 type SendBookingConfirmationBody = {
   bookingId?: string;
@@ -38,12 +38,6 @@ type BookingQueryRow = {
   user_profiles: { email: string | null; full_name: string | null } | null;
   departments: { name: string; costumers: { name: string | null } | null } | null;
 };
-
-/** "dd.mm.yyyy HH:mm" — the full (not shortened) form, since an email is a permanent record rather than space-constrained UI, unlike ConfirmPage.tsx's own `short` display. */
-function formatDanishDateTime(iso: string): string {
-  const { date, time } = splitIsoDateTime(iso);
-  return `${date} ${time}`;
-}
 
 /** Builds the HTML email body: the header line (see this function's own doc comment for the two variants), then the same Kunde/afdeling, Køretøj, Anvendelse, Start, Slut rows ConfirmPage.tsx's own read-only summary shows. */
 function buildHtmlBody(fields: {

@@ -24,6 +24,7 @@ import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
 import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
 import { json } from "./_shared/http.js";
+import { siteBaseUrl } from "./_shared/siteUrl.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
@@ -314,7 +315,7 @@ export default async (req: Request) => {
     to: mailReceiver,
     subject: `${customerName} - Oprettelse af nyt køretøj (${nummerplade}) i FLEETii`,
     html: buildHtmlBody({
-      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp-staging.netlify.app",
+      baseUrl: siteBaseUrl(),
       orderId: insertedOrder.order_id,
       customerName,
       afdeling,
