@@ -11,7 +11,7 @@
 // any logged-in user, not just admins, but ONLY for a vehicle they actually
 // have a relevant booking on (same three-rule "in the Lås/Lås op window"
 // check as set-vehicle-lock.mts's own regular-user authorization — reused,
-// not reimplemented, via computeLockButtonState/findAdjacentBookings, so the
+// not reimplemented, via _shared/vehicleLock.ts's anyOwnBookingAllows, so the
 // two can't drift apart). "start"/"stop" (raw lock/unlock, bypassing those
 // enablement rules entirely) stay admin-only — TwoHireTestPage.tsx's direct
 // testing flow is the only caller of those today. A regular ("admin", not
@@ -25,17 +25,13 @@
 // authenticates this command depends on the TARGET vehicle's costumer (not
 // the caller's own costumer_id, which a sysadm doesn't have) — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
-import { computeLockButtonState, findAdjacentBookings } from "../../src/lib/bookings.js";
-import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
+import { anyOwnBookingAllows, loadLockContext } from "./_shared/vehicleLock.js";
 
 const VALID_COMMANDS: readonly TwoHireGenericCommand[] = ["start", "stop", "locate"];
-
-/** A vehicle's booking, as needed to re-run computeLockButtonState/findAdjacentBookings server-side — see set-vehicle-lock.mts's identical type. */
-type VehicleBooking = { booking_id: string; start: string; end: string | null; user_id: string | null };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -115,30 +111,12 @@ export default async (req: Request) => {
         // only if one of the caller's own bookings on this vehicle currently
         // has lock or unlock enabled (see set-vehicle-lock.mts's identical
         // check for why the raw rules, not just "has a booking", are reused).
-        const [{ data: signal, error: signalError }, { data: bookings, error: bookingsError }] = await Promise.all([
-          admin.from("vehicle_signals").select("locked").eq("vehicle_id", vehicleId).maybeSingle<{ locked: boolean }>(),
-          admin
-            .from("bookings")
-            .select("booking_id, start, end, user_id")
-            .eq("vehicle_id", vehicleId)
-            .returns<VehicleBooking[]>(),
-        ]);
-        if (signalError) throw new Error(`Kunne ikke slå lås-status op: ${signalError.message}`);
-        if (bookingsError) throw new Error(`Kunne ikke slå reservationer op: ${bookingsError.message}`);
-
-        const currentLocked = signal?.locked ?? true;
-        const ownBookings = (bookings ?? []).filter((b) => b.user_id === authResult.userId);
-        const authorized = ownBookings.some((booking) => {
-          const { previous, next } = findAdjacentBookings(bookings ?? [], booking.booking_id);
-          const state = computeLockButtonState(
-            nowUtcIso(),
-            { start: booking.start, end: booking.end },
-            previous ? { end: previous.end } : null,
-            next ? { start: next.start } : null,
-            currentLocked,
-          );
-          return state.lockEnabled || state.unlockEnabled;
-        });
+        const context = await loadLockContext(admin, vehicleId);
+        const authorized = anyOwnBookingAllows(
+          context,
+          (b) => b.user_id === authResult.userId,
+          (state) => state.lockEnabled || state.unlockEnabled,
+        );
         if (!authorized) {
           return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj lige nu." }), { status: 403 });
         }
