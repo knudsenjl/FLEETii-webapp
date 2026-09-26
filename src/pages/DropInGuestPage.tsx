@@ -25,7 +25,7 @@ const EMPTY_GUEST: DropInGuest = { name: "", email: "", phone: "", address: "", 
 /**
  * Step 1 of a drop-in reservation ("/drop-in", admin/sysadm — the
  * receptionist): "Gæstens oplysninger", the walk-in visitor's details.
- * Reached from AdminFrontpage.tsx's "Drop-in reservation" button. All five
+ * Reached from AdminFrontpage.tsx's "Opret drop-in reservation" button. All five
  * fields AND the "Kørekort og legitimation kontrolleret" checkbox are
  * required — "Fortsæt" stays disabled until they're all done (user decisions
  * 2026-09-26). The checkbox is the receptionist's own record that they

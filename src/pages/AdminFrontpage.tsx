@@ -268,14 +268,6 @@ export function AdminFrontpage() {
           <PageSection>
             <PageSectionBody>
               <div className="flex flex-col gap-3">
-                <Button
-                  variant="secondary"
-                  type="button"
-                  onClick={() => navigate("/reservation")}
-                  className="w-full"
-                >
-                  Opret reservation
-                </Button>
                 {/* A booking for a walk-in visitor with no FLEETii account (the receptionist's flow) — see DropInGuestPage.tsx. */}
                 <Button
                   variant="secondary"
@@ -283,7 +275,15 @@ export function AdminFrontpage() {
                   onClick={() => navigate("/drop-in")}
                   className="w-full"
                 >
-                  Drop-in reservation
+                  Opret drop-in reservation
+                </Button>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/reservation")}
+                  className="w-full"
+                >
+                  Opret reservation
                 </Button>
                 <Button
                   variant="secondary"
