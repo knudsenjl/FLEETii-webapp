@@ -1,11 +1,52 @@
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// The app's Content-Security-Policy (code review 2026-09-26). Enforced as a
+// <meta> tag written into the BUILT index.html only — not as a netlify.toml
+// header — because `netlify dev` applies netlify.toml's headers to the Vite
+// dev server too, whose React refresh preamble is an inline <script> that
+// `script-src 'self'` would block, breaking local development. The built app
+// has no inline scripts (verified: 0 violations across 13 staging pages while
+// this ran report-only, 2026-09-27). Sources: Supabase REST + realtime
+// websocket, Google Fonts (index.html), OpenStreetMap tiles (LeafletMap.tsx),
+// the QR scanner's blob: worker (qr-scanner), inline style attributes
+// (React/framer-motion). frame-ancestors can't be set from a <meta> tag, so it
+// stays a header in netlify.toml.
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' https://fonts.gstatic.com",
+  "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+  "connect-src 'self' https://*.supabase.co wss://*.supabase.co",
+  "worker-src 'self' blob:",
+  "manifest-src 'self'",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+].join('; ')
+
+/** Adds CONTENT_SECURITY_POLICY as the first <meta> in the built index.html (build only — see above). */
+function contentSecurityPolicyMeta(): Plugin {
+  return {
+    name: 'fleetii-content-security-policy',
+    apply: 'build',
+    transformIndexHtml: () => [
+      {
+        tag: 'meta',
+        attrs: { 'http-equiv': 'Content-Security-Policy', content: CONTENT_SECURITY_POLICY },
+        injectTo: 'head-prepend',
+      },
+    ],
+  }
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [
+    contentSecurityPolicyMeta(),
     react(),
     tailwindcss(),
     VitePWA({
