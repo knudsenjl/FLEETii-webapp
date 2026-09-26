@@ -153,6 +153,9 @@ export default async (req: Request) => {
       .map((row) => asTrimmedString(row.Afdeling))
       .filter((name): name is string => Boolean(name)),
     costumerId,
+    // Only a sysadm (setting up a costumer) may create departments by import;
+    // for an admin an unknown name is a row error, not a new department.
+    { allowCreate: isSysadm },
   );
 
   const results: RowResult[] = await mapWithConcurrency(rows, IMPORT_CONCURRENCY, async (row, i) => ({
