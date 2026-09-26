@@ -13,7 +13,7 @@
 // or deleting the booking moves or ends access automatically.
 import { createHash, randomBytes } from "node:crypto";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { formatDanishDateTime, toUtcMs } from "../../../src/lib/time.js";
+import { formatDanishLongDateTime, toUtcMs } from "../../../src/lib/time.js";
 import { escapeHtml, sendMail } from "./mailer.js";
 
 /** The link opens this long before the booking's start (user decision 2026-09-26). */
@@ -72,9 +72,13 @@ export function evaluateGuestAccess(
   return "active";
 }
 
-/** The drop-in booking a token resolves to, with just what the guest endpoints need. Never includes the guest's personal data. */
+/** The drop-in booking a token resolves to, with just what the guest endpoints need. Of the guest's personal data only their own name is included — shown on /gaest (user decision 2026-09-26); email/phone/address/licence never leave booking_guests this way. */
 export type GuestBooking = {
   booking_id: string;
+  guest_name: string | null;
+  /** "Kunde/Afdeling" of the booking's department, for /gaest's header line. */
+  costumer_name: string | null;
+  department_name: string | null;
   vehicle_id: string;
   start: string;
   end: string | null;
@@ -92,6 +96,7 @@ export type GuestBooking = {
 
 type GuestRow = {
   booking_id: string;
+  name: string | null;
   revoked_at: string | null;
   anonymized_at: string | null;
   bookings: {
@@ -102,6 +107,7 @@ type GuestRow = {
     usage: string | null;
     is_guest: boolean;
     vehicle_profiles: GuestBooking["vehicle"];
+    departments: { name: string | null; costumers: { name: string | null } | null } | null;
   } | null;
 };
 
@@ -115,7 +121,7 @@ export async function findGuestBookingByToken(admin: SupabaseClient, token: stri
   const { data, error } = await admin
     .from("booking_guests")
     .select(
-      "booking_id, revoked_at, anonymized_at, bookings(booking_id, vehicle_id, start, end, usage, is_guest, vehicle_profiles(number_plate, vehicle_ident, brand, model, costumer_id))",
+      "booking_id, name, revoked_at, anonymized_at, bookings(booking_id, vehicle_id, start, end, usage, is_guest, vehicle_profiles(number_plate, vehicle_ident, brand, model, costumer_id), departments(name, costumers(name)))",
     )
     .eq("token_hash", hashGuestToken(token))
     .maybeSingle<GuestRow>();
@@ -124,6 +130,9 @@ export async function findGuestBookingByToken(admin: SupabaseClient, token: stri
   const b = data.bookings;
   return {
     booking_id: b.booking_id,
+    guest_name: data.name,
+    costumer_name: b.departments?.costumers?.name ?? null,
+    department_name: b.departments?.name ?? null,
     vehicle_id: b.vehicle_id,
     start: b.start,
     end: b.end,
@@ -182,7 +191,9 @@ export function siteBaseUrl(): string {
  * The guest's HTML email: FLEETii header, greeting, the reservation (vehicle,
  * Anvendelse, Start, Slut) and one big "Åbn køretøjet" button linking to
  * /gaest#token. Inline styles and a table layout only — email clients ignore
- * <style> blocks and flexbox. The button is a plain link on purpose: opening
+ * <style> blocks and flexbox. The oval button is drawn twice: a VML
+ * roundrect for desktop Outlook (which ignores border-radius and padding on
+ * links) and a normal rounded link for every other client. It's a plain link on purpose: opening
  * it must never lock/unlock anything, because mail scanners pre-fetch links
  * (see the drop-in plan); the actual action is a tap on the page it opens.
  */
@@ -194,6 +205,8 @@ export function buildGuestEmailHtml(fields: {
   start: string;
   end: string;
   linkUrl: string;
+  /** Absolute URL of the FLEETii logo (public/fleetii-logo.png on this deploy) — emails can't use the app's bundled assets. */
+  logoUrl: string;
 }): string {
   const row = (label: string, value: string) => `
           <tr>
@@ -205,7 +218,9 @@ export function buildGuestEmailHtml(fields: {
 <div style="background:#f3f5f7;padding:24px 12px;font-family:Arial,Helvetica,sans-serif;">
   <table role="presentation" cellpadding="0" cellspacing="0" style="max-width:480px;width:100%;margin:0 auto;background:#ffffff;border:1px solid #c3cbd4;border-radius:20px;overflow:hidden;border-collapse:separate;">
     <tr>
-      <td style="background:#18385b;padding:16px 20px;color:#ffffff;font-size:20px;font-weight:700;letter-spacing:1px;">FLEETii</td>
+      <td style="background:#ffffff;padding:18px 20px 14px;border-bottom:3px solid #18385b;">
+        <img src="${escapeHtml(fields.logoUrl)}" width="140" height="50" alt="FLEETii" style="display:block;border:0;outline:none;text-decoration:none;width:140px;height:50px;" />
+      </td>
     </tr>
     <tr>
       <td style="padding:20px;">
@@ -219,8 +234,16 @@ export function buildGuestEmailHtml(fields: {
         </table>
         <table role="presentation" cellpadding="0" cellspacing="0" style="width:100%;">
           <tr>
-            <td align="center">
-              <a href="${escapeHtml(fields.linkUrl)}" style="display:inline-block;background:#18385b;color:#ffffff;text-decoration:none;font-size:16px;font-weight:700;padding:14px 36px;border-radius:999px;">Åbn køretøjet</a>
+            <td align="center" style="padding:4px 0;">
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${escapeHtml(fields.linkUrl)}" style="height:52px;v-text-anchor:middle;width:260px;" arcsize="50%" stroke="f" fillcolor="#18385b">
+                <w:anchorlock/>
+                <center style="color:#ffffff;font-family:Arial,Helvetica,sans-serif;font-size:17px;font-weight:bold;">Åbn køretøjet</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-->
+              <a href="${escapeHtml(fields.linkUrl)}" style="display:inline-block;min-width:160px;background:#18385b;color:#ffffff;text-decoration:none;font-size:17px;font-weight:700;line-height:20px;text-align:center;padding:16px 50px;border-radius:999px;mso-hide:all;">Åbn køretøjet</a>
+              <!--<![endif]-->
             </td>
           </tr>
         </table>
@@ -266,17 +289,20 @@ export async function sendGuestEmail(
     return false;
   }
 
+  const companyLabel = booking.departments?.costumers?.name?.trim() || booking.departments?.name || "FLEETii";
   const result = await sendMail({
     to: args.guestEmail,
-    subject: "Din reservation – FLEETii",
+    // The company the guest is visiting, not "FLEETii" — that's who they know (user request 2026-09-26).
+    subject: `Din reservation – ${companyLabel}`,
     html: buildGuestEmailHtml({
       guestName: args.guestName,
-      companyLabel: booking.departments?.costumers?.name?.trim() || booking.departments?.name || "FLEETii",
+      companyLabel,
       vehicleLabel: guestVehicleLabel(booking.vehicle_profiles, booking.vehicle_id),
       anvendelse: booking.usage ?? "",
-      start: formatDanishDateTime(booking.start),
-      end: booking.end ? formatDanishDateTime(booking.end) : "—",
+      start: formatDanishLongDateTime(booking.start),
+      end: booking.end ? formatDanishLongDateTime(booking.end) : "—",
       linkUrl: guestLinkUrl(siteBaseUrl(), args.token),
+      logoUrl: `${siteBaseUrl().replace(/\/+$/, "")}/fleetii-logo.png`,
     }),
   });
   if (!result.ok) console.error("[drop-in email] send failed:", result.error);

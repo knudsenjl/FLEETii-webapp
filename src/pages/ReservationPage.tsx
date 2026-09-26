@@ -134,7 +134,9 @@ function danishPartsPlusMinutes(parts: DanishParts, minutes: number): DanishPart
  * Drop-in mode (router state `dropInGuest`, from DropInGuestPage.tsx): the
  * booking is for a walk-in guest, not a FLEETii user — the Bruger picker
  * becomes a read-only "Drop-in: ‹navn›", Anvendelse starts as "Prøvekørsel",
- * Slut can't be switched off (a drop-in must end — the guest's link window is
+ * Start defaults to "Nu" (a walk-in usually drives off right away — user
+ * decision 2026-09-26; the receptionist can still switch it off), Slut
+ * can't be switched off (a drop-in must end — the guest's link window is
  * derived from it), and the guest rides along to AvailablePage/ConfirmPage.
  */
 export function ReservationPage() {
@@ -319,16 +321,23 @@ export function ReservationPage() {
   // on the way out.
   const now = ceilToDanishInterval(Date.now(), effectiveIntervalMinutes);
   const end = danishPartsPlusMinutes(now, effectiveDurationMinutes);
+  /** A NEW drop-in starts with "Nu" on by default — see this component's doc comment. */
+  const dropInStartsNow = Boolean(dropInGuest);
+  const exactNow = utcMsToDanishParts(Date.now());
   const initialStart = formSnapshot
     ? { date: formSnapshot.startDate, time: formSnapshot.startTime }
     : editing
       ? utcToDanishParts(editing.startIso)
-      : now;
+      : dropInStartsNow
+        ? exactNow
+        : now;
   const initialEnd = formSnapshot
     ? { date: formSnapshot.endDate, time: formSnapshot.endTime }
     : editing?.endIso
       ? utcToDanishParts(editing.endIso)
-      : end;
+      : dropInStartsNow
+        ? danishPartsPlusMinutes(exactNow, effectiveDurationMinutes)
+        : end;
   /** Adds minutes to a "HH:mm" time, reporting how many calendar days the result rolled over (can be negative). */
   const addMinutes = (time: string, minutes: number): { time: string; daysAdded: number } => {
     const [hours, mins] = time.split(":").map(Number);
@@ -346,7 +355,7 @@ export function ReservationPage() {
   const [startTime, setStartTime] = useState(initialStart.time);
   const [endTime, setEndTime] = useState(initialEnd.time);
   /** When true (the "Nu" clock icon button is pressed/active), Start is locked to the current moment and its fields are disabled — see handleNowToggle. */
-  const [startIsNow, setStartIsNow] = useState(formSnapshot?.startIsNow ?? false);
+  const [startIsNow, setStartIsNow] = useState(dropInStartsNow || (formSnapshot?.startIsNow ?? false));
   /** When true, End is cleared and its fields are replaced by an "Ingen slutdato" label — see handleEndIgnoreToggle. Starts true when editing a booking that was itself open-ended (endIso null), or when restoring a formSnapshot that had it on. */
   const [endIgnored, setEndIgnored] = useState(formSnapshot?.endIgnored ?? Boolean(editing && editing.endIso === null));
   /** The End date/time as they were right before "ignore" was turned on, restored if it's turned back off. */
@@ -388,7 +397,7 @@ export function ReservationPage() {
    */
   const intervalAppliedRef = useRef(Boolean(formSnapshot));
   useEffect(() => {
-    if (editing || standardIntervalMinutes === null || intervalAppliedRef.current) return;
+    if (editing || dropInStartsNow || standardIntervalMinutes === null || intervalAppliedRef.current) return;
     intervalAppliedRef.current = true;
     const start = ceilToDanishInterval(Date.now(), standardIntervalMinutes);
     const newEnd = danishPartsPlusMinutes(start, effectiveDurationMinutes);
