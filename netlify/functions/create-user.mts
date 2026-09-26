@@ -184,6 +184,24 @@ export default async (req: Request) => {
     return new Response(JSON.stringify({ error: profileError.message }), { status: 400 });
   }
 
+  // The home department is always one of the user's granted departments —
+  // bulk-import-users.mts already did this, but this path relied on
+  // UserDetailsPage adding it afterwards from the browser, so any other
+  // caller (or a failed follow-up request) left a user with no grants at
+  // all (code review 2026-09-26). Upsert-ignore, since UserDetailsPage still
+  // adds its grants (possibly including this one) right after.
+  if (requestedDepartmentId) {
+    const { error: grantError } = await admin
+      .from("user_departments")
+      .upsert(
+        { user_id: created.user.id, department_id: requestedDepartmentId },
+        { onConflict: "user_id,department_id", ignoreDuplicates: true },
+      );
+    if (grantError) {
+      console.error("[create-user] home-department grant failed (account was still created):", grantError);
+    }
+  }
+
   // Best-effort: the account is already fully created and usable at this
   // point, so a failed welcome email is logged, not surfaced as a request
   // failure — the admin still sees it via emailSent below and can pass the

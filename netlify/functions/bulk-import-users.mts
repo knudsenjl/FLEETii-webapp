@@ -235,7 +235,10 @@ async function importUserRow(
   if (departmentId) {
     const { error: grantError } = await admin
       .from("user_departments")
-      .insert({ user_id: created.user.id, department_id: departmentId });
+      .upsert(
+        { user_id: created.user.id, department_id: departmentId },
+        { onConflict: "user_id,department_id", ignoreDuplicates: true },
+      );
     if (grantError) {
       grantWarning = `Bruger oprettet, men tildeling af afdeling fejlede: ${grantError.message}`;
     }
