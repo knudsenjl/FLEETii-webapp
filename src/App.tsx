@@ -65,6 +65,7 @@ const VehicleCreatePage = lazy(() =>
 const VehicleDeletePage = lazy(() =>
   import("./pages/VehicleDeletePage").then((m) => ({ default: m.VehicleDeletePage })),
 );
+const DropInGuestPage = lazy(() => import("./pages/DropInGuestPage").then((m) => ({ default: m.DropInGuestPage })));
 const GuestDrivePage = lazy(() => import("./pages/GuestDrivePage").then((m) => ({ default: m.GuestDrivePage })));
 const AboutPage = lazy(() => import("./pages/AboutPage").then((m) => ({ default: m.AboutPage })));
 const SettingsSuperadminPage = lazy(() =>
@@ -153,6 +154,14 @@ function App() {
         <Suspense fallback={<AppLoadingScreen />}>
           <Routes>
             <Route path="/" element={<RootRoute />} />
+            <Route
+              path="/drop-in"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <DropInGuestPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/reservation"
               element={

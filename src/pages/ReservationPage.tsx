@@ -31,6 +31,7 @@ import {
   isSettingTilladt,
   sortAnvendelserWithAndetLast,
 } from "../lib/settings";
+import { DROP_IN_DEFAULT_ANVENDELSE, dropInLabel, readDropInGuest } from "../lib/dropIn";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 
@@ -129,6 +130,12 @@ function danishPartsPlusMinutes(parts: DanishParts, minutes: number): DanishPart
  * itself changes (the old pick may not even belong to the new department).
  * Every other role never sees the "Kunde/afdeling" row at all; their own
  * afdelingId is used unchanged, exactly as before.
+ *
+ * Drop-in mode (router state `dropInGuest`, from DropInGuestPage.tsx): the
+ * booking is for a walk-in guest, not a FLEETii user — the Bruger picker
+ * becomes a read-only "Drop-in: ‹navn›", Anvendelse starts as "Prøvekørsel",
+ * Slut can't be switched off (a drop-in must end — the guest's link window is
+ * derived from it), and the guest rides along to AvailablePage/ConfirmPage.
  */
 export function ReservationPage() {
   const { session, profile, afdelingId, afdeling, costumerName } = useAuth();
@@ -139,6 +146,8 @@ export function ReservationPage() {
   const editing = (location.state as { editing?: EditingBooking } | null)?.editing ?? null;
   /** Present only when this page was reached via a browser back-navigation from AvailablePage — see ReservationFormSnapshot's own doc comment. Wins over every other default below, but never over editing's OWN fields where a snapshot field is itself blank (e.g. anvendelseCustom empty) — see each initializer. */
   const formSnapshot = (location.state as { formSnapshot?: ReservationFormSnapshot } | null)?.formSnapshot ?? null;
+  /** Set only in drop-in mode — see this component's doc comment. Survives a browser back-navigation from AvailablePage, since handleFindAvailable's snapshot keeps the rest of this entry's state. */
+  const dropInGuest = readDropInGuest(location.state);
   const isAdmin = isAnyAdmin(profile?.role);
   /** A sysadm has no department of their own (platform-wide role) — for them alone, the "Kunde/afdeling" row below is what actually picks which department this booking belongs to (and which department's vehicles AvailablePage shows), rather than defaulting to afdelingId the way every other role does. */
   const isSysadm = isSysadmRole(profile?.role);
@@ -266,6 +275,19 @@ export function ReservationPage() {
       setAnvendelseCustom(editing.anvendelse);
     }
   }, [editing, anvendelseOptions]);
+
+  /** Drop-in mode: pre-selects "Prøvekørsel" once the options have loaded — the plain option if the department has it, otherwise as a free-text "Andet" reason. Same run-once/formSnapshot guard as editingAnvendelsePrefilled just above. */
+  const dropInAnvendelsePrefilled = useRef(Boolean(formSnapshot));
+  useEffect(() => {
+    if (!dropInGuest || dropInAnvendelsePrefilled.current || anvendelseOptions.length === 0) return;
+    dropInAnvendelsePrefilled.current = true;
+    if (anvendelseOptions.includes(DROP_IN_DEFAULT_ANVENDELSE)) {
+      setAnvendelseOption(DROP_IN_DEFAULT_ANVENDELSE);
+    } else {
+      setAnvendelseOption(ANDET_VALUE);
+      setAnvendelseCustom(DROP_IN_DEFAULT_ANVENDELSE);
+    }
+  }, [dropInGuest, anvendelseOptions]);
 
   // A sysadm has no department of their own, so "Bruger" is scoped to
   // whichever department they picked in "Kunde/afdeling" instead of
@@ -469,6 +491,11 @@ export function ReservationPage() {
       return;
     }
 
+    if (dropInGuest) {
+      triggerWarning("endRequired");
+      return;
+    }
+
     if (!canIgnoreEnd) {
       triggerWarning("endBlocked");
       return;
@@ -503,8 +530,9 @@ export function ReservationPage() {
       : danishLocalToUtcIso(startDate, startTime);
     const end = endIgnored ? null : danishLocalToUtcIso(endDate, endTime);
     const selectedUser = departmentUsers.find((u) => u.user_id === bruger);
-    const brugerLabel =
-      isAdmin
+    const brugerLabel = dropInGuest
+      ? dropInLabel(dropInGuest.name)
+      : isAdmin
         ? ((useUserIdent ? selectedUser?.user_ident : undefined) || selectedUser?.email) ?? editing?.userLabel ?? ""
         : ((useUserIdent && profile?.user_ident) || profile?.email || session?.user.email) ?? "";
     return { start, end, brugerLabel };
@@ -558,6 +586,7 @@ export function ReservationPage() {
         editingVehicleId: editing?.vehicleId,
         departmentId: isSysadm ? selectedDepartmentId || null : afdelingId,
         departmentLabel,
+        dropInGuest: dropInGuest ?? undefined,
       },
     });
   };
@@ -575,7 +604,7 @@ export function ReservationPage() {
           <PageSection>
             <PageSectionBody>
               <SectionHeading>
-                {editing ? "Rediger reservation" : "Opret reservation"}
+                {editing ? "Rediger reservation" : dropInGuest ? "Drop-in reservation" : "Opret reservation"}
               </SectionHeading>
 
               <FieldList>
@@ -609,7 +638,15 @@ export function ReservationPage() {
                     </FieldRow>
                   )}
                   <FieldRow className="grid grid-cols-2 gap-3 p-3 sm:p-4" label={<>Bruger {isAdmin && <RequiredMark />}</>}>
-                    {isAdmin ? (
+                    {dropInGuest ? (
+                      <input
+                        type="text"
+                        value={dropInLabel(dropInGuest.name)}
+                        disabled
+                        readOnly
+                        className="rounded-lg border border-brand-200 bg-brand-100 px-3 py-2 text-sm text-brand-800 outline-none"
+                      />
+                    ) : isAdmin ? (
                       <select
                         value={bruger}
                         onChange={(e) => setBruger(e.target.value)}
@@ -753,6 +790,11 @@ export function ReservationPage() {
                     )}
                     <InlinePopup visible={warningKey === "end"} message="Slut kan ikke være før Start" variant="warning" />
                     <InlinePopup
+                      visible={warningKey === "endRequired"}
+                      message="En drop-in reservation skal have en sluttid"
+                      variant="warning"
+                    />
+                    <InlinePopup
                       visible={warningKey === "endBlocked"}
                       message="Du har ikke tilladelse til reservationer uden sluttid"
                       variant="warning"
@@ -787,7 +829,7 @@ export function ReservationPage() {
                     variant="secondary"
                     type="button"
                     onClick={handleFindAvailable}
-                    disabled={!bruger || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
+                    disabled={(!bruger && !dropInGuest) || !anvendelse.trim() || (isSysadm && !selectedDepartmentId)}
                     className="w-full"
                   >
                     Find ledigt køretøj

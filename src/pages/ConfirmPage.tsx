@@ -19,6 +19,7 @@ import {
   splitIsoDateTime,
   type BookingWindow,
 } from "../lib/bookings";
+import type { DropInGuest } from "../lib/dropIn";
 
 /** The selected vehicle, as passed in via router state from AvailablePage. */
 type ReservationVehicle = {
@@ -51,6 +52,12 @@ type ReservationVehicle = {
  * confirming can double-check the department before "Bekræft" actually
  * writes it — most useful for a sysadm picking among many, but shown
  * for every role.
+ *
+ * Drop-in mode (router state `dropInGuest`, see ReservationPage's doc
+ * comment): the summary also shows the guest's details, and "Bekræft"
+ * doesn't insert the booking itself — create-drop-in-booking.mts does the
+ * booking (still under this admin's own RLS), the guest row and the guest's
+ * email in one call. Lands on the new booking's details page afterwards.
  */
 export function ConfirmPage() {
   const { session, profile } = useAuth();
@@ -68,6 +75,7 @@ export function ConfirmPage() {
         departmentId?: string | null;
         /** Display-ready counterpart to departmentId (ReservationPage's own resolved "Kunde/afdeling" label) — shown as the first summary row below, a final read-only "security check" before the booking is actually written. */
         departmentLabel?: string;
+        dropInGuest?: DropInGuest;
       }
     | null;
   const vehicle = state?.vehicle ?? null;
@@ -81,6 +89,8 @@ export function ConfirmPage() {
   const reservationStart = state?.start ?? null;
   const reservationEnd = state?.end ?? null;
   const editingBookingId = state?.editingBookingId;
+  /** Only for a NEW drop-in — see this component's doc comment. */
+  const dropInGuest = editingBookingId ? undefined : state?.dropInGuest;
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -152,6 +162,11 @@ export function ConfirmPage() {
       return;
     }
 
+    if (dropInGuest) {
+      await confirmDropIn(state.departmentId);
+      return;
+    }
+
     const bookingFields = {
       [VEHICLE_ID_COLUMN]: vehicle.id,
       start: reservationStart,
@@ -212,11 +227,62 @@ export function ConfirmPage() {
     navigate(isAnyAdmin(profile?.role) ? "/allbookings" : "/bookings", { replace: true });
   };
 
+  /**
+   * Drop-in "Bekræft": one call to create-drop-in-booking.mts (see this
+   * component's doc comment). A failed guest email doesn't undo the booking —
+   * the details page's Gæst panel can send it again — so it's passed along
+   * as `dropInEmailFailed` for that page to point out.
+   */
+  const confirmDropIn = async (departmentId: string) => {
+    if (!dropInGuest) return;
+    let response: Response;
+    try {
+      response = await fetch("/.netlify/functions/create-drop-in-booking", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
+          vehicleId: vehicle.id,
+          departmentId,
+          start: reservationStart,
+          end: reservationEnd,
+          usage: anvendelse,
+          guest: dropInGuest,
+        }),
+      });
+    } catch {
+      setError("Kunne ikke kontakte serveren. Prøv igen.");
+      setIsSubmitting(false);
+      return;
+    }
+    const result = (await response.json().catch(() => ({}))) as { bookingId?: string; emailSent?: boolean; error?: string };
+    if (!response.ok || !result.bookingId) {
+      setError(result.error ?? "Kunne ikke oprette drop-in reservationen.");
+      setIsSubmitting(false);
+      return;
+    }
+    navigate(`/booking-details/${result.bookingId}`, {
+      replace: true,
+      state: { dropInEmailFailed: result.emailSent === false },
+    });
+  };
+
   /** [label, value] — Start/Slut show "dd/mm" (dropping the year). Kunde/afdeling comes first — a final, read-only "security check" confirming which department this booking is actually about to be written to, before "Bekræft" is pressed. Køretøj comes right after it. */
   const rows: [string, string][] = [
     ["Kunde/afdeling:", state?.departmentLabel ?? ""],
     ["Køretøj:", `${vehicle.plate}: ${vehicle.vehicle}`],
     ["Reserveret til:", brugerLabel],
+    ...(dropInGuest
+      ? ([
+          ["Email:", dropInGuest.email],
+          ["Telefon:", dropInGuest.phone],
+          ["Adresse:", dropInGuest.address],
+          ["Kørekort-nr.:", dropInGuest.licenseNo],
+          ["Legitimation:", dropInGuest.idChecked ? "Kontrolleret" : "Ikke kontrolleret"],
+        ] as [string, string][])
+      : []),
     ["Anvendelse:", anvendelse],
     ["Start:", reservationStart ? formatDanishDateTime(reservationStart, true) : ""],
     ["Slut:", reservationEnd ? formatDanishDateTime(reservationEnd, true) : "Ingen slutdato"],
@@ -229,7 +295,7 @@ export function ConfirmPage() {
           <PageSection>
             <PageSectionBody>
               <SectionHeading>
-                {editingBookingId ? "Rediger reservation" : "Opret reservation"}
+                {editingBookingId ? "Rediger reservation" : dropInGuest ? "Drop-in reservation" : "Opret reservation"}
               </SectionHeading>
 
               <div className="overflow-hidden rounded-none border border-brand-100">

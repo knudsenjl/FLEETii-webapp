@@ -276,6 +276,15 @@ export function AdminFrontpage() {
                 >
                   Opret reservation
                 </Button>
+                {/* A booking for a walk-in visitor with no FLEETii account (the receptionist's flow) — see DropInGuestPage.tsx. */}
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/drop-in")}
+                  className="w-full"
+                >
+                  Drop-in reservation
+                </Button>
                 <Button
                   variant="secondary"
                   type="button"
