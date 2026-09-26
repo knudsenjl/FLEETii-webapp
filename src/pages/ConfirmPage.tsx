@@ -181,7 +181,16 @@ export function ConfirmPage() {
     let writeError: { code?: string; message: string } | null;
     let newBookingId: string | null = null;
     if (editingBookingId) {
-      ({ error: writeError } = await supabase.from("bookings").update(bookingFields).eq(BOOKING_ID_COLUMN, editingBookingId));
+      // .select() returns the updated rows: RLS silently narrows an update
+      // the viewer may not make to 0 rows with no error, so an empty result
+      // is reported instead of looking like a successful save.
+      const { data: updatedRows, error } = await supabase
+        .from("bookings")
+        .update(bookingFields)
+        .eq(BOOKING_ID_COLUMN, editingBookingId)
+        .select(BOOKING_ID_COLUMN);
+      writeError =
+        error ?? (updatedRows?.length ? null : { message: "Reservationen kunne ikke opdateres — du har muligvis ikke tilladelse til det." });
     } else {
       const { data: insertedBooking, error } = await supabase
         .from("bookings")
