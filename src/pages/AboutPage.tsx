@@ -1,7 +1,7 @@
 // The only deliberately public page ("/about" — reachable both from
 // LoginPage before signing in and from every other page's "i" header
 // button). Static company/product info plus links to the three role manuals
-// (Bruger, Administrator, Sysadm) and contact details;
+// (Bruger, Administrator, Sysadm), contact details and the app's version;
 // PageHeader itself handles showing/hiding "Log ud" and the role/afdeling
 // row based on whether the visitor is actually logged in.
 import { useState } from "react";
@@ -14,6 +14,7 @@ import { SectionHeading } from "../components/SectionHeading";
 import { useAuth } from "../contexts/AuthContext";
 import { isAnyAdmin, isSysadm } from "../lib/roles";
 import { ANTI_CLONING_NOTICE } from "../lib/legal";
+import { APP_VERSION_INFO } from "../lib/appVersion";
 
 /**
  * Static "About FLEETii" page: product description, Brugerguide/
@@ -171,6 +172,18 @@ export function AboutPage() {
                     <a href="mailto:info@fleeti.dk" className="hover:underline">info@fleeti.dk</a>
                   </div>
                 </div>
+              </div>
+
+              {/* The app's version (see lib/appVersion.ts) — the number people quote in support questions, with the exact build (commit, date) underneath for us, and "Testmiljø" on anything but production so the two sites can't be mixed up. */}
+              <div className="text-center">
+                <p className="text-sm font-semibold text-brand-700">
+                  Version {APP_VERSION_INFO.version}
+                  {APP_VERSION_INFO.isTestEnvironment && <span className="font-normal text-amber-700"> · Testmiljø</span>}
+                </p>
+                <p className="text-xs text-brand-400">
+                  Build {APP_VERSION_INFO.commit ? `${APP_VERSION_INFO.commit} · ` : ""}
+                  {APP_VERSION_INFO.builtOn}
+                </p>
               </div>
 
               {/* Proprietary notice — the only real recourse if the UI/workflow is cloned is having asserted ownership somewhere; see the repo's own LICENSE file for the full terms. */}
