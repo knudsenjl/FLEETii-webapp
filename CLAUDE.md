@@ -24,6 +24,12 @@ Routine commits/pushes to `main` need no mention of `production` at all — most
 
 **Mechanics of the promotion PR itself** (confirmed against #44/#45, both merged): `gh pr create --base production --head main --title "Promote main to production"` — that exact title is the established convention, reused verbatim each time rather than describing the contents. Merge with `gh pr merge <number> --merge` (a real merge commit, not squash/rebase — confirmed by checking a prior promotion merge commit's parent count: 2 parents). No need to re-derive this from `gh pr list --base production` each time.
 
+**Version number (since 2026-09-27):** the app's version is `MAJOR.PR`, shown on /about.
+- `MAJOR` is the first number of `package.json`'s `"version"`. Change it only when the user decides on a new major version (2.0).
+- `PR` is the newest merged GitHub PR in the build's history. `vite.config.ts` reads it from the "Merge pull request #N" commit subjects at build time; see `src/lib/versionNumber.ts`.
+- So staging shows the last PR merged into `main`, and production shows its promotion PR.
+- It's fully automatic: there is no version bump or release step when promoting.
+
 ## Working conventions
 
 **Time handling: all times are UTC; Danish time only at the edges.** Every timestamp inside the app and in the database is a real UTC instant: an ISO string with `Z`/an offset, or epoch ms. Compare times as instants (`toUtcMs`/`Date.now()`), never as text. Danish time (Europe/Copenhagen) is used in exactly three places, always through `src/lib/time.ts`:
