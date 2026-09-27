@@ -1,7 +1,27 @@
+import { execSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
 import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
+import { versionNumber } from './src/lib/versionNumber.js'
+
+// The app's version (2026-09-27), shown on /about (src/lib/appVersion.ts):
+// "MAJOR.PR" — package.json's first number plus the number of the newest
+// merged GitHub PR in this build's history (see src/lib/versionNumber.ts).
+// Worked out here at build time from git and baked into the bundle, together
+// with the commit (Netlify's COMMIT_REF on a deploy, else git) and the build
+// moment. Without git history it degrades to just "1".
+function git(args: string): string {
+  try {
+    return execSync(`git ${args}`, { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim()
+  } catch {
+    return ''
+  }
+}
+const PACKAGE_VERSION = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version
+const APP_VERSION = versionNumber(PACKAGE_VERSION, git('log -n 200 --format=%s').split('\n'))
+const APP_COMMIT = process.env.COMMIT_REF || git('rev-parse HEAD')
 
 // The app's Content-Security-Policy (code review 2026-09-26). Enforced as a
 // <meta> tag written into the BUILT index.html only — not as a netlify.toml
@@ -45,6 +65,11 @@ function contentSecurityPolicyMeta(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig({
+  define: {
+    __APP_VERSION__: JSON.stringify(APP_VERSION),
+    __APP_COMMIT__: JSON.stringify(APP_COMMIT),
+    __APP_BUILT_AT__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
     contentSecurityPolicyMeta(),
     react(),

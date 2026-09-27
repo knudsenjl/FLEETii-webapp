@@ -14,3 +14,8 @@ interface ImportMetaEnv {
 interface ImportMeta {
   readonly env: ImportMetaEnv;
 }
+
+/** Build-time constants from vite.config.ts's `define` — read them through src/lib/appVersion.ts, not directly. */
+declare const __APP_VERSION__: string;
+declare const __APP_COMMIT__: string;
+declare const __APP_BUILT_AT__: string;
