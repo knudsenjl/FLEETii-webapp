@@ -33,6 +33,10 @@ export interface Vehicle2Hire {
   tripDetectedUpdatedAt?: string;
   /** See autonomyPercentageUpdatedAtIso's own doc comment — same reasoning, for tripDetectedUpdatedAt. Optional for the same reason tripDetectedUpdatedAt itself is. */
   tripDetectedUpdatedAtIso?: string | null;
+  /** When the latest trip began / ended (null while running), and when Online last went false and stayed false (null while online) — derived from signal history by the vehicle_signals view, for lib/vehicleHealth.ts's trip-aware rule. Optional for the same mock-fixture reason as tripDetected. */
+  lastTripStartIso?: string | null;
+  lastTripEndIso?: string | null;
+  onlineFalseSinceIso?: string | null;
   brakingSystemWarning: string;
   brakingSystemWarningUpdatedAt: string;
   drivingRelatedFailureWarning: string;

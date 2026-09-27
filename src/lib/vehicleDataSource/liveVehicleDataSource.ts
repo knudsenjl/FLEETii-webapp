@@ -47,6 +47,9 @@ type VehicleSignalRow = {
   distance_covered_updated_at: string | null;
   trip_detected: boolean | null;
   trip_detected_updated_at: string | null;
+  last_trip_start_at: string | null;
+  last_trip_end_at: string | null;
+  online_false_since: string | null;
 };
 
 /** Formats a timestamptz value as Danish-time "DD/MM/YYYY HH.MM" (2hire's wire format), or "" if null — Danish explicitly, not the browser's own timezone (see lib/time.ts). */
@@ -108,6 +111,9 @@ function toVehicle2Hire(
     tripDetected: signal?.trip_detected === true ? "TRUE" : "FALSE",
     tripDetectedUpdatedAt: formatSignalTimestamp(signal?.trip_detected_updated_at ?? null),
     tripDetectedUpdatedAtIso: signal?.trip_detected_updated_at ?? null,
+    lastTripStartIso: signal?.last_trip_start_at ?? null,
+    lastTripEndIso: signal?.last_trip_end_at ?? null,
+    onlineFalseSinceIso: signal?.online_false_since ?? null,
     brakingSystemWarning: "",
     brakingSystemWarningUpdatedAt: "",
     drivingRelatedFailureWarning: "",
@@ -142,7 +148,7 @@ export const liveVehicleDataSource: VehicleDataSource = {
       supabase
         .from("vehicle_signals")
         .select(
-          "vehicle_id, online, online_updated_at, autonomy_percentage, autonomy_percentage_updated_at, distance_covered_meters, distance_covered_updated_at, trip_detected, trip_detected_updated_at",
+          "vehicle_id, online, online_updated_at, autonomy_percentage, autonomy_percentage_updated_at, distance_covered_meters, distance_covered_updated_at, trip_detected, trip_detected_updated_at, last_trip_start_at, last_trip_end_at, online_false_since",
         )
         .returns<VehicleSignalRow[]>(),
       supabase.from("vehicle_departments").select("vehicle_id, department_id").returns<VehicleDepartmentRow[]>(),
