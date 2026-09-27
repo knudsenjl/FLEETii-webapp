@@ -1,7 +1,9 @@
 // "!" button + popup for a vehicle with one or more unhealthy signals (see
-// lib/vehicleHealth.ts's getVehicleHealthIssues). Red when any issue is an
-// error, amber for warnings only — not green, which already means "driving"
-// (the car icon next to it). Renders nothing if `issues` is empty.
+// lib/vehicleHealth.ts's getVehicleHealthIssues). Solid red with a white "!"
+// when any issue is an error, a light amber outline for warnings only — the
+// fill, not just the hue, tells them apart at this small size (user feedback
+// 2026-09-27). Not green, which already means "driving" (the car icon next to
+// it). Renders nothing if `issues` is empty.
 //
 // Deliberately NOT built on InlinePopup (components/InlinePopup.tsx), unlike
 // most of this app's other small popovers: this button lives inside a
@@ -74,7 +76,7 @@ export function VehicleHealthIndicator({ issues }: VehicleHealthIndicatorProps) 
         aria-label={`${isError ? "Fejl" : "Advarsel"}: ${issues.map((issue) => issue.label).join(", ")}`}
         className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[0.65rem] font-bold leading-none transition ${
           isError
-            ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+            ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
             : "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
         }`}
       >

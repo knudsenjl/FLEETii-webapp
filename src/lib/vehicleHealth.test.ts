@@ -68,7 +68,12 @@ describe("getVehicleHealthIssues", () => {
     it("warns about a reading older than both the trip and 4 days", () => {
       const issues = check({ lastTripStartIso: ago(HOUR), autonomyPercentageUpdatedAtIso: ago(22 * DAY) });
       expect(issues).toEqual([
-        { label: "Drivmiddelniveau", severity: "warning", detail: expect.stringMatching(/^sidst modtaget .+, før seneste tur/) },
+        {
+          label: "Drivmiddelniveau",
+          severity: "warning",
+          refreshSignal: "autonomy_percentage",
+          detail: expect.stringMatching(/^sidst modtaget .+, før seneste tur/),
+        },
       ]);
       expect(healthLevel(issues)).toBe("warning");
     });
@@ -76,7 +81,15 @@ describe("getVehicleHealthIssues", () => {
     it("uses the 4-day age test alone when no trip is on record", () => {
       expect(check({ lastTripStartIso: null, distanceCoveredUpdatedAtIso: ago(3 * DAY) })).toEqual([]);
       expect(check({ lastTripStartIso: null, distanceCoveredUpdatedAtIso: ago(5 * DAY) })).toEqual([
-        { label: "Kilometerstand", severity: "warning", detail: expect.stringMatching(/^sidst modtaget /) },
+        { label: "Kilometerstand", severity: "warning", refreshSignal: "distance_covered", detail: expect.stringMatching(/^sidst modtaget /) },
+      ]);
+    });
+
+    it("tags only too-old readings for a refresh from 2hire, not missing ones", () => {
+      const issues = check({ lastTripStartIso: null, distanceCoveredUpdatedAtIso: ago(5 * DAY), autonomyPercentageUpdatedAtIso: null });
+      expect(issues.map((issue) => [issue.label, issue.refreshSignal])).toEqual([
+        ["Kilometerstand", "distance_covered"],
+        ["Drivmiddelniveau", undefined],
       ]);
     });
 

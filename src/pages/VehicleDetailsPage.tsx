@@ -29,6 +29,7 @@ import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, to
 import { useReverseGeocode } from "../lib/geocode";
 import { supabase } from "../lib/supabase";
 import { getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { useStaleSignalRefresh } from "../hooks/useStaleSignalRefresh";
 import { callFunction } from "../lib/callFunction";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
@@ -401,14 +402,17 @@ export function VehicleDetailsPage() {
     };
   }, [vehicle]);
 
+  /** Admin/sysadm-only "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Reads `liveVehicle` (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) — see liveVehicle's own doc comment for why: this button exists specifically to catch stale signals, so feeding it a frozen router-state snapshot would silently defeat its whole purpose. Empty (button hidden) for a non-admin viewer, or before the vehicle is known. Computed above the early return below because useStaleSignalRefresh is a hook, same as VehiclesPage's own gating. */
+  const healthIssues = isAdmin && vehicle ? getVehicleHealthIssues(liveVehicle ?? vehicle, position?.updatedAtIso ?? null) : [];
+  /** Re-reads a too-old signal from 2hire before settling on the warning — see useStaleSignalRefresh. */
+  useStaleSignalRefresh(vehicle ? [{ vehicleId: vehicle.vehicleId, issues: healthIssues }] : []);
+
   if (!vehicle) {
     return vehiclesLoading ? (
       <PageLoading label="Indlæser køretøj…" />
     ) : null;
   }
 
-  /** Admin/sysadm-only red "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Reads `liveVehicle` (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) — see liveVehicle's own doc comment for why: this button exists specifically to catch stale signals, so feeding it a frozen router-state snapshot would silently defeat its whole purpose. Empty (button hidden) for a non-admin viewer, same as VehiclesPage's own gating. */
-  const healthIssues = isAdmin ? getVehicleHealthIssues(liveVehicle ?? vehicle, position?.updatedAtIso ?? null) : [];
   /** Whether the driving-vehicle icon shows next to the "Køretøjsdetaljer" heading below — admin/sysadm only, and only while 2hire's live trip_detected signal is currently true for this vehicle. Reads `liveVehicle` first, same reasoning as healthIssues above. */
   const isDriving = isAdmin && (liveVehicle?.tripDetected ?? vehicle.tripDetected) === "TRUE";
 

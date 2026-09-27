@@ -31,8 +31,17 @@ const IDLE_WARNING_AFTER_MS = 4 * 24 * 60 * 60 * 1000;
 
 export type HealthSeverity = "warning" | "error";
 
-/** One signal the health check found wrong — `detail` is the ready-to-show Danish explanation for the popup. */
-export type HealthIssue = { label: string; severity: HealthSeverity; detail: string };
+/** The 2hire signals whose age the rule judges — the only ones useStaleSignalRefresh re-reads. */
+export type RefreshableSignal = "position" | "distance_covered" | "autonomy_percentage";
+
+/**
+ * One signal the health check found wrong — `detail` is the ready-to-show
+ * Danish explanation for the popup. `refreshSignal` is set only when the
+ * warning is about a reading that is too old (not one never received): such
+ * a reading is first re-read from 2hire (see useStaleSignalRefresh), in case
+ * a webhook delivery was simply skipped.
+ */
+export type HealthIssue = { label: string; severity: HealthSeverity; detail: string; refreshSignal?: RefreshableSignal };
 
 /** The marker's overall state: the worst severity among `issues`, or "ok" (marker hidden) if there are none. */
 export function healthLevel(issues: HealthIssue[]): "ok" | HealthSeverity {
@@ -86,12 +95,12 @@ export function getVehicleHealthIssues(
   }
 
   const tripStartMs = vehicle.lastTripStartIso ? Date.parse(vehicle.lastTripStartIso) : null;
-  const dataSignals: { label: string; iso: string | null }[] = [
-    { label: "Position", iso: positionUpdatedAtIso },
-    { label: "Kilometerstand", iso: vehicle.distanceCoveredUpdatedAtIso ?? null },
-    { label: "Drivmiddelniveau", iso: vehicle.autonomyPercentageUpdatedAtIso ?? null },
+  const dataSignals: { label: string; signal: RefreshableSignal; iso: string | null }[] = [
+    { label: "Position", signal: "position", iso: positionUpdatedAtIso },
+    { label: "Kilometerstand", signal: "distance_covered", iso: vehicle.distanceCoveredUpdatedAtIso ?? null },
+    { label: "Drivmiddelniveau", signal: "autonomy_percentage", iso: vehicle.autonomyPercentageUpdatedAtIso ?? null },
   ];
-  for (const { label, iso } of dataSignals) {
+  for (const { label, signal, iso } of dataSignals) {
     if (!iso) {
       issues.push({ label, severity: "warning", detail: "aldrig modtaget" });
       continue;
@@ -102,6 +111,7 @@ export function getVehicleHealthIssues(
     issues.push({
       label,
       severity: "warning",
+      refreshSignal: signal,
       detail:
         tripStartMs !== null
           ? `sidst modtaget ${formatIsoShort(iso)}, før seneste tur (${formatIsoShort(vehicle.lastTripStartIso!)})`

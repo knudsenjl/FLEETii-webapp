@@ -17,8 +17,8 @@
 -- are touched. Every fake row carries "fake": true in signal_value (ignored
 -- by the vehicle_signals view), and the first seed saves the original
 -- vehicle_signals_latest rows in staging_health_backup, which the restore
--- puts back. The seed refuses to run where recent non-fake position/online
--- history exists — i.e. on production, where webhooks deliver live data.
+-- puts back. The seed refuses to run where a week's real Online history
+-- exceeds 500 rows — i.e. on production, where webhooks deliver live data.
 --
 -- Callable by the database owner (Supabase SQL editor / MCP) and by the
 -- service role (the /test-center button, see the end of this file) — never
@@ -81,12 +81,16 @@ declare
   km numeric;
   pos jsonb;
 begin
-  if exists (
-    select 1 from vehicle_signal_history
-    where signal_type in ('position', 'online')
+  -- Production receives ~40,000 real Online webhook rows a week; staging
+  -- essentially none. Online only (and a threshold, not "any"): the
+  -- health marker's refresh (refresh-vehicle-signals.mts) and the signal
+  -- backfill can legitimately store a few real readings on staging too.
+  if (
+    select count(*) from vehicle_signal_history
+    where signal_type = 'online'
       and signal_timestamp > t - interval '7 days'
       and not coalesce((signal_value->>'fake')::boolean, false)
-  ) then
+  ) > 500 then
     raise exception 'Live signal history found — this looks like production. Refusing to write fake signals.';
   end if;
 
