@@ -105,7 +105,9 @@ type ProfileRow = {
  * every profile field read-only (a user views but never edits their own
  * Navn/E-mail/Telefon/Rolle/Afdeling(er)/Hjemmeafdeling from here — that
  * still requires an admin) alongside a fully-editable Standard settings/
- * Anvendelser/Rettigheder section further down. A plain "user" requesting
+ * Anvendelser/Rettigheder section further down. Exception (2026-09-28): an
+ * ADMIN on their own row may edit those profile fields too, all but Rolle —
+ * see canEditOwnProfile. A plain "user" requesting
  * someone ELSE's :userId (isSelf false, isAnyAdmin(profile?.role) also
  * false) gets ForbiddenNotice instead — this component's own check, since
  * ProtectedRoute can't express "admin OR your own row". An admin/sysadm
@@ -115,7 +117,7 @@ type ProfileRow = {
  * didn't have before this unification.
  */
 export function UserDetailsPage() {
-  const { profile, costumerId, costumerName, afdelingId, afdeling, availableDepartments } = useAuth();
+  const { profile, costumerId, costumerName, afdelingId, afdeling, availableDepartments, refreshProfile } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -123,6 +125,20 @@ export function UserDetailsPage() {
   const isSelf = Boolean(userId) && userId === profile?.user_id;
   /** A plain "user" (or any non-admin role) requesting someone ELSE's :userId — never allowed, since ProtectedRoute's own check (App.tsx) can't express "admin OR your own row" and had to be loosened to let self-view through at all. Rendered as ForbiddenNotice further down, once past the hooks section. */
   const forbiddenOtherUser = Boolean(userId) && !isSelf && !isAnyAdmin(profile?.role);
+  /**
+   * An admin (role "admin") on their OWN row may edit their own profile
+   * fields — user decision 2026-09-28: at a costumer with a single admin,
+   * nobody but FLEETii support could otherwise ever change that admin's own
+   * name, e-mail, phone or departments. Everything except Rolle, so an admin
+   * can't demote themselves out of the admin pages by accident (another
+   * admin or a sysadm still can). Not for a sysadm: their department fields
+   * are only the Data Filter pointer, not a real home department. The server
+   * (update-user.mts) already allows an admin to update any user of their own
+   * costumer, themselves included.
+   */
+  const canEditOwnProfile = isSelf && isDepartmentAdmin(profile?.role);
+  /** Self-view's profile fields stay read-only for everyone else looking at their own row (a regular user, a sysadm). */
+  const profileReadOnly = isSelf && !canEditOwnProfile;
   const navState = location.state as { user?: ProfileRow } | null;
   const stateUser = navState?.user ?? null;
   const [fetchedUser, setFetchedUser] = useState<ProfileRow | null>(null);
@@ -193,6 +209,8 @@ export function UserDetailsPage() {
   const [anvendelseDirty, setAnvendelseDirty] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  /** canEditOwnProfile only: the "saved" confirmation under the own-profile Opdater button (self-edits stay on this page instead of returning to the user list). */
+  const [ownProfileSavedMessage, setOwnProfileSavedMessage] = useState<string | null>(null);
   const [departmentOptions, setDepartmentOptions] = useState<DepartmentOption[]>([]);
   const [isLastAdmin, setIsLastAdmin] = useState(false);
   const { activeKey: warningKey, trigger: triggerWarning } = useTimedFlag();
@@ -464,7 +482,14 @@ export function UserDetailsPage() {
   // homeDepartmentId (and everything downstream of it, e.g. the new Standard
   // settings section below) undefined for a render or two even though the
   // real answer was already known.
-  const homeDepartmentId = isSelf ? (profile?.department_id ?? null) : departmentOptions.find((d) => d.name === department)?.department_id;
+  // An admin editing their own row (canEditOwnProfile) follows the form's
+  // Hjemmeafdeling choice like any edit, so the "Hjem" badge and its locked
+  // checkbox move with it — falling back to the saved home department until
+  // departmentOptions has loaded.
+  const homeDepartmentId = profileReadOnly
+    ? (profile?.department_id ?? null)
+    : (departmentOptions.find((d) => d.name === department)?.department_id ??
+      (isSelf ? (profile?.department_id ?? null) : undefined));
   /** Whether the user-being-edited/created's OWN home department shows the "Bruger-ID:" row below at all — see useIdentSettings' own doc comment. Deliberately NOT afdelingId (the viewing admin's own active department): a sysadm editing a user in some other department has afdelingId === null (see this page's own doc comment on the fetch-by-id fallback being reachable by "any" department for that role), which would otherwise always hide the field regardless of the edited user's actual department setting. */
   const { useUserIdent } = useIdentSettings(homeDepartmentId ?? null);
   /** The one department checked "Tilhører" in Afdeling(er), when there's exactly one — Hjemmeafdeling locks to it (see the effect above and the rendering below), same as departmentOptions.length === 1 locking it to the costumer's own sole department. */
@@ -610,6 +635,33 @@ export function UserDetailsPage() {
     navigate("/department", { replace: true });
   };
 
+  /** canEditOwnProfile only: whether any own-profile field or department grant differs from what's saved — enables the own-profile Fortryd/Opdater pair. */
+  const ownProfileDirty =
+    canEditOwnProfile &&
+    Boolean(user) &&
+    (fullName !== (user?.full_name ?? "") ||
+      email !== (user?.email ?? "") ||
+      phone !== (user?.phone ?? "") ||
+      userIdent !== (user?.user_ident ?? "") ||
+      department !== (user?.department_name ?? "") ||
+      userDepartmentIds.size !== originalUserDepartmentIds.size ||
+      [...userDepartmentIds].some((id) => !originalUserDepartmentIds.has(id)));
+  /** The e-mail is also the login: changing your OWN one gets an extra line in the confirmation. */
+  const ownEmailChanged = canEditOwnProfile && email.trim() !== (user?.email ?? "");
+
+  /** canEditOwnProfile only: puts every own-profile field and department grant back to what's saved. */
+  const resetOwnProfile = () => {
+    if (!user) return;
+    setFullName(user.full_name ?? "");
+    setEmail(user.email ?? "");
+    setPhone(user.phone ?? "");
+    setUserIdent(user.user_ident ?? "");
+    setDepartment(user.department_name ?? "");
+    setUserDepartmentIds(new Set(originalUserDepartmentIds));
+    setSubmitError(null);
+    setOwnProfileSavedMessage(null);
+  };
+
   /** Calls update-user with the form's current values for this user, authenticated with the current session's access token, then persists any pending Rettigheder checkbox changes (staged locally via deferSave — see RettighederSettings' exposed save()). Shows the server's error message (or a generic connection-failure one) inline on failure. */
   const handleUpdate = async () => {
     if (!user) return;
@@ -682,6 +734,18 @@ export function UserDetailsPage() {
     if (rettighederResult?.error) {
       setSubmitError(rettighederResult.error);
       setIsSubmitting(false);
+      return;
+    }
+
+    // An admin editing their OWN row stays here: reload the logged-in
+    // profile (name, e-mail, home department, department list) so the header
+    // and this form show the saved values; the form and grants re-sync from
+    // it via the `user` effects above.
+    if (isSelf) {
+      await refreshProfile();
+      setIsSubmitting(false);
+      setPendingAction(null);
+      setOwnProfileSavedMessage("Dine oplysninger er opdateret.");
       return;
     }
 
@@ -840,7 +904,7 @@ export function UserDetailsPage() {
                   )}
                   {useUserIdent && (
                     <FieldRow variant="settings" rawLabel label={<label className="text-sm font-medium text-brand-700">Bruger-ID:</label>}>
-                      {isSelf ? (
+                      {profileReadOnly ? (
                         <input
                           type="text"
                           readOnly
@@ -860,13 +924,13 @@ export function UserDetailsPage() {
                     </FieldRow>
                   )}
                   {/* className override on all three: matches this table's own header bar's px-2 (RequiredFieldRow's own default is p-0.5, no horizontal padding) so every row's label text starts flush with the header text above it. */}
-                  <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} readOnly={isSelf} className={SETTINGS_ROW_CLASSNAME} />
+                  <RequiredFieldRow label="Navn:" value={fullName} onChange={setFullName} readOnly={profileReadOnly} className={SETTINGS_ROW_CLASSNAME} />
                   <RequiredFieldRow
                     label="E-mail:"
                     value={email}
                     onChange={setEmail}
                     type="email"
-                    readOnly={isSelf}
+                    readOnly={profileReadOnly}
                     className={SETTINGS_ROW_CLASSNAME}
                   />
                   <RequiredFieldRow
@@ -874,7 +938,7 @@ export function UserDetailsPage() {
                     value={phone}
                     onChange={setPhone}
                     type="tel"
-                    readOnly={isSelf}
+                    readOnly={profileReadOnly}
                     className={SETTINGS_ROW_CLASSNAME}
                   />
                   <FieldRow
@@ -981,8 +1045,8 @@ export function UserDetailsPage() {
                                   <input
                                     type="checkbox"
                                     checked={isHome || userDepartmentIds.has(option.department_id)}
-                                    disabled={isSelf || isHome}
-                                    onChange={isSelf ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
+                                    disabled={profileReadOnly || isHome}
+                                    onChange={profileReadOnly ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
                                     className={CHECKBOX_CLASSNAME}
                                   />
                                   {/* Always-visible, not a hover tooltip — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
@@ -1007,7 +1071,7 @@ export function UserDetailsPage() {
                           <div className="relative flex items-center justify-between gap-2">
                             <label className="text-sm font-medium text-brand-700">
                               Hjemmeafdeling:{" "}
-                              {!isSelf && departmentOptions.length !== 1 && !soleCheckedDepartment && (
+                              {!profileReadOnly && departmentOptions.length !== 1 && !soleCheckedDepartment && (
                                 <RequiredMark />
                               )}
                             </label>
@@ -1015,7 +1079,7 @@ export function UserDetailsPage() {
                               open={openInfoPopover === "hjemmeafdeling"}
                               onToggle={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
                               message={
-                                isSelf || departmentOptions.length === 1 || soleCheckedDepartment
+                                profileReadOnly || departmentOptions.length === 1 || soleCheckedDepartment
                                   ? "Du er tilknyttet denne afdeling"
                                   : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
                               }
@@ -1024,14 +1088,14 @@ export function UserDetailsPage() {
                           </div>
                         }
                       >
-                        {isSelf || departmentOptions.length === 1 || soleCheckedDepartment ? (
+                        {profileReadOnly || departmentOptions.length === 1 || soleCheckedDepartment ? (
                           <input
                             type="text"
                             readOnly
                             disabled
                             value={
-                              isSelf
-                                ? (afdeling ?? "—")
+                              profileReadOnly
+                                ? (department || "—")
                                 : departmentOptions.length === 1
                                   ? departmentOptions[0].name
                                   : (soleCheckedDepartment?.name ?? "")
@@ -1068,10 +1132,37 @@ export function UserDetailsPage() {
               )}
               {phoneFormatInvalid && <p className="text-xs text-red-600">Ugyldigt telefonnummer.</p>}
 
-              {!isSelf && (
+              {!profileReadOnly && (
                 <p className="text-right text-xs text-brand-500">
                   <span className="text-red-600">*</span> Feltet skal udfyldes
                 </p>
+              )}
+
+              {/* An admin's own profile: its own Fortryd/Opdater pair right
+                  under the fields it saves (the Indstillinger table further
+                  down keeps its separate pair), active only when something
+                  actually changed. */}
+              {canEditOwnProfile && (
+                <div className="flex flex-col gap-2">
+                  <ButtonRow>
+                    <Button variant="secondary" type="button" onClick={resetOwnProfile} disabled={!ownProfileDirty || isSubmitting}>
+                      Fortryd
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => {
+                        setSubmitError(null);
+                        setOwnProfileSavedMessage(null);
+                        setPendingAction("update");
+                      }}
+                      disabled={!ownProfileDirty || !canSubmit}
+                    >
+                      Opdater mine oplysninger
+                    </Button>
+                  </ButtonRow>
+                  {ownProfileSavedMessage && <p className="text-sm text-green-700">{ownProfileSavedMessage}</p>}
+                </div>
               )}
 
               {user && !isSelf && user.role === "user" && (
@@ -1242,7 +1333,12 @@ export function UserDetailsPage() {
               : pendingAction === "update"
                 ? (
                     <>
-                      Er du sikker på, at du vil opdatere denne bruger?
+                      {isSelf ? "Er du sikker på, at du vil opdatere dine oplysninger?" : "Er du sikker på, at du vil opdatere denne bruger?"}
+                      {ownEmailChanged && (
+                        <span className="mt-2 block text-amber-600">
+                          Bemærk: din e-mail er også dit login — fremover logger du ind med {email.trim()}.
+                        </span>
+                      )}
                       {isCrossingDepartmentBoundary && (
                         // Informational only — the update itself is still allowed
                         // (a regular admin's real authorization boundary is their
