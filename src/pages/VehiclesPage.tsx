@@ -16,7 +16,7 @@ import { TableMessageRow } from "../components/TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
-import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { getVehicleHealthIssues } from "../lib/vehicleHealth";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
 import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
 
@@ -236,7 +236,7 @@ export function VehiclesPage() {
                                 {vehicle.tripDetected === "TRUE" && <CarGlyph className="h-5 w-8 shrink-0 text-green-600" title="Kører" />}
                                 {/* Reserves the "!" button's own h-4 w-4 footprint even when healthy (VehicleHealthIndicator renders nothing at all for an empty issues list) — otherwise a healthy row's CarGlyph above would sit further right than a row with a real "!" next to it, since this whole group is right-aligned via the parent's justify-between. This blank placeholder keeps every row's CarGlyph at the same horizontal position down the column. */}
                                 {healthIssues.length > 0 ? (
-                                  <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
+                                  <VehicleHealthIndicator issues={healthIssues} />
                                 ) : (
                                   <span className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 )}

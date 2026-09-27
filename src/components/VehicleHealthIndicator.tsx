@@ -1,6 +1,7 @@
-// Red "!" button + popup for a vehicle with one or more unhealthy signals
-// (see getVehicleHealthIssues in VehiclesPage.tsx). Renders nothing if
-// `issues` is empty.
+// "!" button + popup for a vehicle with one or more unhealthy signals (see
+// lib/vehicleHealth.ts's getVehicleHealthIssues). Red when any issue is an
+// error, amber for warnings only — not green, which already means "driving"
+// (the car icon next to it). Renders nothing if `issues` is empty.
 //
 // Deliberately NOT built on InlinePopup (components/InlinePopup.tsx), unlike
 // most of this app's other small popovers: this button lives inside a
@@ -15,16 +16,13 @@
 // row sits in the table.
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-
-export type VehicleHealthIssue = { label: string; lastReceivedIso: string | null };
+import { healthLevel, type HealthIssue } from "../lib/vehicleHealth";
 
 interface VehicleHealthIndicatorProps {
-  issues: VehicleHealthIssue[];
-  /** Formats a lastReceivedIso for display — injected rather than hardcoded here since the exact "DD/MM HH:MM" convention is owned by the calling page (VehiclesPage.tsx's formatIsoShort), not this component. */
-  formatLastReceived: (iso: string) => string;
+  issues: HealthIssue[];
 }
 
-export function VehicleHealthIndicator({ issues, formatLastReceived }: VehicleHealthIndicatorProps) {
+export function VehicleHealthIndicator({ issues }: VehicleHealthIndicatorProps) {
   const [open, setOpen] = useState(false);
   const buttonRef = useRef<HTMLButtonElement>(null);
   const [popupPosition, setPopupPosition] = useState<{ top: number; right: number } | null>(null);
@@ -60,7 +58,9 @@ export function VehicleHealthIndicator({ issues, formatLastReceived }: VehicleHe
     };
   }, [open]);
 
-  if (issues.length === 0) return null;
+  const level = healthLevel(issues);
+  if (level === "ok") return null;
+  const isError = level === "error";
 
   return (
     <>
@@ -71,8 +71,12 @@ export function VehicleHealthIndicator({ issues, formatLastReceived }: VehicleHe
           e.stopPropagation();
           setOpen((prev) => !prev);
         }}
-        aria-label={`Sundhedsproblem: mangler ${issues.map((issue) => issue.label).join(", ")}`}
-        className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-red-500 bg-red-50 text-[0.65rem] font-bold leading-none text-red-600 transition hover:bg-red-100"
+        aria-label={`${isError ? "Fejl" : "Advarsel"}: ${issues.map((issue) => issue.label).join(", ")}`}
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[0.65rem] font-bold leading-none transition ${
+          isError
+            ? "border-red-500 bg-red-50 text-red-600 hover:bg-red-100"
+            : "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
+        }`}
       >
         !
       </button>
@@ -94,22 +98,25 @@ export function VehicleHealthIndicator({ issues, formatLastReceived }: VehicleHe
               setOpen(false);
             }}
             style={{ position: "fixed", top: popupPosition.top, right: popupPosition.right }}
-            className="animate-fade-in z-50 w-max max-w-sm rounded-lg border border-red-300 bg-white px-3 py-2 text-sm text-black shadow-lg"
+            className={`animate-fade-in z-50 w-max max-w-sm rounded-lg border bg-white px-3 py-2 text-sm text-black shadow-lg ${
+              isError ? "border-red-300" : "border-amber-300"
+            }`}
           >
-            {/* Intro + closing explanation around the list (user wording, 2026-09-27): the list alone read as "the vehicle is broken", when the usual cause is simply that it hasn't been used. The 3 days match vehicleHealth.ts's SIGNAL_STALE_THRESHOLD_MS. */}
-            <p className="mb-1">Det er mere end 3 dage siden, at FLEETii har modtaget flg. data fra køretøjet:</p>
+            {/* Errors come first (see getVehicleHealthIssues); each label is colored by its own severity. The closing line explains warnings, which usually just mean an idle vehicle (see the rule in lib/vehicleHealth.ts). */}
+            <p className="mb-1">FLEETii har registreret flg. for køretøjet:</p>
             <ul className="mb-1 space-y-1 pl-4">
               {issues.map((issue) => (
-                <li key={issue.label} className="whitespace-nowrap">
-                  <span className="font-semibold">{issue.label}:</span>{" "}
-                  {issue.lastReceivedIso ? `sidst modtaget ${formatLastReceived(issue.lastReceivedIso)}` : "aldrig modtaget"}
+                <li key={issue.label}>
+                  <span className={`font-semibold ${issue.severity === "error" ? "text-red-600" : "text-amber-600"}`}>
+                    {issue.label}:
+                  </span>{" "}
+                  {issue.detail}
                 </li>
               ))}
             </ul>
-            <p>
-              hvorfor disse data måske ikke er korrekte. Årsagen kan simpelthen være, at køretøjet ikke har været anvendt de sidste
-              tre dage.
-            </p>
+            {issues.some((issue) => issue.severity === "warning") && (
+              <p>Advarsler kan skyldes, at køretøjet ikke har været anvendt i en periode.</p>
+            )}
           </div>,
           document.body,
         )}
