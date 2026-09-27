@@ -5,8 +5,9 @@
 //     2026-09-27 from the round flask icon that used to sit in PageHeader's
 //     top pane) and "Seed Vehicle Health Data" (seed-vehicle-health.mts —
 //     fake 2hire signals showing every vehicle-health outcome). Both are
-//     shown only in test mode (isTestMode below); the real boundary against
-//     writing test data into production is server-side, see
+//     shown only in test mode (isTestMode below) and ask for confirmation
+//     first (SEED_CONFIRM_MESSAGE); the real boundary against writing test
+//     data into production is server-side, see
 //     netlify/functions/_shared/testDataGuard.ts.
 //   - 2hire kommando: type an arbitrary 2hire Adapter API request ("METODE
 //     /sti", e.g. "POST /api/v1/vehicle/{AB12345}/command/generic/locate")
@@ -23,11 +24,16 @@ import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
 import { SectionHeading } from "../components/SectionHeading";
+import { ConfirmDialog } from "../components/ConfirmDialog";
 import { callFunction } from "../lib/callFunction";
 
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Only decides whether the Testdata buttons are shown; the Functions re-check server-side. */
 const isTestMode =
   import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
+
+/** The confirmation every seed button asks for before writing simulated data (user wording, 2026-09-27). Confirming sends { confirmed: true }, which the seed Functions require. */
+const SEED_CONFIRM_MESSAGE =
+  "Denne funktion vil generere simulerede data i databasen. Er du sikker på, at du ønsker at tilføje simulerede data til databasen?";
 
 /** One vehicle's fake-signal scenario, as returned by seed-vehicle-health.mts. */
 type SeededScenario = {
@@ -78,6 +84,8 @@ export function TestCenterPage() {
     null,
   );
 
+  /** Which seed is waiting for the user's answer in the confirmation dialog, or null when none is open. */
+  const [confirmingSeed, setConfirmingSeed] = useState<"bookings" | "health" | null>(null);
   const [seedingBookings, setSeedingBookings] = useState(false);
   const [bookingSeedMessage, setBookingSeedMessage] = useState<string | null>(
     null,
@@ -96,7 +104,7 @@ export function TestCenterPage() {
       const response = await callFunction<{
         created?: { department: string; count: number }[];
         skipped?: { department: string; reason: string }[];
-      }>("seed-test-bookings", { method: "POST" });
+      }>("seed-test-bookings", { body: { confirmed: true } });
       if (!response.ok) {
         setBookingSeedMessage(
           response.data.error ?? "Kunne ikke oprette testreservationer.",
@@ -126,7 +134,7 @@ export function TestCenterPage() {
     try {
       const response = await callFunction<{ scenarios: SeededScenario[] }>(
         "seed-vehicle-health",
-        { method: "POST" },
+        { body: { confirmed: true } },
       );
       if (!response.ok) {
         setHealthSeedError(
@@ -224,7 +232,7 @@ export function TestCenterPage() {
             <div className="flex flex-wrap gap-3">
               <button
                 type="button"
-                onClick={() => void handleSeedTestBookings()}
+                onClick={() => setConfirmingSeed("bookings")}
                 disabled={seedingBookings}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -232,7 +240,7 @@ export function TestCenterPage() {
               </button>
               <button
                 type="button"
-                onClick={() => void handleSeedVehicleHealth()}
+                onClick={() => setConfirmingSeed("health")}
                 disabled={seedingHealth}
                 className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
@@ -429,6 +437,18 @@ export function TestCenterPage() {
           )}
         </PageSection>
       </div>
+
+      {confirmingSeed && (
+        <ConfirmDialog
+          message={SEED_CONFIRM_MESSAGE}
+          onCancel={() => setConfirmingSeed(null)}
+          onConfirm={() => {
+            const seed = confirmingSeed;
+            setConfirmingSeed(null);
+            void (seed === "bookings" ? handleSeedTestBookings() : handleSeedVehicleHealth());
+          }}
+        />
+      )}
     </PageShell>
   );
 }

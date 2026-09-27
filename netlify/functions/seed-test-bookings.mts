@@ -5,9 +5,10 @@
 // interface test isn't staring at empty tables. Reached from the
 // "Seed Test Reservations" button on the sysadm-only /test-center page
 // (TestCenterPage.tsx). What stops it from ever writing fabricated bookings
-// into real production data is testDataGuard.ts's two server-side checks
-// (explicit opt-in env var + hardcoded production SITE_ID backstop), run
-// before requireAdmin() below.
+// into real production data is testDataGuard.ts's three independent
+// server-side checks (not the production site; connected to the staging
+// database by an allowlist; the database itself marked as staging), plus a
+// required { confirmed: true } body from the page's confirmation dialog.
 //
 // For each department — every costumer's for a sysadm, or only the
 // caller's OWN costumer's for a regular admin (see the costumerId scoping
@@ -42,7 +43,7 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { json } from "./_shared/http.js";
-import { testDataSeedingBlocked } from "./_shared/testDataGuard.js";
+import { isConfirmedSeedRequest, testDataDatabaseBlocked, testDataEnvironmentBlocked } from "./_shared/testDataGuard.js";
 
 const MIN_BOOKINGS_PER_DEPARTMENT = 3;
 const MAX_BOOKINGS_PER_DEPARTMENT = 7;
@@ -72,8 +73,8 @@ export default async (req: Request) => {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  const blocked = testDataSeedingBlocked();
-  if (blocked) return blocked;
+  const environmentBlocked = testDataEnvironmentBlocked();
+  if (environmentBlocked) return environmentBlocked;
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
@@ -85,6 +86,14 @@ export default async (req: Request) => {
     return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
+
+  const body = await req.json().catch(() => null);
+  if (!isConfirmedSeedRequest(body)) {
+    return json({ error: "Handlingen skal bekræftes." }, 400);
+  }
+
+  const databaseBlocked = await testDataDatabaseBlocked(admin);
+  if (databaseBlocked) return databaseBlocked;
 
   const { data: caller, error: callerError } = await admin
     .from("user_profiles")
