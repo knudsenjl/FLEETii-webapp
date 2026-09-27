@@ -6,12 +6,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { formatRoleLabel, useAuth, type DepartmentOption } from "../contexts/AuthContext";
-import { isAnyAdmin, isDepartmentAdmin, isSysadm } from "../lib/roles";
+import { isDepartmentAdmin, isSysadm } from "../lib/roles";
 import { useTimedFlag } from "../hooks/useTimedFlag";
 import { FleetiiLogo } from "./FleetiiLogo";
 import { InlinePopup } from "./InlinePopup";
 import { ClickOutsideOverlay } from "./ClickOutsideOverlay";
-import { callFunction } from "../lib/callFunction";
 
 /** One entry in the settings button's dropdown menu (admin/sysadm only — see settingsMenuItemsForRole). */
 type SettingsMenuItem = { label: string; path: string };
@@ -54,7 +53,7 @@ export interface PageHeaderNavigateField {
 }
 
 /**
- * TwoHireCommandPage.tsx-only variant of the same "quick jump" idea as
+ * TestCenterPage.tsx-only variant of the same "quick jump" idea as
  * PageHeaderNavigateField above, but for the Kunde <select> specifically —
  * that page has no Kunde/Afdeling scoping concept of its own at all (its
  * commands address a vehicle directly by plate/2hire id), so repurposing
@@ -115,9 +114,6 @@ function settingsMenuItemsForRole(role: string | null | undefined, ownUserId: st
   return [];
 }
 
-/** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Gates the round test icon below (and the seed-test-bookings.mts function it calls, which re-checks this same var server-side rather than trusting the client). */
-const isTestMode = import.meta.env.VITE_DATA_SOURCE !== "2hire-production-adaptor";
-
 /** Option value for the "Alle" entry in the jump-to-Kunde menu (kundeNavigate) — a sentinel, since "" is that menu's own "Vælg…" placeholder and every other value is a real costumer id. */
 const KUNDE_NAVIGATE_ALL = "__alle__";
 
@@ -156,7 +152,7 @@ const KUNDE_NAVIGATE_ALL = "__alle__";
  * nothing" doc comment).
  *
  * `hideAfdeling`/`kundeNavigate` (optional, page-supplied —
- * TwoHireCommandPage.tsx/AdminFrontpage.tsx only): those pages have no
+ * TestCenterPage.tsx/AdminFrontpage.tsx only): those pages have no
  * Kunde/Afdeling scoping concept at all, so `hideAfdeling` drops the
  * Afdeling <select> entirely (not just its "Alle" option), and
  * `kundeNavigate` (see PageHeaderKundeNavigateField) repurposes the Kunde
@@ -229,8 +225,6 @@ export function PageHeader({
   const [switchError, setSwitchError] = useState<string | null>(null);
   /** True for the duration of any in-flight handleSwitch call — disables BOTH the Kunde and Afdeling <select>s (see their disabled props below) so a second pick can't fire while the first is still resolving. Without this, picking Kunde then immediately picking Afdeling "Alle" before the first switchDepartment call resolves would read a stale, pre-switch costumerId out of this render's closure (line ~496) and silently clobber the just-made Kunde pick once both requests land. */
   const [isSwitchingScope, setIsSwitchingScope] = useState(false);
-  const [seedingBookings, setSeedingBookings] = useState(false);
-  const [seedResultMessage, setSeedResultMessage] = useState<string | null>(null);
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const settingsMenuItems = settingsMenuItemsForRole(profile?.role, profile?.user_id);
 
@@ -286,57 +280,11 @@ export function PageHeader({
     }
   };
 
-  /** Calls seed-test-bookings.mts (test-mode only — see isTestMode above — and admin/sysadm only, both re-checked server-side) to populate departments with a handful of realistic bookings, then shows a short result summary via the same InlinePopup pattern as switchError. A regular admin only seeds departments under their own costumer; a sysadm seeds every costumer's departments — see seed-test-bookings.mts. */
-  const handleSeedTestBookings = async () => {
-    setSeedingBookings(true);
-    try {
-      const response = await callFunction("seed-test-bookings", { method: "POST" });
-      const result = response.data as {
-        error?: string;
-        created?: { department: string; count: number }[];
-        skipped?: { department: string; reason: string }[];
-      };
-      if (!response.ok) {
-        setSeedResultMessage(result.error ?? "Kunne ikke oprette testreservationer.");
-      } else {
-        const total = (result.created ?? []).reduce((sum, d) => sum + d.count, 0);
-        const skippedCount = result.skipped?.length ?? 0;
-        setSeedResultMessage(
-          `${total} testreservationer oprettet i ${result.created?.length ?? 0} afdelinger` +
-            (skippedCount > 0 ? ` (${skippedCount} afdeling(er) sprunget over).` : "."),
-        );
-      }
-    } catch {
-      setSeedResultMessage("Kunne ikke kontakte serveren.");
-    } finally {
-      setSeedingBookings(false);
-      triggerNotImplemented("seed-test-bookings-result");
-    }
-  };
-
   return (
     <div className="mb-2 flex flex-col gap-2">
       <div className="flex items-center justify-between gap-3">
         <FleetiiLogo className={compact ? "h-6 w-auto shrink-0" : "h-8 w-auto shrink-0"} linkToHome />
         <div className="flex items-center justify-end gap-3">
-          {isFullyAuthenticated && isTestMode && isAnyAdmin(profile?.role) && (
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => void handleSeedTestBookings()}
-                disabled={seedingBookings}
-                aria-label="Opret testreservationer"
-                title="Opret testreservationer (kun testmiljø)"
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-amber-300 bg-amber-50 text-amber-700 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
-                  <path d="M9 3h6" />
-                  <path d="M10 3v6.5L4.5 18a2 2 0 0 0 1.7 3h11.6a2 2 0 0 0 1.7-3L14 9.5V3" />
-                </svg>
-              </button>
-              <InlinePopup visible={notImplementedKey === "seed-test-bookings-result"} message={seedResultMessage ?? ""} align="right" />
-            </div>
-          )}
           {isFullyAuthenticated && (
             <button
               type="button"

@@ -1,4 +1,4 @@
-// Netlify Function backing TwoHireCommandPage.tsx ("/2hire-command",
+// Netlify Function backing TestCenterPage.tsx ("/test-center",
 // sysadm-only): sends an arbitrary, hand-typed request straight to 2hire's
 // Adapter API and returns the raw response, for poking at endpoints this
 // codebase has no dedicated wrapper for yet (unlike 2hire-vehicle-command.mts,

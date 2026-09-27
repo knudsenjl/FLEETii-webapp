@@ -1,4 +1,4 @@
-// Netlify Function backing TwoHireCommandPage.tsx's "Signal-backfill"
+// Netlify Function backing TestCenterPage.tsx's "Signal-backfill"
 // section (sysadm-only): a one-off maintenance action, NOT something run
 // automatically or on a schedule. For every vehicle in vehicle_profiles that
 // has no vehicle_signals_latest row (or an outdated one is fine — the

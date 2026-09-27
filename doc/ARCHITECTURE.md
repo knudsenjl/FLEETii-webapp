@@ -99,7 +99,8 @@ nothing about who's calling.
 | `delete-vehicle.mts`, `delete-costumer.mts`, `send-vehicle-deletion-request.mts`, `send-vehicle-request.mts` | Vehicle/costumer lifecycle + the email-based request flow to FLEETii staff |
 | `motorapi-vehicle-lookup.mts` | Danish plate/stelnummer lookup via MotorAPI |
 | `geoapify-reverse-geocode.mts` | GPS position → human-readable address via Geoapify (worldwide, unlike DAWA's Danish-only coverage) |
-| `seed-test-bookings.mts` | Test-data seeding (non-production tooling) |
+| `seed-test-bookings.mts` | Test-data seeding: reservations (non-production tooling, /test-center) |
+| `seed-vehicle-health.mts` | Test-data seeding: fake vehicle-health signals (staging only, /test-center) |
 
 `netlify/functions/_shared/` holds the reusable pieces:
 `serverAuth.ts` (identity/role checks), `twoHireClient.ts` +

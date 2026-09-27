@@ -20,8 +20,9 @@
 -- puts back. The seed refuses to run where recent non-fake position/online
 -- history exists — i.e. on production, where webhooks deliver live data.
 --
--- Callable only by the database owner (Supabase SQL editor / MCP), never by
--- app users.
+-- Callable by the database owner (Supabase SQL editor / MCP) and by the
+-- service role (the /test-center button, see the end of this file) — never
+-- directly by app users.
 
 create table if not exists public.staging_health_backup (
   vehicle_id uuid not null,
@@ -216,3 +217,10 @@ revoke all on function public.staging_fake_signal(uuid, text, jsonb, timestamptz
 revoke all on function public.staging_fake_trip(uuid, timestamptz, timestamptz) from public, anon, authenticated;
 revoke all on function public.staging_seed_health_scenarios() from public, anon, authenticated;
 revoke all on function public.staging_restore_health_scenarios() from public, anon, authenticated;
+
+-- The /test-center "Seed Vehicle Health Data" button calls the seed through
+-- netlify/functions/seed-vehicle-health.mts, which runs as service_role.
+grant execute on function public.staging_fake_signal(uuid, text, jsonb, timestamptz) to service_role;
+grant execute on function public.staging_fake_trip(uuid, timestamptz, timestamptz) to service_role;
+grant execute on function public.staging_seed_health_scenarios() to service_role;
+grant execute on function public.staging_restore_health_scenarios() to service_role;
