@@ -75,9 +75,7 @@ const SettingsAdminPage = lazy(() =>
   import("./pages/SettingsAdminPage").then((m) => ({ default: m.SettingsAdminPage })),
 );
 const SetPasswordPage = lazy(() => import("./pages/SetPasswordPage").then((m) => ({ default: m.SetPasswordPage })));
-const TwoHireCommandPage = lazy(() =>
-  import("./pages/TwoHireCommandPage").then((m) => ({ default: m.TwoHireCommandPage })),
-);
+const TestCenterPage = lazy(() => import("./pages/TestCenterPage").then((m) => ({ default: m.TestCenterPage })));
 
 /**
  * The "/" route. Once the initial auth check finishes, sends a signed-in
@@ -243,13 +241,15 @@ function App() {
               }
             />
             <Route
-              path="/2hire-command"
+              path="/test-center"
               element={
                 <ProtectedRoute requireRole="sysadm">
-                  <TwoHireCommandPage />
+                  <TestCenterPage />
                 </ProtectedRoute>
               }
             />
+            {/* Old name of /test-center (renamed 2026-09-27) — kept so bookmarks still work. */}
+            <Route path="/2hire-command" element={<Navigate to="/test-center" replace />} />
             <Route
               path="/costumer-new"
               element={

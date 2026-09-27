@@ -2,28 +2,12 @@
 // department system-wide for a sysadm, or just the caller's own
 // costumer's for a regular admin — see the costumerId scoping below) with a
 // handful of realistic-looking bookings, so a manual
-// interface test isn't staring at empty tables. Reached from the round test
-// icon in PageHeader.tsx, whose own visibility (VITE_DATA_SOURCE-based) is
-// just a UX convenience — the actual boundary against ever writing
-// fabricated bookings into real production data is the two checks below,
-// neither of which the icon knows about:
-//   1. ALLOW_TEST_BOOKING_SEED === "true" — a server-only (never
-//      VITE_-prefixed) explicit opt-in, defaulting to DISABLED. Unset,
-//      misspelled, wrong-case, or any value other than exactly "true" means
-//      disabled — this fails CLOSED, unlike a check that only blocks when a
-//      var equals a specific "production" marker (which fails OPEN the
-//      instant that marker is ever missing/mistyped on the real production
-//      site — this function used to do exactly that, keyed off
-//      VITE_DATA_SOURCE, see git history).
-//   2. process.env.SITE_ID === PRODUCTION_SITE_ID below — an unbypassable
-//      backstop. Netlify injects SITE_ID into every Function invocation at
-//      runtime automatically (confirmed via `netlify sites:list`), for
-//      whichever site is actually running — there is nothing to configure,
-//      so unlike (1) this can never be "forgotten." Hardcoded rather than
-//      another env var: changing which site counts as "production" should
-//      require an explicit code change and review, not silent drift.
-// Both must pass for the function to even reach requireAdmin() below — no
-// single check here is "the" boundary on its own.
+// interface test isn't staring at empty tables. Reached from the
+// "Seed Test Reservations" button on the sysadm-only /test-center page
+// (TestCenterPage.tsx). What stops it from ever writing fabricated bookings
+// into real production data is testDataGuard.ts's two server-side checks
+// (explicit opt-in env var + hardcoded production SITE_ID backstop), run
+// before requireAdmin() below.
 //
 // For each department — every costumer's for a sysadm, or only the
 // caller's OWN costumer's for a regular admin (see the costumerId scoping
@@ -58,9 +42,7 @@ import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { json } from "./_shared/http.js";
-
-/** Netlify's own permanent, runtime-injected site identifier for the real production deployment (app.fleetii.dk) — confirmed via `netlify sites:list`. Hardcoded, not another env var: unlike a config value, process.env.SITE_ID can't be missing or misspelled (Netlify populates it for every Function invocation automatically), so this can never silently fail to trigger. Changing which site counts as "production" requires an explicit code change here. */
-const PRODUCTION_SITE_ID = "ae77d3e5-f334-44f1-aa47-d33cd231681b";
+import { testDataSeedingBlocked } from "./_shared/testDataGuard.js";
 
 const MIN_BOOKINGS_PER_DEPARTMENT = 3;
 const MAX_BOOKINGS_PER_DEPARTMENT = 7;
@@ -90,19 +72,8 @@ export default async (req: Request) => {
     return json({ error: "Method not allowed" }, 405);
   }
 
-  if (process.env.ALLOW_TEST_BOOKING_SEED !== "true") {
-    return new Response(
-      JSON.stringify({ error: "Testdata-seeding er ikke aktiveret på denne server." }),
-      { status: 403 },
-    );
-  }
-
-  if (process.env.SITE_ID === PRODUCTION_SITE_ID) {
-    return new Response(
-      JSON.stringify({ error: "Denne funktion kan ikke køre mod produktionsdata." }),
-      { status: 403 },
-    );
-  }
+  const blocked = testDataSeedingBlocked();
+  if (blocked) return blocked;
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
