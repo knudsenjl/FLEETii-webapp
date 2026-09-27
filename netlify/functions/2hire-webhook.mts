@@ -43,6 +43,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isWebhookSignatureValid } from "./_shared/webhookSignature.js";
+import { json } from "./_shared/http.js";
 
 const TOPIC_PATTERN = /^vehicle:([^:]+):(generic|specific):([a-z_]+)$/;
 
@@ -109,18 +110,18 @@ export default async (req: Request) => {
 
   if (req.method !== "POST") {
     console.warn(`[2hire-webhook] rejected method: ${req.method}`);
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const secret = process.env.TWOHIRE_WEBHOOK_SECRET;
   if (!secret) {
     console.error("[2hire-webhook] TWOHIRE_WEBHOOK_SECRET is not set — cannot validate any delivery.");
-    return new Response(JSON.stringify({ error: "Serveren mangler TWOHIRE_WEBHOOK_SECRET." }), { status: 500 });
+    return json({ error: "Serveren mangler TWOHIRE_WEBHOOK_SECRET." }, 500);
   }
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
     console.error("[2hire-webhook] getAdminClient() failed:", adminClientResult.error);
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -149,7 +150,7 @@ export default async (req: Request) => {
     console.warn(
       `[2hire-webhook] signature validation failed — x-hub-signature ${signatureHeader ? "present" : "MISSING"}, body length ${rawBody.length}, unverified topic: "${unverifiedTopic}".`,
     );
-    return new Response(JSON.stringify({ error: "Ugyldig signatur." }), { status: 401 });
+    return json({ error: "Ugyldig signatur." }, 401);
   }
 
   let body: WebhookBody;
@@ -157,7 +158,25 @@ export default async (req: Request) => {
     body = JSON.parse(rawBody) as WebhookBody;
   } catch {
     console.warn(`[2hire-webhook] body was not valid JSON (length ${rawBody.length}): ${rawBody.slice(0, 500)}`);
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
+  }
+
+  // A valid signature only proves 2hire sent it, not that it has the shape
+  // used below: a missing/non-numeric timestamp made `new Date(...)
+  // .toISOString()` throw and the delivery end as an unhandled 500 (code
+  // review 2026-09-26). Anything malformed is acknowledged (so 2hire
+  // doesn't retry a delivery that can never succeed) and logged.
+  const payload = body?.payload;
+  if (
+    typeof body?.topic !== "string" ||
+    !payload ||
+    typeof payload.timestamp !== "number" ||
+    !Number.isFinite(payload.timestamp) ||
+    typeof payload.data !== "object" ||
+    payload.data === null
+  ) {
+    console.warn(`[2hire-webhook] malformed payload dropped: ${rawBody.slice(0, 500)}`);
+    return json({ ok: true }, 200);
   }
 
   const topicMatch = TOPIC_PATTERN.exec(body.topic);
@@ -169,7 +188,7 @@ export default async (req: Request) => {
     // drop, and the exact raw topic string is the one thing that can tell
     // us whether 2hire is sending something this regex just doesn't expect.
     console.warn(`[2hire-webhook] topic did not match TOPIC_PATTERN, dropped: "${body.topic}"`);
-    return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    return json({ ok: true }, 200);
   }
 
   const [, vehicleId, topicKind, signal] = topicMatch;
@@ -214,10 +233,10 @@ export default async (req: Request) => {
       console.warn(
         `[2hire-webhook] ignoring ${topicKind}/${signal} for unknown vehicle_id ${vehicleId} (not in vehicle_profiles — registered with 2hire but not yet onboarded into FLEETii, or deleted here without being unsubscribed there).`,
       );
-      return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+      return json({ ok: true }, 200);
     }
     console.error("[2hire-webhook] failed to record signal history:", historyError);
-    return new Response(JSON.stringify({ error: historyError.message }), { status: 500 });
+    return json({ error: historyError.message }, 500);
   }
 
   // GENERIC signals, plus the small explicit allowlist of "specific"
@@ -252,7 +271,7 @@ export default async (req: Request) => {
     });
     if (error) {
       console.error("[2hire-webhook] failed to persist signal:", error);
-      return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+      return json({ error: error.message }, 500);
     }
     signalApplied = Boolean(data);
     if (!signalApplied) {
@@ -306,8 +325,5 @@ export default async (req: Request) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
+  formatDanishDateTimeShort,
+  formatDanishLongDateTime,
   addDaysToDate,
   addMinutesUtc,
   ceilToDanishInterval,
@@ -97,6 +99,23 @@ describe("danishDayKey", () => {
 describe("formatDanishDateTime", () => {
   it("shows a UTC instant as Danish dd.mm.yyyy HH:mm", () => {
     expect(formatDanishDateTime("2026-07-01T10:05:00Z")).toBe("01.07.2026 12:05");
+  });
+});
+
+describe("formatDanishDateTimeShort", () => {
+  it("shows day/month and time on the Danish clock, without the year", () => {
+    expect(formatDanishDateTimeShort("2026-09-26T12:45:00Z")).toBe("26/09 14:45");
+    expect(formatDanishDateTimeShort("2026-12-31T23:30:00Z")).toBe("01/01 00:30");
+  });
+});
+
+describe("formatDanishLongDateTime", () => {
+  it("writes weekday, day, month and time in Danish, on the Danish clock", () => {
+    expect(formatDanishLongDateTime("2026-09-26T12:45:00+00:00")).toBe("lørdag 26. september 2026 kl. 14:45");
+  });
+
+  it("rolls over to the next Danish day and uses winter time", () => {
+    expect(formatDanishLongDateTime("2026-12-31T23:30:00Z")).toBe("fredag 1. januar 2027 kl. 00:30");
   });
 });
 

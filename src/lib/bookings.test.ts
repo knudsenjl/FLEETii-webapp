@@ -19,6 +19,7 @@ import {
   shortSignalTimestamp,
   splitIsoDateTime,
   userAnsatId,
+  bookingUserLabel,
   type BookingNeighbor,
   type BookingRow,
   type BookingWindow,
@@ -45,9 +46,9 @@ describe("DEPARTMENT_COLUMN", () => {
 });
 
 describe("BOOKINGS_SELECT_COLUMNS", () => {
-  it("selects booking_id, vehicle_id, user_id (with embedded user_profiles(email, user_ident)), and department_id", () => {
+  it("selects booking_id, vehicle_id, user_id (with embedded user_profiles(email, user_ident)), department_id and the drop-in fields", () => {
     expect(BOOKINGS_SELECT_COLUMNS).toBe(
-      "booking_id, vehicle_id, start, end, usage, user_id, user_profiles(email, user_ident), department_id",
+      "booking_id, vehicle_id, start, end, usage, user_id, user_profiles(email, user_ident), department_id, is_guest, booking_guests(name)",
     );
   });
 });
@@ -101,6 +102,8 @@ describe("mapBookingRow", () => {
       userEmail: "user@example.com",
       userIdent: null,
       departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
+      isGuest: false,
+      guestName: null,
     });
   });
 
@@ -135,7 +138,40 @@ describe("mapBookingRow", () => {
       userEmail: "user@example.com",
       userIdent: null,
       departmentId: "b1f2c3d4-5678-90ab-cdef-1234567890ab",
+      isGuest: false,
+      guestName: null,
     });
+  });
+});
+
+describe("drop-in bookings", () => {
+  const guestRow: BookingRow = {
+    booking_id: "43",
+    vehicle_id: "v",
+    start: "2026-07-09T07:00:00+00:00",
+    end: "2026-07-09T10:00:00+00:00",
+    usage: "Prøvekørsel",
+    user_id: null,
+    user_profiles: null,
+    department_id: "d",
+    is_guest: true,
+    booking_guests: { name: "Mette Hansen" },
+  };
+
+  it("maps is_guest and the embedded guest name (object or one-element array)", () => {
+    expect(mapBookingRow(guestRow)).toMatchObject({ isGuest: true, guestName: "Mette Hansen" });
+    expect(mapBookingRow({ ...guestRow, booking_guests: [{ name: "Mette Hansen" }] }).guestName).toBe("Mette Hansen");
+  });
+
+  it("labels a drop-in with the name for admins, and just 'Drop-in' when the name isn't visible", () => {
+    expect(bookingUserLabel(mapBookingRow(guestRow), true)).toBe("Drop-in: Mette Hansen");
+    expect(bookingUserLabel(mapBookingRow({ ...guestRow, booking_guests: null }), false)).toBe("Drop-in");
+  });
+
+  it("labels a normal booking by Bruger-ID or email as before", () => {
+    const user = { isGuest: false, guestName: null, userIdent: "A-1", userEmail: "u@example.com" };
+    expect(bookingUserLabel(user, true)).toBe("A-1");
+    expect(bookingUserLabel(user, false)).toBe("u@example.com");
   });
 });
 

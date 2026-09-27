@@ -1,52 +1,47 @@
-// Netlify Function: sends one of 2hire's three generic vehicle commands
-// (start/stop/locate) to a real, registered 2hire vehicle — see
+// Netlify Function: sends 2hire's generic "locate" command (blink the
+// headlights) to a real, registered 2hire vehicle — see
 // _shared/twoHireClient.ts's sendGenericCommand. Reached from
-// TwoHireTestPage.tsx's own Lås/Lås op + "Blink lygterne" buttons (against
-// the dedicated WB20499 test vehicle) AND, since command isn't hardcoded
-// here, from BookingDetailsPage.tsx/VehicleDetailsPage.tsx's "Blink lygterne"
-// (useLocateVehicle) against a real booking's real vehicle.
+// BookingPage.tsx/BookingDetailsPage.tsx/VehicleDetailsPage.tsx's "Blink"
+// (useLocateVehicle).
 //
-// Auth is split per command rather than one blanket check: "locate" (blink
-// headlights, harmless) is available to the same audience as Lås/Lås op —
-// any logged-in user, not just admins, but ONLY for a vehicle they actually
-// have a relevant booking on (same three-rule "in the Lås/Lås op window"
-// check as set-vehicle-lock.mts's own regular-user authorization — reused,
-// not reimplemented, via computeLockButtonState/findAdjacentBookings, so the
-// two can't drift apart). "start"/"stop" (raw lock/unlock, bypassing those
-// enablement rules entirely) stay admin-only — TwoHireTestPage.tsx's direct
-// testing flow is the only caller of those today. A regular ("admin", not
-// "sysadm") caller is additionally scoped to their OWN costumer's
-// vehicles for every command — same scoping VehiclesPage.tsx already applies
-// to what an admin can even see — since requireAdmin()/requireUser() on
-// their own only prove SOME caller is authenticated, not that they
-// administer or have a booking on the TARGET vehicle.
+// Only "locate" is accepted. It used to also take "start"/"stop" (raw
+// unlock/lock) for admins — left over from the long-gone TwoHireTestPage —
+// which physically unlocked a vehicle WITHOUT recording lock history or the
+// persisted `locked` state that set-vehicle-lock.mts maintains. Every real
+// Lås/Lås op goes through set-vehicle-lock.mts (code review 2026-09-26).
+//
+// Audience: the same as Lås/Lås op — any logged-in user, but a regular user
+// ONLY for a vehicle they have a booking on that is currently inside its
+// Lås/Lås op window (the same three-rule check as set-vehicle-lock.mts's
+// regular-user authorization, reused via _shared/vehicleLock.ts's
+// anyOwnBookingAllows, so the two can't drift apart). A regular ("admin",
+// not "sysadm") caller is scoped to their OWN costumer's vehicles — same
+// scoping VehiclesPage.tsx applies to what an admin can even see — since
+// requireUser() alone only proves SOME caller is authenticated.
 //
 // Per the "per-costumer 2hire credentials" plan: which 2hire credential
 // authenticates this command depends on the TARGET vehicle's costumer (not
 // the caller's own costumer_id, which a sysadm doesn't have) — resolved fresh via a service-role
 // lookup on every call, same as every other function touched by that plan.
-import { computeLockButtonState, findAdjacentBookings } from "../../src/lib/bookings.js";
-import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
-import { isAnyAdminRole, isSysadmRole, requireAdmin, requireUser } from "./_shared/serverAuth.js";
+import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
 import { sendGenericCommand, type TwoHireGenericCommand } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
+import { anyOwnBookingAllows, loadLockContext } from "./_shared/vehicleLock.js";
+import { json } from "./_shared/http.js";
 
-const VALID_COMMANDS: readonly TwoHireGenericCommand[] = ["start", "stop", "locate"];
-
-/** A vehicle's booking, as needed to re-run computeLockButtonState/findAdjacentBookings server-side — see set-vehicle-lock.mts's identical type. */
-type VehicleBooking = { booking_id: string; start: string; end: string | null; user_id: string | null };
+const VALID_COMMANDS: readonly TwoHireGenericCommand[] = ["locate"];
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const body = (await req.json().catch(() => null)) as { vehicleId?: string; command?: string } | null;
   const vehicleId = body?.vehicleId;
   const command = body?.command;
   if (!vehicleId || !command) {
-    return new Response(JSON.stringify({ error: "vehicleId og command er påkrævet." }), { status: 400 });
+    return json({ error: "vehicleId og command er påkrævet." }, 400);
   }
   if (!VALID_COMMANDS.includes(command as TwoHireGenericCommand)) {
     return new Response(
@@ -55,14 +50,14 @@ export default async (req: Request) => {
     );
   }
 
-  const authResult = command === "locate" ? await requireUser(req) : await requireAdmin(req);
+  const authResult = await requireUser(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -80,23 +75,23 @@ export default async (req: Request) => {
         .maybeSingle<{ role: string; costumer_id: string | null; deleted_at: string | null }>(),
     ]);
     if (vehicleError) {
-      return new Response(JSON.stringify({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }), { status: 500 });
+      return json({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }, 500);
     }
     if (callerError) {
-      return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), { status: 500 });
+      return json({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }, 500);
     }
     // Same 404 as set-vehicle-lock.mts — otherwise a stale/mistyped id from a
     // sysadm (who skips the costumer check below) surfaced as a misleading
     // "can't determine costumer" 502 from resolveTwoHireCredentials.
     if (!vehicle) {
-      return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
+      return json({ error: "Køretøjet blev ikke fundet." }, 404);
     }
 
     // An archived user (delete-user.mts bans the login AND sets deleted_at)
     // can still hold a valid access token until it expires (up to ~1 hour) —
     // requireUser alone only proves the token is valid, so refuse them here.
     if (!caller || caller.deleted_at) {
-      return new Response(JSON.stringify({ error: "Din bruger er ikke længere aktiv." }), { status: 403 });
+      return json({ error: "Din bruger er ikke længere aktiv." }, 403);
     }
 
     const isSysadm = isSysadmRole(caller.role);
@@ -107,40 +102,21 @@ export default async (req: Request) => {
       // own costumer's vehicles; for a regular user this is checked before
       // trusting any booking row (see set-vehicle-lock.mts's identical check).
       if (!caller?.costumer_id || caller.costumer_id !== vehicle?.costumer_id) {
-        return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+        return json({ error: "Du har ikke adgang til dette køretøj." }, 403);
       }
       if (!isAdmin) {
-        // Only "locate" reaches here as a regular user — "start"/"stop" already
-        // required requireAdmin() above. Same audience as Lås/Lås op: allowed
+        // Same audience as Lås/Lås op: allowed
         // only if one of the caller's own bookings on this vehicle currently
         // has lock or unlock enabled (see set-vehicle-lock.mts's identical
         // check for why the raw rules, not just "has a booking", are reused).
-        const [{ data: signal, error: signalError }, { data: bookings, error: bookingsError }] = await Promise.all([
-          admin.from("vehicle_signals").select("locked").eq("vehicle_id", vehicleId).maybeSingle<{ locked: boolean }>(),
-          admin
-            .from("bookings")
-            .select("booking_id, start, end, user_id")
-            .eq("vehicle_id", vehicleId)
-            .returns<VehicleBooking[]>(),
-        ]);
-        if (signalError) throw new Error(`Kunne ikke slå lås-status op: ${signalError.message}`);
-        if (bookingsError) throw new Error(`Kunne ikke slå reservationer op: ${bookingsError.message}`);
-
-        const currentLocked = signal?.locked ?? true;
-        const ownBookings = (bookings ?? []).filter((b) => b.user_id === authResult.userId);
-        const authorized = ownBookings.some((booking) => {
-          const { previous, next } = findAdjacentBookings(bookings ?? [], booking.booking_id);
-          const state = computeLockButtonState(
-            nowUtcIso(),
-            { start: booking.start, end: booking.end },
-            previous ? { end: previous.end } : null,
-            next ? { start: next.start } : null,
-            currentLocked,
-          );
-          return state.lockEnabled || state.unlockEnabled;
-        });
+        const context = await loadLockContext(admin, vehicleId);
+        const authorized = anyOwnBookingAllows(
+          context,
+          (b) => b.user_id === authResult.userId,
+          (state) => state.lockEnabled || state.unlockEnabled,
+        );
         if (!authorized) {
-          return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj lige nu." }), { status: 403 });
+          return json({ error: "Du har ikke adgang til dette køretøj lige nu." }, 403);
         }
       }
     }
@@ -159,17 +135,14 @@ export default async (req: Request) => {
       // "start"/"stop" surface whatever cause 2hire returns unchanged, since
       // that limitation hasn't been observed for those commands.
       if (command === "locate" && error instanceof Error && error.message.includes("MISSING_CONFIGURATION")) {
-        return new Response(JSON.stringify({ error: "Dette køretøj tillader ikke remote blink." }), { status: 400 });
+        return json({ error: "Dette køretøj tillader ikke remote blink." }, 400);
       }
       throw error;
     }
 
-    return new Response(JSON.stringify({ ok: true }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ ok: true }, 200);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
+    return json({ error: message }, twoHireErrorStatus(error));
   }
 };

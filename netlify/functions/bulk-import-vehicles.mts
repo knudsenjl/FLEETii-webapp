@@ -31,7 +31,9 @@ import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/request
 import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing.js";
 import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
-import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
+import { resolveDepartmentNames, type DepartmentResolution } from "./_shared/departmentLookup.js";
+import { mapWithConcurrency } from "./_shared/concurrency.js";
+import { json } from "./_shared/http.js";
 
 type BulkImportVehiclesBody = {
   format?: "csv" | "json";
@@ -49,6 +51,14 @@ type RowResult = { row: number; success: boolean; orderId?: string; error?: stri
 const DRIVMIDDEL_SET = new Set<string>(DRIVMIDDEL_OPTIONS);
 
 /**
+ * Rows imported at the same time. One at a time let a few dozen rows run
+ * past Netlify's Function time limit (each row waits on Supabase Auth and,
+ * for users, an SMTP welcome e-mail); 4 keeps SMTP/Auth comfortable while
+ * cutting the wall-clock time about fourfold (code review 2026-09-26).
+ */
+const IMPORT_CONCURRENCY = 4;
+
+/**
  * POST { format: "csv"|"json", fileContent, costumerId?, contactperson?,
  * contactemail?, contactnumber? } as an authenticated admin. Parses
  * fileContent into rows (Nummerplade required; Køretøj-ID/Afdeling/Brand/
@@ -60,17 +70,17 @@ const DRIVMIDDEL_SET = new Set<string>(DRIVMIDDEL_OPTIONS);
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -78,7 +88,7 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as BulkImportVehiclesBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const format = body.format;
@@ -100,7 +110,7 @@ export default async (req: Request) => {
     );
   }
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: "Filen indeholder ingen rækker." }), { status: 400 });
+    return json({ error: "Filen indeholder ingen rækker." }, 400);
   }
 
 
@@ -115,7 +125,7 @@ export default async (req: Request) => {
   if (isSysadm) {
     const requested = asTrimmedString(body.costumerId);
     if (!requested) {
-      return new Response(JSON.stringify({ error: "costumerId er påkrævet for sysadm." }), { status: 400 });
+      return json({ error: "costumerId er påkrævet for sysadm." }, 400);
     }
     const { data: costumerRow } = await admin
       .from("costumers")
@@ -123,12 +133,12 @@ export default async (req: Request) => {
       .eq("costumer_id", requested)
       .maybeSingle<{ costumer_id: string }>();
     if (!costumerRow) {
-      return new Response(JSON.stringify({ error: "Ukendt costumerId." }), { status: 400 });
+      return json({ error: "Ukendt costumerId." }, 400);
     }
     costumerId = costumerRow.costumer_id;
   } else {
     if (!caller?.costumer_id) {
-      return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
+      return json({ error: "Din bruger er ikke tilknyttet en kunde." }, 403);
     }
     costumerId = caller.costumer_id;
   }
@@ -145,19 +155,26 @@ export default async (req: Request) => {
     );
   }
 
-  const departmentCache = new Map<string, string>();
+  // Each distinct department is looked up (or created) once, up front and
+  // in order — only for rows that would reach that step (a Nummerplade and a
+  // valid Drivmiddel), same as before — so the concurrent rows below never
+  // race to create the same new department.
+  const departments = await resolveDepartmentNames(
+    admin,
+    rows
+      .filter((row) => asNormalizedNumberString(row.Nummerplade) && DRIVMIDDEL_SET.has(asTrimmedString(row.Drivmiddel) || "Benzin"))
+      .map((row) => asTrimmedString(row.Afdeling))
+      .filter((name): name is string => Boolean(name)),
+    costumerId,
+    // Only a sysadm (setting up a costumer) may create departments by import;
+    // for an admin an unknown name is a row error, not a new department.
+    { allowCreate: isSysadm },
+  );
 
-  const results: RowResult[] = [];
-  for (let i = 0; i < rows.length; i++) {
-    const outcome = await importVehicleRow(admin, rows[i], {
-      costumerId,
-      contactperson,
-      contactemail,
-      contactnumber,
-      departmentCache,
-    });
-    results.push({ row: i + 1, ...outcome });
-  }
+  const results: RowResult[] = await mapWithConcurrency(rows, IMPORT_CONCURRENCY, async (row, i) => ({
+    row: i + 1,
+    ...(await importVehicleRow(admin, row, { costumerId, contactperson, contactemail, contactnumber, departments })),
+  }));
 
   const successCount = results.filter((r) => r.success).length;
   return new Response(
@@ -174,7 +191,7 @@ async function importVehicleRow(
     contactperson: string;
     contactemail: string;
     contactnumber: string;
-    departmentCache: Map<string, string>;
+    departments: Map<string, DepartmentResolution>;
   },
 ): Promise<Omit<RowResult, "row">> {
   const numberPlate = asNormalizedNumberString(row.Nummerplade);
@@ -188,20 +205,16 @@ async function importVehicleRow(
     return { success: false, error: `Drivmiddel skal være en af: ${DRIVMIDDEL_OPTIONS.join(", ")}.` };
   }
 
+  // Already found/created up front (resolveDepartmentNames) — never created
+  // here, since rows run concurrently.
   const departmentName = asTrimmedString(row.Afdeling);
   let departmentId: string | null = null;
   if (departmentName) {
-    const cached = ctx.departmentCache.get(departmentName);
-    if (cached) {
-      departmentId = cached;
-    } else {
-      const resolved = await findOrCreateDepartment(admin, { name: departmentName, costumerId: ctx.costumerId });
-      if ("error" in resolved) {
-        return { success: false, error: `Afdeling "${departmentName}": ${resolved.error}` };
-      }
-      departmentId = resolved.departmentId;
-      ctx.departmentCache.set(departmentName, departmentId);
+    const resolved = ctx.departments.get(departmentName);
+    if (!resolved || "error" in resolved) {
+      return { success: false, error: `Afdeling "${departmentName}": ${resolved?.error ?? "kunne ikke slås op."}` };
     }
+    departmentId = resolved.departmentId;
   }
 
   const { data: insertedOrder, error: insertError } = await admin

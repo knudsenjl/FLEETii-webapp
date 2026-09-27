@@ -1,6 +1,5 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { PageHeader } from "../components/PageHeader";
 import { PageSection } from "../components/PageSection";
 import { PageShell } from "../components/PageShell";
@@ -16,6 +15,7 @@ import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { supabase } from "../lib/supabase";
 import { friendlyCostumerError } from "../lib/costumerErrors";
 import { normalizeNumberSpacing, stripNumberSpacing } from "../lib/textNormalization";
+import { callFunction } from "../lib/callFunction";
 
 /** The freshly-inserted costumer row, as returned by handleCreate's own .select(). Only the fields this page itself needs. */
 type NewCostumer = {
@@ -65,7 +65,6 @@ type NewCostumer = {
  */
 export function CostumerNewPage() {
   const navigate = useNavigate();
-  const { session } = useAuth();
 
   const [step, setStep] = useState<"create" | "register" | "success">("create");
   const [costumer, setCostumer] = useState<NewCostumer | null>(null);
@@ -113,10 +112,8 @@ export function CostumerNewPage() {
     setCvrLookupError(null);
 
     try {
-      const response = await fetch(`/.netlify/functions/cvr-lookup?cvr=${encodeURIComponent(stripNumberSpacing(cvr))}`, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-      });
-      const result = (await response.json()) as {
+      const response = await callFunction("cvr-lookup", { query: { cvr: stripNumberSpacing(cvr) } });
+      const result = response.data as {
         error?: string;
         name?: string;
         address?: string;
@@ -196,16 +193,9 @@ export function CostumerNewPage() {
     }
 
     try {
-      const response = await fetch("/.netlify/functions/2hire-subscribe", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ costumerId: costumer.costumer_id }),
-      });
+      const response = await callFunction("2hire-subscribe", { body: { costumerId: costumer.costumer_id } });
 
-      const result = (await response.json()) as { error?: string };
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setSubmitError(
           result.error ?? "2hire-oplysningerne blev gemt, men registrering hos 2hire mislykkedes. Prøv igen.",
@@ -234,16 +224,9 @@ export function CostumerNewPage() {
     setSubmitError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/delete-draft-costumer", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ costumerId: costumer.costumer_id }),
-      });
+      const response = await callFunction("delete-draft-costumer", { body: { costumerId: costumer.costumer_id } });
 
-      const result = (await response.json()) as { error?: string };
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke fortryde oprettelsen.");
         setIsSubmitting(false);

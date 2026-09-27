@@ -12,17 +12,16 @@ import { SectionHeading } from "../components/SectionHeading";
 import { TableMessageRow } from "../components/TableMessageRow";
 import { useIdentSettings } from "../hooks/useIdentSettings";
 import { useVehicleIdentLookup } from "../hooks/useVehicleIdentLookup";
-import { supabase } from "../lib/supabase";
 import {
-  BOOKING_ID_COLUMN,
-  VEHICLE_ID_COLUMN,
   computeFreePeriod,
   formatFreePeriod,
   formatVehicleIdentLabel,
   isVehicleAvailable,
   type BookingWindow,
 } from "../lib/bookings";
-import { danishDayKey, nowUtcIso, utcToDanishParts } from "../lib/time";
+import { danishDayKey, formatDanishDateTimeShort, nowUtcIso, utcToDanishParts } from "../lib/time";
+import { fetchAvailabilityWindows } from "../lib/bookingWindows";
+import type { DropInGuest } from "../lib/dropIn";
 
 
 /** A vehicle available for the requested period, plus a human-readable description of its free window (short "dd/mm" dates). */
@@ -36,13 +35,6 @@ type AvailableVehicle = {
 /** A UTC ISO timestamp as Danish "HH:mm". */
 function formatDanishTime(iso: string): string {
   return utcToDanishParts(iso).time;
-}
-
-/** A UTC ISO timestamp as Danish "dd/mm HH:mm". */
-function formatDanishDateTimeShort(iso: string): string {
-  const { date, time } = utcToDanishParts(iso);
-  const [, month, day] = date.split("-");
-  return `${day}/${month} ${time}`;
 }
 
 /**
@@ -80,6 +72,10 @@ export function AvailablePage() {
         departmentLabel?: string;
         /** Present only when this page was reached via a browser back-navigation from ConfirmPage — see the "Reserver"/"Opdater" button's own comment below. Restores the row the admin had picked, which a plain useState initializer would otherwise lose on remount. */
         selectedVehicleId?: string | null;
+        /** Drop-in mode only (see ReservationPage's doc comment) — purely pass-through to ConfirmPage, same as userLabel. */
+        dropInGuest?: DropInGuest;
+        /** Editing a drop-in booking — pass-through to ConfirmPage, which must then keep user_id NULL. */
+        editingIsGuest?: boolean;
       }
     | null;
   const bruger = state?.user ?? "";
@@ -96,25 +92,31 @@ export function AvailablePage() {
   const [loadingBookings, setLoadingBookings] = useState(true);
   const [bookingsError, setBookingsError] = useState<string | null>(null);
 
+  // Only the bookings that can matter around the requested start, read in
+  // full (see lib/bookingWindows.ts — the old unfiltered select was silently
+  // capped at 1000 rows).
+  const windowsStart = state?.start ?? null;
   useEffect(() => {
-    supabase
-      .from("bookings")
-      .select(`${BOOKING_ID_COLUMN}, ${VEHICLE_ID_COLUMN}, start, end`)
-      .then(({ data, error }) => {
-        if (error) {
-          setBookingsError(error.message);
-          setLoadingBookings(false);
-          return;
-        }
+    let cancelled = false;
+    fetchAvailabilityWindows(windowsStart ?? nowUtcIso())
+      .then((rows) => {
+        if (cancelled) return;
         // Excludes the booking being edited (if any) from its own
         // availability/free-period check — otherwise a "Rediger
         // reservation" flow would always see its own current vehicle/time
         // slot as occupied, since the row hasn't been updated yet.
-        const rows = (data ?? []) as BookingWindow[];
         setBookings(editingBookingId ? rows.filter((b) => b.booking_id !== editingBookingId) : rows);
         setLoadingBookings(false);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setBookingsError(error instanceof Error ? error.message : "Kunne ikke hente reservationer.");
+        setLoadingBookings(false);
       });
-  }, [editingBookingId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [editingBookingId, windowsStart]);
 
   const referenceStart = state?.start ?? nowUtcIso();
   const referenceEnd = state?.end ?? nowUtcIso();
@@ -272,6 +274,8 @@ export function AvailablePage() {
                         editingBookingId,
                         departmentId: targetDepartmentId,
                         departmentLabel: state?.departmentLabel,
+                        dropInGuest: state?.dropInGuest,
+                        editingIsGuest: state?.editingIsGuest,
                       },
                     });
                   }}

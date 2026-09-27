@@ -28,7 +28,9 @@ import { useLocateVehicle } from "../hooks/useLocateVehicle";
 import { formatKilometerstand, formatVehicleIdentLabel, shortSignalTimestamp, toDisplayVehicle } from "../lib/bookings";
 import { useReverseGeocode } from "../lib/geocode";
 import { supabase } from "../lib/supabase";
-import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { useStaleSignalRefresh } from "../hooks/useStaleSignalRefresh";
+import { callFunction } from "../lib/callFunction";
 
 /** The DisplayVehicle shape (see toDisplayVehicle in lib/bookings.ts), as received via router state from whichever page navigated here (VehiclesPage, FleetManagementPage, BookingDetailsPage). */
 type Vehicle = {
@@ -49,6 +51,10 @@ type Vehicle = {
   /** 2hire's live "trip_detected" signal ("TRUE"/"FALSE") — drives the driving-vehicle icon in the "Køretøj:" row below, same convention as BookingPage.tsx's hero-card car icon (see liveVehicleDataSource.ts's tripDetected mapping). */
   tripDetected?: string;
   tripDetectedUpdatedAtIso?: string | null;
+  /** Inputs to lib/vehicleHealth.ts's trip-aware rule — see Vehicle2Hire's own doc comments. */
+  online?: string;
+  onlineFalseSinceIso?: string | null;
+  lastTripStartIso?: string | null;
 };
 
 /** The regular user's own reservation for this vehicle, if reached via BookingDetailsPage's map marker — see useVehicleLockState. Only ever present for a non-admin; admin navigation paths (VehiclesPage, FleetManagementPage) don't pass one. */
@@ -117,7 +123,7 @@ export function VehicleDetailsPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const { vehicleId } = useParams<{ vehicleId: string }>();
-  const { profile, session } = useAuth();
+  const { profile } = useAuth();
   // "admin OR sysadm" — same superset convention as ProtectedRoute's
   // own requireAdmin (App.tsx) and the server-side requireAdmin() helper;
   // this page has no requireAdmin route gate of its own (see doc comment
@@ -396,14 +402,17 @@ export function VehicleDetailsPage() {
     };
   }, [vehicle]);
 
+  /** Admin/sysadm-only "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Reads `liveVehicle` (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) — see liveVehicle's own doc comment for why: this button exists specifically to catch stale signals, so feeding it a frozen router-state snapshot would silently defeat its whole purpose. Empty (button hidden) for a non-admin viewer, or before the vehicle is known. Computed above the early return below because useStaleSignalRefresh is a hook, same as VehiclesPage's own gating. */
+  const healthIssues = isAdmin && vehicle ? getVehicleHealthIssues(liveVehicle ?? vehicle, position?.updatedAtIso ?? null) : [];
+  /** Re-reads a too-old signal from 2hire before settling on the warning — see useStaleSignalRefresh. */
+  useStaleSignalRefresh(vehicle ? [{ vehicleId: vehicle.vehicleId, issues: healthIssues }] : []);
+
   if (!vehicle) {
     return vehiclesLoading ? (
       <PageLoading label="Indlæser køretøj…" />
     ) : null;
   }
 
-  /** Admin/sysadm-only red "!" health button shown next to the "Køretøjsdetaljer" heading below — see lib/vehicleHealth.ts's own doc comment (shared with VehiclesPage.tsx's fleet table) for what counts as "unhealthy". Reads `liveVehicle` (falling back to the possibly-stale `vehicle` only if allVehicles hasn't loaded this vehicle yet) — see liveVehicle's own doc comment for why: this button exists specifically to catch stale signals, so feeding it a frozen router-state snapshot would silently defeat its whole purpose. Empty (button hidden) for a non-admin viewer, same as VehiclesPage's own gating. */
-  const healthIssues = isAdmin ? getVehicleHealthIssues(liveVehicle ?? vehicle, position?.updatedAtIso ?? null) : [];
   /** Whether the driving-vehicle icon shows next to the "Køretøjsdetaljer" heading below — admin/sysadm only, and only while 2hire's live trip_detected signal is currently true for this vehicle. Reads `liveVehicle` first, same reasoning as healthIssues above. */
   const isDriving = isAdmin && (liveVehicle?.tripDetected ?? vehicle.tripDetected) === "TRUE";
 
@@ -423,16 +432,9 @@ export function VehicleDetailsPage() {
     setDeleteError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/send-vehicle-deletion-request", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ vehicleId: vehicle.vehicleId }),
-      });
+      const response = await callFunction("send-vehicle-deletion-request", { body: { vehicleId: vehicle.vehicleId } });
 
-      const result = (await response.json()) as { ok?: boolean; error?: string };
+      const result = response.data as { ok?: boolean; error?: string };
 
       if (!response.ok) {
         setDeleteError(result.error ?? "Kunne ikke sende anmodningen.");
@@ -557,7 +559,7 @@ export function VehicleDetailsPage() {
                 {isAdmin && (
                   <span className="flex items-center gap-1.5">
                     {isDriving && <CarGlyph className="h-6 w-9 text-green-600" title="Kører" />}
-                    <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
+                    <VehicleHealthIndicator issues={healthIssues} />
                   </span>
                 )}
               </div>

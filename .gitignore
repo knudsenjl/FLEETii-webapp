@@ -33,3 +33,12 @@ dist-ssr
 
 # Personal Claude Code permission overrides (not shared with the team)
 .claude/settings.local.json
+
+# Personal notes/reference documents kept next to the code, not part of it
+Claude build instructions.txt
+Getting Started with Claude and VSCode _ by Jeff P _ May, 2026 _ Medium.pdf
+
+# Deno lockfile that `netlify dev` generates for its edge runtime — this
+# project is npm-only (package-lock.json); it just showed up modified after
+# every local run.
+deno.lock

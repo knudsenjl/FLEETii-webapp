@@ -17,6 +17,11 @@
 //     truly irreversible action in the whole app, unlike archiving a user
 //     (data survives) or deactivating a costumer (reversible).
 //
+// Sysadms are never purged: their costumer_id is only a Data Filter scope
+// pointer, not a membership. purge_costumer resets any sysadm pointing at
+// this costumer to "Alle" instead (see purge_costumer_spare_sysadm.sql), and
+// they're left out of the logged e-mail list below for the same reason.
+//
 // Ordering: costumer_purge_log is written FIRST (a recovery trail — the
 // affected emails/user_ids are recoverable from it even if the auth-account
 // deletion loop below fails partway through), then purge_costumer runs
@@ -26,22 +31,23 @@
 // recoverable from costumer_purge_log if it ever matters).
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 type DeleteCostumerBody = { costumerId?: string; confirmName?: string };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -49,12 +55,12 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as DeleteCostumerBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const targetCostumerId = body.costumerId;
   if (!targetCostumerId) {
-    return new Response(JSON.stringify({ error: "costumerId er påkrævet." }), { status: 400 });
+    return json({ error: "costumerId er påkrævet." }, 400);
   }
 
 
@@ -65,13 +71,13 @@ export default async (req: Request) => {
     .maybeSingle<{ costumer_id: string; name: string | null; deactivated_at: string | null }>();
 
   if (costumerError) {
-    return new Response(JSON.stringify({ error: costumerError.message }), { status: 500 });
+    return json({ error: costumerError.message }, 500);
   }
   if (!costumer) {
-    return new Response(JSON.stringify({ error: "Kunden findes ikke." }), { status: 404 });
+    return json({ error: "Kunden findes ikke." }, 404);
   }
   if (!costumer.deactivated_at) {
-    return new Response(JSON.stringify({ error: "Kundens adgang skal blokeres først." }), { status: 409 });
+    return json({ error: "Kundens adgang skal blokeres først." }, 409);
   }
   // costumer.name is nullable in the schema — if it were ever null/empty,
   // comparing against "" would let an empty confirmName trivially "match",
@@ -79,16 +85,17 @@ export default async (req: Request) => {
   // irreversible action in the app. Refuse outright instead.
   const trimmedName = (costumer.name ?? "").trim();
   if (!trimmedName || (body.confirmName ?? "").trim() !== trimmedName) {
-    return new Response(JSON.stringify({ error: "Det indtastede navn matcher ikke kundens navn." }), { status: 400 });
+    return json({ error: "Det indtastede navn matcher ikke kundens navn." }, 400);
   }
 
   const { data: affectedUsers, error: usersError } = await admin
     .from("user_profiles")
     .select("user_id, email")
     .eq("costumer_id", targetCostumerId)
+    .neq("role", "sysadm")
     .returns<{ user_id: string; email: string | null }[]>();
   if (usersError) {
-    return new Response(JSON.stringify({ error: usersError.message }), { status: 500 });
+    return json({ error: usersError.message }, 500);
   }
 
   const { error: logError } = await admin.from("costumer_purge_log").insert({
@@ -97,14 +104,14 @@ export default async (req: Request) => {
     user_emails: (affectedUsers ?? []).map((u) => u.email).filter((email): email is string => Boolean(email)),
   });
   if (logError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke logge sletningen: ${logError.message}` }), { status: 500 });
+    return json({ error: `Kunne ikke logge sletningen: ${logError.message}` }, 500);
   }
 
   const { data: purgedRows, error: purgeError } = await admin.rpc("purge_costumer", {
     target_costumer_id: targetCostumerId,
   });
   if (purgeError) {
-    return new Response(JSON.stringify({ error: purgeError.message }), { status: 500 });
+    return json({ error: purgeError.message }, 500);
   }
 
   const purgedUserIds = ((purgedRows ?? []) as { purged_user_id: string }[]).map((row) => row.purged_user_id);

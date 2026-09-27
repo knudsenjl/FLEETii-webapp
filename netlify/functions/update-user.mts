@@ -11,6 +11,8 @@ import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/request
 import { getAdminClient } from "./_shared/adminClient.js";
 import { findRequestedDepartment } from "./_shared/departmentLookup.js";
 import { isAnyAdminRole, isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
+import { isAllowedRole } from "./_shared/userAccount.js";
+import { json } from "./_shared/http.js";
 
 type UpdateUserBody = {
   userId?: string;
@@ -26,14 +28,6 @@ type UpdateUserBody = {
   role?: string;
 };
 
-const ALLOWED_ROLES = ["user", "admin"] as const;
-type Role = (typeof ALLOWED_ROLES)[number];
-
-/** True if `value` is exactly "user" or "admin" — the only valid `user_profiles.role` values this form offers. */
-function isAllowedRole(value: string): value is Role {
-  return (ALLOWED_ROLES as readonly string[]).includes(value);
-}
-
 /**
  * POST { userId, email, full_name?, phone?, department?, role? } as an
  * authenticated admin. Both the caller and the target user must belong to
@@ -47,17 +41,17 @@ function isAllowedRole(value: string): value is Role {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -65,24 +59,18 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as UpdateUserBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const targetUserId = asTrimmedString(body.userId);
   if (!targetUserId) {
-    return new Response(JSON.stringify({ error: "userId er påkrævet." }), { status: 400 });
+    return json({ error: "userId er påkrævet." }, 400);
   }
 
   const email = asTrimmedString(body.email);
   if (!email) {
-    return new Response(JSON.stringify({ error: "E-mail er påkrævet." }), { status: 400 });
+    return json({ error: "E-mail er påkrævet." }, 400);
   }
-
-  const rawRole = asTrimmedString(body.role) || "user";
-  if (!isAllowedRole(rawRole)) {
-    return new Response(JSON.stringify({ error: 'Rolle skal være "user" eller "admin".' }), { status: 400 });
-  }
-  const role = rawRole;
 
 
   const requestedDepartmentName = asTrimmedString(body.department) || null;
@@ -101,7 +89,7 @@ export default async (req: Request) => {
   ]);
 
   if (!target) {
-    return new Response(JSON.stringify({ error: "Brugeren findes ikke." }), { status: 404 });
+    return json({ error: "Brugeren findes ikke." }, 404);
   }
   // A sysadm isn't scoped to one costumer — same platform-wide
   // exception as department_settings/user_departments' own RLS policies
@@ -120,6 +108,18 @@ export default async (req: Request) => {
     console.error("[update-user] departments lookup failed:", requestedDepartmentError);
   }
   const departmentRequested = Boolean(requestedDepartmentIdParam || requestedDepartmentName);
+
+  // Role: an omitted role keeps the target's current one (it used to default
+  // to "user", silently demoting an admin on any request without it). Any
+  // value equal to the current role is accepted as "unchanged" — including
+  // "sysadm", so a sysadm's own name/phone can be saved (the form sends the
+  // role it shows, and "sysadm" used to be rejected outright). An actual
+  // CHANGE may only be to "user" or "admin": nobody can be promoted to
+  // sysadm here (code review 2026-09-26).
+  const role = asTrimmedString(body.role) || target.role;
+  if (role !== target.role && !isAllowedRole(role)) {
+    return json({ error: 'Rolle skal være "user" eller "admin".' }, 400);
+  }
   // A regular admin must never be able to touch a sysadm's account —
   // in particular never change their login email (see the updateUserById
   // call below) — regardless of whether the costumer-scoping check below
@@ -132,17 +132,17 @@ export default async (req: Request) => {
   // account (change their email, then reset the password). Checked before
   // any mutation, including the email/role change further down.
   if (!isSysadm && isSysadmRole(target.role)) {
-    return new Response(JSON.stringify({ error: "Du kan ikke opdatere en sysadm." }), { status: 403 });
+    return json({ error: "Du kan ikke opdatere en sysadm." }, 403);
   }
   if (!isSysadm) {
     if (!caller?.costumer_id || caller.costumer_id !== target.costumer_id) {
-      return new Response(JSON.stringify({ error: "Du kan kun opdatere brugere hos din egen kunde." }), { status: 403 });
+      return json({ error: "Du kan kun opdatere brugere hos din egen kunde." }, 403);
     }
     if (departmentRequested && requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
-      return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+      return json({ error: "Ugyldig afdeling." }, 400);
     }
   } else if (departmentRequested && !requestedDepartmentRow) {
-    return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+    return json({ error: "Ugyldig afdeling." }, 400);
   }
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
 
@@ -158,7 +158,7 @@ export default async (req: Request) => {
       email_confirm: true,
     });
     if (emailError) {
-      return new Response(JSON.stringify({ error: emailError.message }), { status: 400 });
+      return json({ error: emailError.message }, 400);
     }
   }
 
@@ -167,8 +167,8 @@ export default async (req: Request) => {
   // same "no one left to manage users" hole delete-user.mts already guards
   // against for archiving, and role changes go through this endpoint too.
   // Only ever fires as a demotion AWAY from "sysadm", never a
-  // reassignment INTO it — ALLOWED_ROLES above never offers it as a value
-  // this form can set. Excludes already-archived holders from the count,
+  // reassignment INTO it — the role check above never lets a change land on
+  // "sysadm". Excludes already-archived holders from the count,
   // same reasoning as delete-user.mts.
   if (isAnyAdminRole(target.role) && target.role !== role) {
     let adminCountQuery = admin
@@ -186,13 +186,13 @@ export default async (req: Request) => {
     const { count: otherAdminCount, error: countError } = await adminCountQuery;
 
     if (countError) {
-      return new Response(JSON.stringify({ error: countError.message }), { status: 500 });
+      return json({ error: countError.message }, 500);
     }
     if (!otherAdminCount) {
       const message = isSysadmRole(target.role)
         ? "Kan ikke ændre rollen for den sidste sysadm."
         : "Kan ikke ændre rollen for den sidste administrator i afdelingen.";
-      return new Response(JSON.stringify({ error: message }), { status: 409 });
+      return json({ error: message }, 409);
     }
   }
 
@@ -203,24 +203,23 @@ export default async (req: Request) => {
       full_name: body.full_name ?? null,
       phone: asNormalizedNumberString(body.phone) || null,
       user_ident: asTrimmedString(body.user_ident) || null,
-      department_id: requestedDepartmentId,
+      // Only touched when a department was actually sent — omitting it used
+      // to wipe the user's home department (code review 2026-09-26).
+      department_id: departmentRequested ? requestedDepartmentId : target.department_id,
       // The requested department's own costumer_id is authoritative — for a
       // regular admin this is always target.costumer_id unchanged (the
       // check above already enforced that match), but a sysadm can
       // move a user to a department under a DIFFERENT costumer, which must
       // update costumer_id to match or it'd go stale relative to
       // department_id.
-      costumer_id: requestedDepartmentRow?.costumer_id ?? target.costumer_id,
+      costumer_id: departmentRequested ? (requestedDepartmentRow?.costumer_id ?? target.costumer_id) : target.costumer_id,
       role,
     })
     .eq("user_id", targetUserId);
 
   if (profileError) {
-    return new Response(JSON.stringify({ error: profileError.message }), { status: 500 });
+    return json({ error: profileError.message }, 500);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

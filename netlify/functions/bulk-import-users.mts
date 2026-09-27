@@ -24,8 +24,11 @@ import { parseImportFile, type ImportRow } from "../../src/lib/bulkImportParsing
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
-import { findOrCreateDepartment } from "./_shared/departmentLookup.js";
+import { resolveDepartmentNames, type DepartmentResolution } from "./_shared/departmentLookup.js";
+import { mapWithConcurrency } from "./_shared/concurrency.js";
 import { buildWelcomeEmailHtml, createAuthUserWithRetry, generateTemporaryPassword, type Role } from "./_shared/userAccount.js";
+import { json } from "./_shared/http.js";
+import { siteUrl } from "./_shared/siteUrl.js";
 
 type BulkImportUsersBody = {
   format?: "csv" | "json";
@@ -35,6 +38,14 @@ type BulkImportUsersBody = {
 };
 
 type RowResult = { row: number; success: boolean; userId?: string; error?: string };
+
+/**
+ * Rows imported at the same time. One at a time let a few dozen rows run
+ * past Netlify's Function time limit (each row waits on Supabase Auth and,
+ * for users, an SMTP welcome e-mail); 4 keeps SMTP/Auth comfortable while
+ * cutting the wall-clock time about fourfold (code review 2026-09-26).
+ */
+const IMPORT_CONCURRENCY = 4;
 
 /** "user"/"admin" case-insensitively, or the Danish UI labels "Bruger"/"Administrator" — the template accepts either. Blank defaults to "user", matching create-user.mts's own default. Anything else is invalid. */
 function normalizeRole(value: string | undefined): Role | null {
@@ -57,17 +68,17 @@ function normalizeRole(value: string | undefined): Role | null {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -75,7 +86,7 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as BulkImportUsersBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const format = body.format;
@@ -97,7 +108,7 @@ export default async (req: Request) => {
     );
   }
   if (rows.length === 0) {
-    return new Response(JSON.stringify({ error: "Filen indeholder ingen rækker." }), { status: 400 });
+    return json({ error: "Filen indeholder ingen rækker." }, 400);
   }
 
 
@@ -112,7 +123,7 @@ export default async (req: Request) => {
   if (isSysadm) {
     const requested = asTrimmedString(body.costumerId);
     if (!requested) {
-      return new Response(JSON.stringify({ error: "costumerId er påkrævet for sysadm." }), { status: 400 });
+      return json({ error: "costumerId er påkrævet for sysadm." }, 400);
     }
     const { data: costumerRow } = await admin
       .from("costumers")
@@ -120,28 +131,39 @@ export default async (req: Request) => {
       .eq("costumer_id", requested)
       .maybeSingle<{ costumer_id: string }>();
     if (!costumerRow) {
-      return new Response(JSON.stringify({ error: "Ukendt costumerId." }), { status: 400 });
+      return json({ error: "Ukendt costumerId." }, 400);
     }
     costumerId = costumerRow.costumer_id;
   } else {
     if (!caller?.costumer_id) {
-      return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
+      return json({ error: "Din bruger er ikke tilknyttet en kunde." }, 403);
     }
     costumerId = caller.costumer_id;
   }
 
-  const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
+  const loginUrl = siteUrl();
   const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
 
-  // Caches a department name → id within this batch, so N rows in the same
-  // department only look it up (or create it) once instead of N times.
-  const departmentCache = new Map<string, string>();
+  // Each distinct department is looked up (or created) once, up front and
+  // in order — only for rows that would reach that step (valid Email and
+  // Rolle), same as before — so the concurrent rows below never race to
+  // create the same new department.
+  const departments = await resolveDepartmentNames(
+    admin,
+    rows
+      .filter((row) => asTrimmedString(row.Email) && normalizeRole(asTrimmedString(row.Rolle)))
+      .map((row) => asTrimmedString(row.Afdeling))
+      .filter((name): name is string => Boolean(name)),
+    costumerId,
+    // Only a sysadm (setting up a costumer) may create departments by import;
+    // for an admin an unknown name is a row error, not a new department.
+    { allowCreate: isSysadm },
+  );
 
-  const results: RowResult[] = [];
-  for (let i = 0; i < rows.length; i++) {
-    const outcome = await importUserRow(admin, rows[i], { costumerId, departmentCache, loginUrl, manualUrl });
-    results.push({ row: i + 1, ...outcome });
-  }
+  const results: RowResult[] = await mapWithConcurrency(rows, IMPORT_CONCURRENCY, async (row, i) => ({
+    row: i + 1,
+    ...(await importUserRow(admin, row, { costumerId, departments, loginUrl, manualUrl })),
+  }));
 
   const successCount = results.filter((r) => r.success).length;
   return new Response(
@@ -153,7 +175,7 @@ export default async (req: Request) => {
 async function importUserRow(
   admin: SupabaseClient,
   row: ImportRow,
-  ctx: { costumerId: string; departmentCache: Map<string, string>; loginUrl: string | null; manualUrl: string | null },
+  ctx: { costumerId: string; departments: Map<string, DepartmentResolution>; loginUrl: string | null; manualUrl: string | null },
 ): Promise<Omit<RowResult, "row">> {
   const email = asTrimmedString(row.Email);
   if (!email) {
@@ -165,20 +187,16 @@ async function importUserRow(
     return { success: false, error: 'Rolle skal være "Bruger"/"user" eller "Administrator"/"admin".' };
   }
 
+  // Already found/created up front (resolveDepartmentNames) — never created
+  // here, since rows run concurrently.
   const departmentName = asTrimmedString(row.Afdeling);
   let departmentId: string | null = null;
   if (departmentName) {
-    const cached = ctx.departmentCache.get(departmentName);
-    if (cached) {
-      departmentId = cached;
-    } else {
-      const resolved = await findOrCreateDepartment(admin, { name: departmentName, costumerId: ctx.costumerId });
-      if ("error" in resolved) {
-        return { success: false, error: `Afdeling "${departmentName}": ${resolved.error}` };
-      }
-      departmentId = resolved.departmentId;
-      ctx.departmentCache.set(departmentName, departmentId);
+    const resolved = ctx.departments.get(departmentName);
+    if (!resolved || "error" in resolved) {
+      return { success: false, error: `Afdeling "${departmentName}": ${resolved?.error ?? "kunne ikke slås op."}` };
     }
+    departmentId = resolved.departmentId;
   }
 
   // Per-row random password — never shared between accounts (see
@@ -222,7 +240,10 @@ async function importUserRow(
   if (departmentId) {
     const { error: grantError } = await admin
       .from("user_departments")
-      .insert({ user_id: created.user.id, department_id: departmentId });
+      .upsert(
+        { user_id: created.user.id, department_id: departmentId },
+        { onConflict: "user_id,department_id", ignoreDuplicates: true },
+      );
     if (grantError) {
       grantWarning = `Bruger oprettet, men tildeling af afdeling fejlede: ${grantError.message}`;
     }

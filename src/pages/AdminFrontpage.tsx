@@ -229,7 +229,7 @@ export function AdminFrontpage() {
             BRUGERE, which genuinely depend on both — see
             handleOpenDepartments/goToVehiclesOrUsers) — so Afdeling is
             simply dropped, and Kunde is repurposed the same way
-            TwoHireCommandPage.tsx's own header is: picking a Kunde jumps
+            TestCenterPage.tsx's own header is: picking a Kunde jumps
             straight to its /costumer-details instead of persisting a scope
             switch nothing on this page's sysadm view would ever read.
           */}
@@ -268,6 +268,15 @@ export function AdminFrontpage() {
           <PageSection>
             <PageSectionBody>
               <div className="flex flex-col gap-3">
+                {/* A booking for a walk-in visitor with no FLEETii account (the receptionist's flow) — see DropInGuestPage.tsx. */}
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/drop-in")}
+                  className="w-full"
+                >
+                  Opret drop-in reservation
+                </Button>
                 <Button
                   variant="secondary"
                   type="button"
@@ -435,10 +444,10 @@ export function AdminFrontpage() {
                   <Button
                     variant="secondary"
                     type="button"
-                    onClick={() => navigate("/2hire-command")}
+                    onClick={() => navigate("/test-center")}
                     className="w-full"
                   >
-                    2HIRE KOMMANDO
+                    TEST CENTER
                   </Button>
                 </div>
               )}

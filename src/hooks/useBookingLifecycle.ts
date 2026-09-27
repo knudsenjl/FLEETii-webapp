@@ -17,8 +17,9 @@ import { useTimedFlag } from "./useTimedFlag";
 import { useLocateVehicle } from "./useLocateVehicle";
 import { supabase } from "../lib/supabase";
 import { isSettingTilladt } from "../lib/settings";
-import { BOOKING_ID_COLUMN, toDisplayVehicle, userAnsatId, type EditingBooking } from "../lib/bookings";
-import { nowUtcIso, toUtcMs } from "../lib/time";
+import { BOOKING_ID_COLUMN, bookingUserLabel, toDisplayVehicle, type EditingBooking } from "../lib/bookings";
+import { toUtcMs } from "../lib/time";
+import { callFunction } from "../lib/callFunction";
 
 /** The fields BookingPage.tsx/BookingDetailsPage.tsx both need for the shared actions below — same shape each page's own fetch (fresh-on-mount for BookingPage, router-state-or-fetch-by-id for BookingDetailsPage) already produces. */
 export type LifecycleBooking = {
@@ -31,6 +32,9 @@ export type LifecycleBooking = {
   userEmail: string | null;
   userIdent: string | null;
   departmentId: string | null;
+  /** Drop-in booking fields (see MappedBooking) — optional, since BookingPage.tsx only ever shows a user's own, never-drop-in booking. */
+  isGuest?: boolean;
+  guestName?: string | null;
 };
 
 /** The genuine Køretøj-ID/Nummerplade pair (plus Drivmiddel and blocked-state) for a booking's vehicle — fetched straight from vehicle_profiles rather than reusing the 2hire vehicle's own plate field, since that's an UNGATED vehicle_ident-or-number_plate fallback and callers need to respect useVehicleIdent themselves. */
@@ -58,7 +62,7 @@ export function useBookingLifecycle(
   opts: {
     /** Passed straight through to useVehicleLockState — true unlocks both Lås/Lås op buttons regardless of the booking's own window (admin/sysadm on BookingDetailsPage); always false on BookingPage (role "user" only, no admin override to make there). */
     isAdminLock: boolean;
-    /** Whether to use userAnsatId(booking) instead of booking.userEmail as goToEditBooking's userLabel prefill — see useIdentSettings' own doc comment. */
+    /** Whether to use the Bruger-ID (see bookingUserLabel) instead of booking.userEmail as goToEditBooking's userLabel prefill — see useIdentSettings' own doc comment. */
     useUserIdent: boolean;
     userId: string | undefined;
     /** The BOOKING's OWN department (booking.departmentId), for the Tillad_slet_reservation/Tillad_rediger_reservation checks below — NOT the viewer's ambient/header-selected afdelingId. For BookingPage.tsx (role "user") the two happen to be identical (a user only ever has bookings in their own department); BookingDetailsPage.tsx (admin/sysadm, who can view any department's booking) must pass the booking's own departmentId explicitly instead. */
@@ -148,26 +152,31 @@ export function useBookingLifecycle(
     const editing: EditingBooking = {
       bookingId: booking.id,
       userId: booking.userId,
-      userLabel: opts.useUserIdent ? userAnsatId(booking) : booking.userEmail,
+      userLabel: bookingUserLabel(booking, opts.useUserIdent),
       anvendelse: booking.use,
       startIso: booking.startIso,
       endIso: booking.endIso,
       vehicleId: booking.vehicle,
       departmentId: booking.departmentId,
+      isGuest: booking.isGuest ?? false,
     };
     navigate("/reservation", { state: { editing } });
   };
 
-  /** Deletes this booking and returns to the bookings list. */
+  /** Deletes this booking and returns to the bookings list. `.select()` returns the deleted rows: RLS silently filters a delete the viewer isn't allowed to make down to 0 rows with no error, so an empty result is reported as a failure instead of navigating away as if it worked. */
   const handleCancelBooking = async () => {
     if (!booking) return;
     setIsCancelling(true);
     setError(null);
 
-    const { error: deleteError } = await supabase.from("bookings").delete().eq(BOOKING_ID_COLUMN, booking.id);
+    const { data: deleted, error: deleteError } = await supabase
+      .from("bookings")
+      .delete()
+      .eq(BOOKING_ID_COLUMN, booking.id)
+      .select(BOOKING_ID_COLUMN);
 
-    if (deleteError) {
-      setError(deleteError.message);
+    if (deleteError || !deleted?.length) {
+      setError(deleteError?.message ?? "Reservationen kunne ikke slettes — du har muligvis ikke tilladelse til det.");
       setIsCancelling(false);
       setShowCancelConfirm(false);
       return;
@@ -176,7 +185,7 @@ export function useBookingLifecycle(
     navigate("/bookings", { replace: true });
   };
 
-  /** Ends this booking early: locks the vehicle, then sets its "end" to now — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. If locking fails, the booking is left untouched (see useVehicleLockState's own error) rather than shortening a booking whose vehicle didn't actually get secured. */
+  /** Ends this booking early: locks the vehicle, then sets its "end" to now via finish-booking.mts — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. Goes through that Function rather than a client UPDATE because bookings' UPDATE RLS requires Tillad_rediger_reservation, which "Afslut" must not depend on (see that Function's header). If locking fails, the booking is left untouched (see useVehicleLockState's own error) rather than shortening a booking whose vehicle didn't actually get secured. */
   const handleFinishBooking = async () => {
     if (!booking) return;
     setIsFinishing(true);
@@ -189,10 +198,19 @@ export function useBookingLifecycle(
       return;
     }
 
-    const { error: updateError } = await supabase.from("bookings").update({ end: nowUtcIso() }).eq(BOOKING_ID_COLUMN, booking.id);
+    let finishError: string | null = null;
+    try {
+      const response = await callFunction("finish-booking", { body: { bookingId: booking.id } });
+      if (!response.ok) {
+        const result = response.data as { error?: string };
+        finishError = result.error ?? "Kunne ikke afslutte reservationen.";
+      }
+    } catch {
+      finishError = "Kunne ikke kontakte serveren. Prøv igen.";
+    }
 
-    if (updateError) {
-      setError(updateError.message);
+    if (finishError) {
+      setError(finishError);
       setIsFinishing(false);
       setShowFinishConfirm(false);
       return;

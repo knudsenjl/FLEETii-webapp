@@ -53,6 +53,7 @@ import {
   unsubscribeFromSpecificSignals,
   type TwoHireCredentials,
 } from "./_shared/twoHireClient.js";
+import { json } from "./_shared/http.js";
 
 type SubscribeBody = { costumerId?: string };
 
@@ -69,7 +70,7 @@ async function parseBody(req: Request): Promise<SubscribeBody> {
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const body = await parseBody(req);
@@ -81,12 +82,12 @@ export default async (req: Request) => {
   // regular costumer admin.
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -103,13 +104,13 @@ export default async (req: Request) => {
       .eq("costumer_id", targetCostumerId)
       .maybeSingle<{ costumer_id: string; name: string | null; twohire_client_id: string | null; twohire_client_secret: string | null }>();
     if (costumerError) {
-      return new Response(JSON.stringify({ error: costumerError.message }), { status: 500 });
+      return json({ error: costumerError.message }, 500);
     }
     if (!costumer) {
-      return new Response(JSON.stringify({ error: "Kunden findes ikke." }), { status: 404 });
+      return json({ error: "Kunden findes ikke." }, 404);
     }
     if (!costumer.twohire_client_id || !costumer.twohire_client_secret) {
-      return new Response(JSON.stringify({ error: "Kunden har endnu ikke 2hire-oplysninger." }), { status: 400 });
+      return json({ error: "Kunden har endnu ikke 2hire-oplysninger." }, 400);
     }
     subscriptions = [
       {
@@ -125,7 +126,7 @@ export default async (req: Request) => {
       .not("twohire_client_secret", "is", null)
       .returns<{ costumer_id: string; name: string | null; twohire_client_id: string; twohire_client_secret: string }[]>();
     if (costumersError) {
-      return new Response(JSON.stringify({ error: costumersError.message }), { status: 500 });
+      return json({ error: costumersError.message }, 500);
     }
 
     subscriptions = [

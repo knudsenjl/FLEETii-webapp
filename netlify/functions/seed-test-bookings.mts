@@ -2,28 +2,13 @@
 // department system-wide for a sysadm, or just the caller's own
 // costumer's for a regular admin — see the costumerId scoping below) with a
 // handful of realistic-looking bookings, so a manual
-// interface test isn't staring at empty tables. Reached from the round test
-// icon in PageHeader.tsx, whose own visibility (VITE_DATA_SOURCE-based) is
-// just a UX convenience — the actual boundary against ever writing
-// fabricated bookings into real production data is the two checks below,
-// neither of which the icon knows about:
-//   1. ALLOW_TEST_BOOKING_SEED === "true" — a server-only (never
-//      VITE_-prefixed) explicit opt-in, defaulting to DISABLED. Unset,
-//      misspelled, wrong-case, or any value other than exactly "true" means
-//      disabled — this fails CLOSED, unlike a check that only blocks when a
-//      var equals a specific "production" marker (which fails OPEN the
-//      instant that marker is ever missing/mistyped on the real production
-//      site — this function used to do exactly that, keyed off
-//      VITE_DATA_SOURCE, see git history).
-//   2. process.env.SITE_ID === PRODUCTION_SITE_ID below — an unbypassable
-//      backstop. Netlify injects SITE_ID into every Function invocation at
-//      runtime automatically (confirmed via `netlify sites:list`), for
-//      whichever site is actually running — there is nothing to configure,
-//      so unlike (1) this can never be "forgotten." Hardcoded rather than
-//      another env var: changing which site counts as "production" should
-//      require an explicit code change and review, not silent drift.
-// Both must pass for the function to even reach requireAdmin() below — no
-// single check here is "the" boundary on its own.
+// interface test isn't staring at empty tables. Reached from the
+// "Seed Test Reservations" button on the sysadm-only /test-center page
+// (TestCenterPage.tsx). What stops it from ever writing fabricated bookings
+// into real production data is testDataGuard.ts's three independent
+// server-side checks (not the production site; connected to the staging
+// database by an allowlist; the database itself marked as staging), plus a
+// required { confirmed: true } body from the page's confirmation dialog.
 //
 // For each department — every costumer's for a sysadm, or only the
 // caller's OWN costumer's for a regular admin (see the costumerId scoping
@@ -57,9 +42,8 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { randomInt } from "node:crypto";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
-
-/** Netlify's own permanent, runtime-injected site identifier for the real production deployment (app.fleetii.dk) — confirmed via `netlify sites:list`. Hardcoded, not another env var: unlike a config value, process.env.SITE_ID can't be missing or misspelled (Netlify populates it for every Function invocation automatically), so this can never silently fail to trigger. Changing which site counts as "production" requires an explicit code change here. */
-const PRODUCTION_SITE_ID = "ae77d3e5-f334-44f1-aa47-d33cd231681b";
+import { json } from "./_shared/http.js";
+import { isConfirmedSeedRequest, testDataDatabaseBlocked, testDataEnvironmentBlocked } from "./_shared/testDataGuard.js";
 
 const MIN_BOOKINGS_PER_DEPARTMENT = 3;
 const MAX_BOOKINGS_PER_DEPARTMENT = 7;
@@ -86,33 +70,30 @@ function randomStart(now: number): Date {
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
-  if (process.env.ALLOW_TEST_BOOKING_SEED !== "true") {
-    return new Response(
-      JSON.stringify({ error: "Testdata-seeding er ikke aktiveret på denne server." }),
-      { status: 403 },
-    );
-  }
-
-  if (process.env.SITE_ID === PRODUCTION_SITE_ID) {
-    return new Response(
-      JSON.stringify({ error: "Denne funktion kan ikke køre mod produktionsdata." }),
-      { status: 403 },
-    );
-  }
+  const environmentBlocked = testDataEnvironmentBlocked();
+  if (environmentBlocked) return environmentBlocked;
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
+
+  const body = await req.json().catch(() => null);
+  if (!isConfirmedSeedRequest(body)) {
+    return json({ error: "Handlingen skal bekræftes." }, 400);
+  }
+
+  const databaseBlocked = await testDataDatabaseBlocked(admin);
+  if (databaseBlocked) return databaseBlocked;
 
   const { data: caller, error: callerError } = await admin
     .from("user_profiles")
@@ -120,7 +101,7 @@ export default async (req: Request) => {
     .eq("user_id", authResult.userId)
     .maybeSingle<{ role: string; costumer_id: string | null }>();
   if (callerError) {
-    return new Response(JSON.stringify({ error: callerError.message }), { status: 500 });
+    return json({ error: callerError.message }, 500);
   }
 
   const isSysadm = isSysadmRole(caller?.role);
@@ -128,7 +109,7 @@ export default async (req: Request) => {
   // sysadm (no costumer of their own) still seeds every department
   // system-wide, unchanged from before this scoping was added.
   if (!isSysadm && !caller?.costumer_id) {
-    return new Response(JSON.stringify({ error: "Din bruger er ikke tilknyttet en kunde." }), { status: 403 });
+    return json({ error: "Din bruger er ikke tilknyttet en kunde." }, 403);
   }
 
   // .eq() (a PostgrestFilterBuilder method) has to be applied before
@@ -154,7 +135,7 @@ export default async (req: Request) => {
 
   for (const result of [departmentsResult, vehicleDepartmentsResult, userDepartmentsResult, anvendelseResult]) {
     if (result.error) {
-      return new Response(JSON.stringify({ error: result.error.message }), { status: 500 });
+      return json({ error: result.error.message }, 500);
     }
   }
 
@@ -224,7 +205,7 @@ export default async (req: Request) => {
           break;
         }
         if (error.code !== EXCLUSION_VIOLATION) {
-          return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+          return json({ error: error.message }, 500);
         }
         // Overlapping booking for that vehicle — retry with a fresh random pick.
       }
@@ -232,8 +213,5 @@ export default async (req: Request) => {
     created.push({ department: departmentLabel, count: insertedForDepartment });
   }
 
-  return new Response(JSON.stringify({ ok: true, created, skipped }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true, created, skipped }, 200);
 };

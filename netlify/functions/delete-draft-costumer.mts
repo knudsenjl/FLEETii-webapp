@@ -31,22 +31,23 @@
 // reason delete-costumer.mts itself is a Function and not a client call.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
+import { json } from "./_shared/http.js";
 
 type DeleteDraftCostumerBody = { costumerId?: string };
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -54,12 +55,12 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as DeleteDraftCostumerBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const targetCostumerId = body.costumerId;
   if (!targetCostumerId) {
-    return new Response(JSON.stringify({ error: "costumerId er påkrævet." }), { status: 400 });
+    return json({ error: "costumerId er påkrævet." }, 400);
   }
 
 
@@ -69,20 +70,27 @@ export default async (req: Request) => {
     .eq("costumer_id", targetCostumerId)
     .maybeSingle<{ costumer_id: string; name: string | null }>();
   if (costumerError) {
-    return new Response(JSON.stringify({ error: costumerError.message }), { status: 500 });
+    return json({ error: costumerError.message }, 500);
   }
   if (!costumer) {
-    return new Response(JSON.stringify({ error: "Kunden findes ikke." }), { status: 404 });
+    return json({ error: "Kunden findes ikke." }, 404);
   }
 
   const [departmentsResult, vehiclesResult, usersResult] = await Promise.all([
     admin.from("departments").select("department_id", { count: "exact", head: true }).eq("costumer_id", targetCostumerId),
     admin.from("vehicle_profiles").select("vehicle_id", { count: "exact", head: true }).eq("costumer_id", targetCostumerId),
-    admin.from("user_profiles").select("user_id", { count: "exact", head: true }).eq("costumer_id", targetCostumerId),
+    // Sysadms don't count: their costumer_id is only a Data Filter scope
+    // pointer (see switch-department.mts), not a membership — they're moved
+    // back to "Alle" just before the delete below.
+    admin
+      .from("user_profiles")
+      .select("user_id", { count: "exact", head: true })
+      .eq("costumer_id", targetCostumerId)
+      .neq("role", "sysadm"),
   ]);
   for (const result of [departmentsResult, vehiclesResult, usersResult]) {
     if (result.error) {
-      return new Response(JSON.stringify({ error: result.error.message }), { status: 500 });
+      return json({ error: result.error.message }, 500);
     }
   }
   const hasRelatedData =
@@ -97,10 +105,22 @@ export default async (req: Request) => {
     );
   }
 
-  const { error: deleteError } = await admin.from("costumers").delete().eq("costumer_id", targetCostumerId);
-  if (deleteError) {
-    return new Response(JSON.stringify({ error: deleteError.message }), { status: 500 });
+  // A draft has no departments, so a sysadm can only point at it via
+  // costumer_id — reset that first, or the delete would fail on the foreign
+  // key (or leave the sysadm scoped to a costumer that no longer exists).
+  const { error: pointerError } = await admin
+    .from("user_profiles")
+    .update({ costumer_id: null, department_id: null, active_department_id: null })
+    .eq("costumer_id", targetCostumerId)
+    .eq("role", "sysadm");
+  if (pointerError) {
+    return json({ error: pointerError.message }, 500);
   }
 
-  return new Response(JSON.stringify({ ok: true }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const { error: deleteError } = await admin.from("costumers").delete().eq("costumer_id", targetCostumerId);
+  if (deleteError) {
+    return json({ error: deleteError.message }, 500);
+  }
+
+  return json({ ok: true }, 200);
 };

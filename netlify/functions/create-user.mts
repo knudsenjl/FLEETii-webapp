@@ -32,6 +32,8 @@ import {
   isAllowedRole,
   isUsableErrorMessage,
 } from "./_shared/userAccount.js";
+import { json } from "./_shared/http.js";
+import { siteUrl } from "./_shared/siteUrl.js";
 
 type CreateUserBody = {
   email?: string;
@@ -57,17 +59,17 @@ type CreateUserBody = {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -75,17 +77,17 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as CreateUserBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const email = asTrimmedString(body.email);
   if (!email) {
-    return new Response(JSON.stringify({ error: "E-mail er påkrævet." }), { status: 400 });
+    return json({ error: "E-mail er påkrævet." }, 400);
   }
 
   const rawRole = asTrimmedString(body.role) || "user";
   if (!isAllowedRole(rawRole)) {
-    return new Response(JSON.stringify({ error: 'Rolle skal være "user" eller "admin".' }), { status: 400 });
+    return json({ error: 'Rolle skal være "user" eller "admin".' }, 400);
   }
   const role = rawRole;
 
@@ -129,10 +131,10 @@ export default async (req: Request) => {
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
   if (isSysadm) {
     if (!requestedDepartmentRow) {
-      return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+      return json({ error: "Ugyldig afdeling." }, 400);
     }
   } else if (!caller?.costumer_id || requestedDepartmentRow?.costumer_id !== caller.costumer_id) {
-    return new Response(JSON.stringify({ error: "Du kan kun oprette brugere hos din egen kunde." }), { status: 403 });
+    return json({ error: "Du kan kun oprette brugere hos din egen kunde." }, 403);
   }
 
   // AuthRetryableFetchError-aware retry (dropped/incomplete HTTP response
@@ -150,7 +152,7 @@ export default async (req: Request) => {
     const message = isUsableErrorMessage(createError?.message)
       ? createError.message
       : "Kunne ikke oprette bruger efter flere forsøg. Tjek Supabase-projektets Authentication-log for detaljer.";
-    return new Response(JSON.stringify({ error: message }), { status: 400 });
+    return json({ error: message }, 400);
   }
 
   // Upsert rather than update: covers both the case where a DB trigger
@@ -181,14 +183,32 @@ export default async (req: Request) => {
     if (rollbackError) {
       console.error("[create-user] rollback of created user failed:", rollbackError);
     }
-    return new Response(JSON.stringify({ error: profileError.message }), { status: 400 });
+    return json({ error: profileError.message }, 400);
+  }
+
+  // The home department is always one of the user's granted departments —
+  // bulk-import-users.mts already did this, but this path relied on
+  // UserDetailsPage adding it afterwards from the browser, so any other
+  // caller (or a failed follow-up request) left a user with no grants at
+  // all (code review 2026-09-26). Upsert-ignore, since UserDetailsPage still
+  // adds its grants (possibly including this one) right after.
+  if (requestedDepartmentId) {
+    const { error: grantError } = await admin
+      .from("user_departments")
+      .upsert(
+        { user_id: created.user.id, department_id: requestedDepartmentId },
+        { onConflict: "user_id,department_id", ignoreDuplicates: true },
+      );
+    if (grantError) {
+      console.error("[create-user] home-department grant failed (account was still created):", grantError);
+    }
   }
 
   // Best-effort: the account is already fully created and usable at this
   // point, so a failed welcome email is logged, not surfaced as a request
   // failure — the admin still sees it via emailSent below and can pass the
   // credentials on some other way.
-  const loginUrl = process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? null;
+  const loginUrl = siteUrl();
   // VITE_BRUGERMANUAL_URL is a site-relative path (e.g.
   // "/manualer/fleetii-manual-bruger.html"), not an absolute URL —
   // needs loginUrl to become one for the email; omitted if either is unset.
@@ -202,8 +222,5 @@ export default async (req: Request) => {
     console.error("[create-user] welcome email failed to send (account was still created):", emailResult.error);
   }
 
-  return new Response(JSON.stringify({ id: created.user.id, emailSent: emailResult.ok }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ id: created.user.id, emailSent: emailResult.ok }, 200);
 };

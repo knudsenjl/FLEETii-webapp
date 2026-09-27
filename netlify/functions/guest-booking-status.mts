@@ -1,0 +1,110 @@
+// Netlify Function (PUBLIC — no login): what the drop-in guest's /gaest page
+// shows. POST { token } → the booking's vehicle, Anvendelse, period, the
+// link's access state and, while access is active, the Lås/Lås op button
+// state by exactly the same rules a regular user gets (via
+// _shared/vehicleLock.ts's lockStateForBooking). POST rather than GET so the
+// token travels in the body, never in a URL/access log.
+//
+// Never returns the guest's personal data (name/email/…) — the token is a
+// bearer credential, and whoever holds a forwarded link shouldn't learn who
+// it was issued to. The vehicle is labelled like VehicleDetailsPage.tsx's
+// "Køretøj:" row ("Køretøj-ID / Nummerplade" when the vehicle's home
+// department uses Køretøj-ID, else just the plate) — worked out here, since a
+// guest isn't logged in and can't read department_settings. While access is
+// active it also returns the vehicle's last
+// GPS position for the page's map (same 15-min-margin window regular users
+// get, see isMapVisible). Rate-limited and logged via _shared/guestAccess.ts.
+import { formatVehicleIdentLabel } from "../../src/lib/bookings.js";
+import { nowUtcIso } from "../../src/lib/time.js";
+import { getAdminClient } from "./_shared/adminClient.js";
+import { guestAccessWindow, guestVehicleLabel, logGuestAccess, resolveGuestRequest } from "./_shared/guestAccess.js";
+import { loadLockContext, lockStateForBooking } from "./_shared/vehicleLock.js";
+import { json as jsonResponse } from "./_shared/http.js";
+
+/** Every answer from this public, token-authenticated endpoint is marked no-store — a guest's lock state must never be served from a cache. */
+const json = (body: unknown, status: number) => jsonResponse(body, status, { "Cache-Control": "no-store" });
+
+export default async (req: Request) => {
+  if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
+
+  const adminClientResult = getAdminClient();
+  if (!adminClientResult.ok) return json({ error: adminClientResult.error }, adminClientResult.status);
+  const { admin } = adminClientResult;
+
+  let token: unknown;
+  try {
+    ({ token } = (await req.json()) as { token?: unknown });
+  } catch {
+    return json({ error: "Ugyldig anmodning." }, 400);
+  }
+
+  const resolved = await resolveGuestRequest(admin, req, token);
+  if (!resolved.ok) return json({ error: resolved.error }, resolved.status);
+  const { booking, access, ip } = resolved;
+
+  // Lock state only while the link is active — outside it the page shows no
+  // buttons at all, so there's no reason to load the vehicle's bookings.
+  let lock: { lockEnabled: boolean; unlockEnabled: boolean } | null = null;
+  let locked: boolean | null = null;
+  let position: { lat: number; lng: number; updatedAt: string | null } | null = null;
+  if (access === "active") {
+    try {
+      const [context, { data: signal }] = await Promise.all([
+        loadLockContext(admin, booking.vehicle_id),
+        admin
+          .from("vehicle_signals")
+          .select("lat, lng, position_updated_at")
+          .eq("vehicle_id", booking.vehicle_id)
+          .maybeSingle<{ lat: number | null; lng: number | null; position_updated_at: string | null }>(),
+      ]);
+      const own = context.bookings.find((b) => b.booking_id === booking.booking_id);
+      lock = own ? lockStateForBooking(context, own) : { lockEnabled: false, unlockEnabled: false };
+      locked = context.currentLocked;
+      if (signal?.lat != null && signal.lng != null) {
+        position = { lat: signal.lat, lng: signal.lng, updatedAt: signal.position_updated_at };
+      }
+    } catch (error) {
+      console.error("[guest-booking-status]", error);
+      return json({ error: "Der opstod en fejl. Prøv igen om lidt." }, 500);
+    }
+  }
+
+  // Same fail-closed default as useIdentSettings: no setting row = plate only.
+  let useVehicleIdent = false;
+  if (booking.vehicle?.department_id) {
+    const { data: setting } = await admin
+      .from("department_settings")
+      .select("value_bool")
+      .eq("department_id", booking.vehicle.department_id)
+      .eq("name", "use_vehicle_ident")
+      .maybeSingle<{ value_bool: boolean | null }>();
+    useVehicleIdent = setting?.value_bool === true;
+  }
+
+  await logGuestAccess(admin, booking.booking_id, access === "active" ? "status" : "denied", ip);
+
+  const window = booking.end ? guestAccessWindow({ start: booking.start, end: booking.end }) : null;
+  return json(
+    {
+      access,
+      costumerName: booking.costumer_name,
+      departmentName: booking.department_name,
+      position,
+      vehicleLabel: guestVehicleLabel(booking.vehicle, "Køretøj"),
+      brand: booking.vehicle?.brand ?? null,
+      model: booking.vehicle?.model ?? null,
+      plate: booking.vehicle?.vehicle_ident?.trim() || booking.vehicle?.number_plate || null,
+      vehicleIdentLabel: formatVehicleIdentLabel(booking.vehicle?.vehicle_ident, booking.vehicle?.number_plate, useVehicleIdent),
+      usage: booking.usage,
+      start: booking.start,
+      end: booking.end,
+      accessFrom: window ? new Date(window.fromMs).toISOString() : null,
+      accessUntil: window ? new Date(window.untilMs).toISOString() : null,
+      // Lets the page count down to accessFrom off the server's clock, not a possibly-wrong phone clock.
+      serverNow: nowUtcIso(),
+      lock,
+      locked,
+    },
+    200,
+  );
+};

@@ -20,6 +20,8 @@
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
+import { json } from "./_shared/http.js";
+import { siteBaseUrl } from "./_shared/siteUrl.js";
 
 type SendVehicleDeletionRequestBody = { vehicleId?: string };
 
@@ -82,22 +84,22 @@ function buildHtmlBody(fields: {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const mailReceiver = process.env.MAIL_RECIEVER;
   if (!mailReceiver) {
-    return new Response(JSON.stringify({ error: "Serveren mangler MAIL_RECIEVER." }), { status: 500 });
+    return json({ error: "Serveren mangler MAIL_RECIEVER." }, 500);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -105,12 +107,12 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as SendVehicleDeletionRequestBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const vehicleId = body.vehicleId?.trim();
   if (!vehicleId) {
-    return new Response(JSON.stringify({ error: "vehicleId er påkrævet." }), { status: 400 });
+    return json({ error: "vehicleId er påkrævet." }, 400);
   }
 
 
@@ -144,10 +146,10 @@ export default async (req: Request) => {
   ]);
 
   if (!caller) {
-    return new Response(JSON.stringify({ error: "Kunne ikke slå din brugerprofil op." }), { status: 500 });
+    return json({ error: "Kunne ikke slå din brugerprofil op." }, 500);
   }
   if (!vehicle) {
-    return new Response(JSON.stringify({ error: "Køretøjet findes ikke." }), { status: 404 });
+    return json({ error: "Køretøjet findes ikke." }, 404);
   }
 
   // A sysadm has no "home" costumer of their own (see isSysadm
@@ -175,7 +177,7 @@ export default async (req: Request) => {
     }
   }
   if (!vehicle.costumer_id) {
-    return new Response(JSON.stringify({ error: "Køretøjet er ikke tilknyttet en kunde." }), { status: 400 });
+    return json({ error: "Køretøjet er ikke tilknyttet en kunde." }, 400);
   }
 
   // customer/department are likewise independent of each other.
@@ -225,7 +227,7 @@ export default async (req: Request) => {
     to: mailReceiver,
     subject: `${customerName} - Anmodning om sletning af køretøj (${vehicle.number_plate ?? "—"}) i FLEETii`,
     html: buildHtmlBody({
-      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp-staging.netlify.app",
+      baseUrl: siteBaseUrl(),
       orderId: insertedOrder.order_id,
       customerName,
       departmentName,
@@ -240,11 +242,8 @@ export default async (req: Request) => {
   });
 
   if (!result.ok) {
-    return new Response(JSON.stringify({ error: `Kunne ikke sende mail: ${result.error}` }), { status: 502 });
+    return json({ error: `Kunne ikke sende mail: ${result.error}` }, 502);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

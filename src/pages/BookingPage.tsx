@@ -358,12 +358,13 @@ export function BookingPage() {
               }
             />
 
+            {/* Blink/Horn are enabled only while Lås or Lås op is — the same rule 2hire-vehicle-command.mts enforces server-side for "locate" (see VehicleLockControlsRow). */}
             <div className="flex w-full gap-2.5">
               <div className="group relative flex-1">
                 <Button
                   type="button"
                   onClick={() => void handleLocate()}
-                  disabled={isLocating}
+                  disabled={isLocating || !(lockEnabled || unlockEnabled)}
                   pill
                   className="flex w-full items-center justify-center gap-1.5 px-2 py-2"
                 >
@@ -373,7 +374,13 @@ export function BookingPage() {
                 <InlinePopup visible={lockConfirmationKey === "located"} message="Lygterne blinker" />
               </div>
               <div className="group relative flex-1">
-                <Button type="button" onClick={handleHonk} pill className="flex w-full items-center justify-center gap-1.5 px-2 py-2">
+                <Button
+                  type="button"
+                  onClick={handleHonk}
+                  disabled={!(lockEnabled || unlockEnabled)}
+                  pill
+                  className="flex w-full items-center justify-center gap-1.5 px-2 py-2"
+                >
                   <HornIcon className="h-4 w-4" />
                   Horn
                 </Button>

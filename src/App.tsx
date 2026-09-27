@@ -1,8 +1,9 @@
 // Top-level route table for the whole app. Every authenticated route is
 // wrapped in <ProtectedRoute> (optionally with requireAdmin) which redirects
 // unauthenticated users to "/" and shows a "forbidden" notice to non-admins
-// on admin-only routes. "/about" is the one deliberately public route (it
-// must be reachable from LoginPage before a user has signed in).
+// on admin-only routes. "/about" (reachable from LoginPage before a user has
+// signed in) and "/gaest" (a drop-in guest's emailed link — see
+// GuestDrivePage.tsx) are the only deliberately public routes.
 import { lazy, Suspense, useEffect } from "react";
 import { Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -64,6 +65,8 @@ const VehicleCreatePage = lazy(() =>
 const VehicleDeletePage = lazy(() =>
   import("./pages/VehicleDeletePage").then((m) => ({ default: m.VehicleDeletePage })),
 );
+const DropInGuestPage = lazy(() => import("./pages/DropInGuestPage").then((m) => ({ default: m.DropInGuestPage })));
+const GuestDrivePage = lazy(() => import("./pages/GuestDrivePage").then((m) => ({ default: m.GuestDrivePage })));
 const AboutPage = lazy(() => import("./pages/AboutPage").then((m) => ({ default: m.AboutPage })));
 const SettingsSuperadminPage = lazy(() =>
   import("./pages/SettingsSuperadminPage").then((m) => ({ default: m.SettingsSuperadminPage })),
@@ -72,9 +75,7 @@ const SettingsAdminPage = lazy(() =>
   import("./pages/SettingsAdminPage").then((m) => ({ default: m.SettingsAdminPage })),
 );
 const SetPasswordPage = lazy(() => import("./pages/SetPasswordPage").then((m) => ({ default: m.SetPasswordPage })));
-const TwoHireCommandPage = lazy(() =>
-  import("./pages/TwoHireCommandPage").then((m) => ({ default: m.TwoHireCommandPage })),
-);
+const TestCenterPage = lazy(() => import("./pages/TestCenterPage").then((m) => ({ default: m.TestCenterPage })));
 
 /**
  * The "/" route. Once the initial auth check finishes, sends a signed-in
@@ -151,6 +152,14 @@ function App() {
         <Suspense fallback={<AppLoadingScreen />}>
           <Routes>
             <Route path="/" element={<RootRoute />} />
+            <Route
+              path="/drop-in"
+              element={
+                <ProtectedRoute requireAdmin>
+                  <DropInGuestPage />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/reservation"
               element={
@@ -232,13 +241,15 @@ function App() {
               }
             />
             <Route
-              path="/2hire-command"
+              path="/test-center"
               element={
                 <ProtectedRoute requireRole="sysadm">
-                  <TwoHireCommandPage />
+                  <TestCenterPage />
                 </ProtectedRoute>
               }
             />
+            {/* Old name of /test-center (renamed 2026-09-27) — kept so bookmarks still work. */}
+            <Route path="/2hire-command" element={<Navigate to="/test-center" replace />} />
             <Route
               path="/costumer-new"
               element={
@@ -408,6 +419,7 @@ function App() {
               }
             />
             <Route path="/about" element={<AboutPage />} />
+            <Route path="/gaest" element={<GuestDrivePage />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>

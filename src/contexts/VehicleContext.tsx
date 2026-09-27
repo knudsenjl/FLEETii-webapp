@@ -161,7 +161,16 @@ export function VehicleProvider({ children }: { children: ReactNode }) {
           const nextValue = tripDetected ? "TRUE" : "FALSE";
           if (prev[index].tripDetected === nextValue && prev[index].tripDetectedUpdatedAtIso === updatedAtIso) return prev;
           const next = [...prev];
-          next[index] = { ...prev[index], tripDetected: nextValue, tripDetectedUpdatedAtIso: updatedAtIso };
+          // A flip starts or ends the latest trip — keep the trip window
+          // (lib/vehicleHealth.ts's yardstick) current without a reload.
+          const flipped = prev[index].tripDetected !== nextValue;
+          next[index] = {
+            ...prev[index],
+            tripDetected: nextValue,
+            tripDetectedUpdatedAtIso: updatedAtIso,
+            ...(flipped && tripDetected ? { lastTripStartIso: updatedAtIso, lastTripEndIso: null } : {}),
+            ...(flipped && !tripDetected ? { lastTripEndIso: updatedAtIso } : {}),
+          };
           return next;
         });
       })

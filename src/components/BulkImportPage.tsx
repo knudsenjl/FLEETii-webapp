@@ -17,6 +17,7 @@ import { RequiredMark } from "./RequiredMark";
 import { SectionHeading } from "./SectionHeading";
 import { TEXT_INPUT_CLASSNAME } from "../lib/inputStyles";
 import { supabase } from "../lib/supabase";
+import { callFunction } from "../lib/callFunction";
 
 /**
  * Opens `url` in a new tab as plain text instead of letting the browser
@@ -75,7 +76,7 @@ export function BulkImportPage({
   introExtra,
   formatResultNoun,
 }: BulkImportPageProps) {
-  const { session, profile, costumerId } = useAuth();
+  const { profile, costumerId } = useAuth();
   const jsonInputRef = useRef<HTMLInputElement>(null);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const [importing, setImporting] = useState(false);
@@ -113,16 +114,11 @@ export function BulkImportPage({
 
     try {
       const fileContent = await file.text();
-      const response = await fetch(`/.netlify/functions/${endpoint}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ format, fileContent, costumerId: targetCostumerId ?? undefined }),
+      const response = await callFunction<ImportSummary>(endpoint, {
+        body: { format, fileContent, costumerId: targetCostumerId ?? undefined },
       });
 
-      const result = (await response.json()) as ImportSummary & { error?: string };
+      const result = response.data;
       if (!response.ok) {
         setRequestError(result.error ?? `Kunne ikke importere ${nounPlural.toLowerCase()}.`);
         return;

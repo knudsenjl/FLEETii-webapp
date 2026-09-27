@@ -1,4 +1,4 @@
-// Netlify Function backing TwoHireCommandPage.tsx ("/2hire-command",
+// Netlify Function backing TestCenterPage.tsx ("/test-center",
 // sysadm-only): sends an arbitrary, hand-typed request straight to 2hire's
 // Adapter API and returns the raw response, for poking at endpoints this
 // codebase has no dedicated wrapper for yet (unlike 2hire-vehicle-command.mts,
@@ -18,13 +18,33 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
+import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
 import { getGlobalCredentials, getTwoHireAccessToken, getTwoHireBaseUrl } from "./_shared/twoHireClient.js";
+import { json } from "./_shared/http.js";
 
 const HTTP_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE"] as const;
 type HttpMethod = (typeof HTTP_METHODS)[number];
 
 /** Matches every "{...}" token in a command string — each one's inner text is treated as a number plate to resolve (see resolvePlatePlaceholders). */
 const PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
+
+/** What a plate placeholder may contain: letters, digits and spaces. Plates are interpolated into a PostgREST .or() filter string, where a comma, dot or parenthesis would change the filter itself. */
+const PLATE_PATTERN = /^[\p{L}\p{N} ]+$/u;
+
+/**
+ * Whether an absolute URL may receive the 2hire bearer token: https only, and
+ * only a 2hire host (adapter/test/e2e are all *.2hire.io). Anything else
+ * would hand the global 2hire credential to whatever host was typed or
+ * pasted (code review 2026-09-26).
+ */
+function isTwoHireUrl(url: string): boolean {
+  try {
+    const { protocol, hostname } = new URL(url);
+    return protocol === "https:" && (hostname === "2hire.io" || hostname.endsWith(".2hire.io"));
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Replaces every "{plate}" token in `path` with that plate's real 2hire
@@ -37,6 +57,10 @@ const PLACEHOLDER_PATTERN = /\{([^{}]+)\}/g;
 async function resolvePlatePlaceholders(path: string, admin: SupabaseClient): Promise<string> {
   const plates = [...new Set([...path.matchAll(PLACEHOLDER_PATTERN)].map((match) => match[1].trim()))];
   if (plates.length === 0) return path;
+  const invalidPlate = plates.find((plate) => !PLATE_PATTERN.test(plate));
+  if (invalidPlate !== undefined) {
+    throw new Error(`Ugyldig nummerplade "${invalidPlate}" — kun bogstaver, tal og mellemrum.`);
+  }
 
   // ilike (not .in()) so a plate typed in any case still matches how it's
   // actually stored — number_plate isn't guaranteed to be all-caps in the DB.
@@ -62,18 +86,18 @@ async function resolvePlatePlaceholders(path: string, admin: SupabaseClient): Pr
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const requestBody = (await req.json().catch(() => null)) as { command?: string; body?: string } | null;
   const command = requestBody?.command?.trim();
   if (!command) {
-    return new Response(JSON.stringify({ error: "command er påkrævet." }), { status: 400 });
+    return json({ error: "command er påkrævet." }, 400);
   }
 
   const [methodToken, ...pathParts] = command.split(/\s+/);
@@ -91,11 +115,14 @@ export default async (req: Request) => {
   // prepending the base URL for a bare path (not unconditionally) avoids
   // mangling an already-absolute URL into "<base>/<absolute-url>".
   const isAbsoluteUrl = /^https?:\/\//i.test(rawPath);
+  if (isAbsoluteUrl && !isTwoHireUrl(rawPath)) {
+    return json({ error: "Kun https-adresser hos 2hire (*.2hire.io) er tilladt." }, 400);
+  }
   const path = isAbsoluteUrl ? rawPath : rawPath.startsWith("/") ? rawPath : `/${rawPath}`;
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
 
   try {
@@ -105,7 +132,8 @@ export default async (req: Request) => {
     const token = await getTwoHireAccessToken(getGlobalCredentials());
     const hasBody = method !== "GET" && method !== "DELETE" && requestBody?.body?.trim();
 
-    const response = await fetch(requestUrl, {
+    const response = await fetchWithTimeout(requestUrl, {
+      label: "2hire",
       method,
       headers: {
         Authorization: `${token.tokenType} ${token.value}`,
@@ -128,6 +156,6 @@ export default async (req: Request) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: 502 });
+    return json({ error: message }, 502);
   }
 };

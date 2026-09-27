@@ -26,6 +26,7 @@ import { useTimedFlag } from "../hooks/useTimedFlag";
 import { supabase } from "../lib/supabase";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
 import { EMAIL_PATTERN, PHONE_PATTERN } from "../lib/validation";
+import { callFunction } from "../lib/callFunction";
 
 /** A row from the `user_profiles` table. When reached with one pre-filled via router state (clicking a row on DepartmentPage), the form edits it (see UserDetailsPage's own doc comment below for how). */
 type ProfileRow = {
@@ -114,7 +115,7 @@ type ProfileRow = {
  * didn't have before this unification.
  */
 export function UserDetailsPage() {
-  const { session, profile, costumerId, costumerName, afdelingId, afdeling, availableDepartments } = useAuth();
+  const { profile, costumerId, costumerName, afdelingId, afdeling, availableDepartments } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { userId } = useParams<{ userId: string }>();
@@ -563,16 +564,9 @@ export function UserDetailsPage() {
     setSubmitError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/delete-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ userId: user.user_id }),
-      });
+      const response = await callFunction("delete-user", { body: { userId: user.user_id } });
 
-      const result = (await response.json()) as { error?: string };
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke slette bruger.");
         setIsSubmitting(false);
@@ -597,16 +591,9 @@ export function UserDetailsPage() {
     setSubmitError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/unblock-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ userId: user.user_id }),
-      });
+      const response = await callFunction("unblock-user", { body: { userId: user.user_id } });
 
-      const result = (await response.json()) as { error?: string };
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke genetablere brugerens adgang.");
         setIsSubmitting(false);
@@ -631,13 +618,8 @@ export function UserDetailsPage() {
     setSubmitError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/update-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const response = await callFunction("update-user", {
+        body: {
           userId: user.user_id,
           email: email.trim(),
           full_name: fullName || null,
@@ -647,10 +629,10 @@ export function UserDetailsPage() {
           // The id is what the server actually resolves (names are only unique per costumer); the name stays for older server versions.
           departmentId: departmentOptions.find((d) => d.name === department)?.department_id ?? null,
           role: role || "user",
-        }),
+        },
       });
 
-      const result = (await response.json()) as { error?: string };
+      const result = response.data as { error?: string };
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke opdatere bruger.");
         setIsSubmitting(false);
@@ -734,13 +716,8 @@ export function UserDetailsPage() {
     setSubmitError(null);
 
     try {
-      const response = await fetch("/.netlify/functions/create-user", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const response = await callFunction("create-user", {
+        body: {
           email: email.trim(),
           full_name: fullName || null,
           phone: phone || null,
@@ -749,10 +726,10 @@ export function UserDetailsPage() {
           // The id is what the server actually resolves (names are only unique per costumer); the name stays for older server versions.
           departmentId: departmentOptions.find((d) => d.name === department)?.department_id ?? null,
           role: role || "user",
-        }),
+        },
       });
 
-      const result = (await response.json()) as { id?: string; emailSent?: boolean; error?: string };
+      const result = response.data as { id?: string; emailSent?: boolean; error?: string };
 
       if (!response.ok) {
         setSubmitError(result.error ?? "Kunne ikke oprette bruger.");
@@ -760,17 +737,21 @@ export function UserDetailsPage() {
         return;
       }
 
-      // Seeds user_departments for the new user — create-user.mts itself
-      // never touches that table, so without this a brand-new user would
-      // have zero grants (the gap flagged earlier this session). The
-      // self-heal effect above guarantees userDepartmentIds already has at
-      // least the chosen home department; if role is "admin" it may also
-      // include whatever else was checked in the Afdelinger table.
+      // Seeds user_departments for the new user. create-user.mts already
+      // grants the home department itself; this adds everything else
+      // checked in the Afdelinger table (role "admin"). The self-heal effect
+      // above guarantees userDepartmentIds has at least the home
+      // department, which create-user has already inserted — hence
+      // upsert-ignore rather than insert (that duplicate would otherwise
+      // fail on the primary key).
       const newUserId = result.id;
       if (newUserId && userDepartmentIds.size > 0) {
         const { error: insertGrantsError } = await supabase
           .from("user_departments")
-          .insert([...userDepartmentIds].map((department_id) => ({ user_id: newUserId, department_id })));
+          .upsert(
+            [...userDepartmentIds].map((department_id) => ({ user_id: newUserId, department_id })),
+            { onConflict: "user_id,department_id", ignoreDuplicates: true },
+          );
         if (insertGrantsError) {
           setSubmitError(insertGrantsError.message);
           setIsSubmitting(false);
@@ -924,6 +905,12 @@ export function UserDetailsPage() {
                         <option value="" className="bg-brand-100">Vælg rolle:</option>
                         <option value="user">Bruger</option>
                         <option value="admin">Administrator</option>
+                        {/* Shown only so a sysadm's own role displays (and is sent back unchanged — update-user.mts accepts an unchanged "sysadm"); it can't be picked for anyone else. */}
+                        {role === "sysadm" && (
+                          <option value="sysadm" disabled>
+                            Sysadm
+                          </option>
+                        )}
                       </select>
                     )}
                   </FieldRow>

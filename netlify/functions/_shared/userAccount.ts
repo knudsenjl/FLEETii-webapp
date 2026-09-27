@@ -55,7 +55,7 @@ export function isUsableErrorMessage(message: string | undefined): message is st
 }
 
 /** Danish label for a `user_profiles.role` value, matching AuthContext.tsx's formatRoleLabel — not imported directly since that file is a client-side React context module, not something a Netlify Function should pull in for one string. */
-export function roleLabel(role: Role): string {
+function roleLabel(role: Role): string {
   return role === "admin" ? "Administrator" : "Bruger";
 }
 

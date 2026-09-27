@@ -6,7 +6,6 @@
 // button-activation rules via computeLockButtonState — only for a regular
 // user with a relevant booking; admins always get both buttons enabled.
 import { useCallback, useEffect, useState } from "react";
-import { useAuth } from "../contexts/AuthContext";
 import { supabase } from "../lib/supabase";
 import {
   computeLockButtonState,
@@ -15,6 +14,7 @@ import {
   type BookingNeighbor,
 } from "../lib/bookings";
 import { nowUtcIso } from "../lib/time";
+import { callFunction } from "../lib/callFunction";
 
 /** The current user's own reservation for this vehicle, if any — the context computeLockButtonState needs. A null endIso means the booking is open-ended (see bookings.ts's BookingRow doc comment), not "no booking" — don't treat it as missing context. */
 export type VehicleLockBookingContext = { bookingId: string; startIso: string; endIso: string | null };
@@ -57,7 +57,6 @@ export function useVehicleLockState(
   booking: VehicleLockBookingContext | null,
   isAdmin: boolean,
 ): VehicleLockState {
-  const { session } = useAuth();
   const [locked, setLocked] = useState<boolean | null>(null);
   const [lockEnabled, setLockEnabled] = useState(isAdmin);
   const [unlockEnabled, setUnlockEnabled] = useState(isAdmin);
@@ -139,16 +138,9 @@ export function useVehicleLockState(
       const previousLocked = locked;
       setLocked(nextLocked);
       try {
-        const response = await fetch("/.netlify/functions/set-vehicle-lock", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ vehicleId, locked: nextLocked, command }),
-        });
+        const response = await callFunction("set-vehicle-lock", { body: { vehicleId, locked: nextLocked, command } });
 
-        const result = (await response.json()) as { error?: string };
+        const result = response.data as { error?: string };
         if (!response.ok) {
           setLocked(previousLocked);
           setError(result.error ?? "Kunne ikke opdatere lås-status.");
@@ -163,7 +155,7 @@ export function useVehicleLockState(
       await reload();
       return true;
     },
-    [vehicleId, session, reload, locked],
+    [vehicleId, reload, locked],
   );
 
   return { locked, lockEnabled, unlockEnabled, loading, setLock, error };

@@ -16,7 +16,8 @@ import { TableMessageRow } from "../components/TableMessageRow";
 import { supabase } from "../lib/supabase";
 import { toDisplayVehicle, type DisplayVehicle } from "../lib/bookings";
 import { fetchDepartmentOptions, type DepartmentOption } from "../lib/departments";
-import { formatIsoShort, getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { getVehicleHealthIssues } from "../lib/vehicleHealth";
+import { useStaleSignalRefresh } from "../hooks/useStaleSignalRefresh";
 import { useEffectiveAfdelingId } from "../hooks/useEffectiveAfdelingId";
 import { useResetOnScopeChange } from "../hooks/useResetOnScopeChange";
 
@@ -93,6 +94,15 @@ export function VehiclesPage() {
 
   const plateOptions = Array.from(new Set(vehicles.map((v) => v.plate))).sort();
   const filteredVehicles = vehicles.filter((v) => !filterPlate || v.plate === filterPlate);
+  /** Each listed vehicle's "!" health issues (see lib/vehicleHealth.ts), computed once per render for both the table rows and useStaleSignalRefresh. */
+  const healthEntries = filteredVehicles.map((vehicle) => ({
+    vehicleId: vehicle.vehicleId,
+    issues: getVehicleHealthIssues(
+      vehicle,
+      gpsPositions.find((g) => g.vehicleId === vehicle.vehicleId)?.updatedAtIso ?? null,
+    ),
+  }));
+  useStaleSignalRefresh(healthEntries);
 
   /** UNLOCKED/ALL-COSTUMERS modes only — loads the target costumer's own departments (or, with no targetCostumerId at all, every department platform-wide — only reachable by a sysadm, see fetchDepartmentOptions' own doc comment), for computing which vehicles are in scope below (via their department_ids). Skipped entirely when targetDepartmentId is set (whether LOCKED via router state or soft-narrowed via the global header), which doesn't need any department list at all, and for a regular admin with no targetCostumerId (can't happen — they always have their own). */
   useEffect(() => {
@@ -201,9 +211,7 @@ export function VehiclesPage() {
                     {filteredVehicles.map((vehicle, index) => {
                       const isAlternate = index % 2 === 1;
                       const goToVehicle = () => navigate(`/vehicle-details/${vehicle.vehicleId}`, { state: { vehicle } });
-                      const positionUpdatedAtIso =
-                        gpsPositions.find((g) => g.vehicleId === vehicle.vehicleId)?.updatedAtIso ?? null;
-                      const healthIssues = getVehicleHealthIssues(vehicle, positionUpdatedAtIso);
+                      const healthIssues = healthEntries[index].issues;
                       return (
                         <tr
                           key={vehicle.vehicleId}
@@ -236,7 +244,7 @@ export function VehiclesPage() {
                                 {vehicle.tripDetected === "TRUE" && <CarGlyph className="h-5 w-8 shrink-0 text-green-600" title="Kører" />}
                                 {/* Reserves the "!" button's own h-4 w-4 footprint even when healthy (VehicleHealthIndicator renders nothing at all for an empty issues list) — otherwise a healthy row's CarGlyph above would sit further right than a row with a real "!" next to it, since this whole group is right-aligned via the parent's justify-between. This blank placeholder keeps every row's CarGlyph at the same horizontal position down the column. */}
                                 {healthIssues.length > 0 ? (
-                                  <VehicleHealthIndicator issues={healthIssues} formatLastReceived={formatIsoShort} />
+                                  <VehicleHealthIndicator issues={healthIssues} />
                                 ) : (
                                   <span className="h-4 w-4 shrink-0" aria-hidden="true" />
                                 )}

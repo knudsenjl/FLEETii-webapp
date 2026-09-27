@@ -25,7 +25,9 @@
 // user only if one of their OWN bookings on this vehicle currently has the
 // requested action enabled, per the exact same three rules the button uses
 // (see src/lib/bookings.ts's computeLockButtonState/findAdjacentBookings —
-// reused here, not reimplemented, so the two can't drift apart). A regular
+// reused here via _shared/vehicleLock.ts, not reimplemented, so the two
+// can't drift apart). The 2hire command + history/signal writes also live
+// there (sendAndRecordLock), shared with the drop-in guest path. A regular
 // user also can't supply a `command` override — that's the admin-only Bloker/
 // Frigiv path (VehicleDetailsPage.tsx), which physically locks/unlocks
 // independent of the persisted `locked` flag; forcing the default mapping
@@ -37,15 +39,10 @@
 // costumer_id (not the caller's own — a sysadm has none), same as every
 // other function this plan touches.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
-import { computeLockButtonState, findAdjacentBookings } from "../../src/lib/bookings.js";
-import { nowUtcIso } from "../../src/lib/time.js";
 import { getAdminClient } from "./_shared/adminClient.js";
 import { isAnyAdminRole, isSysadmRole, requireUser } from "./_shared/serverAuth.js";
-import { sendGenericCommand } from "./_shared/twoHireClient.js";
-import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
-
-/** A vehicle's booking, as needed to re-run computeLockButtonState/findAdjacentBookings server-side. */
-type VehicleBooking = { booking_id: string; start: string; end: string | null; user_id: string | null };
+import { anyOwnBookingAllows, loadLockContext, sendAndRecordLock } from "./_shared/vehicleLock.js";
+import { json } from "./_shared/http.js";
 
 // `command`, if present, overrides which real 2hire generic command is sent
 // (default: `locked ? "stop" : "start"`) while `locked` still controls what
@@ -58,17 +55,17 @@ type SetVehicleLockBody = { vehicleId?: string; locked?: boolean; command?: "sta
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireUser(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -76,27 +73,22 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as SetVehicleLockBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const vehicleId = asTrimmedString(body.vehicleId);
   if (!vehicleId) {
-    return new Response(JSON.stringify({ error: "vehicleId er påkrævet." }), { status: 400 });
+    return json({ error: "vehicleId er påkrævet." }, 400);
   }
   if (typeof body.locked !== "boolean") {
-    return new Response(JSON.stringify({ error: "locked skal være true eller false." }), { status: 400 });
+    return json({ error: "locked skal være true eller false." }, 400);
   }
   if (body.command !== undefined && body.command !== "start" && body.command !== "stop") {
-    return new Response(JSON.stringify({ error: "command skal være start eller stop." }), { status: 400 });
+    return json({ error: "command skal være start eller stop." }, 400);
   }
   const locked = body.locked;
 
-  const [
-    { data: vehicle, error: vehicleError },
-    { data: caller, error: callerError },
-    { data: signal, error: signalError },
-    { data: bookings, error: bookingsError },
-  ] = await Promise.all([
+  const [{ data: vehicle, error: vehicleError }, { data: caller, error: callerError }] = await Promise.all([
     admin
       .from("vehicle_profiles")
       .select("costumer_id")
@@ -107,34 +99,22 @@ export default async (req: Request) => {
       .select("role, costumer_id, deleted_at")
       .eq("user_id", authResult.userId)
       .maybeSingle<{ role: string; costumer_id: string | null; deleted_at: string | null }>(),
-    admin.from("vehicle_signals").select("locked").eq("vehicle_id", vehicleId).maybeSingle<{ locked: boolean }>(),
-    admin
-      .from("bookings")
-      .select("booking_id, start, end, user_id")
-      .eq("vehicle_id", vehicleId)
-      .returns<VehicleBooking[]>(),
   ]);
   if (vehicleError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }), { status: 500 });
+    return json({ error: `Kunne ikke slå køretøjet op: ${vehicleError.message}` }, 500);
   }
   if (callerError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }), { status: 500 });
-  }
-  if (signalError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå lås-status op: ${signalError.message}` }), { status: 500 });
-  }
-  if (bookingsError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke slå reservationer op: ${bookingsError.message}` }), { status: 500 });
+    return json({ error: `Kunne ikke slå brugeren op: ${callerError.message}` }, 500);
   }
   if (!vehicle) {
-    return new Response(JSON.stringify({ error: "Køretøjet blev ikke fundet." }), { status: 404 });
+    return json({ error: "Køretøjet blev ikke fundet." }, 404);
   }
 
   // An archived user (delete-user.mts bans the login AND sets deleted_at)
   // can still hold a valid access token until it expires (up to ~1 hour) —
   // requireUser alone only proves the token is valid, so refuse them here.
   if (!caller || caller.deleted_at) {
-    return new Response(JSON.stringify({ error: "Din bruger er ikke længere aktiv." }), { status: 403 });
+    return json({ error: "Din bruger er ikke længere aktiv." }, 403);
   }
 
   const isSysadm = isSysadmRole(caller.role);
@@ -146,7 +126,7 @@ export default async (req: Request) => {
     // full access, any vehicle
   } else if (isAdmin) {
     if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
-      return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+      return json({ error: "Du har ikke adgang til dette køretøj." }, 403);
     }
   } else {
     // Regular user: only the admin-only Bloker/Frigiv flow ever needs a
@@ -162,93 +142,42 @@ export default async (req: Request) => {
     // booking row alone must never be enough to unlock another costumer's
     // vehicle — e.g. one inserted before that policy existed.
     if (!caller?.costumer_id || caller.costumer_id !== vehicle.costumer_id) {
-      return new Response(JSON.stringify({ error: "Du har ikke adgang til dette køretøj." }), { status: 403 });
+      return json({ error: "Du har ikke adgang til dette køretøj." }, 403);
     }
 
-    const currentLocked = signal?.locked ?? true;
-    const ownBookings = (bookings ?? []).filter((b) => b.user_id === authResult.userId);
-    const requiredFlag = locked ? "lockEnabled" : "unlockEnabled";
-    const authorized = ownBookings.some((booking) => {
-      const { previous, next } = findAdjacentBookings(bookings ?? [], booking.booking_id);
-      const state = computeLockButtonState(
-        nowUtcIso(),
-        { start: booking.start, end: booking.end },
-        previous ? { end: previous.end } : null,
-        next ? { start: next.start } : null,
-        currentLocked,
+    let authorized: boolean;
+    try {
+      const context = await loadLockContext(admin, vehicleId);
+      const requiredFlag = locked ? "lockEnabled" : "unlockEnabled";
+      authorized = anyOwnBookingAllows(
+        context,
+        (b) => b.user_id === authResult.userId,
+        (state) => state[requiredFlag],
       );
-      return state[requiredFlag];
-    });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Ukendt fejl.";
+      return json({ error: message }, 500);
+    }
     if (!authorized) {
-      return new Response(JSON.stringify({ error: "Du har ikke adgang til at låse/låse op for dette køretøj lige nu." }), {
-        status: 403,
-      });
+      return json({ error: "Du har ikke adgang til at låse/låse op for dette køretøj lige nu." }, 403);
     }
   }
 
-  // Real 2hire command first — the vehicle_signals write below only happens
-  // if this actually succeeds, so "locked" always reflects a confirmed real
-  // state rather than wishful thinking. Expected to fail for any vehicle
-  // that was never actually registered with 2hire (only WB20499 is today) —
-  // surfaced as a normal error, not swallowed, since a regular user pressing
-  // Lås/Lås op needs to know the vehicle didn't actually respond.
-  try {
-    const credentials = await resolveTwoHireCredentials(admin, {
-      costumerId: vehicle.costumer_id,
-    });
-
-    await sendGenericCommand(vehicleId, command, credentials);
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    console.error(`[set-vehicle-lock] sendGenericCommand(${vehicleId}, ${command}) failed:`, message);
-    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
+  // Real 2hire command first, then the history row (signal_value records
+  // the driver's user_id — "who drove") and the persisted `locked` flag —
+  // see sendAndRecordLock. Expected to fail for any vehicle never actually
+  // registered with 2hire; surfaced as a normal error.
+  const result = await sendAndRecordLock(admin, {
+    vehicleId,
+    costumerId: vehicle.costumer_id,
+    command,
+    locked,
+    actor: { user_id: authResult.userId },
+    logTag: "set-vehicle-lock",
+  });
+  if (!result.ok) {
+    return json({ error: result.error }, result.status);
   }
 
-  // Record who drove: a 'lock'/'unlock' history row per fulfilled command,
-  // keyed off the real physical `command` sent (not the persisted `locked`
-  // resting-state flag below) — "Frigiv køretøj" sends command "start"
-  // (a real unlock) while persisting locked: true, and it's the physical
-  // unlock that matters for "who had the vehicle driveable", not the resting
-  // flag. signal_value holds the driver's user_id, same shape convention as
-  // 2hire-webhook.mts's own vehicle_signal_history inserts.
-  const fulfilledAt = new Date().toISOString();
-  const { error: historyError } = await admin.from("vehicle_signal_history").insert({
-    vehicle_id: vehicleId,
-    signal_type: command === "start" ? "unlock" : "lock",
-    signal_value: { user_id: authResult.userId },
-    signal_timestamp: fulfilledAt,
-  });
-  if (historyError) {
-    console.error("[set-vehicle-lock] failed to record signal history:", historyError);
-    return new Response(JSON.stringify({ error: "Kunne ikke gemme lås-historik. Prøv igen." }), { status: 500 });
-  }
-
-  // vehicle_signals is a compatibility VIEW over vehicle_signals_latest
-  // (see vehicle_signals_to_narrow_schema.sql) — a plain .upsert() no
-  // longer works against it (an aggregate view isn't directly writable).
-  // Goes through the same generic upsert_vehicle_signal_if_newer() RPC
-  // every real 2hire signal uses (see
-  // upsert_vehicle_signal_if_newer_generic.sql), keyed as signal_type
-  // 'locked'. This is the ONLY writer of 'locked' anywhere in the app, so
-  // there's never actually a race for the RPC's "reject if older" guard to
-  // protect against here — harmless, just pointless, kept only for
-  // consistency with every other signal sharing one write path. Reuses
-  // fulfilledAt (already computed above for the history insert) rather
-  // than reading the clock twice for one logical write.
-  const { error } = await admin.rpc("upsert_vehicle_signal_if_newer", {
-    p_vehicle_id: vehicleId,
-    p_signal: "locked",
-    p_timestamp: fulfilledAt,
-    p_data: { locked },
-  });
-
-  if (error) {
-    console.error("[set-vehicle-lock] upsert failed:", error);
-    return new Response(JSON.stringify({ error: "Kunne ikke gemme lås-status. Prøv igen." }), { status: 500 });
-  }
-
-  return new Response(JSON.stringify({ ok: true, locked }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true, locked }, 200);
 };

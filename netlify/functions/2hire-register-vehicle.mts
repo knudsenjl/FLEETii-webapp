@@ -57,6 +57,7 @@ import {
   type TwoHireCredentials,
 } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
+import { json } from "./_shared/http.js";
 
 /** The GENERIC signals read back right after a successful registration — see the post-registration signal-seeding step at the bottom of this function. "locked" replaced with "online" (2026-09-08: "locked" doesn't actually resolve against 2hire's real API, confirmed via the /2hire-command console). */
 const GENERIC_SIGNALS_TO_SEED = ["distance_covered", "autonomy_percentage", "autonomy_meters", "position", "online"] as const;
@@ -67,17 +68,17 @@ type RegisterVehicleOrderBody = { orderId?: string; qrCode?: string; profileId?:
 
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireSysadm(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -85,7 +86,7 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as RegisterVehicleOrderBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const orderId = body.orderId?.trim();
@@ -93,7 +94,7 @@ export default async (req: Request) => {
   const profileId = body.profileId?.trim();
   const profileLabel = body.profileLabel?.trim() || null;
   if (!orderId || !qrCode || !profileId) {
-    return new Response(JSON.stringify({ error: "orderId, qrCode og profileId er påkrævet." }), { status: 400 });
+    return json({ error: "orderId, qrCode og profileId er påkrævet." }, 400);
   }
 
 
@@ -124,20 +125,17 @@ export default async (req: Request) => {
     }>();
 
   if (!order) {
-    return new Response(JSON.stringify({ error: "Bestillingen findes ikke." }), { status: 404 });
+    return json({ error: "Bestillingen findes ikke." }, 404);
   }
   if (order.order_type !== "Opret") {
-    return new Response(JSON.stringify({ error: "Denne bestilling er ikke en oprettelse." }), { status: 400 });
+    return json({ error: "Denne bestilling er ikke en oprettelse." }, 400);
   }
 
   // Already fully completed by an earlier call — nothing left to do. Not
   // just an optimization: re-running the writes below is harmless (they're
   // all idempotent now), but there's no reason to.
   if (order.vehicle_id && order.vehicle_registered) {
-    return new Response(JSON.stringify({ ok: true, vehicleId: order.vehicle_id }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ ok: true, vehicleId: order.vehicle_id }, 200);
   }
 
   // Resolved once here (not just inside the registerVehicle branch below) so
@@ -151,7 +149,7 @@ export default async (req: Request) => {
     credentials = await resolveTwoHireCredentials(admin, { costumerId: order.costumer_id });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return new Response(JSON.stringify({ error: message }), { status: twoHireErrorStatus(error) });
+    return json({ error: message }, twoHireErrorStatus(error));
   }
 
   let vehicleId: string;
@@ -191,7 +189,7 @@ export default async (req: Request) => {
       .or(`registration_claimed_at.is.null,registration_claimed_at.lt.${staleThreshold}`)
       .select("order_id");
     if (claimError) {
-      return new Response(JSON.stringify({ error: claimError.message }), { status: 500 });
+      return json({ error: claimError.message }, 500);
     }
     if (!claimed || claimed.length === 0) {
       // Someone else (a genuinely concurrent request, or one that hasn't
@@ -216,7 +214,7 @@ export default async (req: Request) => {
       // just to retry immediately.
       await admin.from("costumer_orders").update({ registration_claimed_at: null }).eq("order_id", orderId);
       const message = error instanceof Error ? error.message : "Ukendt fejl.";
-      return new Response(JSON.stringify({ error: message }), { status: 502 });
+      return json({ error: message }, 502);
     }
 
     // Persisted immediately, before any of the finalization steps below —
@@ -325,8 +323,5 @@ export default async (req: Request) => {
     }
   }
 
-  return new Response(JSON.stringify({ ok: true, vehicleId }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true, vehicleId }, 200);
 };

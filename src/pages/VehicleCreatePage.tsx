@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
-import { useAuth } from "../contexts/AuthContext";
 import { CHECKBOX_CLASSNAME } from "../lib/inputStyles";
 import { useRefreshVehicles } from "../contexts/VehicleContext";
 import { PageHeader } from "../components/PageHeader";
@@ -25,7 +24,10 @@ import {
   sortBoardProfiles,
   type TwoHireBoardProfile,
 } from "../lib/twoHireProfiles";
-import { stripNumberSpacing } from "../lib/textNormalization";
+import { callFunction } from "../lib/callFunction";
+import { useMotorApiLookup } from "../hooks/useMotorApiLookup";
+import { MotorApiLookupButton } from "../components/MotorApiLookupButton";
+import { useClickOutside } from "../hooks/useClickOutside";
 
 /** A pending "send-vehicle-request" submission — mirrors InstallationAdministrationPage.tsx's own CostumerOrder shape. Normally arrives pre-filled via router state (its table row click), but also fetchable by id alone (see the fetch-by-id effect below) so "/vehicle-create/:orderId" works as a direct link. */
 type CostumerOrder = {
@@ -109,7 +111,6 @@ type CostumerOrderQueryRow = {
  *     with the error surfaced, rather than pretending registration failed.
  */
 export function VehicleCreatePage() {
-  const { session } = useAuth();
   const refreshVehicles = useRefreshVehicles();
   const navigate = useNavigate();
   const location = useLocation();
@@ -361,39 +362,10 @@ export function VehicleCreatePage() {
   const profileJsonRef = useRef<HTMLDivElement>(null);
 
   /** Closes the profile-JSON popup on an outside click — same pattern as AllBookingsPage.tsx's own filter popover. */
-  useEffect(() => {
-    if (!showProfileJson) return;
+  useClickOutside(profileJsonRef, showProfileJson, () => setShowProfileJson(false));
 
-    function handleClickOutside(event: MouseEvent) {
-      if (profileJsonRef.current && !profileJsonRef.current.contains(event.target as Node)) {
-        setShowProfileJson(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showProfileJson]);
-
-  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the "i" button on the merged Køretøj row below — always keyed on order.number_plate (the real registration number), never vehicle_ident (MotorAPI has no notion of a company-internal identifier) — fetched lazily on first open rather than on mount, since MotorAPI usage counts against a daily quota. Combined { vehicle, environment, equipment } response, each independently either { data } or { error } (a used/older vehicle may simply have no environment/equipment data). */
-  const [motorApiResult, setMotorApiResult] = useState<unknown>(null);
-  const [motorApiLoading, setMotorApiLoading] = useState(false);
-  const [motorApiError, setMotorApiError] = useState<string | null>(null);
-  const [showMotorApiPopup, setShowMotorApiPopup] = useState(false);
-  const motorApiRef = useRef<HTMLDivElement>(null);
-
-  /** Closes the MotorAPI popup on an outside click — same pattern as the profile-JSON popup above. */
-  useEffect(() => {
-    if (!showMotorApiPopup) return;
-
-    function handleClickOutside(event: MouseEvent) {
-      if (motorApiRef.current && !motorApiRef.current.contains(event.target as Node)) {
-        setShowMotorApiPopup(false);
-      }
-    }
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [showMotorApiPopup]);
+  /** MotorAPI lookup (see motorapi-vehicle-lookup.mts) for the "i" button on the merged Køretøj row below (state/fetch/popup in useMotorApiLookup + MotorApiLookupButton) — always keyed on order.number_plate (the real registration number), never vehicle_ident (MotorAPI has no notion of a company-internal identifier) — fetched lazily on first open rather than on mount, since MotorAPI usage counts against a daily quota. Combined { vehicle, environment, equipment } response, each independently either { data } or { error } (a used/older vehicle may simply have no environment/equipment data). */
+  const motorApi = useMotorApiLookup();
 
   /** Whether the "Kun mulig hvis redigering er aktiv" notice (shown when the MotorAPI button is clicked outside "Rediger" mode — see handleOpenMotorApiPopup below) is visible. Auto-hides after 3s, same timed-notice pattern as FleetManagementPage.tsx's own showEmptyNotice. */
   const [showEditRequiredNotice, setShowEditRequiredNotice] = useState(false);
@@ -421,33 +393,10 @@ export function VehicleCreatePage() {
     if (drivmiddelValue) setDrivmiddelInput(drivmiddelValue);
   };
 
-  /** Fetches the MotorAPI lookup exactly once and caches it in motorApiResult — every caller (handleOpenMotorApiPopup below) goes through this single guarded entry point, so no combination of clicks ever triggers a second network call once a result (or an in-flight request) already exists. MotorAPI usage counts against a daily quota, so this matters beyond just avoiding redundant work. On success, also runs autofillFromMotorApi once with the fresh result — handleOpenMotorApiPopup is responsible for re-running autofillFromMotorApi against the cached result on later opens, since this function itself won't fire again once motorApiResult is populated. */
+  /** Fetches the MotorAPI lookup exactly once and caches it (motorApi.result, see useMotorApiLookup) — every caller (handleOpenMotorApiPopup below) goes through this single guarded entry point, so no combination of clicks ever triggers a second network call once a result (or an in-flight request) already exists. MotorAPI usage counts against a daily quota, so this matters beyond just avoiding redundant work. On success, also runs autofillFromMotorApi once with the fresh result — handleOpenMotorApiPopup is responsible for re-running autofillFromMotorApi against the cached result on later opens, since this function itself won't fire again once motorApiResult is populated. */
   const ensureMotorApiDataLoaded = () => {
-    if (motorApiResult !== null || motorApiLoading || !order) return;
-
-    setMotorApiLoading(true);
-    setMotorApiError(null);
-    // Stripped of ALL whitespace (not just trimmed) — passed on to MotorAPI,
-    // which expects the plain registration number, not a spaced-out one.
-    void fetch(`/.netlify/functions/motorapi-vehicle-lookup?regNo=${encodeURIComponent(stripNumberSpacing(order.number_plate))}`, {
-      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-    })
-      .then(async (response) => {
-        const result = (await response.json()) as unknown;
-        if (!response.ok) {
-          const message = (result as { error?: string } | null)?.error ?? "Kunne ikke hente data fra MotorAPI.";
-          setMotorApiError(message);
-          setMotorApiLoading(false);
-          return;
-        }
-        setMotorApiResult(result);
-        autofillFromMotorApi(result);
-        setMotorApiLoading(false);
-      })
-      .catch(() => {
-        setMotorApiError("Kunne ikke kontakte serveren. Prøv igen senere.");
-        setMotorApiLoading(false);
-      });
+    if (motorApi.result !== null || motorApi.loading || !order) return;
+    motorApi.load(order.number_plate, autofillFromMotorApi);
   };
 
   /** Opens the MotorAPI popup — only while isEditingOrder ("Rediger"), since the whole point is autofilling Mærke/Model/Årgang/Drivmiddel, which are only editable then anyway; outside edit mode this just flashes showEditRequiredNotice instead of doing anything (button stays visible either way, unlike the old vehicleRegistered-only guard, since "not editing yet" is a much more common/expected state to click it in than "already registered"). First-ever open fetches+caches the data (ensureMotorApiDataLoaded, which also autofills once on success); every later open reuses the cached motorApiResult — no new network call (quota) — but still re-runs autofillFromMotorApi against it, so re-opening while isEditingOrder re-applies MotorAPI's values even if the admin has since typed something else in, or entered a fresh "Rediger" session after an earlier Opdater. A plain close (re-click while already open) does neither. */
@@ -457,11 +406,11 @@ export function VehicleCreatePage() {
       return;
     }
 
-    const opening = !showMotorApiPopup;
-    setShowMotorApiPopup(opening);
+    const opening = !motorApi.open;
+    motorApi.setOpen(opening);
     if (!opening) return;
-    if (motorApiResult !== null) {
-      autofillFromMotorApi(motorApiResult);
+    if (motorApi.result !== null) {
+      autofillFromMotorApi(motorApi.result);
       return;
     }
     ensureMotorApiDataLoaded();
@@ -474,11 +423,9 @@ export function VehicleCreatePage() {
     let cancelled = false;
     setProfilesLoading(true);
     setProfilesError(null);
-    void fetch(`/.netlify/functions/2hire-board-profiles?costumerId=${encodeURIComponent(order.costumer_id)}`, {
-      headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-    })
-      .then(async (response) => {
-        const result = (await response.json()) as { profiles?: TwoHireBoardProfile[]; error?: string };
+    void callFunction("2hire-board-profiles", { query: { costumerId: order.costumer_id } })
+      .then((response) => {
+        const result = response.data as { profiles?: TwoHireBoardProfile[]; error?: string };
         if (cancelled) return;
         if (!response.ok) {
           setProfilesError(result.error ?? "Kunne ikke hente 2hire-profiler.");
@@ -497,7 +444,7 @@ export function VehicleCreatePage() {
     return () => {
       cancelled = true;
     };
-  }, [session, order?.vehicle_registered, order?.costumer_id]);
+  }, [order?.vehicle_registered, order?.costumer_id]);
 
   // Only while a SPECIFIC order is being fetched by id (:orderId present, no
   // router state yet) — without this guard, the page would flash-redirect
@@ -525,21 +472,16 @@ export function VehicleCreatePage() {
     const profileLabel = selectedProfile ? boardProfileLabel(selectedProfile) : null;
 
     try {
-      const response = await fetch("/.netlify/functions/2hire-register-vehicle", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const response = await callFunction("2hire-register-vehicle", {
+        body: {
           orderId: order.order_id,
           qrCode: qrCode.trim(),
           profileId: selectedProfileId,
           profileLabel,
-        }),
+        },
       });
 
-      const result = (await response.json()) as { ok?: boolean; vehicleId?: string; error?: string };
+      const result = response.data as { ok?: boolean; vehicleId?: string; error?: string };
 
       if (!response.ok) {
         setRegisterError(result.error ?? "Kunne ikke registrere køretøjet.");
@@ -587,16 +529,9 @@ export function VehicleCreatePage() {
 
     if (vehicleRegistered && registeredVehicleId) {
       try {
-        const response = await fetch("/.netlify/functions/delete-vehicle", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-          },
-          body: JSON.stringify({ vehicleId: registeredVehicleId, orderId: order.order_id }),
-        });
+        const response = await callFunction("delete-vehicle", { body: { vehicleId: registeredVehicleId, orderId: order.order_id } });
 
-        const result = (await response.json()) as { ok?: boolean; error?: string };
+        const result = response.data as { ok?: boolean; error?: string };
         if (!response.ok) {
           setDeleteError(result.error ?? "Kunne ikke slette køretøjet.");
           setIsDeleting(false);
@@ -715,39 +650,11 @@ export function VehicleCreatePage() {
                             onChange={(e) => editableField.setValue(e.target.value)}
                             className="min-w-0 flex-1 rounded-lg border border-brand-200 bg-white px-2 py-0.5 text-sm text-brand-800 outline-none transition focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                           />
-                          <div className="relative shrink-0" ref={motorApiRef}>
-                            <button
-                              type="button"
-                              onClick={handleOpenMotorApiPopup}
-                              aria-label="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
-                              title="Slå op i MotorAPI"
-                              className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition"
-                            >
-                              {motorApiLoading ? (
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
-                                  <path d="M21 12a9 9 0 1 1-9-9" />
-                                </svg>
-                              ) : (
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                                  <circle cx="11" cy="11" r="7" />
-                                  <path d="m21 21-4.3-4.3" />
-                                </svg>
-                              )}
-                            </button>
-                            <InlinePopup
-                              visible={showMotorApiPopup}
-                              align="right"
-                              message={
-                                <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
-                                  {motorApiLoading
-                                    ? "Henter fra MotorAPI…"
-                                    : motorApiError
-                                      ? motorApiError
-                                      : JSON.stringify(motorApiResult, null, 2)}
-                                </pre>
-                              }
-                            />
-                          </div>
+                          <MotorApiLookupButton
+                            lookup={motorApi}
+                            onClick={handleOpenMotorApiPopup}
+                            ariaLabel="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
+                          />
                         </div>
                       </FieldRow>
                     );
@@ -800,45 +707,17 @@ export function VehicleCreatePage() {
                         {/* Plain text, same transparent-border look as Kunde/Afdeling/every other genuinely non-editable row below — a bordered input-shaped box here would visually claim this field is editable when it isn't. */}
                         <span className="min-w-0 flex-1 truncate rounded-lg border border-transparent px-2 py-0.5 text-sm text-brand-800">{value}</span>
                         {/* Right-aligned in the value column, not the label column. On the transition into "open", this ALSO autofills Mærke/Model/Årgang/Drivmiddel below from the same lookup (see ensureMotorApiDataLoaded/autofillFromMotorApi) — there's no separate per-field fill button anymore. */}
-                        <div className="relative shrink-0" ref={motorApiRef}>
-                          {/* Same lookup-button look as CostumerNewPage.tsx's CVR lookup (magnifying glass, spinner while in flight) — replaced the old plain "i" glyph so both external-lookup buttons in the app read the same way. */}
-                          <button
-                            type="button"
-                            onClick={handleOpenMotorApiPopup}
-                            aria-label="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
-                            title="Slå op i MotorAPI"
-                            className="flex h-5 w-5 items-center justify-center rounded-full border border-brand-300 text-brand-600 transition"
-                          >
-                            {motorApiLoading ? (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" className="h-3 w-3 animate-spin">
-                                <path d="M21 12a9 9 0 1 1-9-9" />
-                              </svg>
-                            ) : (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                                <circle cx="11" cy="11" r="7" />
-                                <path d="m21 21-4.3-4.3" />
-                              </svg>
-                            )}
-                          </button>
-                          <InlinePopup
-                            visible={showMotorApiPopup}
-                            align="right"
-                            message={
-                              <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-all text-[0.65rem]">
-                                {motorApiLoading
-                                  ? "Henter fra MotorAPI…"
-                                  : motorApiError
-                                    ? motorApiError
-                                    : JSON.stringify(motorApiResult, null, 2)}
-                              </pre>
-                            }
-                          />
+                        <MotorApiLookupButton
+                          lookup={motorApi}
+                          onClick={handleOpenMotorApiPopup}
+                          ariaLabel="Slå nummerplade op i MotorAPI og udfyld Mærke/Model/Årgang/Drivmiddel"
+                        >
                           <InlinePopup
                             visible={showEditRequiredNotice}
                             align="right"
                             message="Kun mulig hvis redigering er aktiv"
                           />
-                        </div>
+                        </MotorApiLookupButton>
                       </div>
                     </FieldRow>
                   ) : (

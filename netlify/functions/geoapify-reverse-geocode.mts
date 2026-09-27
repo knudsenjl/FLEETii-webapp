@@ -43,6 +43,8 @@
 // as a bug in an otherwise all-Danish UI.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireUser } from "./_shared/serverAuth.js";
+import { fetchWithTimeout } from "./_shared/fetchWithTimeout.js";
+import { json } from "./_shared/http.js";
 
 const GEOAPIFY_BASE_URL = "https://api.geoapify.com/v1/geocode/reverse";
 
@@ -53,8 +55,9 @@ type SignalRow = { signal_type: string; signal_value: { latitude?: number; longi
 
 /** Calls Geoapify's reverse-geocode endpoint for one lat/lng. Returns the formatted address, or null if Geoapify has nothing for this position. Throws on network/HTTP/parse failure — callers decide how to fall back. */
 async function fetchGeoapifyAddress(lat: number, lng: number, apiKey: string): Promise<string | null> {
-  const response = await fetch(
-    `${GEOAPIFY_BASE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&lang=da&limit=1&format=json&apiKey=${apiKey}`,
+  const response = await fetchWithTimeout(
+    `${GEOAPIFY_BASE_URL}?lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&lang=da&limit=1&format=json&apiKey=${encodeURIComponent(apiKey)}`,
+    { label: "Geoapify" },
   );
   if (!response.ok) {
     throw new Error(`Geoapify svarede ${response.status}.`);
@@ -66,23 +69,23 @@ async function fetchGeoapifyAddress(lat: number, lng: number, apiKey: string): P
 /** GET ?vehicleId=<uuid>, as a logged-in user. Returns { address: string | null }. */
 export default async (req: Request) => {
   if (req.method !== "GET") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireUser(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const apiKey = process.env.GEOAPIFY_API_KEY;
   if (!apiKey) {
-    return new Response(JSON.stringify({ error: "Serveren mangler GEOAPIFY_API_KEY." }), { status: 500 });
+    return json({ error: "Serveren mangler GEOAPIFY_API_KEY." }, 500);
   }
 
   const url = new URL(req.url);
   const vehicleId = url.searchParams.get("vehicleId");
   if (!vehicleId) {
-    return new Response(JSON.stringify({ error: "vehicleId er påkrævet." }), { status: 400 });
+    return json({ error: "vehicleId er påkrævet." }, 400);
   }
 
   const { data: rows, error: selectError } = await authResult.client
@@ -92,23 +95,18 @@ export default async (req: Request) => {
     .in("signal_type", ["position", "address"])
     .returns<SignalRow[]>();
   if (selectError) {
-    return new Response(JSON.stringify({ error: `Kunne ikke læse køretøjets position: ${selectError.message}` }), {
-      status: 500,
-    });
+    return json({ error: `Kunne ikke læse køretøjets position: ${selectError.message}` }, 500);
   }
 
   const positionRow = rows?.find((row) => row.signal_type === "position");
   const addressRow = rows?.find((row) => row.signal_type === "address");
   if (!positionRow || positionRow.signal_value.latitude == null || positionRow.signal_value.longitude == null) {
-    return new Response(JSON.stringify({ address: null }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return json({ address: null }, 200);
   }
 
   const needsRefresh = !addressRow || positionRow.signal_timestamp > addressRow.signal_timestamp;
   if (!needsRefresh) {
-    return new Response(JSON.stringify({ address: addressRow.signal_value.formatted ?? null }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ address: addressRow.signal_value.formatted ?? null }, 200);
   }
 
   let address: string | null;
@@ -118,10 +116,7 @@ export default async (req: Request) => {
     // A transient Geoapify failure shouldn't take down the "text under the
     // map" for a vehicle whose location we already know reasonably well —
     // fall back to whatever cached address exists (possibly none).
-    return new Response(JSON.stringify({ address: addressRow?.signal_value.formatted ?? null }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
+    return json({ address: addressRow?.signal_value.formatted ?? null }, 200);
   }
 
   const adminResult = getAdminClient();
@@ -137,8 +132,5 @@ export default async (req: Request) => {
     });
   }
 
-  return new Response(JSON.stringify({ address }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ address }, 200);
 };

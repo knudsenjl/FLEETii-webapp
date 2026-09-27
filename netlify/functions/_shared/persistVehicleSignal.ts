@@ -26,12 +26,19 @@ export async function persistVehicleSignal(
   // History row first, unconditionally — same order as 2hire-webhook.mts, so
   // a failure on the "current state" write below can never leave a signal
   // with no history trace at all.
-  const { error: historyError } = await admin.from("vehicle_signal_history").insert({
-    vehicle_id: vehicleId,
-    signal_type: signal,
-    signal_value: reading.data,
-    signal_timestamp: timestampIso,
-  });
+  // Upsert-ignore, same as 2hire-webhook.mts: the reading may already be in
+  // history (the webhook delivered it, or a backfill is re-run), and a plain
+  // insert then failed on the (vehicle_id, signal_type, signal_timestamp)
+  // unique key and reported the signal as a failure (code review 2026-09-26).
+  const { error: historyError } = await admin.from("vehicle_signal_history").upsert(
+    {
+      vehicle_id: vehicleId,
+      signal_type: signal,
+      signal_value: reading.data,
+      signal_timestamp: timestampIso,
+    },
+    { onConflict: "vehicle_id,signal_type,signal_timestamp", ignoreDuplicates: true },
+  );
   if (historyError) throw new Error(`vehicle_signal_history (${signal}): ${historyError.message}`);
 
   const { error: rpcError } = await admin.rpc("upsert_vehicle_signal_if_newer", {

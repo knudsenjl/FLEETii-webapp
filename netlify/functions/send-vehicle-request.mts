@@ -22,6 +22,9 @@ import { findActiveDepartmentId } from "./_shared/departmentLookup.js";
 import { asNormalizedNumberString, asTrimmedString } from "../../src/lib/requestValidation.js";
 import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { escapeHtml, sendMail } from "./_shared/mailer.js";
+import { DRIVMIDDEL_OPTIONS } from "../../src/lib/bookings.js";
+import { json } from "./_shared/http.js";
+import { siteBaseUrl } from "./_shared/siteUrl.js";
 
 type SendVehicleRequestBody = {
   afdeling?: string | null;
@@ -129,22 +132,22 @@ function buildHtmlBody(fields: {
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
-    return new Response(JSON.stringify({ error: "Method not allowed" }), { status: 405 });
+    return json({ error: "Method not allowed" }, 405);
   }
 
   const authResult = await requireAdmin(req);
   if (!authResult.ok) {
-    return new Response(JSON.stringify({ error: authResult.error }), { status: authResult.status });
+    return json({ error: authResult.error }, authResult.status);
   }
 
   const mailReceiver = process.env.MAIL_RECIEVER;
   if (!mailReceiver) {
-    return new Response(JSON.stringify({ error: "Serveren mangler MAIL_RECIEVER." }), { status: 500 });
+    return json({ error: "Serveren mangler MAIL_RECIEVER." }, 500);
   }
 
   const adminClientResult = getAdminClient();
   if (!adminClientResult.ok) {
-    return new Response(JSON.stringify({ error: adminClientResult.error }), { status: adminClientResult.status });
+    return json({ error: adminClientResult.error }, adminClientResult.status);
   }
   const { admin } = adminClientResult;
 
@@ -152,7 +155,7 @@ export default async (req: Request) => {
   try {
     body = (await req.json()) as SendVehicleRequestBody;
   } catch {
-    return new Response(JSON.stringify({ error: "Ugyldig anmodning." }), { status: 400 });
+    return json({ error: "Ugyldig anmodning." }, 400);
   }
 
   const vehicleIdent = asTrimmedString(body.vehicleIdent);
@@ -165,6 +168,12 @@ export default async (req: Request) => {
   const fuelLevel = asTrimmedString(body.fuelLevel);
   const mileage = asTrimmedString(body.mileage);
   const drivmiddel = asTrimmedString(body.drivmiddel) || "Benzin";
+  // Checked here against the same list as the DB's CHECK constraint — an
+  // invalid value used to reach the insert and come back as a generic
+  // "Kunne ikke oprette bestillingen" (code review 2026-09-26).
+  if (!(DRIVMIDDEL_OPTIONS as readonly string[]).includes(drivmiddel)) {
+    return json({ error: `Drivmiddel skal være en af: ${DRIVMIDDEL_OPTIONS.join(", ")}.` }, 400);
+  }
   const kontaktperson = asTrimmedString(body.kontaktperson);
   const kontaktemail = asTrimmedString(body.kontaktemail);
   const kontaktnummer = asNormalizedNumberString(body.kontaktnummer);
@@ -187,6 +196,8 @@ export default async (req: Request) => {
   }
   const fleetiiDevice = needsFleetiiDevice ? "Nyt device skal installeres" : `Eksisterende device (id: ${fleetiiDeviceId})`;
 
+  // Only a last-resort fallback: both branches below replace it with the
+  // department's real name from the database whenever there is one.
   let afdeling = asTrimmedString(body.afdeling) || "—";
 
 
@@ -208,7 +219,7 @@ export default async (req: Request) => {
   if (isSysadmRole(caller?.role)) {
     const requestedDepartmentId = asTrimmedString(body.departmentId);
     if (!requestedDepartmentId) {
-      return new Response(JSON.stringify({ error: "Kunde og afdeling er påkrævet." }), { status: 400 });
+      return json({ error: "Kunde og afdeling er påkrævet." }, 400);
     }
     const { data: requestedDepartment } = await admin
       .from("departments")
@@ -216,7 +227,7 @@ export default async (req: Request) => {
       .eq("department_id", requestedDepartmentId)
       .maybeSingle<{ department_id: string; name: string; costumer_id: string | null }>();
     if (!requestedDepartment?.costumer_id) {
-      return new Response(JSON.stringify({ error: "Ugyldig afdeling." }), { status: 400 });
+      return json({ error: "Ugyldig afdeling." }, 400);
     }
     costumerId = requestedDepartment.costumer_id;
     departmentId = requestedDepartment.department_id;
@@ -235,6 +246,17 @@ export default async (req: Request) => {
           activeDepartmentId: caller.active_department_id,
         })
       : null;
+    // The e-mail shows this department's real name, not the afdeling text
+    // the browser sent (which could disagree with departmentId — code review
+    // 2026-09-26).
+    if (departmentId) {
+      const { data: department } = await admin
+        .from("departments")
+        .select("name")
+        .eq("department_id", departmentId)
+        .maybeSingle<{ name: string }>();
+      if (department?.name) afdeling = department.name;
+    }
   }
 
   if (!costumerId) {
@@ -293,7 +315,7 @@ export default async (req: Request) => {
     to: mailReceiver,
     subject: `${customerName} - Oprettelse af nyt køretøj (${nummerplade}) i FLEETii`,
     html: buildHtmlBody({
-      baseUrl: process.env.URL ?? process.env.DEPLOY_PRIME_URL ?? "https://fleetii-webapp-staging.netlify.app",
+      baseUrl: siteBaseUrl(),
       orderId: insertedOrder.order_id,
       customerName,
       afdeling,
@@ -315,11 +337,8 @@ export default async (req: Request) => {
   });
 
   if (!result.ok) {
-    return new Response(JSON.stringify({ error: `Kunne ikke sende mail: ${result.error}` }), { status: 502 });
+    return json({ error: `Kunne ikke sende mail: ${result.error}` }, 502);
   }
 
-  return new Response(JSON.stringify({ ok: true }), {
-    status: 200,
-    headers: { "Content-Type": "application/json" },
-  });
+  return json({ ok: true }, 200);
 };

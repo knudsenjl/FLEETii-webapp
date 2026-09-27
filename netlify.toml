@@ -24,6 +24,11 @@
 # Applies to the whole SPA — stops the app being embedded in an <iframe> on
 # someone else's site (a cheap way to "skin"/clone a UI without copying any
 # code), on top of the LICENSE's own ownership notice.
+#
+# The rest of the Content-Security-Policy is enforced from a <meta> tag in
+# the built index.html (see vite.config.ts's CONTENT_SECURITY_POLICY for why
+# it isn't a header here); frame-ancestors can only be set as a header, so it
+# stays below.
 [[headers]]
   for = "/*"
   [headers.values]
