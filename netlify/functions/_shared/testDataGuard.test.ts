@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isConfirmedSeedRequest, testDataDatabaseBlocked, testDataEnvironmentBlocked } from "./testDataGuard";
+import { isConfirmedSeedRequest, testDataDatabaseBlocked, testDataEnvironmentBlocked } from "./testDataGuard.js";
 
 const STAGING_URL = "https://owbbihnbocuczbdogzxv.supabase.co";
 const PRODUCTION_URL = "https://adjnqjziyblusrruqigt.supabase.co";
