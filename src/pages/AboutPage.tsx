@@ -17,7 +17,7 @@ import { ANTI_CLONING_NOTICE } from "../lib/legal";
 import { APP_VERSION_INFO } from "../lib/appVersion";
 
 /**
- * Static "About FLEETii" page: product description, Brugerguide/
+ * Static "About FLEETii" page: product description, Brugermanual/
  * Administratormanual/Sysadm-manual links, and contact info.
  * Content is static Danish copy — no data fetching. Each manual link comes
  * from its own env var (VITE_BRUGERMANUAL_URL/VITE_ADMINMANUAL_URL/
@@ -43,7 +43,7 @@ import { APP_VERSION_INFO } from "../lib/appVersion";
  * LoginPage, so both stay hidden for them too. Administratormanual shows
  * for "admin" AND "sysadm" (a sysadm is a superset of admin and still
  * administers departments day-to-day); Sysadm-manual shows only for
- * "sysadm". Brugerguide has no such gate; every role may want it.
+ * "sysadm". Brugermanual has no such gate; every role may want it.
  *
  * fleetiiAdministratormanualUrl/VITE_FLEETIIMANUAL_URL keep their original
  * names (matching the untouched public/manualer/ filename) even though the
@@ -74,7 +74,7 @@ export function AboutPage() {
                       rel="noopener noreferrer"
                       className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-1.5 text-center text-sm font-semibold text-brand-700 transition hover:bg-brand-100"
                     >
-                      Brugerguide
+                      Brugermanual
                     </a>
                   )}
                   {administratormanualUrl && isAnyAdmin(profile?.role) && (
