@@ -275,7 +275,7 @@ export function AdminFrontpage() {
                   onClick={() => navigate("/drop-in")}
                   className="w-full"
                 >
-                  Opret drop-in reservation
+                  OPRET DROP-IN RESERVATION
                 </Button>
                 <Button
                   variant="secondary"
@@ -283,7 +283,7 @@ export function AdminFrontpage() {
                   onClick={() => navigate("/reservation")}
                   className="w-full"
                 >
-                  Opret reservation
+                  OPRET RESERVATION
                 </Button>
                 <Button
                   variant="secondary"
@@ -291,7 +291,7 @@ export function AdminFrontpage() {
                   onClick={() => navigate("/allbookings")}
                   className="w-full"
                 >
-                  Reservationer
+                  LISTE OVER RESERVATIONER
                 </Button>
                 {!isDepartmentAdmin(profile?.role) && (
                   <>
@@ -302,7 +302,7 @@ export function AdminFrontpage() {
                       onClick={() => navigate("/fleet-map")}
                       className="w-full"
                     >
-                      Flådestyring
+                      FLÅDESTYRING
                     </Button>
                   </>
                 )}
@@ -320,7 +320,7 @@ export function AdminFrontpage() {
                         onClick={() => navigate("/fleet-map")}
                         className="col-span-2"
                       >
-                        Flådestyring
+                        FLÅDESTYRING
                       </Button>
                       <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
                         <CountBadge count={departmentsCount} />
