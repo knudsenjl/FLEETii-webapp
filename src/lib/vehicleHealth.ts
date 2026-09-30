@@ -6,6 +6,8 @@
 // The rule (user-specified 2026-09-27, replacing "any signal older than 3
 // days"): each signal is OK, WARNING or ERROR, and the marker shows the worst
 // of them — red for an error, amber for warnings only, hidden when all is OK.
+// An Online error replaces the red "!" with a red "offline" icon (user
+// request 2026-09-30), since being offline also explains most other issues.
 //   - Online: ERROR once it has been false for OFFLINE_ERROR_AFTER_MS. Online
 //     flips to false for ~10 s many times a day on production, so the latest
 //     value alone would flash red constantly.
@@ -39,12 +41,23 @@ export type RefreshableSignal = "position" | "distance_covered" | "autonomy_perc
  * Danish explanation for the popup. `refreshSignal` is set only when the
  * warning is about a reading that is too old (not one never received): such
  * a reading is first re-read from 2hire (see useStaleSignalRefresh), in case
- * a webhook delivery was simply skipped.
+ * a webhook delivery was simply skipped. `offline` marks the Online error.
  */
-export type HealthIssue = { label: string; severity: HealthSeverity; detail: string; refreshSignal?: RefreshableSignal };
+export type HealthIssue = {
+  label: string;
+  severity: HealthSeverity;
+  detail: string;
+  refreshSignal?: RefreshableSignal;
+  offline?: true;
+};
 
-/** The marker's overall state: the worst severity among `issues`, or "ok" (marker hidden) if there are none. */
-export function healthLevel(issues: HealthIssue[]): "ok" | HealthSeverity {
+/**
+ * The marker's overall state: "offline" if the vehicle has been offline long
+ * enough to be an error (shown as a red offline icon), else the worst
+ * severity among `issues`, or "ok" (marker hidden) if there are none.
+ */
+export function healthLevel(issues: HealthIssue[]): "ok" | "offline" | HealthSeverity {
+  if (issues.some((issue) => issue.offline)) return "offline";
   if (issues.some((issue) => issue.severity === "error")) return "error";
   return issues.length > 0 ? "warning" : "ok";
 }
@@ -90,7 +103,12 @@ export function getVehicleHealthIssues(
     // (false) reading is then the conservative stand-in.
     const offlineSince = vehicle.onlineFalseSinceIso ?? vehicle.onlineUpdatedAtIso;
     if (now - Date.parse(offlineSince) >= OFFLINE_ERROR_AFTER_MS) {
-      issues.push({ label: "Online", severity: "error", detail: `offline siden ${formatIsoShort(offlineSince)}` });
+      issues.push({
+        label: "Online",
+        severity: "error",
+        detail: `offline siden ${formatIsoShort(offlineSince)}`,
+        offline: true,
+      });
     }
   }
 

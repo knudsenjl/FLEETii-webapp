@@ -3,7 +3,9 @@
 // when any issue is an error, a light amber outline for warnings only — the
 // fill, not just the hue, tells them apart at this small size (user feedback
 // 2026-09-27). Not green, which already means "driving" (the car icon next to
-// it). Renders nothing if `issues` is empty.
+// it). A vehicle that is offline (Online error) instead shows a red
+// crossed-out broadcast icon (OfflineIcon) in place of the "!" (user request
+// 2026-09-30). Renders nothing if `issues` is empty.
 //
 // Deliberately NOT built on InlinePopup (components/InlinePopup.tsx), unlike
 // most of this app's other small popovers: this button lives inside a
@@ -19,6 +21,17 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { healthLevel, type HealthIssue } from "../lib/vehicleHealth";
+
+/** Red "no signal" glyph: broadcast arcs around a dot, struck through diagonally. */
+function OfflineIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-4 w-4" aria-hidden="true">
+      <circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none" />
+      <path d="M8.5 8.5a5 5 0 0 0 0 7M15.5 8.5a5 5 0 0 1 0 7M5.6 5.6a9 9 0 0 0 0 12.8M18.4 5.6a9 9 0 0 1 0 12.8" />
+      <path d="M3 3l18 18" />
+    </svg>
+  );
+}
 
 interface VehicleHealthIndicatorProps {
   issues: HealthIssue[];
@@ -62,7 +75,8 @@ export function VehicleHealthIndicator({ issues }: VehicleHealthIndicatorProps) 
 
   const level = healthLevel(issues);
   if (level === "ok") return null;
-  const isError = level === "error";
+  const isOffline = level === "offline";
+  const isError = level === "error" || isOffline;
 
   return (
     <>
@@ -74,13 +88,15 @@ export function VehicleHealthIndicator({ issues }: VehicleHealthIndicatorProps) 
           setOpen((prev) => !prev);
         }}
         aria-label={`${isError ? "Fejl" : "Advarsel"}: ${issues.map((issue) => issue.label).join(", ")}`}
-        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border text-[0.65rem] font-bold leading-none transition ${
-          isError
-            ? "border-red-600 bg-red-600 text-white hover:bg-red-700"
-            : "border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
+        className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[0.65rem] font-bold leading-none transition ${
+          isOffline
+            ? "text-red-600 hover:text-red-700"
+            : isError
+              ? "border border-red-600 bg-red-600 text-white hover:bg-red-700"
+              : "border border-amber-500 bg-amber-50 text-amber-600 hover:bg-amber-100"
         }`}
       >
-        !
+        {isOffline ? <OfflineIcon /> : "!"}
       </button>
       {open &&
         popupPosition &&
