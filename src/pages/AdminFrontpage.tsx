@@ -302,7 +302,15 @@ export function AdminFrontpage() {
                       onClick={() => navigate("/fleet-map")}
                       className="w-full"
                     >
-                      FLÅDESTYRING
+                      KORT OVER FLÅDEN
+                    </Button>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => navigate("/fleet-table")}
+                      className="w-full"
+                    >
+                      LISTE OVER FLÅDEN
                     </Button>
                   </>
                 )}
@@ -320,7 +328,15 @@ export function AdminFrontpage() {
                         onClick={() => navigate("/fleet-map")}
                         className="col-span-2"
                       >
-                        FLÅDESTYRING
+                        KORT OVER FLÅDEN
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        type="button"
+                        onClick={() => navigate("/fleet-table")}
+                        className="col-span-2"
+                      >
+                        LISTE OVER FLÅDEN
                       </Button>
                       <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
                         <CountBadge count={departmentsCount} />
