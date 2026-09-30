@@ -17,7 +17,9 @@
 //     vehicle_id.
 //   - Signalværdi: read the current value of one generic/specific signal
 //     for one vehicle (by number plate) straight from 2hire — see
-//     2hire-read-signal.mts. Read-only, nothing is saved.
+//     2hire-read-signal.mts. Read-only, nothing is saved, so unlike Testdata
+//     it is deliberately NOT behind isTestMode: in production it reads the
+//     real fleet (getTwoHireBaseUrl picks adapter.2hire.io there).
 //   - Signal-backfill: see 2hire-backfill-vehicle-signals.mts.
 // This page is a thin form around those Functions, no business logic of its
 // own.
