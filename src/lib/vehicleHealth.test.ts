@@ -34,8 +34,10 @@ describe("getVehicleHealthIssues", () => {
 
     it("is an error once offline for 15 minutes", () => {
       const issues = check({ online: "FALSE", onlineUpdatedAtIso: ago(MIN), onlineFalseSinceIso: ago(15 * MIN) });
-      expect(issues).toEqual([{ label: "Online", severity: "error", detail: expect.stringMatching(/^offline siden /) }]);
-      expect(healthLevel(issues)).toBe("error");
+      expect(issues).toEqual([
+        { label: "Online", severity: "error", detail: expect.stringMatching(/^offline siden /), offline: true },
+      ]);
+      expect(healthLevel(issues)).toBe("offline");
     });
 
     it("falls back to the latest reading when the offline start is unknown", () => {
@@ -101,7 +103,7 @@ describe("getVehicleHealthIssues", () => {
     });
   });
 
-  it("lists the Online error before warnings and rates the whole as an error", () => {
+  it("lists the Online error before warnings and rates the whole as offline", () => {
     const issues = check({
       online: "FALSE",
       onlineFalseSinceIso: ago(HOUR),
@@ -112,6 +114,6 @@ describe("getVehicleHealthIssues", () => {
       ["Online", "error"],
       ["Kilometerstand", "warning"],
     ]);
-    expect(healthLevel(issues)).toBe("error");
+    expect(healthLevel(issues)).toBe("offline");
   });
 });
