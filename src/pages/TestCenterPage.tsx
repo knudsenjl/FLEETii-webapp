@@ -15,6 +15,11 @@
 //     request/placeholder-substitution logic. A "{plate}" token anywhere in
 //     the command is resolved server-side to that vehicle's real 2hire
 //     vehicle_id.
+//   - Signalværdi: read the current value of one generic/specific signal
+//     for one vehicle (by number plate) straight from 2hire — see
+//     2hire-read-signal.mts. Read-only, nothing is saved, so unlike Testdata
+//     it is deliberately NOT behind isTestMode: in production it reads the
+//     real fleet (getTwoHireBaseUrl picks adapter.2hire.io there).
 //   - Signal-backfill: see 2hire-backfill-vehicle-signals.mts.
 // This page is a thin form around those Functions, no business logic of its
 // own.
@@ -26,6 +31,7 @@ import { PageSection } from "../components/PageSection";
 import { SectionHeading } from "../components/SectionHeading";
 import { ConfirmDialog } from "../components/ConfirmDialog";
 import { callFunction } from "../lib/callFunction";
+import { formatDanishDateTime } from "../lib/time";
 
 /** True unless VITE_DATA_SOURCE is explicitly the real production adaptor — same "anything else is the safe/test default" convention as twoHireClient.ts's own reading of this var server-side. Only decides whether the Testdata buttons are shown; the Functions re-check server-side. */
 const isTestMode =
@@ -50,6 +56,23 @@ type RawCommandResult = {
   ok: boolean;
   result: unknown;
 };
+
+/** The shape 2hire-read-signal.mts resolves to on a 200 — either this or {error} (see handleReadSignal). */
+type SignalReadResult = {
+  vehicleId: string;
+  numberPlate: string | null;
+  kind: "generic" | "specific";
+  signal: string;
+  found: boolean;
+  data: Record<string, unknown> | null;
+  timestamp: string | null;
+};
+
+/** Signal names offered as suggestions in the Signalværdi form — the ones this app already tracks (see 2hire-backfill-vehicle-signals.mts). Any other name can still be typed. */
+const SIGNAL_SUGGESTIONS = {
+  generic: ["distance_covered", "autonomy_percentage", "autonomy_meters", "position", "online"],
+  specific: ["trip_detected"],
+} as const;
 
 /** The shape 2hire-backfill-vehicle-signals.mts always resolves to on a 200 — either this or {error} (see handleBackfill). */
 type BackfillResult = {
@@ -77,6 +100,17 @@ export function TestCenterPage() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<RawCommandResult | null>(null);
+
+  const [signalPlate, setSignalPlate] = useState("");
+  const [signalKind, setSignalKind] = useState<"generic" | "specific">(
+    "generic",
+  );
+  const [signalName, setSignalName] = useState("distance_covered");
+  const [isReadingSignal, setIsReadingSignal] = useState(false);
+  const [signalError, setSignalError] = useState<string | null>(null);
+  const [signalResult, setSignalResult] = useState<SignalReadResult | null>(
+    null,
+  );
 
   const [isBackfilling, setIsBackfilling] = useState(false);
   const [backfillError, setBackfillError] = useState<string | null>(null);
@@ -172,6 +206,31 @@ export function TestCenterPage() {
     }
   };
 
+  /** Reads one signal's current value for one vehicle via 2hire-read-signal.mts (read-only — nothing is saved). */
+  const handleReadSignal = async () => {
+    setIsReadingSignal(true);
+    setSignalError(null);
+    setSignalResult(null);
+
+    try {
+      const response = await callFunction<SignalReadResult>(
+        "2hire-read-signal",
+        {
+          body: { plate: signalPlate, kind: signalKind, signal: signalName },
+        },
+      );
+      if (!response.ok) {
+        setSignalError(response.data.error ?? "Signalopslaget fejlede.");
+        return;
+      }
+      setSignalResult(response.data);
+    } catch {
+      setSignalError("Kunne ikke kontakte serveren. Prøv igen senere.");
+    } finally {
+      setIsReadingSignal(false);
+    }
+  };
+
   /** Triggers the one-off signal-backfill Function (see 2hire-backfill-vehicle-signals.mts's own doc comment) — dryRun previews without writing, an explicit real run does. */
   const handleBackfill = async (dryRun: boolean) => {
     if (
@@ -212,7 +271,7 @@ export function TestCenterPage() {
         }}
       />
 
-      {/* Three separate cards (Testcenter, 2hire kommando, Signal-backfill), each only as tall as its content, in one scrolling column. */}
+      {/* Separate cards (Testcenter, 2hire kommando, Signalværdi, Signal-backfill), each only as tall as its content, in one scrolling column. */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
         {isTestMode && (
           <PageSection grow={false} className="gap-4">
@@ -368,6 +427,115 @@ export function TestCenterPage() {
               <pre className="max-h-96 overflow-auto rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs text-brand-900">
                 {JSON.stringify(result.result, null, 2)}
               </pre>
+            </div>
+          )}
+        </PageSection>
+
+        <PageSection grow={false} className="gap-4">
+          <div>
+            <SectionHeading>Signalværdi</SectionHeading>
+            <p className="mt-1 text-sm text-brand-600">
+              Henter den aktuelle værdi af ét generic- eller specific-signal for
+              ét køretøj direkte fra 2hire (med kundens egen 2hire-adgang).
+              Intet gemmes i databasen.
+            </p>
+          </div>
+
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="signal-plate"
+                className="text-sm font-medium text-brand-700"
+              >
+                Nummerplade
+              </label>
+              <input
+                id="signal-plate"
+                type="text"
+                value={signalPlate}
+                onChange={(e) => setSignalPlate(e.target.value)}
+                placeholder="AB12345"
+                spellCheck={false}
+                className="rounded-lg border border-brand-200 px-3 py-2 font-mono text-sm text-brand-900 focus:border-brand-500 focus:outline-none"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label
+                htmlFor="signal-kind"
+                className="text-sm font-medium text-brand-700"
+              >
+                Type
+              </label>
+              <select
+                id="signal-kind"
+                value={signalKind}
+                onChange={(e) =>
+                  setSignalKind(e.target.value as "generic" | "specific")
+                }
+                className="rounded-lg border border-brand-200 px-3 py-2 text-sm text-brand-900 focus:border-brand-500 focus:outline-none"
+              >
+                <option value="generic">generic</option>
+                <option value="specific">specific</option>
+              </select>
+            </div>
+            <div className="flex flex-1 flex-col gap-1">
+              <label
+                htmlFor="signal-name"
+                className="text-sm font-medium text-brand-700"
+              >
+                Signal
+              </label>
+              <input
+                id="signal-name"
+                type="text"
+                list="signal-suggestions"
+                value={signalName}
+                onChange={(e) => setSignalName(e.target.value)}
+                spellCheck={false}
+                className="rounded-lg border border-brand-200 px-3 py-2 font-mono text-sm text-brand-900 focus:border-brand-500 focus:outline-none"
+              />
+              <datalist id="signal-suggestions">
+                {SIGNAL_SUGGESTIONS[signalKind].map((name) => (
+                  <option key={name} value={name} />
+                ))}
+              </datalist>
+            </div>
+            <button
+              type="button"
+              onClick={() => void handleReadSignal()}
+              disabled={
+                isReadingSignal || !signalPlate.trim() || !signalName.trim()
+              }
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {isReadingSignal ? "Henter…" : "Hent værdi"}
+            </button>
+          </div>
+
+          {signalError && <p className="text-sm text-red-600">{signalError}</p>}
+
+          {signalResult && (
+            <div className="flex flex-col gap-2">
+              <p className="text-sm text-brand-600">
+                <span className="font-medium">
+                  {signalResult.numberPlate ?? signalResult.vehicleId}
+                </span>{" "}
+                · {signalResult.kind}/{signalResult.signal} ·{" "}
+                {signalResult.found && signalResult.timestamp ? (
+                  <span className="font-medium text-green-700">
+                    {formatDanishDateTime(signalResult.timestamp)}
+                  </span>
+                ) : (
+                  <span className="font-medium text-red-600">
+                    Ingen værdi hos 2hire
+                  </span>
+                )}
+              </p>
+              {signalResult.found && (
+                <pre className="max-h-96 overflow-auto rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs text-brand-900">
+                  {JSON.stringify(signalResult.data, null, 2)}
+                </pre>
+              )}
             </div>
           )}
         </PageSection>
