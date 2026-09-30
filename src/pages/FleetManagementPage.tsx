@@ -7,7 +7,6 @@ import { use2hireGPS, use2hireVehicle, useRefreshVehicles, useSetLiveTracking } 
 import { PageHeader } from "../components/PageHeader";
 import { MapOverlayMessage } from "../components/MapOverlayMessage";
 import { fadeInUp } from "../lib/motionVariants";
-import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { LeafletMap } from "../components/LeafletMap";
 import { SectionHeading } from "../components/SectionHeading";
@@ -59,7 +58,7 @@ function isPageReload(): boolean {
 }
 
 /**
- * Admin "Flådestyring" page ("/fleet-map"): a single map showing every
+ * Admin "Kort over flåden" page (formerly "Flådestyring") ("/fleet-map"): a single map showing every
  * vehicle in scope, clustered by default (toggleable via clusterMarkers
  * below), with the first in-scope vehicle as the "primary" marker (used to
  * center the map) and the rest as extra markers. Clicking any marker jumps
@@ -275,7 +274,7 @@ export function FleetManagementPage() {
             <section className="flex min-h-0 flex-1 flex-col overflow-y-auto rounded-2xl border border-brand-100 bg-white p-5 shadow-sm shadow-brand-900/5 sm:p-6">
               <div className="flex items-center justify-between gap-2 space-y-4">
                 <SectionHeading>
-                  Flådestyring{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
+                  Kort over flåden{targetCostumerName ? ` hos ${targetCostumerName}` : ""}
                 </SectionHeading>
                 <div className="flex shrink-0 items-center gap-2">
                   {vehiclesWithoutGps.length > 0 && (
@@ -366,9 +365,6 @@ export function FleetManagementPage() {
                 )}
               </div>
 
-              <Button variant="secondary" type="button" onClick={() => navigate("/fleet-table")} className="mt-4 w-full">
-                Liste af køretøjer
-              </Button>
             </section>
           </motion.main>
         </div>
