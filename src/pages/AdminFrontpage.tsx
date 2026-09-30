@@ -12,7 +12,6 @@ import { Button } from "../components/Button";
 import { InlinePopup } from "../components/InlinePopup";
 import { CountBadge } from "../components/CountBadge";
 import { PageSection } from "../components/PageSection";
-import { PageSectionBody } from "../components/PageSectionBody";
 import { DashboardTile } from "../components/DashboardTile";
 import { ClickOutsideOverlay } from "../components/ClickOutsideOverlay";
 import { TableMessageRow } from "../components/TableMessageRow";
@@ -40,16 +39,17 @@ type Costumer = {
 };
 
 /**
- * Admin dashboard: a list of buttons linking to reservation, fleet, and
- * user-management pages, plus (below a divider) a role-specific 2x2 grid of
- * big square buttons. Admin-only (see ProtectedRoute requireAdmin in
+ * Admin dashboard, in separate stacked panes: the reservation buttons
+ * first, then the fleet buttons, then a role-specific pane (for an admin, a
+ * 2x2 grid of big square buttons). Admin-only (see ProtectedRoute requireAdmin in
  * App.tsx). A "sysadm" also lands here after login now (same as a
  * regular admin — see App.tsx's RootRoute); for that role, the grid area
- * instead shows an "INSTALLATIONER" button plus the costumer list embedded
+ * instead shows the costumer list embedded
  * directly (same table CostumerAdministrationPage.tsx's own full-page
  * version shows, "Kunde" as its own column header), with an "Opret kunde"
- * button below it (straight to CostumerNewPage.tsx, same as
- * CostumerAdministrationPage.tsx's own) — no separate hub page needed for
+ * "+" in its header (straight to CostumerNewPage.tsx, same as
+ * CostumerAdministrationPage.tsx's own), and a third pane below with
+ * INSTALLATIONER/TEST CENTER — no separate hub page needed for
  * either, so a sysadm sees the actual customer list, and can start
  * creating a new one, the moment they land here rather than one more click
  * away. Per-costumer management (afdelinger/køretøjer/brugere) lives on
@@ -265,8 +265,8 @@ export function AdminFrontpage() {
             }}
           />
 
-          <PageSection>
-            <PageSectionBody>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+            <PageSection grow={false}>
               <div className="flex flex-col gap-3">
                 {/* A booking for a walk-in visitor with no FLEETii account (the receptionist's flow) — see DropInGuestPage.tsx. */}
                 <Button
@@ -293,75 +293,55 @@ export function AdminFrontpage() {
                 >
                   LISTE OVER RESERVATIONER
                 </Button>
-                {!isDepartmentAdmin(profile?.role) && (
-                  <>
-                    <hr className="border-brand-200" />
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => navigate("/fleet-map")}
-                      className="w-full"
-                    >
-                      KORT OVER FLÅDEN
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => navigate("/fleet-table")}
-                      className="w-full"
-                    >
-                      LISTE OVER FLÅDEN
-                    </Button>
-                  </>
-                )}
               </div>
+            </PageSection>
 
-              {isDepartmentAdmin(profile?.role) && (
-                <>
-                  <hr className="border-brand-200" />
+            <PageSection grow={false}>
+              <div className="flex flex-col gap-3">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/fleet-map")}
+                  className="w-full"
+                >
+                  KORT OVER FLÅDEN
+                </Button>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/fleet-table")}
+                  className="w-full"
+                >
+                  LISTE OVER FLÅDEN
+                </Button>
+              </div>
+            </PageSection>
 
-                  <div className="flex flex-col gap-3">
-                    <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                      <Button
-                        variant="secondary"
-                        type="button"
-                        onClick={() => navigate("/fleet-map")}
-                        className="col-span-2"
-                      >
-                        KORT OVER FLÅDEN
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        type="button"
-                        onClick={() => navigate("/fleet-table")}
-                        className="col-span-2"
-                      >
-                        LISTE OVER FLÅDEN
-                      </Button>
-                      <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
-                        <CountBadge count={departmentsCount} />
-                      </DashboardTile>
-                      <DashboardTile onClick={() => goToVehiclesOrUsers("/fleet-table")} label="KØRETØJER">
-                        <CountBadge count={vehiclesCount} />
-                      </DashboardTile>
-                      <DashboardTile onClick={() => goToVehiclesOrUsers("/department")} label="BRUGERE">
-                        <CountBadge count={usersCount} />
-                      </DashboardTile>
-                      <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
-                        {showRapporterInfo && (
-                          <ClickOutsideOverlay onClick={() => setShowRapporterInfo(false)} />
-                        )}
-                        <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
-                      </DashboardTile>
-                    </div>
-                  </div>
-                </>
-              )}
+            {isDepartmentAdmin(profile?.role) && (
+              <PageSection grow={false}>
+                <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                  <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
+                    <CountBadge count={departmentsCount} />
+                  </DashboardTile>
+                  <DashboardTile onClick={() => goToVehiclesOrUsers("/fleet-table")} label="KØRETØJER">
+                    <CountBadge count={vehiclesCount} />
+                  </DashboardTile>
+                  <DashboardTile onClick={() => goToVehiclesOrUsers("/department")} label="BRUGERE">
+                    <CountBadge count={usersCount} />
+                  </DashboardTile>
+                  <DashboardTile onClick={() => setShowRapporterInfo((prev) => !prev)} dimmed label="RAPPORTER">
+                    {showRapporterInfo && (
+                      <ClickOutsideOverlay onClick={() => setShowRapporterInfo(false)} />
+                    )}
+                    <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
+                  </DashboardTile>
+                </div>
+              </PageSection>
+            )}
 
-              {isSysadm(profile?.role) && (
-                <div className="flex flex-col gap-3">
-                  <hr className="border-brand-200" />
-
+            {isSysadm(profile?.role) && (
+              <>
+                <PageSection grow={false}>
                   <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
                     <table className={TABLE_CLASSNAME}>
                       <thead className={STICKY_THEAD_CLASSNAME}>
@@ -440,35 +420,37 @@ export function AdminFrontpage() {
                       </tbody>
                     </table>
                   </div>
+                </PageSection>
 
-                  <hr className="border-brand-200" />
+                <PageSection grow={false}>
+                  <div className="flex flex-col gap-3">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => navigate("/sysadm-installations")}
+                      className="relative w-full"
+                    >
+                      INSTALLATIONER
+                      {Boolean(pendingInstallationsCount) && (
+                        <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
+                          {pendingInstallationsCount}
+                        </span>
+                      )}
+                    </Button>
 
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => navigate("/sysadm-installations")}
-                    className="relative w-full"
-                  >
-                    INSTALLATIONER
-                    {Boolean(pendingInstallationsCount) && (
-                      <span className="absolute right-2 top-1/2 flex h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-full bg-red-600 px-1 text-xs font-semibold text-white">
-                        {pendingInstallationsCount}
-                      </span>
-                    )}
-                  </Button>
-
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => navigate("/test-center")}
-                    className="w-full"
-                  >
-                    TEST CENTER
-                  </Button>
-                </div>
-              )}
-            </PageSectionBody>
-          </PageSection>
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      onClick={() => navigate("/test-center")}
+                      className="w-full"
+                    >
+                      TEST CENTER
+                    </Button>
+                  </div>
+                </PageSection>
+              </>
+            )}
+          </div>
     </PageShell>
   );
 }
