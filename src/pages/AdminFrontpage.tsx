@@ -40,7 +40,7 @@ type Costumer = {
 
 /**
  * Admin dashboard, in separate stacked panes: the reservation buttons
- * first, then the fleet buttons plus a role-specific area (for an admin, a
+ * first, then the fleet buttons, then a role-specific pane (for an admin, a
  * 2x2 grid of big square buttons). Admin-only (see ProtectedRoute requireAdmin in
  * App.tsx). A "sysadm" also lands here after login now (same as a
  * regular admin — see App.tsx's RootRoute); for that role, the grid area
@@ -296,25 +296,30 @@ export function AdminFrontpage() {
               </div>
             </PageSection>
 
+            <PageSection grow={false}>
+              <div className="flex flex-col gap-3">
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/fleet-map")}
+                  className="w-full"
+                >
+                  KORT OVER FLÅDEN
+                </Button>
+                <Button
+                  variant="secondary"
+                  type="button"
+                  onClick={() => navigate("/fleet-table")}
+                  className="w-full"
+                >
+                  LISTE OVER FLÅDEN
+                </Button>
+              </div>
+            </PageSection>
+
             {isDepartmentAdmin(profile?.role) && (
               <PageSection grow={false}>
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => navigate("/fleet-map")}
-                    className="col-span-2"
-                  >
-                    KORT OVER FLÅDEN
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() => navigate("/fleet-table")}
-                    className="col-span-2"
-                  >
-                    LISTE OVER FLÅDEN
-                  </Button>
                   <DashboardTile onClick={handleOpenDepartments} label="AFDELINGER">
                     <CountBadge count={departmentsCount} />
                   </DashboardTile>
@@ -337,101 +342,83 @@ export function AdminFrontpage() {
             {isSysadm(profile?.role) && (
               <>
                 <PageSection grow={false}>
-                  <div className="flex flex-col gap-3">
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => navigate("/fleet-map")}
-                      className="w-full"
-                    >
-                      KORT OVER FLÅDEN
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      type="button"
-                      onClick={() => navigate("/fleet-table")}
-                      className="w-full"
-                    >
-                      LISTE OVER FLÅDEN
-                    </Button>
-                    <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
-                      <table className={TABLE_CLASSNAME}>
-                        <thead className={STICKY_THEAD_CLASSNAME}>
-                          <tr>
-                            <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">
-                              <div className="flex items-center justify-between gap-2">
-                                <span className="text-sm">Kunde</span>
-                                <button
-                                  type="button"
-                                  onClick={() => navigate("/costumer-new")}
-                                  aria-label="Opret kunde"
-                                  title="Opret kunde"
-                                  className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-100"
-                                >
-                                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
-                                    <path d="M12 5v14" />
-                                    <path d="M5 12h14" />
-                                  </svg>
-                                </button>
-                              </div>
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-brand-100 bg-white">
-                          {costumersLoading && (
-                            <TableMessageRow>Indlæser kunder…</TableMessageRow>
-                          )}
-                          {!costumersLoading && costumersError && (
-                            <TableMessageRow variant="error">{costumersError}</TableMessageRow>
-                          )}
-                          {!costumersLoading && !costumersError && costumers.length === 0 && (
-                            <TableMessageRow>Ingen kunder fundet.</TableMessageRow>
-                          )}
-                          {!costumersLoading &&
-                            !costumersError &&
-                            costumers.map((costumer, index) => {
-                              const isAlternate = index % 2 === 1;
-                              const goToCostumer = () =>
-                                navigate(`/costumer-details/${costumer.costumer_id}`, { state: { costumer } });
-                              return (
-                                <tr
-                                  key={costumer.costumer_id}
-                                  role="button"
-                                  tabIndex={0}
-                                  onClick={goToCostumer}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" || e.key === " ") {
-                                      e.preventDefault();
-                                      goToCostumer();
-                                    }
-                                  }}
-                                  className={`cursor-pointer transition ${
-                                    isAlternate
-                                      ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
-                                      : "bg-white text-brand-700 hover:bg-brand-50"
-                                  }`}
-                                >
-                                  <td className="whitespace-nowrap px-2 py-0.5 font-medium">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span>{costumer.name ?? "—"}</span>
-                                      <div className="flex shrink-0 items-center gap-2">
-                                        {costumer.deactivated_at && (
-                                          <BlockedBadge>Adgang blokeret</BlockedBadge>
-                                        )}
-                                        {!costumer.has_twohire_credentials && (
-                                          <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
-                                            Mangler 2hire registrering
-                                          </span>
-                                        )}
-                                      </div>
+                  <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
+                    <table className={TABLE_CLASSNAME}>
+                      <thead className={STICKY_THEAD_CLASSNAME}>
+                        <tr>
+                          <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-sm">Kunde</span>
+                              <button
+                                type="button"
+                                onClick={() => navigate("/costumer-new")}
+                                aria-label="Opret kunde"
+                                title="Opret kunde"
+                                className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-100"
+                              >
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3">
+                                  <path d="M12 5v14" />
+                                  <path d="M5 12h14" />
+                                </svg>
+                              </button>
+                            </div>
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-brand-100 bg-white">
+                        {costumersLoading && (
+                          <TableMessageRow>Indlæser kunder…</TableMessageRow>
+                        )}
+                        {!costumersLoading && costumersError && (
+                          <TableMessageRow variant="error">{costumersError}</TableMessageRow>
+                        )}
+                        {!costumersLoading && !costumersError && costumers.length === 0 && (
+                          <TableMessageRow>Ingen kunder fundet.</TableMessageRow>
+                        )}
+                        {!costumersLoading &&
+                          !costumersError &&
+                          costumers.map((costumer, index) => {
+                            const isAlternate = index % 2 === 1;
+                            const goToCostumer = () =>
+                              navigate(`/costumer-details/${costumer.costumer_id}`, { state: { costumer } });
+                            return (
+                              <tr
+                                key={costumer.costumer_id}
+                                role="button"
+                                tabIndex={0}
+                                onClick={goToCostumer}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    goToCostumer();
+                                  }
+                                }}
+                                className={`cursor-pointer transition ${
+                                  isAlternate
+                                    ? "bg-brand-50/70 text-brand-700 hover:bg-brand-100"
+                                    : "bg-white text-brand-700 hover:bg-brand-50"
+                                }`}
+                              >
+                                <td className="whitespace-nowrap px-2 py-0.5 font-medium">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span>{costumer.name ?? "—"}</span>
+                                    <div className="flex shrink-0 items-center gap-2">
+                                      {costumer.deactivated_at && (
+                                        <BlockedBadge>Adgang blokeret</BlockedBadge>
+                                      )}
+                                      {!costumer.has_twohire_credentials && (
+                                        <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[0.62rem] font-semibold uppercase tracking-wide text-amber-700">
+                                          Mangler 2hire registrering
+                                        </span>
+                                      )}
                                     </div>
-                                  </td>
-                                </tr>
-                              );
-                            })}
-                        </tbody>
-                      </table>
-                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
                   </div>
                 </PageSection>
 
