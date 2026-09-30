@@ -517,7 +517,7 @@
   </div>
   </div>
   <div class="topbar-row">
-    <span class="eyebrow">28. september 2026 · Version 1.3</span>
+    <span class="eyebrow">30. september 2026 · Version 1.4</span>
     <a href="/about" class="back-link" aria-label="Tilbage til FLEETii">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M19 12H5"/><path d="M12 19l-7-7 7-7"/></svg>
       <span>Tilbage til FLEETii</span>
@@ -542,7 +542,7 @@
       <div class="part-head"><h2>Log ind og systemadministratorpanelet</h2></div>
       <div class="shot-row">
         <div class="shot-text">
-          <p class="lede">Du lander efter login på administratorpanelet, men uden en “hjemme”-kunde af din egen — de fire knapper øverst (<span class="btn">OPRET DROP-IN RESERVATION</span>, <span class="btn">OPRET RESERVATION</span>, <span class="btn">LISTE OVER RESERVATIONER</span> og <span class="btn">FLÅDESTYRING</span>) virker som i <a href="fleetii-manual-administrator.html">Administrator-manualen</a>. Derunder erstatter panelet Administrator-manualens AFDELINGER/KØRETØJER/BRUGERE-gitter med følgende, på tværs af <strong>alle</strong> kunder i systemet:</p>
+          <p class="lede">Du lander efter login på administratorpanelet, men uden en “hjemme”-kunde af din egen — de fem knapper øverst (<span class="btn">OPRET DROP-IN RESERVATION</span>, <span class="btn">OPRET RESERVATION</span>, <span class="btn">LISTE OVER RESERVATIONER</span>, <span class="btn">KORT OVER FLÅDEN</span> og <span class="btn">LISTE OVER FLÅDEN</span>) virker som i <a href="fleetii-manual-administrator.html">Administrator-manualen</a>. Derunder erstatter panelet Administrator-manualens AFDELINGER/KØRETØJER/BRUGERE-gitter med følgende, på tværs af <strong>alle</strong> kunder i systemet:</p>
           <p><strong>Kunde-tabellen</strong><br>Viser alle FLEETii's kunder. Klik en linje for at åbne dens Kundedetaljer (se “<a href="#kundeadministration">Kundeadministration</a>” nedenfor). Plus-ikonet i tabellens hjørne fører til “Opret kunde”.</p>
           <p><span class="btn">INSTALLATIONER</span><br>Denne knap fører dig til “<a href="#installationer">Administration af installationer</a>” (se nedenfor), som viser alle ventende køretøjs-bestillinger på tværs af alle kunder, med et rødt tal-mærke der viser hvor mange.</p>
           <p><span class="btn">TEST CENTER</span><br>Herfra kommer du til en side, der indeholder diverse test-funktionaliteter. Disse værktøjer bør <strong>KUN</strong> anvendes af udviklerne af FLEETii, da de kan bringe datasikkerheden i fare.</p>
@@ -604,7 +604,7 @@
         <div class="shot-text">
           <p class="lede">Klik en kunde i listen for at åbne Kundedetaljer: stamdata (inkl. om 2hire er “Konfigureret”) øverst, derefter:</p>
           <p><span class="btn">Rediger kunde</span> / <span class="btn danger">Bloker kundens adgang</span><br>Se “Rediger kunde” og næste afsnit.</p>
-          <p><span class="btn">Flådestyring</span><br>Kort over hele denne kundes flåde — samme side som i <a href="fleetii-manual-administrator.html">Administrator-manualen</a>.</p>
+          <p><span class="btn">Kort over flåden</span><br>Kort over hele denne kundes flåde — samme side som i <a href="fleetii-manual-administrator.html">Administrator-manualen</a>.</p>
           <p><span class="btn">AFDELINGER</span> / <span class="btn">KØRETØJER</span> / <span class="btn">BRUGERE</span><br>Samme 2×2-gitter (plus en nedtonet, endnu ikke lavet RAPPORTER) som Administrator-manualens eget administratorpanel — blot åbnet for denne ene, valgte kunde, i stedet for din egen. AFDELINGER uddybes i “<a href="#afdelingsadministration">Afdelingsadministration</a>” nedenfor.</p>
         </div>
         <figure class="shot">
@@ -653,7 +653,7 @@
       <div class="shot-row">
         <div class="shot-text">
           <p class="lede">Tryk <span class="btn">AFDELINGER</span> fra Kundedetaljer for en samlet liste over kundens afdelinger, navn og adresse — samme side og samme blyant-til-inline-redigering som i <a href="fleetii-manual-administrator.html">Administrator-manualen</a>. Som systemadministrator ser du derudover <span class="btn">Opret afdeling</span> og <span class="btn danger">Slet afdeling</span> under tabellen — de to handlinger, en almindelig Administrator ikke har adgang til.</p>
-          <p>Under de to knapper sidder <span class="btn">Flådestyring</span>, en knap til at skifte hvilken afdeling der er valgt, dernæst <span class="btn">KØRETØJER</span>/<span class="btn">BRUGERE</span> for netop den valgte afdeling, og til sidst <span class="btn">Indstillinger</span> — den samme, fuldt funktionsdygtige side som Administrator-manualens “<a href="fleetii-manual-administrator.html#afdelingens-indstillinger">Afdelingens indstillinger</a>” (ikke at forveksle med systemadministratorens egen, endnu ikke designede “<a href="#paa-tvaers">Indstillinger</a>” under tandhjulsikonet — se nedenfor).</p>
+          <p>Under de to knapper sidder <span class="btn">Kort over flåden</span>, en knap til at skifte hvilken afdeling der er valgt, dernæst <span class="btn">KØRETØJER</span>/<span class="btn">BRUGERE</span> for netop den valgte afdeling, og til sidst <span class="btn">Indstillinger</span> — den samme, fuldt funktionsdygtige side som Administrator-manualens “<a href="fleetii-manual-administrator.html#afdelingens-indstillinger">Afdelingens indstillinger</a>” (ikke at forveksle med systemadministratorens egen, endnu ikke designede “<a href="#paa-tvaers">Indstillinger</a>” under tandhjulsikonet — se nedenfor).</p>
           <div class="callout limit">
             <span class="label">En afdeling i brug kan ikke slettes</span>
             <p>Har afdelingen stadig brugere, køretøjer eller andet tilknyttet, afviser FLEETii sletningen med beskeden “Denne afdeling kan ikke slettes”. Flyt eller fjern det tilknyttede først.</p>

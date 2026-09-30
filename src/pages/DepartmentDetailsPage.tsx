@@ -512,7 +512,7 @@ export function DepartmentDetailsPage() {
                     onClick={() => void scopeSwitch.switchAndNavigate("fleet", selectedDepartmentId, costumerId, "/fleet-map")}
                     className="w-full"
                   >
-                    {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Flådestyring"}
+                    {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Kort over flåden"}
                   </Button>
                   <InlinePopup
                     visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
