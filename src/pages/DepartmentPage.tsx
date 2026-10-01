@@ -295,7 +295,8 @@ export function DepartmentPage() {
                   <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
+                      {/* w-full: Navn takes all the width Bruger/Afdeling/Rolle leave over (they shrink to their own content) — paired with max-w-0 + truncate on its cells below, so Navn is the column that gives way (clips with "…") instead of the table scrolling sideways. */}
+                      <th className="w-full whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
                       <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Afdeling</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Rolle</th>
                     </tr>
@@ -342,7 +343,7 @@ export function DepartmentPage() {
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
                               {(useUserIdent ? user.user_ident || user.email : user.email) ?? "—"}
                             </td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{user.full_name ?? "—"}</td>
+                            <td className="max-w-0 truncate border-r border-brand-100 px-2 py-0.5 font-medium" title={user.full_name ?? undefined}>{user.full_name ?? "—"}</td>
                             <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">{user.department_name ?? "—"}</td>
                             <td className="whitespace-nowrap px-2 py-0.5">
                               {user.deleted_at ? (

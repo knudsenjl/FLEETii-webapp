@@ -236,10 +236,11 @@ export function VehiclesPage() {
                               <BlockedBadge className="ml-2" />
                             )}
                           </td>
-                          <td className="whitespace-nowrap px-2 py-0.5">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="truncate">{vehicle.vehicle}</span>
-                              <div className="flex items-center gap-1.5">
+                          {/* max-w-0 stops the model text from widening the table (table-layout:auto would otherwise size the column to the full unclipped text and make the wrapper scroll sideways) — the column still gets all the space Køretøj's w-px leaves over, and the text clips with "…" when that runs out. Full text stays available in the tooltip. Same technique as AllBookingsPage.tsx/AvailablePage.tsx/DepartmentPage.tsx. */}
+                          <td className="max-w-0 whitespace-nowrap px-2 py-0.5">
+                            <div className="flex min-w-0 items-center justify-between gap-2">
+                              <span className="min-w-0 truncate" title={vehicle.vehicle}>{vehicle.vehicle}</span>
+                              <div className="flex shrink-0 items-center gap-1.5">
                                 {/* Driving-vehicle icon, same trip_detected convention as VehicleDetailsPage.tsx's header/BookingPage.tsx's hero card — placed right before the "!" health button, both right-aligned in this cell. */}
                                 {vehicle.tripDetected === "TRUE" && <CarGlyph className="h-5 w-8 shrink-0 text-green-600" title="Kører" />}
                                 {/* Reserves the "!" button's own h-4 w-4 footprint even when healthy (VehicleHealthIndicator renders nothing at all for an empty issues list) — otherwise a healthy row's CarGlyph above would sit further right than a row with a real "!" next to it, since this whole group is right-aligned via the parent's justify-between. This blank placeholder keeps every row's CarGlyph at the same horizontal position down the column. */}

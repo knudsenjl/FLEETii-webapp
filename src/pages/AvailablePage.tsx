@@ -182,7 +182,8 @@ export function AvailablePage() {
                   <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
                       <th className="w-px whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Køretøj</th>
-                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
+                      {/* w-full: Model takes all the width Køretøj/Ledig periode leave over (they shrink to their own content) — paired with max-w-0 + truncate on its cells below, so a long model name clips with "…" instead of making the table scroll sideways. */}
+                      <th className="w-full whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Model</th>
                       <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-center">Ledig periode</th>
                     </tr>
                   </thead>
@@ -231,7 +232,7 @@ export function AvailablePage() {
                                 useVehicleIdent,
                               )}
                             </td>
-                            <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5 font-medium">{vehicle.vehicle}</td>
+                            <td className="max-w-0 truncate border-r border-brand-100 px-2 py-0.5 font-medium" title={vehicle.vehicle}>{vehicle.vehicle}</td>
                             <td className="whitespace-nowrap px-2 py-0.5 text-center">{vehicle.ledigPeriode}</td>
                           </tr>
                         );
