@@ -389,7 +389,9 @@ export function DepartmentDetailsPage() {
             }}
           />
 
-          <PageSection className="gap-4 overflow-y-auto">
+          {/* Two stacked panes in one scrolling column (same layout as AdminFrontpage.tsx): the department table (+ sysadm's Opret/Slet afdeling) first, then the selected department's own action buttons — the panes' own gap replaces the <hr> dividers that used to separate these inside a single card. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <PageSection grow={false} className="gap-4">
             <SectionHeading>Afdelinger hos {costumerName ?? "—"}</SectionHeading>
 
             <div className="flex max-h-[50vh] flex-col overflow-auto rounded-none border border-brand-100">
@@ -441,7 +443,7 @@ export function DepartmentDetailsPage() {
               </table>
             </div>
 
-            {/* Create/delete stays sysadm-only — same boundary the old two-page split enforced via this page's own former sysadm-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). Moved directly under the table (rather than after the KØRETØJER/BRUGERE/Flådestyring grid) at the user's request 2026-08-28, so creating/deleting departments doesn't require scrolling past the quick-nav grid first — no divider directly above it any more (it now sits right under the table), its own former leading divider moved below it instead, see the grid section's own comment below. */}
+            {/* Create/delete stays sysadm-only — same boundary the old two-page split enforced via this page's own former sysadm-only route gate (now relaxed to requireAdmin so a regular admin can still reach the table above for their own costumer). Moved directly under the table (rather than after the KØRETØJER/BRUGERE/Flådestyring grid) at the user's request 2026-08-28, so creating/deleting departments doesn't require scrolling past the quick-nav grid first — it sits right under the table, in the same pane. */}
             {isSysadm && (
               <>
                 {isAddingDepartment && (
@@ -499,34 +501,31 @@ export function DepartmentDetailsPage() {
               </>
             )}
 
+          </PageSection>
+
             {!departmentsLoading && !departmentsError && departments.length > 0 && (
-              <>
-                {/* Only shown when the Opret/Slet afdeling block above actually rendered (isSysadm) — separates that block from Flådestyring below; a regular admin never sees that block, so no divider is needed here for them either. */}
-                {isSysadm && <hr className="border-brand-200" />}
-
-                <div className="relative">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    disabled={scopeSwitch.isSwitching}
-                    onClick={() => void scopeSwitch.switchAndNavigate("fleet", selectedDepartmentId, costumerId, "/fleet-map")}
-                    className="w-full"
-                  >
-                    {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Kort over flåden"}
-                  </Button>
-                  <InlinePopup
-                    visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
-                    message={scopeSwitch.error ?? ""}
-                    align="right"
-                  />
-                </div>
-
-                <hr className="border-brand-200" />
-
+              <PageSection grow={false}>
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
                   {/* Was a plain <h3> label above the grid — now a row inside it, same width/centering, just a slightly darker background (bg-brand-100 vs the buttons' bg-brand-50) and no hover/click affordance, since it's a status label, not an action. */}
                   <div className="col-span-2 rounded-lg border border-brand-200 bg-brand-100 px-2 py-1.5 text-center text-sm font-semibold text-brand-700">
                     {selectedDepartment ? (selectedDepartment.name ?? "—") : "Ingen afdeling valgt"}
+                  </div>
+                  {/* KORT OVER FLÅDEN (Flådestyring) — a col-span-2 row directly under the department label, same width as it (2026-10-01, at the user's request; was a full-width button above the grid, separated by dividers). Same switch-then-navigate pattern as KØRETØJER/BRUGERE/Indstillinger below. */}
+                  <div className="relative col-span-2">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("fleet", selectedDepartmentId, costumerId, "/fleet-map")}
+                      className="w-full"
+                    >
+                      {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "KORT OVER FLÅDEN"}
+                    </Button>
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
                   </div>
                   <DashboardTile
                     onClick={() => void scopeSwitch.switchAndNavigate("koretojer", selectedDepartmentId, costumerId, "/fleet-table")}
@@ -552,7 +551,7 @@ export function DepartmentDetailsPage() {
                       align="right"
                     />
                   </DashboardTile>
-                  {/* Indstillinger — a col-span-2 row in this SAME grid (both roles now: 2026-09-14, opened to sysadm too, alongside App.tsx's /department-settings route relaxing to requireAdmin — see this page's own top doc comment), rather than its own full-width block below a divider like Flådestyring above — sized to match KØRETØJER+BRUGERE's own combined width instead of the section's full width, and grouped with them as one visual cluster with no divider, since all three ("department-specific actions") belong together once a department is selected, whereas Flådestyring above stays full-width/undivided as the one department-independent action. Same switch-then-navigate pattern as Flådestyring/KØRETØJER/BRUGERE. */}
+                  {/* Indstillinger — a col-span-2 row in this SAME grid (both roles now: 2026-09-14, opened to sysadm too, alongside App.tsx's /department-settings route relaxing to requireAdmin — see this page's own top doc comment), sized to match KØRETØJER+BRUGERE's own combined width instead of the section's full width, and grouped with them (and KORT OVER FLÅDEN above) as one visual cluster with no divider, since they all belong together once a department is selected. Same switch-then-navigate pattern as Flådestyring/KØRETØJER/BRUGERE. */}
                   <div className="relative col-span-2">
                     <Button
                       variant="secondary"
@@ -570,9 +569,9 @@ export function DepartmentDetailsPage() {
                     />
                   </div>
                 </div>
-              </>
+              </PageSection>
             )}
-          </PageSection>
+          </div>
       </PageShell>
 
       {pendingAction && (
