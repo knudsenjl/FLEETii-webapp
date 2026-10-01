@@ -278,8 +278,9 @@ export function BookingDetailsPage() {
       <PageShell>
           <PageHeader />
 
-          <PageSection>
-            <PageSectionBody>
+          {/* Three stacked panes in one scrolling column (PageSectionBody), same layout as AdminFrontpage.tsx/DepartmentDetailsPage.tsx: Reservationsdetaljer, then Gæst (drop-in bookings only), then the map + vehicle controls + Afslut/Rediger/Slet. */}
+          <PageSectionBody>
+            <PageSection grow={false} className="gap-4">
               <SectionHeading className="shrink-0">Reservationsdetaljer</SectionHeading>
 
               <FieldList>
@@ -346,16 +347,21 @@ export function BookingDetailsPage() {
                     </span>
                   </FieldRow>
               </FieldList>
+            </PageSection>
 
               {/* Drop-in booking: the guest's details + resend/revoke of their link — admins only (booking_guests' RLS wouldn't return the row to anyone else anyway). */}
               {isAdmin && booking.isGuest && (
-                <DropInGuestPanel
-                  bookingId={booking.id}
-                  endIso={booking.endIso}
-                  emailFailed={(location.state as { dropInEmailFailed?: boolean } | null)?.dropInEmailFailed === true}
-                />
+                <PageSection grow={false}>
+                  <DropInGuestPanel
+                    bookingId={booking.id}
+                    endIso={booking.endIso}
+                    emailFailed={(location.state as { dropInEmailFailed?: boolean } | null)?.dropInEmailFailed === true}
+                  />
+                </PageSection>
               )}
 
+            {/* grow={false} + "grow": never shrinks below its own content (the column scrolls instead), but still takes any height left over, so the map's flex-1 keeps filling the rest of the screen as it did in the old single card. */}
+            <PageSection grow={false} className="grow gap-4">
               {mapVisible && (
                 <VehicleMapCard
                   lat={savedMapView?.lat ?? stableCenter.lat}
@@ -441,8 +447,8 @@ export function BookingDetailsPage() {
               {locateError && <p className="shrink-0 text-sm text-red-600">{locateError}</p>}
 
               {error && <p className="shrink-0 text-sm text-red-600">{error}</p>}
-            </PageSectionBody>
-          </PageSection>
+            </PageSection>
+          </PageSectionBody>
       </PageShell>
 
       {showCancelConfirm && (

@@ -579,7 +579,9 @@ export function CostumerDetailsPage() {
             }}
           />
 
-          <PageSection className="gap-4 overflow-y-auto">
+          {/* Two stacked panes in one scrolling column (same layout as DepartmentDetailsPage.tsx/AdminFrontpage.tsx): the costumer's own details + Rediger/Bloker buttons first, then its quick-nav buttons — the panes' own gap replaces the <hr> dividers that used to separate these inside a single card. The second pane is hidden while editing, as those buttons were before. */}
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto">
+          <PageSection grow={false} className="gap-4">
             <SectionHeading>
               {isEditing ? `Rediger ${costumer.name ?? "—"}` : (costumer.name ?? "—")}
             </SectionHeading>
@@ -772,29 +774,30 @@ export function CostumerDetailsPage() {
                     </>
                   )}
                 </ButtonRow>
+              </>
+            )}
+          </PageSection>
 
-                <hr className="border-brand-200" />
-
-                <div className="relative">
-                  <Button
-                    variant="secondary"
-                    type="button"
-                    disabled={scopeSwitch.isSwitching}
-                    onClick={() => void scopeSwitch.switchAndNavigate("fleet", null, costumer.costumer_id, "/fleet-map")}
-                    className="w-full"
-                  >
-                    {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "Kort over flåden"}
-                  </Button>
-                  <InlinePopup
-                    visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
-                    message={scopeSwitch.error ?? ""}
-                    align="right"
-                  />
-                </div>
-
-                <hr className="border-brand-200" />
-
+            {!isEditing && (
+              <PageSection grow={false}>
                 <div className="grid grid-cols-[repeat(2,max-content)] justify-center gap-3">
+                  {/* KORT OVER FLÅDEN — a col-span-2 row at the top of the grid, same width as the two tile columns below it (2026-10-01, at the user's request, matching DepartmentDetailsPage.tsx; was a full-width button above the grid, separated by dividers). Same switch-then-navigate pattern as the tiles below. */}
+                  <div className="relative col-span-2">
+                    <Button
+                      variant="secondary"
+                      type="button"
+                      disabled={scopeSwitch.isSwitching}
+                      onClick={() => void scopeSwitch.switchAndNavigate("fleet", null, costumer.costumer_id, "/fleet-map")}
+                      className="w-full"
+                    >
+                      {scopeSwitch.activeKey === "fleet" && scopeSwitch.isSwitching ? "Vent…" : "KORT OVER FLÅDEN"}
+                    </Button>
+                    <InlinePopup
+                      visible={scopeSwitch.activeKey === "fleet" && Boolean(scopeSwitch.error)}
+                      message={scopeSwitch.error ?? ""}
+                      align="right"
+                    />
+                  </div>
                   <DashboardTile
                     onClick={() => void scopeSwitch.switchAndNavigate("afdelinger", null, costumer.costumer_id, "/department-details")}
                     disabled={scopeSwitch.isSwitching}
@@ -838,9 +841,9 @@ export function CostumerDetailsPage() {
                     <InlinePopup visible={showRapporterInfo} align="right" message="Ikke implementeret endnu" />
                   </DashboardTile>
                 </div>
-              </>
+              </PageSection>
             )}
-          </PageSection>
+          </div>
       </PageShell>
 
       {pendingAction && (
