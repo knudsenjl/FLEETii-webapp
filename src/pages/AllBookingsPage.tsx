@@ -259,10 +259,12 @@ export function AllBookingsPage() {
                     w-px (shrink to their actual content — only meaningful
                     under table-layout:auto, table-fixed ignores content
                     entirely). Model has none of these — combined with
-                    `truncate` (which exempts it from contributing its full
-                    intrinsic width to the auto-layout algorithm), it absorbs
-                    whatever space the others leave over, same end result as
-                    the old table-fixed approach. */}
+                    `max-w-0 truncate` on its cells (max-w-0 is what exempts
+                    it from contributing its full intrinsic width to the
+                    auto-layout algorithm — `truncate` alone does not, the
+                    table then just grows and scrolls sideways), it absorbs
+                    whatever space the others leave over and clips with "…",
+                    same end result as the old table-fixed approach. */}
                 <table className={TABLE_CLASSNAME}>
                   <thead className={STICKY_THEAD_CLASSNAME}>
                     <tr>
@@ -325,7 +327,7 @@ export function AllBookingsPage() {
                               )}
                             </td>
                             <td
-                              className="truncate border-r border-brand-100 px-2 py-0.5 font-medium"
+                              className="max-w-0 truncate border-r border-brand-100 px-2 py-0.5 font-medium"
                               title={twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle}
                             >
                               {twoHireVehicle ? `${twoHireVehicle.brand} ${twoHireVehicle.model}` : booking.vehicle}
