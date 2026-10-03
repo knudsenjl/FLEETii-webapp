@@ -247,6 +247,14 @@
   section.feature > .lede { color: var(--ink-soft); margin: 0 0 14px; max-width: 60ch; }
   ol, ul { padding-left: 1.3em; }
   li { margin: 5px 0; }
+  /* Text-only sections: tight spacing between a small heading and its list. */
+  .compact p { margin: 12px 0 2px; }
+  .compact > p:first-child { margin-top: 0; }
+  .compact ul, .compact ol { margin: 0; }
+  .compact li { margin: 2px 0; }
+  .compact .indent { margin-left: 1.3em; }
+  .compact .indent ul, .compact .indent ol { margin-left: 1.3em; }
+  .compact .indent > p:first-child { margin-top: 4px; }
   ol li::marker { color: var(--brand); font-weight: 600; font-variant-numeric: tabular-nums; }
 
   .badge {
@@ -555,6 +563,7 @@
       <a href="#reservationsdetaljer">Reservationsdetaljer</a>
       <a href="#mine-indstillinger">Mine indstillinger</a>
       <a href="#hjemmeskaerm">Tilføj til hjemmeskærm</a>
+      <a href="#opgradering">Opgradering til ny version af app'en</a>
       <a href="#kontakt">Kontakt og support</a>
       <a href="#copyright">Copyright</a>
     </nav>
@@ -854,6 +863,47 @@
             <p>Har du tilføjet FLEETii til hjemmeskærmen eller som app tidligere, kan enheden have gemt en ældre genvej uden ikon. Fjern den gamle genvej, og gentag trinene ovenfor for at få en frisk genvej med det rigtige logo.</p>
           </div>
         </div>
+      </div>
+    </section>
+
+    <section class="part" id="opgradering">
+      <div class="part-head"><h2>Opgradering til ny version af app'en</h2></div>
+      <div class="compact">
+          <p>Hvis den nye version ikke straks er tilgængelig i din browser eller på din iPad eller iPhone, skal du tvinge app'en til at genindlæse.</p>
+          <p><strong>Windows og Mac (browser på computer)</strong></p>
+          <div class="indent">
+          <ul>
+            <li>Windows: Tryk enten <strong>Ctrl+R</strong> eller <strong>F5</strong> for at genindlæse app'en.</li>
+            <li>Mac: Tryk <strong>Cmd+R</strong> for at genindlæse app'en.</li>
+          </ul>
+          </div>
+          <p><strong>iPad og iPhone</strong></p>
+          <div class="indent">
+          <p><strong>iPad og iPhone uden Hjem-knap (Face ID eller modeller med fuld skærm)</strong></p>
+          <ul>
+            <li>Stryg op fra skærmens nederste kant, og hold en kort pause midt på skærmen.</li>
+          </ul>
+          <p><strong>iPad og iPhone med Hjem-knap</strong></p>
+          <ul>
+            <li>Dobbeltklik på den fysiske Hjem-knap for at se dine senest brugte apps.</li>
+          </ul>
+          <p><strong>Derefter:</strong></p>
+          <ul>
+            <li>Stryg til højre eller venstre for at finde den app, du vil lukke.</li>
+            <li>Stryg op på app'ens eksempelvindue for at lukke den.</li>
+            <li>Åbn FLEETii igen.</li>
+          </ul>
+          </div>
+          <p><strong>Android</strong></p>
+          <div class="indent">
+          <ul>
+            <li>Stryg op fra skærmens nederste kant, og hold en kort pause midt på skærmen — eller tryk på knappen for senest brugte apps, hvis din telefon har navigationsknapper nederst.</li>
+            <li>Stryg til højre eller venstre for at finde FLEETii (eller Chrome, hvis du bruger FLEETii i en browserfane).</li>
+            <li>Stryg op på app'ens eksempelvindue for at lukke den.</li>
+            <li>Åbn FLEETii igen.</li>
+          </ul>
+          <p style="margin-left: 2.6em;">Bruger du FLEETii i en fane i Chrome, kan du i stedet trække ned fra toppen af siden for at genindlæse den.</p>
+          </div>
       </div>
     </section>
 
