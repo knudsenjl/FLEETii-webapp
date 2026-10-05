@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
+import type { KeyboardEvent } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { isSysadm as isSysadmRole } from "../lib/roles";
+import { isFleetiiCostumer } from "../lib/fleetiiCostumer";
 import { PageHeader } from "../components/PageHeader";
 import { PageShell } from "../components/PageShell";
 import { PageSection } from "../components/PageSection";
@@ -46,6 +48,16 @@ type ProfileQueryRow = {
   departments: { name: string } | null;
 };
 
+/** A row of the "Systemadministratorer" table (see DepartmentPage's own doc comment) — deliberately without department_id/costumer_id: for a sysadm those are only the Data Filter pointer, never real membership, so they're neither shown nor fetched here. */
+type SysadmRow = {
+  user_id: string;
+  email: string | null;
+  full_name: string | null;
+  phone: string | null;
+  /** Set for a blocked sysadm — still listed, with the same "Blokeret" badge as the user table above. */
+  deleted_at: string | null;
+};
+
 /**
  * Admin "user management" page ("/department"): scoped to a target
  * costumer (the global header's own costumerId — see "Data Filter",
@@ -74,6 +86,15 @@ type ProfileQueryRow = {
  * appears next to their Rolle, same style as CostumerAdministrationPage's
  * own "Adgang blokeret" marker for a deactivated costumer), since blocking
  * is reversible and they need to stay reachable to unblock.
+ *
+ * Sysadms are never part of that users list (see loadUsers' own comment).
+ * Instead, a sysadm viewing the internal FLEETii costumer (see
+ * lib/fleetiiCostumer.ts) gets a second, view-only "Systemadministratorer"
+ * table last on the page, listing every sysadm platform-wide. Only the
+ * viewer's own row is clickable (it opens their own profile, where a sysadm
+ * can edit their own Navn/E-mail/Telefon), and the Data Filter's
+ * Afdeling/Rolle/Bruger/Navn don't apply to it. The "+" in its heading
+ * opens UserDetailsPage's "Opret systemadministrator" form.
  */
 export function DepartmentPage() {
   const { costumerId, costumerName, afdeling, profile } = useAuth();
@@ -168,6 +189,43 @@ export function DepartmentPage() {
     // department/costumer selected without a full remount, e.g. via browser
     // back/forward).
   }, [targetDepartmentId, targetCostumerId, isSysadm]);
+
+  /** Whether the "Systemadministratorer" table is shown at all — only to a sysadm, and only while the Data Filter's Kunde is the internal FLEETii costumer. */
+  const showSysadms = isSysadm && isFleetiiCostumer(targetCostumerId);
+  const [sysadms, setSysadms] = useState<SysadmRow[]>([]);
+  const [sysadmsLoading, setSysadmsLoading] = useState(false);
+  const [sysadmsError, setSysadmsError] = useState<string | null>(null);
+
+  /** Loads every sysadm platform-wide for the "Systemadministratorer" table — no costumer/department filter (a sysadm belongs to neither), and user_profiles' SELECT RLS already lets a sysadm read them all. Skipped entirely unless showSysadms. */
+  useEffect(() => {
+    if (!showSysadms) {
+      setSysadms([]);
+      return;
+    }
+
+    let cancelled = false;
+    setSysadmsLoading(true);
+    setSysadmsError(null);
+    void supabase
+      .from("user_profiles")
+      .select("user_id, email, full_name, phone, deleted_at")
+      .eq("role", "sysadm")
+      .order("full_name", { ascending: true })
+      .returns<SysadmRow[]>()
+      .then(({ data, error: fetchError }) => {
+        if (cancelled) return;
+        if (fetchError) {
+          setSysadmsError(fetchError.message);
+        } else {
+          setSysadms(data ?? []);
+        }
+        setSysadmsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [showSysadms]);
 
   // Server-side filtering above already scopes `users` to the right set for
   // either mode — kept as its own name (rather than using `users` directly
@@ -369,6 +427,93 @@ export function DepartmentPage() {
               </div>
             </div>
           </PageSection>
+
+          {/* "Systemadministratorer" — its own pane, last on the page (see this component's own doc comment). grow={false}: only as tall as its own few rows, so the users pane above keeps all the remaining height. View-only apart from the viewer's own row. */}
+          {showSysadms && (
+            <PageSection grow={false} className="mt-4 gap-4">
+              {/* Heading + a right-aligned "+" (same round icon button as AdminFrontpage.tsx's own "Opret kunde"): opens UserDetailsPage's create form in its "Opret systemadministrator" mode (router state createSysadm — see that page's own creatingSysadm). */}
+              <div className="flex items-center justify-between gap-2">
+                <SectionHeading>Systemadministratorer</SectionHeading>
+                <button
+                  type="button"
+                  onClick={() => navigate("/user-details", { state: { createSysadm: true } })}
+                  aria-label="Opret systemadministrator"
+                  title="Opret systemadministrator"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-brand-200 bg-white text-brand-700 transition hover:bg-brand-100"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                    <path d="M12 5v14" />
+                    <path d="M5 12h14" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="flex max-h-[30vh] min-w-0 flex-col overflow-auto rounded-none border border-brand-100">
+                <table className={TABLE_CLASSNAME}>
+                  <thead className={STICKY_THEAD_CLASSNAME}>
+                    <tr>
+                      <th className="whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Bruger</th>
+                      {/* Same give-way column as the users table above: w-full here, max-w-0 + truncate on its cells. */}
+                      <th className="w-full whitespace-nowrap border-b border-r border-brand-200 px-2 py-0.5 text-left">Navn</th>
+                      <th className="whitespace-nowrap border-b border-brand-200 px-2 py-0.5 text-left">Telefon</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-brand-100 bg-white">
+                    {sysadmsLoading && <TableMessageRow colSpan={3}>Indlæser systemadministratorer…</TableMessageRow>}
+                    {!sysadmsLoading && sysadmsError && (
+                      <TableMessageRow colSpan={3} variant="error">{sysadmsError}</TableMessageRow>
+                    )}
+                    {!sysadmsLoading && !sysadmsError && sysadms.length === 0 && (
+                      <TableMessageRow colSpan={3}>Ingen systemadministratorer fundet.</TableMessageRow>
+                    )}
+                    {!sysadmsLoading &&
+                      !sysadmsError &&
+                      sysadms.map((sysadm, index) => {
+                        const isAlternate = index % 2 === 1;
+                        // Only the viewer's own row opens anything: their
+                        // own profile on UserDetailsPage, where a sysadm can
+                        // edit their own Navn/E-mail/Telefon. Every other
+                        // sysadm's row stays a plain, non-interactive row.
+                        const isOwnRow = sysadm.user_id === profile?.user_id;
+                        const goToOwnProfile = () => navigate(`/user-details/${sysadm.user_id}`);
+                        return (
+                        <tr
+                          key={sysadm.user_id}
+                          {...(isOwnRow
+                            ? {
+                                role: "button",
+                                tabIndex: 0,
+                                onClick: goToOwnProfile,
+                                onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
+                                  if (e.key === "Enter" || e.key === " ") {
+                                    e.preventDefault();
+                                    goToOwnProfile();
+                                  }
+                                },
+                              }
+                            : {})}
+                          className={`${isOwnRow ? "cursor-pointer transition " : ""}${
+                            isAlternate
+                              ? `bg-brand-50/70 text-brand-700${isOwnRow ? " hover:bg-brand-100" : ""}`
+                              : `bg-white text-brand-700${isOwnRow ? " hover:bg-brand-50" : ""}`
+                          }`}
+                        >
+                          <td className="whitespace-nowrap border-r border-brand-100 px-2 py-0.5">
+                            <span className="inline-flex items-center gap-2">
+                              {sysadm.email ?? "—"}
+                              {sysadm.deleted_at && <BlockedBadge />}
+                            </span>
+                          </td>
+                          <td className="max-w-0 truncate border-r border-brand-100 px-2 py-0.5 font-medium" title={sysadm.full_name ?? undefined}>{sysadm.full_name ?? "—"}</td>
+                          <td className="whitespace-nowrap px-2 py-0.5">{sysadm.phone ?? "—"}</td>
+                        </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+            </PageSection>
+          )}
     </PageShell>
   );
 }
