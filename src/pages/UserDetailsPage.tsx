@@ -131,16 +131,38 @@ export function UserDetailsPage() {
    * nobody but FLEETii support could otherwise ever change that admin's own
    * name, e-mail, phone or departments. Everything except Rolle, so an admin
    * can't demote themselves out of the admin pages by accident (another
-   * admin or a sysadm still can). Not for a sysadm: their department fields
-   * are only the Data Filter pointer, not a real home department. The server
-   * (update-user.mts) already allows an admin to update any user of their own
-   * costumer, themselves included.
+   * admin or a sysadm still can). A sysadm gets it too, minus the department
+   * fields — see isSysadmSelf. The server (update-user.mts) already allows an
+   * admin to update any user of their own costumer, themselves included, and
+   * a sysadm to update anyone.
    */
-  const canEditOwnProfile = isSelf && isDepartmentAdmin(profile?.role);
-  /** Self-view's profile fields stay read-only for everyone else looking at their own row (a regular user, a sysadm). */
+  const canEditOwnProfile = isSelf && isAnyAdmin(profile?.role);
+  /**
+   * A sysadm on their OWN row (user decision 2026-10-05: there was no way in
+   * the app for a sysadm to correct their own name, e-mail or phone). They
+   * get the same own-profile edit as an admin, but ONLY for those personal
+   * fields: Afdeling(er)/Hjemmeafdeling stay read-only and are never sent or
+   * saved, since a sysadm's department fields are only the Data Filter
+   * pointer, not a real home department (see departmentReadOnly).
+   */
+  const isSysadmSelf = isSelf && isSysadmRole(profile?.role);
+  /** Self-view's profile fields stay read-only for everyone else looking at their own row (a regular user). */
   const profileReadOnly = isSelf && !canEditOwnProfile;
-  const navState = location.state as { user?: ProfileRow } | null;
+  /** Afdeling(er)/Hjemmeafdeling are read-only whenever the profile fields are, and additionally for a sysadm editing their own row (see isSysadmSelf). */
+  const departmentReadOnly = profileReadOnly || isSysadmSelf;
+  const navState = location.state as { user?: ProfileRow; createSysadm?: boolean } | null;
   const stateUser = navState?.user ?? null;
+  /**
+   * "Opret systemadministrator" mode: the create form (no :userId), opened
+   * from DepartmentPage.tsx's "Systemadministratorer" table's "+" (router
+   * state createSysadm), and only ever for a viewer who is a sysadm
+   * themselves. Rolle is fixed to sysadm, and everything department-related
+   * (Kunde row, Bruger-ID, Afdelingsindstillinger, Tilladelser) is hidden
+   * and not sent — a sysadm has no home department. create-user.mts
+   * re-checks that the caller is a sysadm; this flag is only what the form
+   * shows.
+   */
+  const creatingSysadm = !userId && Boolean(navState?.createSysadm) && isSysadmRole(profile?.role);
   const [fetchedUser, setFetchedUser] = useState<ProfileRow | null>(null);
   /** Starts true whenever a fetch-by-id will actually run (userId present, no stateUser) — NOT just false-by-default. The redirect-on-missing-user effect below and this page's own fetch effect both run in the SAME passive-effects pass on mount; if this started false, the redirect effect would see the pre-fetch "not loading, no user" state and bounce to /department before the fetch's setUserLoading(true) had any chance to take effect for that pass. Every existing caller (DepartmentPage) masked this by always passing router state, so `user` was already truthy and the redirect's `!user` check short-circuited — this only surfaces for a caller that navigates here by id alone (e.g. BookingDetailsPage's "Bruger" link, or a raw bookmark/refresh). */
   const [userLoading, setUserLoading] = useState(() => Boolean(userId) && !stateUser && !isSelf);
@@ -196,7 +218,7 @@ export function UserDetailsPage() {
   // locked, see the departmentOptions effect below) only when their costumer
   // has exactly one department, since there's no actual choice then.
   const [department, setDepartment] = useState(user?.department_name ?? "");
-  const [role, setRole] = useState(user?.role ?? "user");
+  const [role, setRole] = useState(user?.role ?? (creatingSysadm ? "sysadm" : "user"));
 
   const [emailExists, setEmailExists] = useState<boolean | null>(null);
   const [pendingAction, setPendingAction] = useState<"create" | "update" | "close" | "delete" | "reactivate" | null>(
@@ -463,7 +485,8 @@ export function UserDetailsPage() {
     EMAIL_PATTERN.test(email.trim()) &&
     emailExists === false &&
     PHONE_PATTERN.test(phone.trim()) &&
-    department.trim().length > 0 &&
+    // A sysadm has no home department to require (see isSysadmSelf/creatingSysadm).
+    (isSysadmSelf || creatingSysadm || department.trim().length > 0) &&
     role.trim().length > 0 &&
     // A brand-new user created by a sysadm needs a real targetCostumerId
     // (from the global header — see this component's own doc comment) —
@@ -486,7 +509,7 @@ export function UserDetailsPage() {
   // Hjemmeafdeling choice like any edit, so the "Hjem" badge and its locked
   // checkbox move with it — falling back to the saved home department until
   // departmentOptions has loaded.
-  const homeDepartmentId = profileReadOnly
+  const homeDepartmentId = departmentReadOnly
     ? (profile?.department_id ?? null)
     : (departmentOptions.find((d) => d.name === department)?.department_id ??
       (isSelf ? (profile?.department_id ?? null) : undefined));
@@ -643,9 +666,12 @@ export function UserDetailsPage() {
       email !== (user?.email ?? "") ||
       phone !== (user?.phone ?? "") ||
       userIdent !== (user?.user_ident ?? "") ||
-      department !== (user?.department_name ?? "") ||
-      userDepartmentIds.size !== originalUserDepartmentIds.size ||
-      [...userDepartmentIds].some((id) => !originalUserDepartmentIds.has(id)));
+      // Never for a sysadm: their department fields aren't editable here, and
+      // the self-heal effects above may still touch this local state.
+      (!isSysadmSelf &&
+        (department !== (user?.department_name ?? "") ||
+          userDepartmentIds.size !== originalUserDepartmentIds.size ||
+          [...userDepartmentIds].some((id) => !originalUserDepartmentIds.has(id)))));
   /** The e-mail is also the login: changing your OWN one gets an extra line in the confirmation. */
   const ownEmailChanged = canEditOwnProfile && email.trim() !== (user?.email ?? "");
 
@@ -677,9 +703,12 @@ export function UserDetailsPage() {
           full_name: fullName || null,
           phone: phone || null,
           user_ident: userIdent.trim() || null,
-          department: department || null,
+          // Omitted entirely for a sysadm's own row — update-user.mts then
+          // leaves department_id/costumer_id (their Data Filter pointer)
+          // untouched.
+          department: isSysadmSelf ? null : department || null,
           // The id is what the server actually resolves (names are only unique per costumer); the name stays for older server versions.
-          departmentId: departmentOptions.find((d) => d.name === department)?.department_id ?? null,
+          departmentId: isSysadmSelf ? null : (departmentOptions.find((d) => d.name === department)?.department_id ?? null),
           role: role || "user",
         },
       });
@@ -700,8 +729,10 @@ export function UserDetailsPage() {
     // the grants section itself loaded successfully, so a failed fetch
     // (grantsError set) can't wipe out real grants the admin never
     // actually saw or touched. Mirrors HandleVehiclePage.tsx's own
-    // vehicle_departments reconciliation.
-    if (!grantsError) {
+    // vehicle_departments reconciliation. Skipped for a sysadm's own row: a
+    // sysadm has no department grants, and the home-department self-heal
+    // effect above would otherwise write one for their Data Filter pointer.
+    if (!grantsError && !isSysadmSelf) {
       const toAdd = [...userDepartmentIds].filter((id) => !originalUserDepartmentIds.has(id));
       const toRemove = [...originalUserDepartmentIds].filter((id) => !userDepartmentIds.has(id));
 
@@ -785,11 +816,12 @@ export function UserDetailsPage() {
           email: email.trim(),
           full_name: fullName || null,
           phone: phone || null,
-          user_ident: userIdent.trim() || null,
-          department: department || null,
+          user_ident: creatingSysadm ? null : userIdent.trim() || null,
+          // Nothing department-related is sent for a new sysadm (see creatingSysadm) — create-user.mts ignores it for that role anyway.
+          department: creatingSysadm ? null : department || null,
           // The id is what the server actually resolves (names are only unique per costumer); the name stays for older server versions.
-          departmentId: departmentOptions.find((d) => d.name === department)?.department_id ?? null,
-          role: role || "user",
+          departmentId: creatingSysadm ? null : (departmentOptions.find((d) => d.name === department)?.department_id ?? null),
+          role: creatingSysadm ? "sysadm" : role || "user",
         },
       });
 
@@ -809,7 +841,7 @@ export function UserDetailsPage() {
       // upsert-ignore rather than insert (that duplicate would otherwise
       // fail on the primary key).
       const newUserId = result.id;
-      if (newUserId && userDepartmentIds.size > 0) {
+      if (newUserId && userDepartmentIds.size > 0 && !creatingSysadm) {
         const { error: insertGrantsError } = await supabase
           .from("user_departments")
           .upsert(
@@ -888,9 +920,11 @@ export function UserDetailsPage() {
                       ? "Dine bruger oplysninger"
                       : user
                         ? `Bruger oplysninger for ${user.user_ident ?? user.full_name ?? user.email ?? "—"}`
-                        : "Opret bruger"}
+                        : creatingSysadm
+                          ? "Opret systemadministrator"
+                          : "Opret bruger"}
                   </SettingsSectionHeading>
-                  {!user && isSysadm && (
+                  {!user && isSysadm && !creatingSysadm && (
                     // sysadm-only "Ny bruger" Kunde row — read-only
                     // display, not a picker: targetCostumerId already
                     // follows the global header's own costumerId ("Data
@@ -902,7 +936,7 @@ export function UserDetailsPage() {
                       </span>
                     </FieldRow>
                   )}
-                  {useUserIdent && (
+                  {useUserIdent && !creatingSysadm && (
                     <FieldRow variant="settings" rawLabel label={<label className="text-sm font-medium text-brand-700">Bruger-ID:</label>}>
                       {profileReadOnly ? (
                         <input
@@ -946,11 +980,11 @@ export function UserDetailsPage() {
                     rawLabel
                     label={
                       <label className="flex items-center text-sm font-medium text-brand-700">
-                        Rolle: {!isSelf && <RequiredMark />}
+                        Rolle: {!isSelf && !creatingSysadm && <RequiredMark />}
                       </label>
                     }
                   >
-                    {isSelf ? (
+                    {isSelf || creatingSysadm ? (
                       <input
                         type="text"
                         readOnly
@@ -991,6 +1025,8 @@ export function UserDetailsPage() {
                   in the "Dine bruger oplysninger" field list above) since
                   they're tightly coupled — Hjemmeafdeling can only ever be
                   one of whichever departments are checked "Tilhører" here. */}
+              {/* Not for "Opret systemadministrator": a sysadm has no department to pick. */}
+              {!creatingSysadm && (
               <div className="rounded-2xl border border-brand-100 bg-white">
                 <div className="divide-y divide-brand-100 rounded-2xl">
                   <div className="relative flex items-center justify-between gap-2 rounded-t-2xl bg-brand-50/60 px-2 py-1 text-brand-600">
@@ -1045,8 +1081,8 @@ export function UserDetailsPage() {
                                   <input
                                     type="checkbox"
                                     checked={isHome || userDepartmentIds.has(option.department_id)}
-                                    disabled={profileReadOnly || isHome}
-                                    onChange={profileReadOnly ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
+                                    disabled={departmentReadOnly || isHome}
+                                    onChange={departmentReadOnly ? undefined : (e) => toggleUserDepartment(option, e.target.checked)}
                                     className={CHECKBOX_CLASSNAME}
                                   />
                                   {/* Always-visible, not a hover tooltip — explains why this one row's checkbox can't be unchecked, same "Blokeret" badge styling convention as VehicleDetailsPage.tsx/BookingDetailsPage.tsx. */}
@@ -1071,7 +1107,7 @@ export function UserDetailsPage() {
                           <div className="relative flex items-center justify-between gap-2">
                             <label className="text-sm font-medium text-brand-700">
                               Hjemmeafdeling:{" "}
-                              {!profileReadOnly && departmentOptions.length !== 1 && !soleCheckedDepartment && (
+                              {!departmentReadOnly && departmentOptions.length !== 1 && !soleCheckedDepartment && (
                                 <RequiredMark />
                               )}
                             </label>
@@ -1079,7 +1115,7 @@ export function UserDetailsPage() {
                               open={openInfoPopover === "hjemmeafdeling"}
                               onToggle={() => setOpenInfoPopover((key) => (key === "hjemmeafdeling" ? null : "hjemmeafdeling"))}
                               message={
-                                profileReadOnly || departmentOptions.length === 1 || soleCheckedDepartment
+                                departmentReadOnly || departmentOptions.length === 1 || soleCheckedDepartment
                                   ? "Du er tilknyttet denne afdeling"
                                   : "Her skal du angive, hvilken afdeling brugeren pt. er tilknyttet (brugeren kan frit reservere fra alle tilknyttede afdelinger)"
                               }
@@ -1088,13 +1124,13 @@ export function UserDetailsPage() {
                           </div>
                         }
                       >
-                        {profileReadOnly || departmentOptions.length === 1 || soleCheckedDepartment ? (
+                        {departmentReadOnly || departmentOptions.length === 1 || soleCheckedDepartment ? (
                           <input
                             type="text"
                             readOnly
                             disabled
                             value={
-                              profileReadOnly
+                              departmentReadOnly
                                 ? (department || "—")
                                 : departmentOptions.length === 1
                                   ? departmentOptions[0].name
@@ -1123,6 +1159,7 @@ export function UserDetailsPage() {
                       </FieldRow>
                     </div>
                   </div>
+              )}
 
               {emailFormatInvalid && <p className="text-xs text-red-600">Ugyldigt e-mailformat.</p>}
               {emailExists && (
@@ -1194,7 +1231,7 @@ export function UserDetailsPage() {
                 />
               )}
 
-              {!user && isAnyAdmin(profile?.role) && (
+              {!user && !creatingSysadm && isAnyAdmin(profile?.role) && (
                 // "Ny bruger": gated on the LOGGED-IN admin's own role
                 // (profile?.role), not the new user's selected role — this
                 // is a department_settings-scoped view (rights for everyone
@@ -1314,7 +1351,7 @@ export function UserDetailsPage() {
                     }}
                     disabled={!canSubmit}
                   >
-                    Opret bruger
+                    {creatingSysadm ? "Opret sysadm" : "Opret bruger"}
                   </Button>
                   <Button variant="secondary" type="button" onClick={() => setPendingAction("close")}>
                     Fortryd
@@ -1329,7 +1366,9 @@ export function UserDetailsPage() {
         <ConfirmDialog
           message={
             pendingAction === "create"
-              ? "Er du sikker på, at du vil oprette denne bruger?"
+              ? creatingSysadm
+                ? "Er du sikker på, at du vil oprette denne systemadministrator?"
+                : "Er du sikker på, at du vil oprette denne bruger?"
               : pendingAction === "update"
                 ? (
                     <>

@@ -44,7 +44,7 @@ export function generateTemporaryPassword(): string {
 export const ALLOWED_ROLES = ["user", "admin"] as const;
 export type Role = (typeof ALLOWED_ROLES)[number];
 
-/** True if `value` is exactly "user" or "admin" — the only valid `user_profiles.role` values a caller may assign via create-user.mts/bulk-import-users.mts ("sysadm" is never assignable through either). */
+/** True if `value` is exactly "user" or "admin" — the only valid `user_profiles.role` values an ordinary caller may assign via create-user.mts/bulk-import-users.mts. "sysadm" is deliberately NOT in this list: its one assignable path (a sysadm creating another sysadm) is checked separately in create-user.mts. */
 export function isAllowedRole(value: string): value is Role {
   return (ALLOWED_ROLES as readonly string[]).includes(value);
 }
@@ -55,7 +55,8 @@ export function isUsableErrorMessage(message: string | undefined): message is st
 }
 
 /** Danish label for a `user_profiles.role` value, matching AuthContext.tsx's formatRoleLabel — not imported directly since that file is a client-side React context module, not something a Netlify Function should pull in for one string. */
-function roleLabel(role: Role): string {
+function roleLabel(role: Role | "sysadm"): string {
+  if (role === "sysadm") return "Systemadministrator";
   return role === "admin" ? "Administrator" : "Bruger";
 }
 
@@ -93,16 +94,40 @@ export async function createAuthUserWithRetry(
   return result!;
 }
 
+/** One manual link in the welcome email: the Danish noun it's shown as, and its absolute URL. */
+export type WelcomeManualLink = { label: string; url: string };
+
+/**
+ * Which manuals a new account's welcome email links to, by role (user
+ * decision 2026-10-05): a "user" gets the Bruger manual, an "admin" the
+ * Bruger and Administrator manuals, a "sysadm" all three. Each comes from
+ * the same env var AboutPage.tsx reads (VITE_BRUGERMANUAL_URL /
+ * VITE_ADMINMANUAL_URL / VITE_FLEETIIMANUAL_URL) — a site-relative path to
+ * a self-hosted static file under public/manualer/, NOT an absolute URL, so
+ * it's prefixed with loginUrl (the site's own base URL) here. A manual
+ * whose env var is unset is simply left out, and with no loginUrl there are
+ * none at all, since a relative href is meaningless in an email client.
+ * `env` is a parameter only so tests don't have to touch process.env.
+ */
+export function welcomeManualLinks(
+  role: Role | "sysadm",
+  loginUrl: string | null,
+  env: Record<string, string | undefined> = process.env,
+): WelcomeManualLink[] {
+  if (!loginUrl) return [];
+  const candidates: { label: string; path: string | undefined; show: boolean }[] = [
+    { label: "brugermanualen", path: env.VITE_BRUGERMANUAL_URL, show: true },
+    { label: "administratormanualen", path: env.VITE_ADMINMANUAL_URL, show: role === "admin" || role === "sysadm" },
+    { label: "systemadministratormanualen", path: env.VITE_FLEETIIMANUAL_URL, show: role === "sysadm" },
+  ];
+  return candidates.flatMap(({ label, path, show }) => (show && path ? [{ label, url: `${loginUrl}${path}` }] : []));
+}
+
 /**
  * Builds the "your account is ready" HTML email sent to a newly created
- * user: FLEETii logo, a short intro with links to the user manual and the
- * login page (both omitted gracefully if their URL isn't known — the
- * manual's via VITE_BRUGERMANUAL_URL — a site-relative path to a
- * self-hosted static file under public/manualer/ (see AboutPage.tsx's own
- * doc comment), NOT an absolute URL, so building the email's manualUrl
- * requires prefixing it with loginUrl (the site's own base URL) below —
- * omitted if EITHER is unset, since a relative href is meaningless in an
- * email client with no "current page" to resolve against; the login page's
+ * user: FLEETii logo, a short intro with links to the role's manuals (see
+ * welcomeManualLinks) and the login page (each omitted gracefully if its
+ * URL isn't known; the login page's
  * via process.env.URL, set automatically by Netlify but absent in some
  * local setups), the login credentials, and what happens on first login.
  * logoUrl points at public/fleetii-logo.png (served at the site's own root
@@ -111,11 +136,13 @@ export async function createAuthUserWithRetry(
  * build-time asset import a Netlify Function has no access to anyway.
  */
 export function buildWelcomeEmailHtml(args: {
-  role: Role;
+  /** "sysadm" only ever comes from create-user.mts's own sysadm-creates-sysadm path — see its doc comment. */
+  role: Role | "sysadm";
   email: string;
   password: string;
   loginUrl: string | null;
-  manualUrl: string | null;
+  /** The role's manuals — see welcomeManualLinks. Empty when none are known. */
+  manuals: WelcomeManualLink[];
 }): string {
   // A table (not flex) for the header row — reliable across email clients,
   // several of which (Outlook chief among them) ignore flexbox entirely.
@@ -129,13 +156,22 @@ export function buildWelcomeEmailHtml(args: {
     ? `<td style="vertical-align:middle;width:1%;white-space:nowrap;padding-left:16px;"><a href="https://www.fleetii.dk"><img src="${escapeHtml(args.loginUrl)}/fleetii-logo.png" alt="FLEETii" width="73" height="26" style="height:26px;width:73px;display:block;border:0;" /></a></td>`
     : "";
 
-  const manualLink = args.manualUrl ? `<a href="${escapeHtml(args.manualUrl)}">her</a>` : null;
+  // One manual (a regular user) keeps the original wording with a single
+  // "her" link; several are listed by name, each its own link, joined as
+  // "a, b og c".
+  const namedManualLinks = args.manuals.map((m) => `<a href="${escapeHtml(m.url)}">${escapeHtml(m.label)}</a>`);
+  const manualSentence =
+    args.manuals.length === 1
+      ? `Du kan finde en kort introduktion til FLEETii <a href="${escapeHtml(args.manuals[0].url)}">her</a>`
+      : args.manuals.length > 1
+        ? `Du kan finde en introduktion til FLEETii i ${namedManualLinks.slice(0, -1).join(", ")} og ${namedManualLinks[namedManualLinks.length - 1]}`
+        : null;
   const loginLink = args.loginUrl
     ? `<a href="${escapeHtml(args.loginUrl)}">${escapeHtml(args.loginUrl)}</a>`
     : null;
 
   const introParts: string[] = [];
-  if (manualLink) introParts.push(`Du kan finde en kort introduktion til FLEETii ${manualLink}`);
+  if (manualSentence) introParts.push(manualSentence);
   if (loginLink) introParts.push(`du starter FLEETii på denne adresse: ${loginLink}`);
   const introLine = introParts.length > 0 ? `<p>${introParts.join(", og ")}.</p>` : "";
 

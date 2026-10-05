@@ -26,7 +26,7 @@ import { isSysadmRole, requireAdmin } from "./_shared/serverAuth.js";
 import { sendMail } from "./_shared/mailer.js";
 import { resolveDepartmentNames, type DepartmentResolution } from "./_shared/departmentLookup.js";
 import { mapWithConcurrency } from "./_shared/concurrency.js";
-import { buildWelcomeEmailHtml, createAuthUserWithRetry, generateTemporaryPassword, type Role } from "./_shared/userAccount.js";
+import { buildWelcomeEmailHtml, createAuthUserWithRetry, generateTemporaryPassword, welcomeManualLinks, type Role } from "./_shared/userAccount.js";
 import { json } from "./_shared/http.js";
 import { siteUrl } from "./_shared/siteUrl.js";
 
@@ -142,7 +142,6 @@ export default async (req: Request) => {
   }
 
   const loginUrl = siteUrl();
-  const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
 
   // Each distinct department is looked up (or created) once, up front and
   // in order — only for rows that would reach that step (valid Email and
@@ -162,7 +161,7 @@ export default async (req: Request) => {
 
   const results: RowResult[] = await mapWithConcurrency(rows, IMPORT_CONCURRENCY, async (row, i) => ({
     row: i + 1,
-    ...(await importUserRow(admin, row, { costumerId, departments, loginUrl, manualUrl })),
+    ...(await importUserRow(admin, row, { costumerId, departments, loginUrl })),
   }));
 
   const successCount = results.filter((r) => r.success).length;
@@ -175,7 +174,7 @@ export default async (req: Request) => {
 async function importUserRow(
   admin: SupabaseClient,
   row: ImportRow,
-  ctx: { costumerId: string; departments: Map<string, DepartmentResolution>; loginUrl: string | null; manualUrl: string | null },
+  ctx: { costumerId: string; departments: Map<string, DepartmentResolution>; loginUrl: string | null },
 ): Promise<Omit<RowResult, "row">> {
   const email = asTrimmedString(row.Email);
   if (!email) {
@@ -252,7 +251,8 @@ async function importUserRow(
   const emailResult = await sendMail({
     to: email,
     subject: "Din FLEETii-konto er oprettet",
-    html: buildWelcomeEmailHtml({ role, email, password: temporaryPassword, loginUrl: ctx.loginUrl, manualUrl: ctx.manualUrl }),
+    // Manuals by role (user: Bruger; admin: + Administrator) — see welcomeManualLinks.
+    html: buildWelcomeEmailHtml({ role, email, password: temporaryPassword, loginUrl: ctx.loginUrl, manuals: welcomeManualLinks(role, ctx.loginUrl) }),
   });
   if (!emailResult.ok) {
     console.error(`[bulk-import-users] welcome email failed for ${email} (account was still created):`, emailResult.error);

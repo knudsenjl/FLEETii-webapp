@@ -31,6 +31,7 @@ import {
   generateTemporaryPassword,
   isAllowedRole,
   isUsableErrorMessage,
+  welcomeManualLinks,
 } from "./_shared/userAccount.js";
 import { json } from "./_shared/http.js";
 import { siteUrl } from "./_shared/siteUrl.js";
@@ -56,6 +57,13 @@ type CreateUserBody = {
  * random temporary password, upserts their profile, and rolls back the
  * created account if the profile write fails so the email doesn't end up
  * permanently "stuck".
+ *
+ * Role "sysadm" (user decision 2026-10-05, DepartmentPage.tsx's own
+ * "Systemadministratorer" table's "+"): accepted ONLY when the caller is
+ * themselves a sysadm — anyone else gets 403. A new sysadm gets no
+ * department, no costumer and no user_departments grant (a sysadm has no
+ * home department; those columns are only their Data Filter pointer), and
+ * any department sent along is ignored.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") {
@@ -86,11 +94,13 @@ export default async (req: Request) => {
   }
 
   const rawRole = asTrimmedString(body.role) || "user";
-  if (!isAllowedRole(rawRole)) {
+  // "sysadm" passes this first check for everyone, and is then restricted to
+  // sysadm callers below, once the caller's own role is known.
+  const creatingSysadm = isSysadmRole(rawRole);
+  if (!creatingSysadm && !isAllowedRole(rawRole)) {
     return json({ error: 'Rolle skal være "user" eller "admin".' }, 400);
   }
-  const role = rawRole;
-
+  const role = creatingSysadm ? ("sysadm" as const) : (rawRole as "user" | "admin");
 
   // An admin may only create users within their own costumer — mirrors
   // update-user.mts's identical check (broadened from an earlier, stricter
@@ -117,19 +127,32 @@ export default async (req: Request) => {
   // they just need the requested department to actually exist.
   const isSysadm = isSysadmRole(caller?.role);
 
+  // Only a sysadm may create another sysadm — the service-role client below
+  // bypasses RLS entirely, so this check is the whole authorization boundary
+  // for it.
+  if (creatingSysadm && !isSysadm) {
+    return json({ error: "Kun en sysadm kan oprette en sysadm." }, 403);
+  }
+
   // By id when the client sends one (UserDetailsPage.tsx does); a bare name
   // is scoped to the caller's own costumer, since department names are only
   // unique per costumer — see findRequestedDepartment.
-  const { department: requestedDepartmentRow, error: requestedDepartmentError } = await findRequestedDepartment(admin, {
-    departmentId: asTrimmedString(body.departmentId) || null,
-    departmentName: requestedDepartmentName,
-    costumerId: isSysadm ? null : (caller?.costumer_id ?? null),
-  });
+  // Skipped entirely for a new sysadm: they get no department at all, so
+  // whatever the request carried is ignored rather than looked up.
+  const { department: requestedDepartmentRow, error: requestedDepartmentError } = creatingSysadm
+    ? { department: null, error: null }
+    : await findRequestedDepartment(admin, {
+        departmentId: asTrimmedString(body.departmentId) || null,
+        departmentName: requestedDepartmentName,
+        costumerId: isSysadm ? null : (caller?.costumer_id ?? null),
+      });
   if (requestedDepartmentError) {
     console.error("[create-user] departments lookup failed:", requestedDepartmentError);
   }
   const requestedDepartmentId = requestedDepartmentRow?.department_id ?? null;
-  if (isSysadm) {
+  if (creatingSysadm) {
+    // No department to validate.
+  } else if (isSysadm) {
     if (!requestedDepartmentRow) {
       return json({ error: "Ugyldig afdeling." }, 400);
     }
@@ -171,8 +194,10 @@ export default async (req: Request) => {
     // The requested department's own costumer_id is authoritative (matters
     // for a sysadm, whose own costumer_id — if they even have one —
     // may differ from the department they're assigning); falls back to the
-    // caller's own only if somehow no department resolved.
-    costumer_id: requestedDepartmentRow?.costumer_id ?? caller?.costumer_id ?? null,
+    // caller's own only if somehow no department resolved. Always null for
+    // a new sysadm — the calling sysadm's own costumer_id is just their Data
+    // Filter pointer, never something to copy onto someone else.
+    costumer_id: creatingSysadm ? null : (requestedDepartmentRow?.costumer_id ?? caller?.costumer_id ?? null),
     role,
   });
 
@@ -209,14 +234,11 @@ export default async (req: Request) => {
   // failure — the admin still sees it via emailSent below and can pass the
   // credentials on some other way.
   const loginUrl = siteUrl();
-  // VITE_BRUGERMANUAL_URL is a site-relative path (e.g.
-  // "/manualer/fleetii-manual-bruger.html"), not an absolute URL —
-  // needs loginUrl to become one for the email; omitted if either is unset.
-  const manualUrl = loginUrl && process.env.VITE_BRUGERMANUAL_URL ? `${loginUrl}${process.env.VITE_BRUGERMANUAL_URL}` : null;
   const emailResult = await sendMail({
     to: email,
     subject: "Din FLEETii-konto er oprettet",
-    html: buildWelcomeEmailHtml({ role, email, password: temporaryPassword, loginUrl, manualUrl }),
+    // Manuals by role (user: Bruger; admin: + Administrator; sysadm: all three) — see welcomeManualLinks.
+    html: buildWelcomeEmailHtml({ role, email, password: temporaryPassword, loginUrl, manuals: welcomeManualLinks(role, loginUrl) }),
   });
   if (!emailResult.ok) {
     console.error("[create-user] welcome email failed to send (account was still created):", emailResult.error);
