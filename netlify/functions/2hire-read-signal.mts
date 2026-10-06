@@ -13,7 +13,7 @@
 // assumed to reach it.
 import { getAdminClient } from "./_shared/adminClient.js";
 import { requireSysadm } from "./_shared/serverAuth.js";
-import { fetchGenericVehicleSignal, fetchSpecificVehicleSignal } from "./_shared/twoHireClient.js";
+import { fetchGenericVehicleSignal, fetchSpecificVehicleSignal, getVehicleSignalUrl } from "./_shared/twoHireClient.js";
 import { resolveTwoHireCredentials, twoHireErrorStatus } from "./_shared/twoHireCredentials.js";
 import { json } from "./_shared/http.js";
 
@@ -68,6 +68,11 @@ export default async (req: Request) => {
     return json({ error: `Flere køretøjer har nummerplade "${plate}".` }, 409);
   }
   const vehicle = vehicles[0];
+  // The exact request sent to 2hire, returned alongside both the reading and
+  // any error so the page can show what was actually asked (the plate is
+  // already resolved to 2hire's own vehicle_id here). No credentials in it —
+  // the bearer token travels in a header.
+  const request = `GET ${getVehicleSignalUrl(vehicle.vehicle_id, kind, signal)}`;
 
   try {
     const credentials = await resolveTwoHireCredentials(admin, { costumerId: vehicle.costumer_id });
@@ -82,6 +87,7 @@ export default async (req: Request) => {
         numberPlate: vehicle.number_plate,
         kind,
         signal,
+        request,
         found: reading !== null,
         data: reading?.data ?? null,
         timestamp: reading ? new Date(reading.timestampMs).toISOString() : null,
@@ -90,6 +96,6 @@ export default async (req: Request) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : "Ukendt fejl.";
-    return json({ error: message }, twoHireErrorStatus(error));
+    return json({ error: message, request }, twoHireErrorStatus(error));
   }
 };

@@ -63,6 +63,8 @@ type SignalReadResult = {
   numberPlate: string | null;
   kind: "generic" | "specific";
   signal: string;
+  /** The request as sent to 2hire ("GET https://…/signal/generic/…"). Also present next to {error} when the lookup failed at 2hire — absent when it failed before any request was made (bad input, unknown plate). */
+  request?: string;
   found: boolean;
   data: Record<string, unknown> | null;
   timestamp: string | null;
@@ -108,6 +110,10 @@ export function TestCenterPage() {
   const [signalName, setSignalName] = useState("distance_covered");
   const [isReadingSignal, setIsReadingSignal] = useState(false);
   const [signalError, setSignalError] = useState<string | null>(null);
+  /** The request 2hire-read-signal.mts sent to 2hire when the lookup failed, shown under the error; null when no request was made. */
+  const [signalErrorRequest, setSignalErrorRequest] = useState<string | null>(
+    null,
+  );
   const [signalResult, setSignalResult] = useState<SignalReadResult | null>(
     null,
   );
@@ -210,6 +216,7 @@ export function TestCenterPage() {
   const handleReadSignal = async () => {
     setIsReadingSignal(true);
     setSignalError(null);
+    setSignalErrorRequest(null);
     setSignalResult(null);
 
     try {
@@ -221,6 +228,7 @@ export function TestCenterPage() {
       );
       if (!response.ok) {
         setSignalError(response.data.error ?? "Signalopslaget fejlede.");
+        setSignalErrorRequest(response.data.request ?? null);
         return;
       }
       setSignalResult(response.data);
@@ -512,7 +520,16 @@ export function TestCenterPage() {
             </button>
           </div>
 
-          {signalError && <p className="text-sm text-red-600">{signalError}</p>}
+          {signalError && (
+            <div className="flex flex-col gap-1 text-sm text-red-600">
+              <p>{signalError}</p>
+              {signalErrorRequest && (
+                <p className="break-all font-mono text-xs">
+                  Forespørgsel til 2hire: {signalErrorRequest}
+                </p>
+              )}
+            </div>
+          )}
 
           {signalResult && (
             <div className="flex flex-col gap-2">
@@ -531,6 +548,11 @@ export function TestCenterPage() {
                   </span>
                 )}
               </p>
+              {!signalResult.found && signalResult.request && (
+                <p className="break-all font-mono text-xs text-red-600">
+                  Forespørgsel til 2hire: {signalResult.request}
+                </p>
+              )}
               {signalResult.found && (
                 <pre className="max-h-96 overflow-auto rounded-lg border border-brand-100 bg-brand-50 p-3 text-xs text-brand-900">
                   {JSON.stringify(signalResult.data, null, 2)}
