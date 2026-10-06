@@ -279,6 +279,11 @@ export async function deregisterVehicle(vehicleId: string, credentials: TwoHireC
 /** One point-in-time signal reading as 2hire's signal-read endpoints return it — same {data, timestamp} shape a webhook delivery's payload has (see 2hire-webhook.mts). */
 export type TwoHireSignalReading = { data: Record<string, unknown>; timestampMs: number };
 
+/** The URL fetchVehicleSignal GETs for one vehicle+signal. Exported so 2hire-read-signal.mts can show the exact request it sent (TestCenterPage.tsx's "Signalværdi" section) without rebuilding the path by hand. */
+export function getVehicleSignalUrl(vehicleId: string, kind: "generic" | "specific", signal: string): string {
+  return `${getTwoHireBaseUrl()}/api/v1/vehicle/${encodeURIComponent(vehicleId)}/signal/${kind}/${encodeURIComponent(signal)}`;
+}
+
 /**
  * Reads one signal's current value directly (as opposed to waiting for a
  * webhook delivery) — GET /api/v1/vehicle/{vehicleId}/signal/{generic|
@@ -297,10 +302,10 @@ async function fetchVehicleSignal(
   credentials: TwoHireCredentials,
 ): Promise<TwoHireSignalReading | null> {
   const token = await getTwoHireAccessToken(credentials);
-  const response = await fetchWithTimeout(
-    `${getTwoHireBaseUrl()}/api/v1/vehicle/${encodeURIComponent(vehicleId)}/signal/${kind}/${encodeURIComponent(signal)}`,
-    { label: "2hire", headers: { Authorization: `${token.tokenType} ${token.value}` } },
-  );
+  const response = await fetchWithTimeout(getVehicleSignalUrl(vehicleId, kind, signal), {
+    label: "2hire",
+    headers: { Authorization: `${token.tokenType} ${token.value}` },
+  });
 
   if (response.status === 404) return null;
   if (!response.ok) {
