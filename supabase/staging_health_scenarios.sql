@@ -33,6 +33,8 @@ create table if not exists public.staging_health_backup (
 );
 alter table public.staging_health_backup enable row level security;
 revoke all on public.staging_health_backup from anon, authenticated;
+-- Explicit, since Supabase stopped auto-granting new public tables (2026-10-30).
+grant select, insert, update, delete on public.staging_health_backup to service_role;
 
 /** Records one fake signal: into the history, and into the latest-state table if it's the newest of its type. */
 create or replace function public.staging_fake_signal(p_vehicle_id uuid, p_type text, p_value jsonb, p_ts timestamptz)
