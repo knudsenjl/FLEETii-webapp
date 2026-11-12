@@ -35,17 +35,24 @@ interface DropInGuestPanelProps {
   endIso: string | null;
   /** Set when ConfirmPage just created this drop-in but the guest's email failed to send (see create-drop-in-booking.mts) — shown as a warning pointing at "Send email igen". */
   emailFailed?: boolean;
+  /** The server's reason for that failure (e.g. the mail server rejected the SMTP login), appended to the warning so the cause can be found without reading the Function log. */
+  emailError?: string | null;
 }
 
 /** guest-access-admin.mts's link window tail (end + 30 min) — mirrored here only to decide whether "Send email igen" is still worth offering; the server re-checks. */
 const LINK_TAIL_MS = 30 * 60_000;
 
-export function DropInGuestPanel({ bookingId, endIso, emailFailed = false }: DropInGuestPanelProps) {
+export function DropInGuestPanel({ bookingId, endIso, emailFailed = false, emailError = null }: DropInGuestPanelProps) {
   const [guest, setGuest] = useState<GuestRow | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [busy, setBusy] = useState<"resend" | "revoke" | null>(null);
   const [message, setMessage] = useState<{ text: string; error: boolean } | null>(
-    emailFailed ? { text: "Reservationen er oprettet, men emailen til gæsten kunne ikke sendes. Prøv \"Send email igen\".", error: true } : null,
+    emailFailed
+      ? {
+          text: `Reservationen er oprettet, men emailen til gæsten kunne ikke sendes.${emailError ? ` ${emailError}` : ""} Prøv "Send email igen".`,
+          error: true,
+        }
+      : null,
   );
   const [confirmRevoke, setConfirmRevoke] = useState(false);
 

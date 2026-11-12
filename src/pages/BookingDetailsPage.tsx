@@ -356,6 +356,7 @@ export function BookingDetailsPage() {
                     bookingId={booking.id}
                     endIso={booking.endIso}
                     emailFailed={(location.state as { dropInEmailFailed?: boolean } | null)?.dropInEmailFailed === true}
+                    emailError={(location.state as { dropInEmailError?: string | null } | null)?.dropInEmailError ?? null}
                   />
                 </PageSection>
               )}

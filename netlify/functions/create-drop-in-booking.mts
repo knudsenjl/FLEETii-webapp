@@ -54,7 +54,8 @@ const isZonedIso = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\
  * phone, address, licenseNo, idChecked } } as an admin/sysadm. All five
  * guest fields, idChecked (the receptionist has checked licence and ID) and
  * Slut are required (user decisions 2026-09-26). Returns
- * { bookingId, emailSent }.
+ * { bookingId, emailSent, emailError } (emailError: why the guest email
+ * failed, or null).
  */
 export default async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -151,7 +152,7 @@ export default async (req: Request) => {
   }
 
   // 3. The email (best-effort, see header comment).
-  const emailSent = await sendGuestEmail(admin, { bookingId, token, guestName: guest.name, guestEmail: guest.email });
+  const emailResult = await sendGuestEmail(admin, { bookingId, token, guestName: guest.name, guestEmail: guest.email });
 
-  return json({ bookingId, emailSent }, 200);
+  return json({ bookingId, emailSent: emailResult.ok, emailError: emailResult.ok ? null : emailResult.error }, 200);
 };

@@ -16,11 +16,41 @@ export function escapeHtml(value: string): string {
     .replace(/"/g, "&quot;");
 }
 
+/** The fields of a nodemailer error worth reading: `code` (EAUTH, ECONNECTION, …), the SMTP reply code and the server's raw reply text. */
+type SmtpError = { code?: string; responseCode?: number; response?: string; message?: string };
+
+/**
+ * Turns a nodemailer failure into a Danish message that says which setting to
+ * check. A bare "Invalid login: 535 …" didn't make that clear (2026-11-12, when
+ * production's SMTP password had stopped working). Admins see this text, so it
+ * names the env vars and the SMTP login, but never the password.
+ */
+export function describeSmtpError(error: unknown, settings: { host: string; port: number; user: string }): string {
+  const e = (error ?? {}) as SmtpError;
+  const serverReply = e.response?.trim() || e.message?.trim() || "intet svar";
+  const where = `${settings.host}:${settings.port}`;
+  switch (e.code) {
+    case "EAUTH":
+      return `Mailserveren (${settings.host}) afviste login for ${settings.user}${e.responseCode ? ` (SMTP ${e.responseCode})` : ""}. Adgangskoden (SMTP_PASS) er sandsynligvis forkert eller udløbet, eller kontoen er spærret. Serverens svar: ${serverReply}`;
+    case "ECONNECTION":
+    case "ETIMEDOUT":
+    case "ESOCKET":
+    case "EDNS":
+      return `Kunne ikke forbinde til mailserveren ${where} (${e.code}). Tjek SMTP_HOST/SMTP_PORT, eller om mailserveren er nede. Detaljer: ${serverReply}`;
+    case "ETLS":
+      return `Den krypterede forbindelse til mailserveren ${where} fejlede (ETLS). Tjek SMTP_PORT (587 = STARTTLS, 465 = TLS). Detaljer: ${serverReply}`;
+    case "EENVELOPE":
+      return `Mailserveren afviste afsender eller modtager${e.responseCode ? ` (SMTP ${e.responseCode})` : ""}. Tjek modtagerens emailadresse og SMTP_FROM. Serverens svar: ${serverReply}`;
+    default:
+      return `Mailfejl${e.code ? ` (${e.code})` : ""}${e.responseCode ? ` (SMTP ${e.responseCode})` : ""} via ${where}: ${serverReply}`;
+  }
+}
+
 /**
  * Sends one HTML email via plain SMTP (nodemailer). Returns a plain
  * ok/error result rather than throwing, so the caller can turn a failure
  * into a friendly Danish error response without a try/catch at the call
- * site.
+ * site. The error text comes from describeSmtpError.
  */
 export async function sendMail(args: { to: string; subject: string; html: string }): Promise<{ ok: true } | { ok: false; error: string }> {
   const smtpHost = process.env.SMTP_HOST;
@@ -34,13 +64,14 @@ export async function sendMail(args: { to: string; subject: string; html: string
     return { ok: false, error: "Serveren mangler SMTP_USER/SMTP_PASS." };
   }
 
+  const smtpPort = Number(process.env.SMTP_PORT ?? 587);
   const transporter = nodemailer.createTransport({
     host: smtpHost,
-    port: Number(process.env.SMTP_PORT ?? 587),
+    port: smtpPort,
     // Port 465 is implicit TLS from the first byte; 587 (and everything
     // else) starts in plaintext and upgrades via STARTTLS instead —
     // nodemailer needs to be told which one applies for the given port.
-    secure: Number(process.env.SMTP_PORT ?? 587) === 465,
+    secure: smtpPort === 465,
     auth: { user: smtpUser, pass: smtpPass },
     // nodemailer's own defaults wait up to 2 min to connect and 10 min on an
     // idle socket — far past Netlify's Function limit, so a stuck mail
@@ -60,7 +91,6 @@ export async function sendMail(args: { to: string; subject: string; html: string
     });
     return { ok: true };
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Ukendt SMTP-fejl.";
-    return { ok: false, error: message };
+    return { ok: false, error: describeSmtpError(error, { host: smtpHost, port: smtpPort, user: smtpUser }) };
   }
 }
