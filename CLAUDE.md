@@ -32,6 +32,13 @@ Routine commits/pushes to `main` need no mention of `production` at all — most
 
 ## Working conventions
 
+**New tables need explicit grants (since 2026-10-30).** Supabase no longer auto-grants Data API access to tables created in `public`. Without a grant, supabase-js/PostgREST return "permission denied" (see also the missing-grants-after-rename lesson). Every SQL file that creates a table must grant in that same file, and only what is needed:
+- `grant select, insert, update, delete on public.<t> to service_role;` is always needed (Netlify Functions use it).
+- `authenticated` gets only the privileges the client really uses, with RLS enabled and policies written. Column-level grants are fine (see `bookings_drop_in_guests.sql`).
+- `anon` gets nothing unless there is a deliberate reason. Don't copy Supabase's generic example, which grants `select` to `anon`.
+- Apply the same SQL to both staging and production, then diff `information_schema.role_table_grants` between them.
+Renaming or recreating (drop + create) an existing table counts as a new table.
+
 **Time handling: all times are UTC; Danish time only at the edges.** Every timestamp inside the app and in the database is a real UTC instant: an ISO string with `Z`/an offset, or epoch ms. Compare times as instants (`toUtcMs`/`Date.now()`), never as text. Danish time (Europe/Copenhagen) is used in exactly three places, always through `src/lib/time.ts`:
 - **Showing a time to the user:** `utcToDanishParts`, `formatDanishDateTime`, `splitIsoDateTime`.
 - **Reading a time the user typed:** `danishLocalToUtcIso`/`danishPartsToUtcMs`. Typed times are always Danish, even if the browser is set to another timezone.

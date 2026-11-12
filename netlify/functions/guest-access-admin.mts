@@ -92,7 +92,7 @@ export default async (req: Request) => {
     .eq("booking_id", bookingId);
   if (updateError) return json({ error: `Kunne ikke lave et nyt link: ${updateError.message}` }, 500);
 
-  const emailSent = await sendGuestEmail(admin, { bookingId, token, guestName: guest.name, guestEmail: guest.email });
-  if (!emailSent) return json({ error: "Et nyt link blev lavet, men emailen kunne ikke sendes. Prøv igen." }, 502);
+  const emailResult = await sendGuestEmail(admin, { bookingId, token, guestName: guest.name, guestEmail: guest.email });
+  if (!emailResult.ok) return json({ error: `Et nyt link blev lavet, men emailen kunne ikke sendes. ${emailResult.error}` }, 502);
   return json({ ok: true }, 200);
 };

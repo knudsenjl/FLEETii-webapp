@@ -254,14 +254,16 @@ export function buildGuestEmailHtml(fields: {
 
 /**
  * Loads what the guest email shows (vehicle, company, period) for a drop-in
- * booking and sends it with a link carrying `token`. Returns whether the mail
- * went out; failures are logged, not thrown. Shared by
- * create-drop-in-booking.mts and guest-access-admin.mts ("Send email igen").
+ * booking and sends it with a link carrying `token`. Returns ok, or a Danish
+ * error saying which step failed (the booking lookup, or the SMTP send as
+ * described by mailer.ts's describeSmtpError). Failures are logged too, not
+ * thrown. Shared by create-drop-in-booking.mts and guest-access-admin.mts
+ * ("Send email igen").
  */
 export async function sendGuestEmail(
   admin: SupabaseClient,
   args: { bookingId: string; token: string; guestName: string; guestEmail: string },
-): Promise<boolean> {
+): Promise<{ ok: true } | { ok: false; error: string }> {
   const { data: booking, error } = await admin
     .from("bookings")
     .select(
@@ -284,7 +286,7 @@ export async function sendGuestEmail(
     }>();
   if (error || !booking) {
     console.error("[drop-in email] booking lookup failed:", error);
-    return false;
+    return { ok: false, error: `Kunne ikke hente reservationens oplysninger til emailen: ${error?.message ?? "reservationen blev ikke fundet"}` };
   }
 
   const companyLabel = booking.departments?.costumers?.name?.trim() || booking.departments?.name || "FLEETii";
@@ -304,7 +306,7 @@ export async function sendGuestEmail(
     }),
   });
   if (!result.ok) console.error("[drop-in email] send failed:", result.error);
-  return result.ok;
+  return result;
 }
 
 /** The neutral answer to every bad token — unknown, malformed or pointing at a non-drop-in booking — so the response never reveals which. */

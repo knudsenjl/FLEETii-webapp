@@ -232,13 +232,14 @@ export function ConfirmPage() {
    * Drop-in "Bekræft": one call to create-drop-in-booking.mts (see this
    * component's doc comment). A failed guest email doesn't undo the booking —
    * the details page's Gæst panel can send it again — so it's passed along
-   * as `dropInEmailFailed` for that page to point out.
+   * as `dropInEmailFailed` (plus the server's reason, `dropInEmailError`)
+   * for that page to point out.
    */
   const confirmDropIn = async (departmentId: string) => {
     if (!dropInGuest) return;
-    let response: Awaited<ReturnType<typeof callFunction<{ bookingId?: string; emailSent?: boolean }>>>;
+    let response: Awaited<ReturnType<typeof callFunction<{ bookingId?: string; emailSent?: boolean; emailError?: string | null }>>>;
     try {
-      response = await callFunction<{ bookingId?: string; emailSent?: boolean }>("create-drop-in-booking", {
+      response = await callFunction<{ bookingId?: string; emailSent?: boolean; emailError?: string | null }>("create-drop-in-booking", {
         body: {
           vehicleId: vehicle.id,
           departmentId,
@@ -261,7 +262,7 @@ export function ConfirmPage() {
     }
     navigate(`/booking-details/${result.bookingId}`, {
       replace: true,
-      state: { dropInEmailFailed: result.emailSent === false },
+      state: { dropInEmailFailed: result.emailSent === false, dropInEmailError: result.emailError ?? null },
     });
   };
 
