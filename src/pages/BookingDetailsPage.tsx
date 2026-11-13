@@ -68,7 +68,8 @@ const DENMARK_CENTER = { lat: 56.2639, lng: 9.5018 };
  * booking pre-filled via router state (BookingsPage/AllBookingsPage), which
  * skips a round-trip; a direct URL/refresh/bookmark (no router state) falls
  * back to fetching it by the :bookingId route param instead, redirecting to
- * "/bookings" if it can't be found (deleted, or an invalid id).
+ * the viewer's bookings list ("/allbookings" for admin/sysadm, "/bookings"
+ * for a user) if it can't be found (deleted, or an invalid id).
  *
  * Shares its underlying booking actions (cancel/finish/edit/Blink/Horn/etc.)
  * with BookingPage.tsx (role "user"'s equivalent landing page) via
@@ -263,9 +264,10 @@ export function BookingDetailsPage() {
 
   useEffect(() => {
     if (!booking && !bookingLoading) {
-      navigate("/bookings", { replace: true });
+      // "/bookings" is role "user" only — an admin/sysadm would get ForbiddenNotice there.
+      navigate(isAdmin ? "/allbookings" : "/bookings", { replace: true });
     }
-  }, [booking, bookingLoading, navigate]);
+  }, [booking, bookingLoading, navigate, isAdmin]);
 
   if (!booking) {
     return bookingLoading ? (
@@ -355,8 +357,6 @@ export function BookingDetailsPage() {
                   <DropInGuestPanel
                     bookingId={booking.id}
                     endIso={booking.endIso}
-                    emailFailed={(location.state as { dropInEmailFailed?: boolean } | null)?.dropInEmailFailed === true}
-                    emailError={(location.state as { dropInEmailError?: string | null } | null)?.dropInEmailError ?? null}
                   />
                 </PageSection>
               )}

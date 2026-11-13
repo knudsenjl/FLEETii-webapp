@@ -20,6 +20,8 @@ import { isSettingTilladt } from "../lib/settings";
 import { BOOKING_ID_COLUMN, bookingUserLabel, toDisplayVehicle, type EditingBooking } from "../lib/bookings";
 import { toUtcMs } from "../lib/time";
 import { callFunction } from "../lib/callFunction";
+import { useAuth } from "../contexts/AuthContext";
+import { isAnyAdmin } from "../lib/roles";
 
 /** The fields BookingPage.tsx/BookingDetailsPage.tsx both need for the shared actions below — same shape each page's own fetch (fresh-on-mount for BookingPage, router-state-or-fetch-by-id for BookingDetailsPage) already produces. */
 export type LifecycleBooking = {
@@ -70,6 +72,11 @@ export function useBookingLifecycle(
   },
 ) {
   const navigate = useNavigate();
+  const { profile } = useAuth();
+  // Where "Slet"/"Afslut" return to: "/bookings" is gated to role "user"
+  // exactly, so an admin/sysadm sent there got ForbiddenNotice (2026-11-12) —
+  // they go back to their own list, "/allbookings", instead.
+  const bookingsListPath = isAnyAdmin(profile?.role) ? "/allbookings" : "/bookings";
   const vehicles = use2hireVehicle();
   const twoHireVehicle = booking ? vehicles.find((v) => v.vehicleId === booking.vehicle) : undefined;
 
@@ -163,7 +170,7 @@ export function useBookingLifecycle(
     navigate("/reservation", { state: { editing } });
   };
 
-  /** Deletes this booking and returns to the bookings list. `.select()` returns the deleted rows: RLS silently filters a delete the viewer isn't allowed to make down to 0 rows with no error, so an empty result is reported as a failure instead of navigating away as if it worked. */
+  /** Deletes this booking and returns to the viewer's bookings list (bookingsListPath). `.select()` returns the deleted rows: RLS silently filters a delete the viewer isn't allowed to make down to 0 rows with no error, so an empty result is reported as a failure instead of navigating away as if it worked. */
   const handleCancelBooking = async () => {
     if (!booking) return;
     setIsCancelling(true);
@@ -182,7 +189,7 @@ export function useBookingLifecycle(
       return;
     }
 
-    navigate("/bookings", { replace: true });
+    navigate(bookingsListPath, { replace: true });
   };
 
   /** Ends this booking early: locks the vehicle, then sets its "end" to now via finish-booking.mts — unlike "Slet reservation", the booking row itself isn't deleted, just shortened to end at this moment. Goes through that Function rather than a client UPDATE because bookings' UPDATE RLS requires Tillad_rediger_reservation, which "Afslut" must not depend on (see that Function's header). If locking fails, the booking is left untouched (see useVehicleLockState's own error) rather than shortening a booking whose vehicle didn't actually get secured. */
@@ -216,7 +223,7 @@ export function useBookingLifecycle(
       return;
     }
 
-    navigate("/bookings", { replace: true });
+    navigate(bookingsListPath, { replace: true });
   };
 
   /** "Blink": sends 2hire's real "locate" command via useLocateVehicle — same audience as Lås/Lås op (any user with a relevant booking, see 2hire-vehicle-command.mts's own doc comment on the auth split). */
