@@ -230,16 +230,15 @@ export function ConfirmPage() {
 
   /**
    * Drop-in "Bekræft": one call to create-drop-in-booking.mts (see this
-   * component's doc comment). A failed guest email doesn't undo the booking —
-   * the details page's Gæst panel can send it again — so it's passed along
-   * as `dropInEmailFailed` (plus the server's reason, `dropInEmailError`)
-   * for that page to point out.
+   * component's doc comment). If the guest email fails, the Function deletes
+   * the booking again and returns the reason; it's shown here and the page
+   * stays filled in, so "Bekræft" can just be pressed again.
    */
   const confirmDropIn = async (departmentId: string) => {
     if (!dropInGuest) return;
-    let response: Awaited<ReturnType<typeof callFunction<{ bookingId?: string; emailSent?: boolean; emailError?: string | null }>>>;
+    let response: Awaited<ReturnType<typeof callFunction<{ bookingId?: string }>>>;
     try {
-      response = await callFunction<{ bookingId?: string; emailSent?: boolean; emailError?: string | null }>("create-drop-in-booking", {
+      response = await callFunction<{ bookingId?: string }>("create-drop-in-booking", {
         body: {
           vehicleId: vehicle.id,
           departmentId,
@@ -260,10 +259,7 @@ export function ConfirmPage() {
       setIsSubmitting(false);
       return;
     }
-    navigate(`/booking-details/${result.bookingId}`, {
-      replace: true,
-      state: { dropInEmailFailed: result.emailSent === false, dropInEmailError: result.emailError ?? null },
-    });
+    navigate(`/booking-details/${result.bookingId}`, { replace: true });
   };
 
   /** [label, value] — Start/Slut show "dd/mm" (dropping the year). Kunde/afdeling comes first — a final, read-only "security check" confirming which department this booking is actually about to be written to, before "Bekræft" is pressed. Køretøj comes right after it. */

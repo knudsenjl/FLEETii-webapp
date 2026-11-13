@@ -12,11 +12,14 @@
 //      (service role — no client may write that table). If this fails, the
 //      booking from step 1 is deleted again, same rollback idea as
 //      create-user.mts;
-//   3. emails the guest their /gaest link. Best-effort, like create-user.mts's
-//      welcome email: the booking stays either way, the response says
-//      whether the mail went out, and the receptionist can use "Send email
-//      igen" (guest-access-admin.mts), which issues a fresh link. The mail
-//      itself is built by _shared/guestAccess.ts (sendGuestEmail).
+//   3. emails the guest their /gaest link (built by _shared/guestAccess.ts's
+//      sendGuestEmail). If the mail fails, the booking is deleted again
+//      (booking_guests goes with it via ON DELETE CASCADE) and the error is
+//      returned. Without the email the guest has no way into the car, and a
+//      kept booking would block the vehicle for anyone else if the
+//      receptionist gave up (user decision 2026-11-12; it used to be
+//      best-effort and kept). ConfirmPage stays filled in, so "Bekræft" can
+//      simply be pressed again.
 // The raw token only ever exists in this request and in the email.
 import { asTrimmedString } from "../../src/lib/requestValidation.js";
 import { toUtcMs } from "../../src/lib/time.js";
@@ -53,9 +56,9 @@ const isZonedIso = (value: string) => /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\
  * POST { vehicleId, departmentId, start, end, usage, guest: { name, email,
  * phone, address, licenseNo, idChecked } } as an admin/sysadm. All five
  * guest fields, idChecked (the receptionist has checked licence and ID) and
- * Slut are required (user decisions 2026-09-26). Returns
- * { bookingId, emailSent, emailError } (emailError: why the guest email
- * failed, or null).
+ * Slut are required (user decisions 2026-09-26). Returns { bookingId } once
+ * the booking exists AND the guest email went out; otherwise an error, with
+ * nothing left behind.
  */
 export default async (req: Request) => {
   if (req.method !== "POST") return json({ error: "Method not allowed" }, 405);
@@ -151,8 +154,21 @@ export default async (req: Request) => {
     return json({ error: "Kunne ikke gemme gæstens oplysninger. Reservationen blev ikke oprettet." }, 500);
   }
 
-  // 3. The email (best-effort, see header comment).
+  // 3. The email — on failure, undo the booking (see header comment).
   const emailResult = await sendGuestEmail(admin, { bookingId, token, guestName: guest.name, guestEmail: guest.email });
+  if (!emailResult.ok) {
+    const { error: rollbackError } = await admin.from("bookings").delete().eq("booking_id", bookingId);
+    if (rollbackError) {
+      console.error("[create-drop-in-booking] rollback after failed email failed:", rollbackError);
+      return json(
+        {
+          error: `Emailen til gæsten kunne ikke sendes, og reservationen kunne ikke fjernes igen — slet den under Reservationer. ${emailResult.error}`,
+        },
+        502,
+      );
+    }
+    return json({ error: `Emailen til gæsten kunne ikke sendes, så reservationen blev ikke oprettet. ${emailResult.error}` }, 502);
+  }
 
-  return json({ bookingId, emailSent: emailResult.ok, emailError: emailResult.ok ? null : emailResult.error }, 200);
+  return json({ bookingId }, 200);
 };
